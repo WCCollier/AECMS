@@ -1,6 +1,6 @@
 # PRD 09: User Management & Authentication
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-01-28
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
@@ -168,22 +168,27 @@ product.delete       - Delete products
 order.view.own       - View own orders
 order.view.any       - View all orders
 order.manage         - Update order status, process refunds
+reports.export       - Export ecommerce reports (CSV)
 cart.manage          - Add/remove cart items
 checkout.guest       - Checkout without account
 ```
 
 **Users & Comments**:
 ```
-user.create          - Create user accounts
-user.edit.own        - Edit own profile
-user.edit.any        - Edit any user profile
-user.delete          - Delete users
-comment.create       - Leave comments
-comment.edit.own     - Edit own comments
-comment.edit.any     - Edit any comments
-comment.delete.own   - Delete own comments
-comment.delete.any   - Delete any comments
-review.create        - Leave product reviews
+user.create                  - Create user accounts
+user.edit.own                - Edit own profile
+user.edit.any                - Edit any user profile
+user.delete                  - Delete users
+users.promote                - Elevate Member to Admin (Owner only)
+users.promote.owner          - Elevate Member to Owner (Owner only)
+users.reset_password.member  - Force password reset for Members
+users.reset_password.admin   - Force password reset for Admins
+comment.create               - Leave comments
+comment.edit.own             - Edit own comments
+comment.edit.any             - Edit any comments
+comment.delete.own           - Delete own comments
+comment.delete.any           - Delete any comments
+review.create                - Leave product reviews
 ```
 
 **System & Configuration**:
@@ -212,8 +217,13 @@ analytics.view       - View analytics dashboard
 | order.view.own | ✅ | ✅ | ✅ | ❌ |
 | order.view.any | ✅ | ✅ | ❌ | ❌ |
 | order.manage | ✅ | ✅ | ❌ | ❌ |
+| reports.export | ✅ | ❌ | ❌ | ❌ |
 | user.create | ✅ | ✅* | ❌ | ❌ |
 | user.delete | ✅ | ✅* | ❌ | ❌ |
+| users.promote | ✅ | ❌ | ❌ | ❌ |
+| users.promote.owner | ✅ | ❌ | ❌ | ❌ |
+| users.reset_password.member | ✅ | ✅ | ❌ | ❌ |
+| users.reset_password.admin | ✅ | ❌ | ❌ | ❌ |
 | comment.create | ✅ | ✅ | ✅ | ❌ |
 | comment.delete.any | ✅ | ✅ | ❌ | ❌ |
 | review.create | ✅ | ✅ | ✅ | ❌ |
@@ -395,6 +405,93 @@ enum CommentStatus {
 - **Members**: Can create, edit, delete own comments/reviews
 - **Admin/Owner**: Can moderate (approve/reject), edit, delete any comments/reviews
 - **Guests**: Cannot comment, can view (if visibility allows)
+
+## Account Creation & Verification
+
+### Member Account Creation
+
+**All Member accounts must verify their email address** to prevent creation of spam accounts.
+
+**Account Creation Flow**:
+
+1. User visits site and clicks "Sign Up" (front door)
+2. User enters:
+   - Email address
+   - Password (min 12 characters)
+   - Display name
+3. System validates input and creates account with `email_verified = false`
+4. System sends verification email with unique token (valid 24 hours)
+5. User clicks link in email: `/auth/verify-email?token=xxx`
+6. System marks `email_verified = true`
+7. User can now log in and access Member features
+
+**Email Verification Requirement**:
+- ✅ **Required for Members**: Cannot log in until email verified
+- ❌ **Not required for Guest Checkout**: Transaction completion is sufficient validation
+- ✅ **OAuth Auto-Verified**: OAuth sign-ins (Google, Apple) are pre-verified by provider
+
+**Resend Verification Email**:
+- User can request new verification email if original expires
+- Rate limited: 1 email per 5 minutes per account
+
+**Implementation**:
+
+```typescript
+// Email verification token (24-hour expiry)
+model EmailVerificationToken {
+  id         String   @id @default(uuid())
+  user_id    String
+  user       User     @relation(fields: [user_id])
+  token      String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+  @@index([token])
+}
+
+// Verify email endpoint
+POST /api/auth/verify-email
+Body: { token: 'xxx' }
+Response: { success: true, message: 'Email verified' }
+
+// Resend verification email
+POST /api/auth/resend-verification
+Body: { email: 'user@example.com' }
+Response: { success: true, message: 'Verification email sent' }
+```
+
+### Admin/Owner Account Creation (Elevation Flow)
+
+**Admins and Owners are not created directly.** Instead, they are created by elevating existing Member accounts.
+
+**Account Elevation Flow**:
+
+1. User creates Member account (email verified)
+2. Owner logs in to admin panel
+3. Owner navigates to Users → All Users
+4. Owner finds Member account
+5. Owner clicks "Change Role" → Selects "Admin" or "Owner"
+6. System updates user role
+7. **If elevated to Admin/Owner**, system forces user to:
+   - Set up 2FA on next back-door login (mandatory)
+   - User receives email notification of role change
+
+**Capability Requirement**:
+- Elevating Member → Admin: Requires `users.promote` or `users.manage` capability (Owner default)
+- Elevating Member → Owner: Requires `users.promote.owner` capability (**Owner-only**)
+- Owners have all capabilities by default
+- Future: Custom "Super Admin" role could also have `users.promote` capability
+
+**Security Note**: This prevents unauthorized account creation at elevated privilege levels. All elevated accounts start as verified Members, ensuring email ownership and identity verification.
+
+### Guest Checkout (No Account Required)
+
+Guests can purchase products marked as `guest_purchaseable` without creating an account:
+- No email verification required
+- Email used for order confirmation only
+- Transaction completion validates email ownership
+- Post-purchase, guest can optionally create Member account and claim order history
 
 ## Authentication System: Front Door vs Back Door
 
@@ -750,51 +847,249 @@ Dropdown menu:
 - Can be lost (backup key recommended)
 - More complex setup
 
-### Recommended 2FA Strategy for AECMS
+### Recommended 2FA Strategy for AECMS ✅ **CONFIRMED**
 
-**MVP (Phase 1)**:
-- ✅ **TOTP (Primary)** - Free, secure, offline
-- ✅ **SMS (Backup)** - Low cost, works without app
-- ✅ **Recovery Codes** - 10 single-use codes for emergency access
+**MVP**:
+- ✅ **TOTP Only** - Free, secure, offline, no ongoing costs
 
-**Future (Post-MVP)**:
-- 🔄 **Hardware Keys** - For high-security environments
-- 🔄 **Backup Email** - For users without phones
+**Not Implemented**:
+- ❌ **SMS Backup** - Not needed (avoids costs/complexity)
+- ❌ **Recovery Codes** - Not needed (see password reset for device loss recovery)
+- ❌ **Hardware Keys** - Not needed for MVP
+- ❌ **Email 2FA** - Not secure enough for admin access
 
-**Implementation Priority**:
-1. TOTP with QR code setup (Week 2-3 of Phase 1)
-2. Recovery codes generation and storage (Week 2-3)
-3. SMS backup (Week 10-11, with payment integration)
+**Rationale**: TOTP-only approach minimizes costs and complexity while providing strong security. Lost device recovery is handled via password reset (see [Password Reset & Recovery](#password-reset--recovery) section).
 
-### 2FA Enforcement Policy
+### 2FA Enforcement Policy ✅ **CONFIRMED**
 
-**Back Door (/admin)**:
+**Back Door (/admin)** - MANDATORY:
 - **Owner**: 2FA mandatory, cannot be disabled
-- **Admin**: 2FA mandatory by default, Owner can override per-user
+- **Admin**: 2FA mandatory, cannot be disabled
 - **Member**: N/A (no admin access)
+- **No login path exists for disabled 2FA** - Admins/Owners must enable 2FA to access `/admin`
 
 **Front Door**:
 - **All roles**: 2FA optional (future feature, user can enable)
 
-### 2FA Recovery
+**Critical Rule**: Back-door login REQUIRES 2FA. There is no bypass. Admins/Owners are forced to set up TOTP on first back-door login attempt.
 
-**Recovery Codes**:
-- Generate 10 single-use recovery codes on 2FA setup
-- User must download and save securely
-- Each code can be used once to bypass 2FA
-- Notify user when recovery code used
+### 2FA Recovery (Lost Device) ✅ **CONFIRMED APPROACH**
 
-**If 2FA Device Lost**:
-1. User enters email + password
-2. User enters recovery code
-3. User gains access
-4. User re-sets up 2FA with new device
-5. New recovery codes generated
+**If 2FA Device Lost** - Use Password Reset:
 
-**If Recovery Codes Lost**:
-- Owner can reset 2FA for Admin users
-- No one can reset Owner 2FA (security by design)
-- Owner must use recovery codes or contact support (manual intervention)
+1. User initiates password reset via email link
+2. Email verification proves email ownership
+3. User sets new password
+4. **2FA is automatically reset/cleared** for users with back-door access
+5. On next login, user must set up 2FA again with new device
+6. New TOTP secret generated
+
+**Security Rationale**:
+- Email ownership is the ultimate security boundary
+- Password reset already proves identity
+- No additional recovery mechanism needed
+- Simpler than recovery codes
+- Standard industry pattern
+
+**No Recovery Codes Implemented**: Recovery codes are not needed because password reset serves as the recovery mechanism. This reduces complexity and eliminates the need for users to store recovery codes securely.
+
+**Admin-Initiated 2FA Reset**: See [Password Reset & Recovery](#password-reset--recovery) section for capability-based password/2FA reset by elevated users.
+
+## Password Reset & Recovery
+
+### Self-Initiated Password Reset
+
+**Any Member or above can initiate their own password reset.**
+
+**Password Reset Flow**:
+
+1. User clicks "Forgot Password?" on login page
+2. User enters email address
+3. System sends password reset email with unique token (valid 1 hour)
+4. User clicks link in email: `/auth/reset-password?token=xxx`
+5. User enters new password (min 12 characters)
+6. System validates token and updates password
+7. **If user has back-door access (Admin/Owner)**: System clears 2FA secret (forces 2FA reconfiguration)
+8. User receives email confirmation of password change
+9. All existing sessions/refresh tokens are invalidated (security)
+
+**Password Reset Implementation**:
+
+```typescript
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  user_id    String
+  user       User     @relation(fields: [user_id])
+  token      String   @unique
+  expires_at DateTime // 1 hour from creation
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+  @@index([token])
+}
+
+// Password reset service
+async function resetPassword(token: string, newPassword: string) {
+  const resetToken = await prisma.passwordResetToken.findUnique({
+    where: { token },
+    include: { user: true }
+  })
+
+  if (!resetToken || resetToken.expires_at < new Date()) {
+    throw new Error('Invalid or expired reset token')
+  }
+
+  // Update password
+  const hashedPassword = await bcrypt.hash(newPassword, 12)
+  await prisma.user.update({
+    where: { id: resetToken.user_id },
+    data: {
+      password_hash: hashedPassword,
+      // If user has back-door access, clear 2FA (forces reconfiguration)
+      two_factor_secret: resetToken.user.role === 'admin' || resetToken.user.role === 'owner'
+        ? null
+        : resetToken.user.two_factor_secret,
+      two_factor_enabled: resetToken.user.role === 'admin' || resetToken.user.role === 'owner'
+        ? false
+        : resetToken.user.two_factor_enabled
+    }
+  })
+
+  // Invalidate all sessions
+  await revokeAllRefreshTokens(resetToken.user_id)
+
+  // Delete used reset token
+  await prisma.passwordResetToken.delete({ where: { id: resetToken.id } })
+
+  // Send confirmation email
+  await sendEmail({
+    to: resetToken.user.email,
+    subject: 'Password Changed',
+    body: 'Your password has been successfully changed. If you did not make this change, contact support immediately.'
+  })
+
+  // Log in audit trail
+  await auditLog.create({
+    action: 'password_reset',
+    userId: resetToken.user_id,
+    metadata: { method: 'self_initiated' }
+  })
+}
+```
+
+### Admin-Initiated Password Reset (Force Reset)
+
+**Elevated users can force password resets for other users based on capabilities.**
+
+**Capability-Based Password Reset Permissions**:
+
+Given the potential for future roles with non-hierarchical relationships, password reset is handled with **granular per-role capabilities**:
+
+**Capability Names**:
+- `users.reset_password.member` - Can force password reset for Members
+- `users.reset_password.admin` - Can force password reset for Admins
+- `users.reset_password.owner` - Can force password reset for Owners (future, if needed)
+
+**Default Capability Assignments**:
+
+| Role | Capabilities |
+|------|-------------|
+| **Owner** | `users.reset_password.member`<br>`users.reset_password.admin` |
+| **Admin** | `users.reset_password.member` |
+| **Member** | None |
+
+**Admin-Initiated Reset Flow**:
+
+1. Admin/Owner navigates to Users → View User
+2. Admin/Owner clicks "Force Password Reset"
+3. System checks if admin has capability for target user's role
+4. System sends password reset email to target user
+5. **If target has back-door access**: Password reset also clears 2FA
+6. Target user receives email and follows reset flow
+7. Admin/Owner receives confirmation notification
+
+**Permission Check Example**:
+
+```typescript
+async function canResetPasswordFor(adminUser: User, targetUser: User): Promise<boolean> {
+  // Owner has all capabilities
+  if (adminUser.role === 'owner') return true
+
+  // Check specific capability for target role
+  const requiredCapability = `users.reset_password.${targetUser.role}`
+  return await adminUser.hasCapability(requiredCapability)
+}
+
+// API endpoint with capability guard
+@UseGuards(JwtAuthGuard, CapabilityGuard)
+@Post('/api/users/:id/force-password-reset')
+async forcePasswordReset(
+  @Param('id') targetUserId: string,
+  @CurrentUser() adminUser: User
+) {
+  const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } })
+
+  if (!await canResetPasswordFor(adminUser, targetUser)) {
+    throw new ForbiddenException('Cannot reset password for this user role')
+  }
+
+  // Send password reset email
+  await sendPasswordResetEmail(targetUser.email)
+
+  // Log in audit trail
+  await auditLog.create({
+    action: 'password_reset_forced',
+    userId: adminUser.id,
+    targetUserId: targetUser.id,
+    metadata: { targetRole: targetUser.role }
+  })
+
+  return { success: true, message: 'Password reset email sent' }
+}
+```
+
+### Username/UID Recovery
+
+**Users can recover their username (email address) if forgotten**:
+
+**Recovery Flow**:
+1. User clicks "Forgot Username?" on login page
+2. User enters possible email addresses
+3. If account exists, system sends email with username reminder
+4. Email includes link to password reset (if needed)
+5. No indication given if account doesn't exist (security)
+
+### Password Reset + 2FA Reset Security Model ✅ **CONFIRMED SECURE**
+
+**For users with back-door access (Admin/Owner), password reset ALSO resets 2FA.**
+
+**Rationale**:
+- **Email ownership is the ultimate security boundary**
+- If attacker has email access, they can already reset password
+- Adding 2FA reset doesn't create additional vulnerability
+- This handles lost 2FA device scenario cleanly
+- Standard industry pattern (GitHub, Google, Microsoft use this approach)
+
+**Security Analysis**:
+✅ Email verification proves identity
+✅ Password reset link expires in 1 hour
+✅ All sessions invalidated on password change
+✅ User receives confirmation email
+✅ If email compromised, account is compromised regardless of 2FA
+✅ Users should protect email with separate 2FA (external to AECMS)
+❌ **No vulnerability identified** - This approach is secure
+
+**Lost Device Recovery Flow**:
+1. Admin loses phone with TOTP app
+2. Admin initiates password reset from login page
+3. Admin clicks email link (proves email ownership)
+4. Admin sets new password
+5. System automatically clears 2FA secret
+6. Admin logs in with new password
+7. System forces 2FA setup on new device
+8. Admin scans new QR code with authenticator app
+9. Admin verifies code and gains access
+10. New TOTP secret saved
 
 ## Database Schema
 
@@ -804,19 +1099,18 @@ Dropdown menu:
 model User {
   id                  String    @id @default(uuid())
   email               String    @unique
+  email_verified      Boolean   @default(false) // Email verification required for Members
   password_hash       String?   // Null for OAuth-only users
   display_name        String
   role                UserRole  @default(member)
 
-  // OAuth
+  // OAuth (OAuth sign-ins are pre-verified)
   google_id           String?   @unique
   apple_id            String?   @unique
 
-  // 2FA
+  // 2FA (TOTP only, no SMS, no recovery codes)
   two_factor_enabled  Boolean   @default(false)
   two_factor_secret   String?   // TOTP secret, encrypted
-  two_factor_phone    String?   // SMS backup, encrypted
-  recovery_codes      String[]  // Hashed recovery codes
 
   // Metadata
   created_at          DateTime  @default(now())
@@ -828,6 +1122,8 @@ model User {
   articles            Article[]
   comments            Comment[]
   orders              Order[]
+  emailVerificationTokens EmailVerificationToken[]
+  passwordResetTokens     PasswordResetToken[]
 }
 
 enum UserRole {
@@ -876,28 +1172,36 @@ POST   /api/auth/oauth/google           # Google OAuth
 POST   /api/auth/oauth/apple            # Apple OAuth
 POST   /api/auth/logout                 # Logout
 POST   /api/auth/refresh                # Refresh access token
-POST   /api/auth/register               # Sign up as Member
+POST   /api/auth/register               # Sign up as Member (sends verification email)
+POST   /api/auth/verify-email           # Verify email with token
+POST   /api/auth/resend-verification    # Resend verification email
 POST   /api/auth/forgot-password        # Request password reset
-POST   /api/auth/reset-password         # Reset password with token
+POST   /api/auth/reset-password         # Reset password with token (also resets 2FA for Admin/Owner)
+POST   /api/auth/forgot-username        # Request username/email reminder
 
 # Back Door
 POST   /api/admin/auth/login            # Admin login (email + password)
 POST   /api/admin/auth/oauth/google     # Admin OAuth login
 POST   /api/admin/auth/oauth/apple      # Admin OAuth login
-POST   /api/admin/auth/2fa/verify       # Verify 2FA code
-POST   /api/admin/auth/2fa/setup        # Setup 2FA (TOTP)
-POST   /api/admin/auth/2fa/disable      # Disable 2FA
-POST   /api/admin/auth/recovery-code    # Use recovery code
+POST   /api/admin/auth/2fa/verify       # Verify TOTP code
+POST   /api/admin/auth/2fa/setup        # Setup 2FA (TOTP only, generates QR code)
 POST   /api/admin/auth/logout           # Admin logout
+
+# Removed (not implemented):
+# POST /api/admin/auth/2fa/disable     # 2FA cannot be disabled for Admin/Owner
+# POST /api/admin/auth/recovery-code   # No recovery codes (use password reset instead)
+# POST /api/admin/auth/2fa/sms-setup   # No SMS 2FA
 
 # User Management
 GET    /api/users                       # List users (Admin+)
 GET    /api/users/:id                   # Get user details
-POST   /api/users                       # Create user (Admin+)
+POST   /api/users                       # Create user (Admin+ - creates Member, then elevate)
 PUT    /api/users/:id                   # Update user
+PUT    /api/users/:id/role              # Elevate user role (Owner only, requires capability)
 DELETE /api/users/:id                   # Delete user (Admin+)
 GET    /api/users/me                    # Get current user profile
 PUT    /api/users/me                    # Update own profile
+POST   /api/users/:id/force-password-reset  # Force password reset (Admin+, capability-based)
 
 # Capability Management
 GET    /api/capabilities                # List all capabilities (Owner)

@@ -1,7 +1,7 @@
 # PRD 02: User Interface & Experience
 
-**Version:** 1.0
-**Date:** 2026-01-27
+**Version:** 1.1
+**Date:** 2026-01-28
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -75,10 +75,197 @@ This document defines the user interface requirements for both the public-facing
 - Search functionality
 - Sidebar with categories and tag cloud
 
-### Static Pages
-- Flexible layouts based on templates
-- Breadcrumb navigation
-- Customizable content panes
+### Static Pages (Robust Page Builder)
+
+**Strategic Approach**: The owner's site will be **primarily composed of customized static pages** using these page builder capabilities. Auto-generated `/articles` and `/products` pages provide comprehensive listings and search functionality for visitors who want to browse beyond the curated static pages.
+
+#### Static Page Building Blocks
+
+Static pages support rich, customizable layouts with **block-based content embedding** in all columns.
+
+**Available Content Blocks (All Page Templates)**:
+
+1. **Article Embeds**:
+   - Single article card with thumbnail, title, excerpt, date
+   - Clickable to full article page
+   - Similar to product embed cards
+
+2. **Product Embeds**:
+   - Same embeddable product tiles as used in articles (PRD 01)
+   - Display modes: Card (default), Inline, Grid
+   - Functional "Add to Cart" button
+   - Real-time price and stock updates
+
+3. **Article Carousels**:
+   - Horizontal scrolling carousel of article cards
+   - Auto-play option (configurable)
+   - Navigation arrows and dots
+   - Filter by category/tag
+
+4. **Product Carousels**:
+   - Horizontal scrolling carousel of product cards
+   - Auto-play option
+   - Navigation arrows
+   - Filter by category/tag
+
+5. **Media Items**:
+   - Image embeds (from media library or external URL)
+   - Video embeds (uploaded or external YouTube/Vimeo)
+   - YouTube embeds (direct)
+   - Social media embeds (X/Twitter posts)
+   - Layout options: Block (full-width), Float (corner-anchored), Inline
+
+6. **Callouts / Call-to-Action (CTA)**:
+   - Styled content boxes with title, description, button
+   - Color schemes: Primary, Secondary, Success, Warning, Info
+   - Button with customizable text and link
+   - Optional icon
+
+7. **Rich Text Block**:
+   - Full TipTap editor capabilities
+   - Headings, paragraphs, lists, formatting
+   - Embed products/images inline within text
+
+8. **Custom HTML Block** (Admin/Owner only):
+   - Raw HTML/CSS for advanced customization
+
+#### Two-Column Layout (Content + Sidebar)
+
+**Main Content Column**:
+- All content blocks available (see list above)
+- Blocks stack vertically in single column
+- Full-width of content area
+- Drag-and-drop reordering
+
+**Sidebar Column** (Left or Right):
+- All content blocks available (same as main column)
+- Optimized sizing for narrower column:
+  - Article previews: Compact cards (thumbnail + title + date)
+  - Product previews: Same embeddable tiles (card mode, scaled to sidebar width)
+  - Images: Scaled to sidebar width
+  - Small callouts: Compact CTA boxes
+- Blocks stack vertically
+- Drag-and-drop reordering
+
+**Block Layout Visual**:
+
+```
+┌─────────────────────────────────────────────────┐
+│ Header / Navigation                              │
+├──────────────────────────────┬──────────────────┤
+│ Main Content Column          │ Sidebar          │
+│                              │                  │
+│ [Article Carousel Block]     │ [Article Preview]│
+│ ┌─────┐ ┌─────┐ ┌─────┐    │ [Article Preview]│
+│ │Art 1│ │Art 2│ │Art 3│    │ [Article Preview]│
+│ └─────┘ └─────┘ └─────┘    │                  │
+│                              │ [Product Preview]│
+│ [Rich Text Block]            │ ┌──────┐        │
+│ Lorem ipsum dolor sit...     │ │ Img  │        │
+│                              │ │$39.99│        │
+│ [Product Embed Grid]         │ └──────┘        │
+│ ┌────┐ ┌────┐ ┌────┐       │                  │
+│ │Pr 1│ │Pr 2│ │Pr 3│       │ [CTA Callout]    │
+│ └────┘ └────┘ └────┘       │ ┌──────────────┐ │
+│                              │ │ Sign Up Now! │ │
+│ [Image Block - Full Width]   │ │ [Button]     │ │
+│ ┌──────────────────────┐    │ └──────────────┘ │
+│ │  Feature Image       │    │                  │
+│ └──────────────────────┘    │                  │
+│                              │                  │
+│ [CTA Block]                  │                  │
+│ ┌─────────────────────┐     │                  │
+│ │ Get Started Today!  │     │                  │
+│ │ [Sign Up Button]    │     │                  │
+│ └─────────────────────┘     │                  │
+└──────────────────────────────┴──────────────────┘
+│ Footer                                           │
+└─────────────────────────────────────────────────┘
+```
+
+#### Other Layout Options
+
+All layout templates (Full-Width, Split Comparison, Grid, Landing Page) support the same content blocks:
+
+- **Full-Width**: Single column with all blocks, full content width
+- **Split Comparison**: Left and right panes each support all blocks
+- **Grid Layout**: Multiple columns, each column supports all blocks
+- **Landing Page**: Full-screen sections, each section supports all blocks
+
+#### Page Builder Interface
+
+```
+┌──────────────────────────────────────────────┐
+│ Page: Homepage (Two-Column Layout)          │
+├──────────────────────────────────────────────┤
+│ Template: [Two-Column - Sidebar Right ▼]    │
+│                                              │
+│ ┌─ Main Content Column ──────────────────┐  │
+│ │                                         │  │
+│ │ [+ Add Block ▼]                         │  │
+│ │   Article Carousel                      │  │
+│ │   Product Carousel                      │  │
+│ │   Article Embed                         │  │
+│ │   Product Embed                         │  │
+│ │   Image                                 │  │
+│ │   Video                                 │  │
+│ │   YouTube Embed                         │  │
+│ │   Social Media Embed                    │  │
+│ │   Callout / CTA                         │  │
+│ │   Rich Text                             │  │
+│ │   Custom HTML                           │  │
+│ │                                         │  │
+│ │ ── Block 1: Article Carousel ──         │  │
+│ │    Filter: [Technology ▼]              │  │
+│ │    Items: [5]  Auto-play: ☑            │  │
+│ │    [↑ Move Up] [↓ Move Down] [✕ Delete]│  │
+│ │                                         │  │
+│ │ ── Block 2: Rich Text ──                │  │
+│ │    [TipTap Editor Content...]           │  │
+│ │    [↑ Move Up] [↓ Move Down] [✕ Delete]│  │
+│ │                                         │  │
+│ │ [+ Add Block]                           │  │
+│ └─────────────────────────────────────────┘  │
+│                                              │
+│ ┌─ Sidebar Column ────────────────────────┐  │
+│ │                                         │  │
+│ │ [+ Add Block ▼]                         │  │
+│ │                                         │  │
+│ │ ── Block 1: Article Preview ──          │  │
+│ │    Article: [Select Article]           │  │
+│ │    [↑ Move Up] [↓ Move Down] [✕ Delete]│  │
+│ │                                         │  │
+│ │ ── Block 2: Product Preview ──          │  │
+│ │    Product: [Select Product]           │  │
+│ │    Display: [Card ▼]                   │  │
+│ │    [↑ Move Up] [↓ Move Down] [✕ Delete]│  │
+│ │                                         │  │
+│ │ [+ Add Block]                           │  │
+│ └─────────────────────────────────────────┘  │
+│                                              │
+│ [Preview] [Save Draft] [Publish]            │
+└──────────────────────────────────────────────┘
+```
+
+#### Auto-Generated Pages
+
+Beyond the customized static pages, AECMS provides two auto-generated pages:
+
+1. **`/articles`**: Comprehensive article listing
+   - Grid or list view
+   - Filter by category/tag
+   - Sort by date, title, popularity
+   - Pagination
+   - Search
+
+2. **`/products`**: Product catalog
+   - Grid or list view
+   - Filter by category, price, availability
+   - Sort by price, popularity, newest
+   - Pagination
+   - Search
+
+These provide visitors with browsing and search capabilities beyond the curated static page experience.
 
 ### Search
 - Global search bar in header
@@ -127,7 +314,7 @@ Left sidebar with collapsible sections:
 - **Ecommerce**
   - Products
   - Orders
-  - Customers
+  - Customers (filtered user view - see spec below)
   - Inventory
 - **Users**
   - All Users
@@ -138,10 +325,165 @@ Left sidebar with collapsible sections:
   - Site Identity
   - Navigation Menus
   - Payment Settings
-  - Email Settings
+  - Email Settings (SMTP configuration - see spec below)
 - **User Profile** (bottom)
   - Account Settings
   - Logout
+
+#### "Customers" Link Specification
+
+**Purpose**: The "Customers" link in the admin sidebar navigates to the **same User Management interface** as "All Users", but **pre-filtered** to show only customers.
+
+**Customer Definition** ✅ **CONFIRMED APPROACH**:
+
+A "customer" is **any user with at least one completed order** (`payment_status = 'paid'`).
+
+**Implementation**: Dynamic Filter (no database schema changes required)
+
+**Key Characteristics**:
+- ✅ **Accurate**: Only includes users who actually purchased
+- ✅ **Self-maintaining**: Updates automatically as orders complete
+- ✅ **No schema changes**: No `is_customer` flag needed
+- ✅ **Includes guest purchases**: Links guest orders by email
+- ✅ **Excludes abandoned carts**: Users who added items but never purchased are not counted
+- ✅ **Performance**: Acceptable for low-traffic sites (query can be cached)
+
+**Database Query**:
+```sql
+SELECT DISTINCT users.* FROM users
+JOIN orders ON orders.customer_id = users.id OR orders.customer_email = users.email
+WHERE orders.payment_status = 'paid'
+```
+
+**Implementation**:
+
+```typescript
+// Backend: Customer service
+async function getCustomers() {
+  return await prisma.user.findMany({
+    where: {
+      OR: [
+        // Users with completed orders
+        { orders: { some: { payment_status: 'paid' } } },
+        // Guest purchases linked by email that later created account
+        { email: { in: await getGuestPurchaseEmails() } }
+      ]
+    },
+    include: {
+      orders: {
+        where: { payment_status: 'paid' },
+        select: {
+          id: true,
+          order_number: true,
+          total: true,
+          created_at: true
+        }
+      }
+    },
+    orderBy: { created_at: 'desc' }
+  })
+}
+
+// Frontend: Admin UI
+// "Customers" link routes to /admin/users?filter=customers
+// Same User Management interface, pre-filtered
+```
+
+**Customer View Enhancements**:
+
+When viewing customers (vs all users), show ecommerce-specific info:
+- Total order count
+- Total lifetime value (sum of all order totals)
+- First purchase date
+- Last purchase date
+- Average order value
+
+**Alternatives Considered** (but not chosen):
+
+1. **Permanent Boolean Flag** (`is_customer` column): Rejected due to schema changes, maintenance overhead, and inability to handle guest-to-member conversions seamlessly.
+
+2. **Cart Activity Flag** (`has_cart_activity` column): Rejected because it includes window shoppers who never purchased, inflating customer count with non-customers.
+
+The dynamic filter approach was chosen for its accuracy, zero maintenance, and self-updating behavior.
+
+---
+
+#### Email Settings (SMTP Configuration)
+
+Email settings must support SMTP configuration for various system functions:
+
+**Email Use Cases**:
+1. **Content Moderation**: Notify Admin of flagged comments/reviews
+2. **Shop Support**: Order confirmations, shipping notifications, refund notifications
+3. **Send to Kindle**: eBook delivery origin address
+4. **User Management**: Password resets, account verification, welcome emails
+5. **System Notifications**: Low stock alerts, system errors (to Admin)
+
+**SMTP Configuration Interface**:
+
+```
+┌──────────────────────────────────────────────┐
+│ Email Settings                                │
+├──────────────────────────────────────────────┤
+│ SMTP Configuration                            │
+│                                              │
+│ SMTP Host: [smtp.example.com]               │
+│ SMTP Port: [587] ▼ (25, 465, 587, 2525)    │
+│ Security: [TLS ▼] (None, SSL, TLS, STARTTLS)│
+│ Username: [user@example.com]                 │
+│ Password: [••••••••••]                       │
+│                                              │
+│ From Address: [noreply@example.com]         │
+│ From Name: [AECMS Store]                     │
+│                                              │
+│ [Test Email Configuration]                   │
+│ Send test email to: [admin@example.com]     │
+│                                              │
+│ ── Email Templates ──                        │
+│ ☑ Order Confirmation                         │
+│ ☑ Shipping Notification                     │
+│ ☑ Refund Notification                       │
+│ ☑ Comment Flagged (Admin)                   │
+│ ☑ Password Reset                            │
+│ ☑ Account Verification                      │
+│ ☑ Low Stock Alert (Admin)                   │
+│                                              │
+│ Send to Kindle Settings:                     │
+│ Kindle From Address: [kindle@example.com]   │
+│ (Must be approved in Amazon "Approved         │
+│  Personal Document Email List")              │
+│                                              │
+│ [Save Settings]                              │
+└──────────────────────────────────────────────┘
+```
+
+**SMTP Providers Supported**:
+- Gmail SMTP
+- AWS SES (recommended for Send to Kindle, ~$0.10/1,000 emails)
+- SendGrid
+- Mailgun
+- Postmark
+- Custom SMTP server
+
+**Environment Variables**:
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=true
+SMTP_USER=user@example.com
+SMTP_PASS=app-specific-password
+SMTP_FROM_ADDRESS=noreply@example.com
+SMTP_FROM_NAME=AECMS Store
+
+# Send to Kindle (AWS SES recommended)
+KINDLE_SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+KINDLE_SMTP_USER=AKIAIOSFODNN7EXAMPLE
+KINDLE_SMTP_PASS=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+KINDLE_FROM_ADDRESS=kindle@example.com
+```
+
+**Note**: Email configuration is detailed in [PRD 05: Security & Compliance](./05-security.md) for security considerations and [PRD 11: Digital Products - eBooks](./11-digital-products-ebooks.md) for Send to Kindle implementation.
 
 ### Content Management Interface
 
@@ -245,18 +587,25 @@ On click: Modal with media details, edit options, and use/insert button
 ## Design System
 
 ### Color Palette
-**Admin Panel:**
-- Primary: Professional blue (#2563eb)
-- Secondary: Neutral gray (#6b7280)
-- Success: Green (#10b981)
-- Warning: Yellow (#f59e0b)
-- Error: Red (#ef4444)
-- Background: Light gray (#f9fafb)
+
+**Admin Panel (Dark Mode Only):**
+- **Theme**: Dark mode exclusively (no light mode option)
+- **Primary**: Blue (#3b82f6)
+- **Secondary**: Slate gray (#64748b)
+- **Success**: Green (#10b981)
+- **Warning**: Amber (#f59e0b)
+- **Error**: Red (#ef4444)
+- **Background**: Dark slate (#0f172a)
+- **Surface**: Darker slate (#1e293b)
+- **Text Primary**: White (#ffffff)
+- **Text Secondary**: Slate gray (#94a3b8)
+- **Border**: Slate gray (#334155)
 
 **Public Site:**
-- Customizable via settings
-- Default theme provided
-- Support for dark mode (future)
+- Single default theme in MVP
+- Owner-selectable preset themes (post-MVP)
+- No light/dark mode toggle for end users
+- Theme determined by owner selection
 
 ### Typography
 **Admin Panel:**
@@ -317,11 +666,18 @@ On click: Modal with media details, edit options, and use/insert button
 2. Click "New Article"
 3. Enter title (slug auto-generates)
 4. Write content in rich text editor
-5. Add featured image from media library
-6. Select categories and add tags
-7. Configure SEO settings
-8. Preview article
-9. Save as draft or publish
+5. **Add media items to content**:
+   - **Block media items**: Insert images/videos between paragraphs (full-width)
+   - **Corner-float media items**: Insert images inside paragraphs with corner anchor selection
+     - Choose anchor position: top-left, top-right, bottom-left, bottom-right
+     - Select size: Small (25%), Medium (40%), Large (60%)
+     - Text wraps around image (magazine-style layout)
+   - **Inline media items**: Insert icon-sized images within text lines
+6. Add featured image from media library
+7. Select categories and add tags
+8. Configure SEO settings
+9. Preview article
+10. Save as draft or publish
 
 ### Managing Media
 1. Navigate to Media Library
@@ -376,13 +732,29 @@ On click: Modal with media details, edit options, and use/insert button
 - Form management (React Hook Form recommended)
 - Icons (Heroicons or Lucide)
 
-## Open Questions
+## Open Questions & Answers
 
-1. Do we want a dark mode for the admin panel?
-2. Should we support custom themes for the public site?
-3. Do we need a mobile app for admin functions?
-4. Should we implement a visual CSS editor for non-technical users?
-5. Do we want widget/block library extensibility for developers?
+### Answered Questions ✅
+
+1. ~~Do we want a dark mode for the admin panel?~~ → **YES - Dark mode only!** Admin panel will use dark theme exclusively (no light mode toggle).
+
+2. ~~Should we support custom themes for the public site?~~ → **YES - Owner-selectable preset themes (Post-MVP)**
+   - **MVP**: Single pre-built theme (no selection)
+   - **Post-MVP**: Owner can select from a set of preset themes via admin settings
+   - **End users**: Cannot re-theme the site (theme selection is owner-only)
+   - **No theme editor**: Themes are pre-designed, not customizable via UI
+   - Styling within content is done via RTE or Markdown
+
+3. ~~Do we need a mobile app for admin functions?~~ → **NO - No mobile app required.** Admin panel will be responsive web interface (works on mobile browsers, but optimized for desktop use).
+
+4. ~~Should we implement a visual CSS editor for non-technical users?~~ → **NO - No visual CSS editor for now.**
+   - Styling is handled by:
+     - Selecting preset themes (owner only, post-MVP)
+     - Formatting within articles/products through RTE
+     - Markdown formatting for content
+   - No custom CSS editing via UI
+
+5. ~~Do we want widget/block library extensibility for developers?~~ → **NO - No extensibility for other developers.** This is a closed project. No plugin system, no third-party extensions, no developer API for custom blocks.
 
 ## Success Metrics
 
