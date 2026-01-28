@@ -1,7 +1,7 @@
 # PRD 03: Ecommerce & Payments
 
-**Version:** 1.0
-**Date:** 2026-01-27
+**Version:** 1.1
+**Date:** 2026-01-28
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -376,7 +376,7 @@ POST /api/checkout/amazon-pay
 - Add order notes
 - Process refunds
 - Print packing slips / invoices (future)
-- Export orders (CSV)
+- Export orders and other reports (CSV) - see [Reporting & Data Export](#reporting--data-export) section
 
 #### Customer Order Management
 - View order history in account dashboard
@@ -686,6 +686,246 @@ Reviews are a special type of comment with star ratings (1-5 stars):
 - Low stock products
 - Out of stock products
 
+### Reporting & Data Export
+
+**Strategic Approach**: No direct accounting software integration. Instead, provide comprehensive CSV export capabilities for manual import into QuickBooks, Xero, Excel, or other tools.
+
+#### CSV Export Capability
+
+**Capability Name**: `reports.export` or `ecommerce.reports.export`
+
+**Default Assignment**:
+- ✅ **Owner**: Has capability by default (all capabilities enabled)
+- ⏸️ **Admin**: Not assigned by default, can be granted by Owner
+- ❌ **Member/Guest**: Not available
+
+**Future Role Consideration**: "Store Admin" role could be created with this capability for dedicated ecommerce management without full system access.
+
+**Implementation Note**: This follows the capability-based RBAC system defined in [PRD 09: User Management & Authentication](./09-user-management-auth.md). Owner can assign this capability to specific Admins via the Roles & Permissions interface.
+
+#### Available Reports (CSV Export)
+
+**1. Orders Report**
+- Date range filter (start date, end date)
+- Status filter (all, completed, pending, cancelled, refunded)
+- Customer filter (specific customer or all)
+
+**Columns**:
+- Order Number
+- Order Date
+- Customer Name
+- Customer Email
+- Order Status
+- Payment Status
+- Payment Method
+- Subtotal
+- Tax
+- Shipping Cost
+- Total
+- Number of Items
+- Product SKUs (comma-separated)
+
+**Use Case**: Import into accounting software for revenue tracking, tax reporting, financial reconciliation.
+
+**2. Products Report**
+- Category filter
+- Stock status filter (all, in stock, low stock, out of stock)
+
+**Columns**:
+- Product ID
+- SKU
+- Product Name
+- Category
+- Regular Price
+- Sale Price
+- Stock Quantity
+- Stock Status
+- Total Units Sold (lifetime)
+- Total Revenue (lifetime)
+- Created Date
+- Last Modified Date
+
+**Use Case**: Inventory management, pricing analysis, product performance.
+
+**3. Customers Report**
+- Date range filter (customer since date)
+- Purchase activity filter (has purchases, no purchases)
+
+**Columns**:
+- Customer ID
+- Name
+- Email
+- Total Orders
+- Total Lifetime Value
+- Average Order Value
+- First Purchase Date
+- Last Purchase Date
+- Account Created Date
+
+**Use Case**: Customer analysis, marketing campaigns, loyalty program planning.
+
+**4. Transactions Report** (Detailed)
+- Date range filter
+- Payment method filter
+
+**Columns**:
+- Transaction ID
+- Order Number
+- Transaction Date
+- Customer Name
+- Customer Email
+- Payment Method
+- Payment Gateway Transaction ID (Stripe/PayPal/Amazon Pay)
+- Amount
+- Fee (if available from payment gateway)
+- Net Amount
+- Status (succeeded, failed, refunded)
+- Refund Date (if applicable)
+- Refund Amount (if applicable)
+
+**Use Case**: Financial reconciliation, payment gateway fee tracking, refund tracking.
+
+**5. Product Sales Report** (Aggregated)
+- Date range filter
+- Top N products (e.g., top 20)
+
+**Columns**:
+- Product ID
+- SKU
+- Product Name
+- Category
+- Units Sold (period)
+- Total Revenue (period)
+- Average Sale Price
+- Number of Orders
+
+**Use Case**: Sales analysis, identifying best sellers, inventory planning.
+
+**6. Tax Report**
+- Date range filter
+- Tax jurisdiction filter (if applicable)
+
+**Columns**:
+- Order Number
+- Order Date
+- Customer Name
+- Customer Location (State/Province)
+- Subtotal
+- Tax Rate
+- Tax Amount
+- Total Order Value
+
+**Use Case**: Tax filing, sales tax remittance, compliance.
+
+#### Admin Interface (Reports Page)
+
+```
+┌──────────────────────────────────────────────┐
+│ Reports & Exports                             │
+├──────────────────────────────────────────────┤
+│                                              │
+│ Select Report Type:                          │
+│ [Orders Report ▼]                            │
+│   - Orders Report                            │
+│   - Products Report                          │
+│   - Customers Report                         │
+│   - Transactions Report                      │
+│   - Product Sales Report                     │
+│   - Tax Report                               │
+│                                              │
+│ ┌─ Filters ──────────────────────────────┐  │
+│ │ Date Range:                             │  │
+│ │ From: [2026-01-01] To: [2026-01-31]    │  │
+│ │                                         │  │
+│ │ Order Status: [All ▼]                   │  │
+│ │ Payment Method: [All ▼]                 │  │
+│ └─────────────────────────────────────────┘  │
+│                                              │
+│ Format: ● CSV  ○ Excel (future)             │
+│                                              │
+│ [Generate Report]                            │
+│                                              │
+│ ── Recent Exports ──                         │
+│ Orders_2026-01-28.csv (234 KB) [Download]   │
+│ Customers_2026-01-25.csv (45 KB) [Download] │
+│ Products_2026-01-20.csv (12 KB) [Download]  │
+└──────────────────────────────────────────────┘
+```
+
+#### API Endpoints
+
+```
+# Reports
+GET    /api/reports/orders         # Export orders CSV (Owner/Admin with capability)
+GET    /api/reports/products       # Export products CSV
+GET    /api/reports/customers      # Export customers CSV
+GET    /api/reports/transactions   # Export transactions CSV
+GET    /api/reports/sales          # Export product sales CSV
+GET    /api/reports/tax            # Export tax report CSV
+
+# Query parameters for filtering
+?start_date=2026-01-01&end_date=2026-01-31
+?status=completed
+?payment_method=stripe
+?category=electronics
+```
+
+#### Permission Check Example
+
+```typescript
+// Backend: Check capability before allowing export
+@UseGuards(JwtAuthGuard, CapabilityGuard)
+@RequireCapability('reports.export')
+@Get('/api/reports/orders')
+async exportOrders(@Query() filters: ReportFilters) {
+  const orders = await this.ordersService.getOrdersForExport(filters)
+  const csv = await this.csvService.generateOrdersCsv(orders)
+
+  // Log in audit trail
+  await this.auditLog.create({
+    action: 'report_exported',
+    category: AuditCategory.ECOMMERCE,
+    userId: req.user.id,
+    metadata: {
+      reportType: 'orders',
+      filters: filters,
+      recordCount: orders.length
+    }
+  })
+
+  return {
+    filename: `orders_${new Date().toISOString().split('T')[0]}.csv`,
+    data: csv
+  }
+}
+```
+
+#### CSV Generation Library
+
+**Recommended**: `csv-writer` or `fast-csv` npm packages
+
+```typescript
+import { createObjectCsvWriter } from 'csv-writer'
+
+async function generateOrdersCsv(orders: Order[]): Promise<string> {
+  const csvWriter = createObjectCsvWriter({
+    path: 'temp/orders.csv',
+    header: [
+      { id: 'orderNumber', title: 'Order Number' },
+      { id: 'orderDate', title: 'Order Date' },
+      { id: 'customerName', title: 'Customer Name' },
+      { id: 'customerEmail', title: 'Customer Email' },
+      { id: 'status', title: 'Status' },
+      { id: 'paymentMethod', title: 'Payment Method' },
+      { id: 'total', title: 'Total' }
+    ]
+  })
+
+  await csvWriter.writeRecords(orders)
+  return fs.readFileSync('temp/orders.csv', 'utf-8')
+}
+```
+
 ### Tax Calculation
 
 **Options:**
@@ -912,11 +1152,9 @@ POST   /api/webhooks/amazon-pay   # Amazon Pay webhook endpoint
 4. ~~Do we need wholesale/bulk pricing tiers?~~ → **NO** - Not needed
 5. ~~Should we support product reviews and ratings?~~ → **YES** - Implemented as review-type comments with star ratings (see PRD 09)
 
-### Open Questions
-
-6. Should we implement a loyalty/rewards program?
-7. Should we support multiple payment methods per order (e.g., gift card + credit card)?
-8. Do we need integration with accounting software (QuickBooks, Xero)?
+6. ~~Should we implement a loyalty/rewards program?~~ → **NO** - Not planned for MVP or post-MVP
+7. ~~Should we support multiple payment methods per order (e.g., gift card + credit card)?~~ → **NO** - Single payment method per order
+8. ~~Do we need integration with accounting software (QuickBooks, Xero)?~~ → **NO direct integration** - Instead, implement **CSV report export capability** for manual import into accounting software
 
 ## Success Metrics
 

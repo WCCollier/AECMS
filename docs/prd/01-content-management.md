@@ -1,7 +1,7 @@
 # PRD 01: Content Management
 
-**Version:** 1.0
-**Date:** 2026-01-27
+**Version:** 1.1
+**Date:** 2026-01-28
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -9,13 +9,53 @@
 
 The Content Management module is the core of AECMS, enabling users to create, organize, and publish articles, pages, and media content.
 
+## Roles & Capabilities Definition
+
+**Note**: This section defines canonical role mappings for content management features. For comprehensive role and capability specifications, see [PRD 09: User Management & Authentication](./09-user-management-auth.md).
+
+### Content Editor (Role Mapping)
+
+In this document, **"content editor"** refers to any user with article/page editing capabilities:
+
+- **Owner**: All content editing capabilities (always)
+- **Admin**: Content editing capabilities (configurable by Owner)
+- **Specific Author**: Can edit their own content (permission flags apply, see PRD 12)
+- **Future Roles**: Custom roles with `article.create` or `article.edit` capabilities (e.g., Writer role)
+
+### Content Creator (Role Mapping)
+
+In this document, **"content creator"** refers to any user with article/page creation capabilities:
+
+- **Owner**: Can create all content types (always)
+- **Admin**: Can create articles, pages, products (configurable by Owner, MVP default: YES)
+- **Future Roles**: Custom roles with `article.create` capability (e.g., Writer role - post-MVP)
+
+**MVP Constraint**: In MVP, only **Owner** and **Admin** can create articles, pages, and products. These are trusted roles and do not require approval workflow. The approval workflow (Review status) is reserved for future roles like Writer.
+
+### Administrator (Role Mapping)
+
+In this document, **"administrator"** refers to:
+
+- **Owner**: Super-admin with all capabilities
+- **Admin**: Configurable capabilities set by Owner
+
+### Member (Role Mapping)
+
+In this document, **"Member"** refers to:
+
+- Standard logged-in user
+- Can view logged-in-only content
+- Can post comments and reviews
+- Limited Markdown in comments (no URLs, no external embeds)
+- External images in comments flag for human review
+
 ## User Stories
 
 ### Content Creation
-- As a content editor, I want to create articles with a rich text editor so I can format my content professionally
+- As a content editor (Owner, Admin, or author), I want to create articles with a rich text editor so I can format my content professionally
 - As a content editor, I want to save drafts so I can work on content over time
 - As a content editor, I want to preview content before publishing so I can ensure it looks correct
-- As an administrator, I want to schedule posts for future publication so I can plan content releases
+- As an administrator (Owner, Admin), I want to schedule posts for future publication so I can plan content releases
 
 ### Content Organization
 - As a content editor, I want to categorize articles so readers can find related content
@@ -30,6 +70,16 @@ The Content Management module is the core of AECMS, enabling users to create, or
 - As a content editor, I want to reuse media across multiple articles so I don't duplicate uploads
 
 ## Functional Requirements
+
+**Note on Products**: Product objects (detailed in [PRD 03: Ecommerce](./03-ecommerce.md)) inherit **all content management capabilities** described in this document. Products have:
+- ✅ All article fields (title, slug, content, excerpt, featured image, etc.)
+- ✅ All rich text editor features (formatting, media embedding, product embedding, Markdown)
+- ✅ All publishing workflow statuses (Draft, Review, Scheduled, Published, Archived)
+- ✅ All comment/review capabilities (products can receive both comments and reviews)
+- ✅ All SEO fields and visibility controls
+- **PLUS** commerce-specific features (price, SKU, stock, cart integration, purchase options)
+
+This document describes content features for articles, but these apply equally to products unless otherwise noted.
 
 ### Articles/Posts
 
@@ -64,12 +114,70 @@ The Content Management module is the core of AECMS, enabling users to create, or
 - Block quotes
 - Horizontal rules
 
-**Media Embedding** (Admin and Owner only):
+**Media Embedding**:
+
+**Embedding Capabilities by Role**:
+- **Admin/Owner**: All media types (internal, external videos, external images, social embeds)
+- **Member (comments only)**: Internal images, external images (flagged for review)
+
+**Media Types**:
 - Internal images: From media library
 - Internal videos: From media library
-- **External videos**: YouTube embeds (via URL or embed code)
-- **External social media**: X (Twitter) post embeds (via URL or embed code)
-- Other embeds: Vimeo, SoundCloud, CodePen (via oEmbed or iframe)
+- **External images**: Direct image URLs (Members: flagged for human review)
+- **External videos** (Admin/Owner only): YouTube embeds (via URL or embed code)
+- **External social media** (Admin/Owner only): X (Twitter) post embeds (via URL or embed code)
+- Other embeds (Admin/Owner only): Vimeo, SoundCloud, CodePen (via oEmbed or iframe)
+
+**Image Layout Options**:
+
+When embedding images (internal or external) in articles, pages, or product descriptions, the following layout options are available:
+
+1. **Block (Full-Width)**:
+   - Image spans full width of content container
+   - Positioned between paragraphs
+   - No text wrapping
+   - Optimal for: Hero images, wide graphics, diagrams, charts
+   - CSS: `display: block; width: 100%; margin: 1em 0;`
+
+2. **Float (Corner-Anchored with Text Wrapping)**:
+   - Image positioned within paragraph flow
+   - Anchored to corner (top-left, top-right, bottom-left, bottom-right)
+   - Text wraps around image (magazine-style)
+   - Size: Small (25%), Medium (40%), Large (60%)
+   - Optimal for: Portrait images, inline illustrations, callouts
+   - CSS: `float: left|right; margin: 0.5em 1em; max-width: [size]%;`
+   - Mobile behavior: Stacks vertically on screens < 640px
+
+3. **Inline (Text-Level)**:
+   - Image embedded within text line (icon-sized)
+   - Flows with text
+   - Optimal for: Icons, small graphics, emojis
+   - CSS: `display: inline; vertical-align: middle; height: 1.2em;`
+
+**Editor Interface for Image Insertion**:
+
+```
+┌──────────────────────────────────────────┐
+│ Insert Image                              │
+├──────────────────────────────────────────┤
+│ Source:                                   │
+│ ○ Media Library  ● External URL          │
+│                                           │
+│ Image URL: [https://example.com/img.jpg] │
+│                                           │
+│ Layout:                                   │
+│ ● Block (Full-Width)                      │
+│ ○ Float (Corner-Anchored)                │
+│   ├─ Position: [Top-Left ▼]              │
+│   └─ Size: [Medium ▼]                    │
+│ ○ Inline (Icon-Sized)                    │
+│                                           │
+│ Alt Text: [Descriptive text]             │
+│ Caption: [Optional caption]              │
+│                                           │
+│ [Cancel]  [Insert]                        │
+└──────────────────────────────────────────┘
+```
 
 **Product Embedding** (All roles with article editing capability):
 - **Product Cards**: Embed products as interactive widgets within articles/pages
@@ -94,31 +202,131 @@ The Content Management module is the core of AECMS, enabling users to create, or
 - **See**: [PRD 03: Ecommerce](./03-ecommerce.md) for detailed product display modes
 
 **Markdown Support**:
-- Admin/Owner: Full Markdown with HTML, links, and external embeds
-- Member (comments/reviews): Limited Markdown - formatting only, NO URLs, NO external embeds
+- **Admin/Owner**: Full Markdown with HTML, links, and external embeds (all capabilities)
+- **Member** (comments/reviews): Limited Markdown with reactive moderation:
+  - ✅ Formatting (bold, italic, lists, headings, code blocks)
+  - ✅ **External image embeds** (triggers human review flag)
+  - ❌ URL links (prevents spam/phishing)
+  - ❌ External video/social embeds (security risk)
+  - ❌ HTML tags (XSS prevention)
 - Markdown renderer: CommonMark compliant with GFM (GitHub Flavored Markdown) extensions
 
 **Security Restrictions by Role**:
-- **Admin/Owner**:
-  - ✅ Full HTML editing
-  - ✅ External embeds (YouTube, X, etc.)
-  - ✅ URL links in Markdown
-  - ✅ Inline scripts (sanitized)
 
-- **Member** (in comments/reviews):
-  - ✅ Markdown formatting (bold, italic, lists, headings)
-  - ✅ Code blocks (no script execution)
-  - ❌ URLs in Markdown (prevents spam/phishing)
-  - ❌ External embeds (security risk)
-  - ❌ HTML tags (XSS prevention)
-  - ❌ Image embeds (use text only)
+**Admin/Owner**:
+- ✅ Full HTML editing
+- ✅ External embeds (YouTube, X, images, etc.)
+- ✅ URL links in Markdown
+- ✅ Inline scripts (sanitized)
+- ✅ All image layout options (Block, Float, Inline)
+
+**Member** (in comments/reviews):
+- ✅ Markdown formatting (bold, italic, lists, headings)
+- ✅ Code blocks (no script execution)
+- ✅ **External image embeds** - Allowed with reactive moderation:
+  - Image posts immediately
+  - Comment flagged for human review (same as profanity detection)
+  - Admin receives notification
+  - Image displayed until reviewed
+- ✅ Image layout options (Block, Float, Inline)
+- ❌ URL links in Markdown (prevents spam/phishing)
+- ❌ External video/social embeds (security risk)
+- ❌ HTML tags (XSS prevention)
+
+**Member External Image Flagging**:
+
+When a Member embeds an external image in a comment/review:
+
+```typescript
+async function processCommentWithExternalImage(comment: Comment) {
+  // Check if comment contains external image URL
+  const hasExternalImage = detectExternalImageEmbed(comment.content)
+
+  if (hasExternalImage) {
+    // Flag for human review
+    await prisma.comment.update({
+      where: { id: comment.id },
+      data: {
+        flagged_for_review: true,
+        flag_reason: 'external_image_embed'
+      }
+    })
+
+    // Notify admin
+    await notifyAdmin({
+      type: 'comment_flagged',
+      reason: 'External image embedded by Member',
+      commentId: comment.id
+    })
+
+    // Log in audit trail
+    await auditLog.create({
+      action: 'comment_flagged_external_image',
+      userId: comment.author_id,
+      resourceType: 'comment',
+      resourceId: comment.id
+    })
+  }
+
+  // Comment still displays immediately (reactive moderation)
+  return comment
+}
+```
 
 #### Publishing Workflow
+
+**Status Options**:
+
 1. **Draft**: Work in progress, not visible to public
-2. **Review** (optional): Awaiting approval
+2. **Review**: Awaiting approval from Admin/Owner (reserved for future roles)
 3. **Scheduled**: Set for future publication
 4. **Published**: Live on site
 5. **Archived**: Removed from active listings but accessible via URL
+
+**Status Workflow by Role**:
+
+**Owner/Admin (MVP)**:
+- Create article → **Draft** → (optional: **Scheduled**) → **Published**
+- **Review status not used** (Owner/Admin are trusted roles, no approval needed)
+- Can transition directly from Draft to Published or Scheduled
+
+**Future Roles (Post-MVP, e.g., Writer)**:
+- Create article → **Draft** → Submit for **Review** → (Admin approves) → **Published**
+- **Review status required** for untrusted roles
+- Cannot publish without Admin/Owner approval
+- Admin/Owner can send back to Draft with feedback
+
+**Status Transition Rules (MVP)**:
+
+```
+Draft → Published        ✅ Owner, Admin
+Draft → Scheduled        ✅ Owner, Admin
+Draft → Review           ⏸️  Not used in MVP (for future roles)
+Review → Published       ⏸️  Not used in MVP
+Review → Draft           ⏸️  Not used in MVP
+Published → Archived     ✅ Owner, Admin
+Archived → Published     ✅ Owner, Admin
+Scheduled → Published    🤖 Automatic (on scheduled datetime)
+```
+
+**Review Status Implementation Note**:
+
+The **Review** status is implemented in the database schema and UI but **not actively used in MVP**. This allows for seamless addition of future roles (e.g., Writer) that require approval workflows without database migrations.
+
+```typescript
+// Database schema includes Review status
+enum ArticleStatus {
+  DRAFT
+  REVIEW       // Reserved for future roles
+  SCHEDULED
+  PUBLISHED
+  ARCHIVED
+}
+
+// MVP: Only Owner/Admin can create articles
+// Owner/Admin skip Review status (trusted)
+// Future: Writer role will use Review workflow
+```
 
 ### Pages
 
@@ -133,12 +341,167 @@ The Content Management module is the core of AECMS, enabling users to create, or
 - **SEO Fields**: Meta title, meta description
 
 #### Page Templates
-- **Default**: Standard content page
-- **Home**: Homepage with customizable sections
-- **Landing Page**: Marketing-focused layout
-- **Split Comparison**: Full-screen width 50/50 split, edge-to-edge, no gutter
-- **Article List**: Display filtered articles
-- **Custom**: User-defined templates
+
+- **Default**: Standard content page with header, footer, and content area
+- **Home**: Homepage with customizable widget sections and featured content
+- **Landing Page**: Full-screen marketing-focused layout with parallax scrolling and animated backgrounds (see detailed spec below)
+- **Split Comparison**: Full-screen width 50/50 split, edge-to-edge, no gutter (for side-by-side comparisons)
+- **Article List**: Display filtered articles in grid or list view
+- **Custom**: User-defined templates (advanced)
+
+#### Landing Page Template (Detailed Specification)
+
+**Purpose**: Full-screen marketing landing page with modern parallax effects and animated backgrounds for high-impact first impressions.
+
+**Key Features**:
+- Full-screen sections (100vh height)
+- Parallax scrolling with fixed backgrounds
+- Optional background morphing/animation on scroll
+- Overlay text with smooth scroll reveal
+- Call-to-action buttons
+- No header/footer by default (optional)
+
+**Visual Layout**:
+
+```
+┌─────────────────────────────────────────┐
+│                                         │ ← Section 1 (100vh)
+│         Hero Text (scrolls)             │
+│     ┌─────────────────────┐            │
+│     │  [Call to Action]   │            │
+│     └─────────────────────────┘         │
+│                                         │
+│  Background: Fixed (parallax effect)    │
+└─────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│                                         │ ← Section 2 (100vh)
+│      More Content (scrolls)             │
+│                                         │
+│  Background: Fixed (different image)    │
+│  Optional: Morphs/animates with scroll  │
+└─────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│                                         │ ← Section 3 (100vh)
+│      Final CTA Section                  │
+│                                         │
+│  Background: Solid color or gradient    │
+└─────────────────────────────────────────┘
+```
+
+**Parallax Effect**:
+- **Fixed Background**: Background image/video remains stationary while content scrolls over it
+- **Scroll Rate Control**: Adjust background scroll speed (0 = fixed, 1 = normal, 0.5 = half speed)
+- **Multiple Layers**: Foreground, midground, background layers with different scroll rates
+
+**Animated Background Options**:
+
+1. **Static**: Fixed image, no animation
+2. **Morphing**: Background smoothly transitions between images/colors as user scrolls
+3. **Gradient Shift**: Gradient colors shift based on scroll position
+4. **Particle Effects**: Animated particles (stars, dots, geometric shapes) overlay background
+5. **Video Background**: Full-screen video loop with optional parallax
+
+**Content Editor Interface**:
+
+```
+┌──────────────────────────────────────────────┐
+│ Page: Landing Page (Landing Page Template)  │
+├──────────────────────────────────────────────┤
+│                                              │
+│ ┌─ Section 1 Settings ──────────────────┐   │
+│ │ Height: [100vh ▼] (Full-screen)       │   │
+│ │                                        │   │
+│ │ Background Type:                       │   │
+│ │ ● Image  ○ Video  ○ Gradient          │   │
+│ │                                        │   │
+│ │ Background Image: [Upload/Select]     │   │
+│ │ Parallax Effect: ☑ Enabled            │   │
+│ │ Scroll Speed: [0.5] (0=fixed, 1=normal)│   │
+│ │                                        │   │
+│ │ Background Animation:                  │   │
+│ │ [None ▼] Static, Morph, Gradient Shift│   │
+│ │                                        │   │
+│ │ Text Overlay Color: [#ffffff] [Picker]│   │
+│ │ Overlay Opacity: [0.3] (darkens bg)   │   │
+│ └────────────────────────────────────────┘   │
+│                                              │
+│ ┌─ Section 1 Content ───────────────────┐   │
+│ │ [Rich text editor for hero text]      │   │
+│ │                                        │   │
+│ │ Vertical Alignment: [Center ▼]        │   │
+│ │ Horizontal Alignment: [Center ▼]      │   │
+│ │                                        │   │
+│ │ Call-to-Action Button:                │   │
+│ │ Text: [Get Started]                   │   │
+│ │ Link: [/signup]                        │   │
+│ │ Style: [Primary ▼]                    │   │
+│ └────────────────────────────────────────┘   │
+│                                              │
+│ [+ Add Section]                              │
+│                                              │
+│ [Preview] [Save] [Publish]                   │
+└──────────────────────────────────────────────┘
+```
+
+**Technical Implementation**:
+
+```css
+/* Parallax section */
+.landing-section {
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Fixed background with parallax */
+.landing-section-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background-size: cover;
+  background-position: center;
+  z-index: -1;
+  transform: translateY(calc(var(--scroll-position) * -0.5)); /* Parallax effect */
+}
+
+/* Scrolling content over fixed bg */
+.landing-section-content {
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-align: center;
+}
+```
+
+```javascript
+// Parallax scroll effect
+window.addEventListener('scroll', () => {
+  const scrollPosition = window.pageYOffset
+  document.querySelectorAll('.landing-section-bg').forEach((bg, index) => {
+    const scrollRate = bg.dataset.scrollRate || 0.5
+    bg.style.transform = `translateY(${scrollPosition * scrollRate}px)`
+  })
+})
+
+// Morphing background animation
+function morphBackground(element, images, scrollPosition) {
+  const progress = (scrollPosition % 1000) / 1000 // 0 to 1
+  const imageIndex = Math.floor(progress * images.length)
+  element.style.backgroundImage = `url(${images[imageIndex]})`
+}
+```
+
+**Mobile Responsive**:
+- Parallax disabled on mobile (performance)
+- Sections stack vertically
+- Backgrounds become static
+- Full-width content maintained
 
 #### Page Layout System
 - **Pane/Widget Support**: Ability to add content blocks
@@ -342,21 +705,72 @@ The Content Management module is the core of AECMS, enabling users to create, or
 
 **Note**: For comprehensive details, see [PRD 09: User Management & Authentication](./09-user-management-auth.md)
 
-#### Comment Types
-- **Standard Comments**: General feedback on articles
-- **Reviews**: Product reviews with optional star ratings (1-5 stars)
+#### Unified Comment System
+
+**Reviews are Comments**: In AECMS, reviews are a specialized type of comment with star ratings. The system uses a unified comment architecture:
+
+- **Standard Comment**: Text-only feedback (no rating)
+- **Review**: Comment with 1-5 star rating (optional text)
+
+Both comment types use the same database table, moderation system, and display interface.
+
+#### Comments on Articles and Products
+
+**Both articles and products can receive comments and reviews**:
+
+- **Articles**: Can receive both standard comments AND reviews
+  - Users can review articles (e.g., "5 stars, great tutorial!")
+  - Default sort: Most Recent (newest first)
+
+- **Products**: Can receive both standard comments AND reviews
+  - Reviews are primary (product quality feedback with ratings)
+  - Standard comments also allowed (e.g., "When will this be back in stock?")
+  - Default sort: Reviews First (highest rated reviews at top)
+
+**Rationale**: Unified system allows flexibility. Articles can be rated, and products can receive non-review comments (questions, feedback, etc.)
 
 #### Comment Capabilities by Role
-- **Members**: Create, edit, delete own comments/reviews
-- **Admin/Owner**: Moderate (approve/reject), edit, delete any comments
-- **Guests**: Cannot comment, can view (if visibility allows)
+- **Members**: Create, edit own, delete own comments/reviews
+- **Admin/Owner**: Moderate (approve/reject), edit any, delete any comments
+- **Guests**: Cannot comment, can view comments (if visibility allows)
 
 #### Comment Visibility Controls
 
-Each article can have comment visibility set to:
+Each article and product can have comment visibility set to:
 - **Disabled**: No comments allowed
 - **Logged-in only**: Members and above can comment, only logged-in users can view
 - **Public**: Members and above can comment, everyone (including Guests) can view
+
+#### Comment Sorting Options
+
+**Default Sort Order**:
+- **Products**: Reviews First (reviews sorted by rating, then standard comments by recency)
+- **Articles**: Most Recent (all comments sorted by newest first)
+
+**User-Selectable Sort Options**:
+- Most Recent (default for articles)
+- Oldest First
+- Highest Rated (reviews only, 5 stars first)
+- Lowest Rated (reviews only, 1 star first)
+- Reviews First (default for products)
+- Most Helpful (based on upvotes - future feature)
+
+**Sort Implementation**:
+
+```typescript
+// Product default: Reviews first, then by rating
+SELECT * FROM comments
+WHERE product_id = 'uuid'
+ORDER BY
+  CASE WHEN rating IS NOT NULL THEN 0 ELSE 1 END, -- Reviews first
+  rating DESC NULLS LAST,                          -- Then by rating
+  created_at DESC                                   -- Then by recency
+
+// Article default: Most recent
+SELECT * FROM comments
+WHERE article_id = 'uuid'
+ORDER BY created_at DESC
+```
 
 #### Comment Moderation
 
@@ -763,7 +1177,7 @@ PUT    /api/comments/:id/moderate     # Approve/reject (Admin+)
 4. ~~Should we implement a workflow with roles (editor/reviewer/publisher)?~~ → **Future**: Writer role documented for future implementation
 5. ~~Do we want built-in commenting system for articles?~~ → **Answered**: YES - Implemented with review variants and AI moderation
 6. ~~Should media library support external media sources (Unsplash, Pexels integration)?~~ → **Answered**: YES - Post-MVP feature, will be implemented eventually
-7. Should we implement automatic content suggestions or AI writing assistance? → **Open** (Post-MVP consideration)
+7. ~~Should we implement automatic content suggestions or AI writing assistance?~~ → **Answered**: NO - Not planned for MVP or post-MVP
 
 ## Success Metrics
 
