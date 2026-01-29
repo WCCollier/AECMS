@@ -54,6 +54,7 @@ model User {
   cart_items            CartItem[]
   kindle_devices        KindleDevice[]
   audit_logs            AuditLog[]
+  media_uploads         Media[]       @relation("MediaUploader")
 
   @@index([email])
   @@index([role])
@@ -180,7 +181,7 @@ model Article {
   deleted_at          DateTime?
 
   author          User            @relation(fields: [author_id], references: [id])
-  featured_image  MediaFile?      @relation("ArticleFeaturedImage", fields: [featured_image_id], references: [id])
+  featured_image  Media?      @relation("ArticleFeaturedImage", fields: [featured_image_id], references: [id])
   categories      ArticleCategory[]
   tags            ArticleTag[]
   media           ArticleMedia[]
@@ -323,26 +324,30 @@ model ArticleTag {
   @@map("article_tags")
 }
 
-model MediaFile {
-  id            String   @id @default(uuid())
-  filename      String
-  original_name String
-  mime_type     String
-  size          Int      // bytes
-  width         Int?
+model Media {
+  id             String   @id @default(uuid())
+  filename       String
+  original_name  String
+  mime_type      String
+  size           Int      // bytes
+  width          Int?
   height        Int?
-  alt_text      String?
-  caption       String?
-  storage_path  String
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  alt_text       String?
+  caption        String?
+  file_path      String   // Full path to file on disk
+  thumbnail_path String?  // Path to thumbnail (if generated)
+  uploaded_by    String
+  uploaded_at    DateTime @default(now())
+  updated_at     DateTime @updatedAt
 
-  article_featured Article[] @relation("ArticleFeaturedImage")
+  uploader         User          @relation("MediaUploader", fields: [uploaded_by], references: [id], onDelete: Cascade)
+  article_featured Article[]     @relation("ArticleFeaturedImage")
   article_media    ArticleMedia[]
   product_media    ProductMedia[]
 
   @@index([mime_type])
-  @@map("media_files")
+  @@index([uploaded_by])
+  @@map("media")
 }
 
 model ArticleMedia {
@@ -351,7 +356,7 @@ model ArticleMedia {
   order      Int @default(0)
 
   article Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
-  media   MediaFile @relation(fields: [media_id], references: [id], onDelete: Cascade)
+  media   Media @relation(fields: [media_id], references: [id], onDelete: Cascade)
 
   @@id([article_id, media_id])
   @@map("article_media")
@@ -422,7 +427,7 @@ model DigitalProductFile {
   id                      String      @id @default(uuid())
   product_id              String
   format                  FileFormat
-  file_id                 String      // References MediaFile
+  file_id                 String      // References Media
   personalization_enabled Boolean     @default(false)
   max_downloads           Int         @default(5)
   created_at              DateTime    @default(now())
@@ -505,7 +510,7 @@ model ProductMedia {
   is_primary Boolean @default(false)
 
   product Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  media   MediaFile @relation(fields: [media_id], references: [id], onDelete: Cascade)
+  media   Media @relation(fields: [media_id], references: [id], onDelete: Cascade)
 
   @@id([product_id, media_id])
   @@map("product_media")
