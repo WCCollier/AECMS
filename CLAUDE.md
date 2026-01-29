@@ -21,10 +21,11 @@
 **Phase 2**: ✅ COMPLETE - Capability-based RBAC (27 capabilities, guards, decorators)
 **Phase 3**: ✅ COMPLETE - Content Management (Media, Categories, Tags, Articles, Pages)
 **Phase 4**: ✅ COMPLETE - Ecommerce Core (Products, Cart, Orders)
-**Phase 5**: 🔄 NEXT - Payments Integration (Stripe, PayPal)
+**Phase 5**: ✅ AUTONOMOUS COMPLETE - Payments Module (Stripe, PayPal) - Pending human config
+**Phase 6**: 🔄 NEXT - Frontend (Next.js) + Integration Testing
 
 **Test Status**: 42 unit tests passing, 16 E2E tests passing
-**API Endpoints**: 51 total
+**API Endpoints**: 58 total (7 new from Payments)
 
 ## API Endpoint Summary
 
@@ -40,6 +41,7 @@
 | Products | 7 |
 | Cart | 6 |
 | Orders | 7 |
+| Payments | 7 |
 
 ## Key Architecture Decisions
 
@@ -102,6 +104,9 @@ docker-compose logs -f
 - `docs/PHASE_1_COMPLETION_REPORT.md` - Auth & database details
 - `docs/PHASE_2_COMPLETION_REPORT.md` - RBAC system details
 - `docs/PHASE_3_COMPLETION_REPORT.md` - Content management details
+- `docs/PHASE_4_COMPLETION_REPORT.md` - Ecommerce core details
+- `docs/PHASE_5_COMPLETION_REPORT.md` - Payments integration details
+- `docs/PHASE_5_PLAN.md` - Payments human configuration requirements
 - `docs/prd/` - 12 PRD documents with full specifications
 
 ## Notes for Claude
@@ -115,16 +120,25 @@ docker-compose logs -f
 - Commit incrementally with descriptive messages
 - **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
 
-## Phase 5: Payments Integration (Next)
+## Phase 5: Payments Integration (AUTONOMOUS COMPLETE)
+
+**Implemented**:
+- ✅ PaymentsModule with provider abstraction pattern
+- ✅ StripeProvider - Payment Intents API, webhooks
+- ✅ PayPalProvider - Orders API v2, OAuth2 tokens
+- ✅ Test mode for development without API keys
+- ✅ OptionalJwtAuthGuard for guest checkout
+
+**Human Configuration Required** (see `docs/PHASE_5_COMPLETION_REPORT.md`):
+1. **Stripe**: Get API keys, configure webhooks, set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
+2. **PayPal**: Create app, configure webhooks, set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET
+3. **Test**: Use test mode first (PAYMENT_TEST_MODE=true), then test with real sandbox credentials
+
+## Phase 6: Frontend (Next)
 
 **Modules to implement**:
-1. Stripe Integration - Payment Intents, webhooks
-2. PayPal Integration - Orders API
-3. Payment processing flow
-
-**Existing Schema** (from Phase 1):
-- Payment model with provider, intent_id, status fields
-- Support for Stripe, PayPal, Amazon Pay
-
-**Capabilities Available**:
-- order.refund
+1. Next.js App Router setup
+2. Authentication UI (login, register, OAuth)
+3. Content pages (articles, pages)
+4. Shop UI (products, cart, checkout)
+5. Admin dashboard
