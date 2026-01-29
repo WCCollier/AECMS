@@ -7,6 +7,7 @@ import { validate } from './config/env.validation';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CapabilitiesModule } from './capabilities/capabilities.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { CapabilitiesModule } from './capabilities/capabilities.module';
     PrismaModule,
     AuthModule,
     CapabilitiesModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
