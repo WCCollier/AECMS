@@ -1,7 +1,7 @@
 # PRD 08: WordPress Migration Strategy
 
-**Version:** 1.0
-**Date:** 2026-01-27
+**Version:** 1.1
+**Date:** 2026-01-29
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -20,7 +20,7 @@ This document defines the strategy for migrating content from WordPress.org to A
 - ✅ Tags → Tags
 - ✅ Media (images, documents) → Media Library
 - ✅ Post metadata (author, date, featured image)
-- ✅ Comments → Export only (optional import later)
+- ✅ Comments → Comments (with AI moderation on import)
 
 **Not Migrating**:
 - ❌ WordPress users (recreate admin manually)
@@ -77,6 +77,19 @@ wp_postmeta {
   post_id
   meta_key (_thumbnail_id, _wp_attached_file, etc.)
   meta_value
+}
+
+-- Comments
+wp_comments {
+  comment_ID
+  comment_post_ID
+  comment_author
+  comment_author_email
+  comment_author_url
+  comment_date
+  comment_content
+  comment_approved (1, 0, spam)
+  comment_parent
 }
 ```
 
@@ -162,12 +175,14 @@ scripts/
     │   ├── posts.js           # Parse wp_posts
     │   ├── terms.js           # Parse wp_terms
     │   ├── media.js           # Parse wp_postmeta for media
+    │   ├── comments.js        # Parse wp_comments
     │   └── relationships.js   # Parse wp_term_relationships
     ├── transformers/
     │   ├── articles.js        # Transform posts → articles
     │   ├── pages.js           # Transform pages → pages
     │   ├── categories.js      # Transform categories
     │   ├── tags.js            # Transform tags
+    │   ├── comments.js        # Transform comments (with AI moderation)
     │   └── media.js           # Transform media metadata
     ├── importers/
     │   ├── database.js        # Import to PostgreSQL
@@ -343,6 +358,53 @@ module.exports = {
   created_at: "..."
 }
 ```
+
+### Comments Transformation
+
+**WordPress**:
+- Comments stored in `wp_comments` table
+- Approved status: 1 (approved), 0 (pending), spam (spam)
+- Threaded comments with `comment_parent`
+
+**AECMS**:
+```javascript
+// WordPress comment
+{
+  comment_ID: 123,
+  comment_post_ID: 45,
+  comment_author: "John Doe",
+  comment_author_email: "john@example.com",
+  comment_date: "2024-01-15 10:30:00",
+  comment_content: "Great article!",
+  comment_approved: "1",
+  comment_parent: 0
+}
+
+// AECMS comment (run through AI moderation on import)
+{
+  id: uuid(),
+  entity_type: "article",
+  entity_id: article_uuid,  // Mapped from comment_post_ID
+  user_id: null,  // Anonymous (or create Guest user if needed)
+  author_name: "John Doe",
+  author_email: "john@example.com",
+  content: "Great article!",
+  is_review: false,
+  rating: null,
+  status: "approved",  // Or "flagged" if AI moderation catches issues
+  flagged: false,  // Set to true if AI moderation flags content
+  parent_id: null,  // Mapped from comment_parent if threaded
+  created_at: "2024-01-15T10:30:00Z"
+}
+```
+
+**Import Strategy**:
+1. Only import approved comments (comment_approved = '1')
+2. Skip spam comments
+3. Run all imported comments through AI moderation
+4. Flag potentially problematic comments for manual review
+5. Map comment_post_ID to AECMS article_id
+6. Preserve comment threading (parent_id)
 
 ### Content HTML Transformation
 
@@ -722,11 +784,11 @@ For testing migration script:
 
 ## Open Questions
 
-1. Should we preserve WordPress post IDs (for external links)?
-2. How to handle WordPress comments (export only, import later, or discard)?
-3. Should we migrate WordPress users or start fresh?
-4. What to do with WooCommerce data (if present)?
-5. Should we maintain WordPress URL structure or use AECMS structure?
+1. ~~Should we preserve WordPress post IDs (for external links)?~~ - **No, use UUID. Generate redirect map for SEO.**
+2. ~~How to handle WordPress comments (export only, import later, or discard)?~~ - **Import approved comments with AI moderation.**
+3. ~~Should we migrate WordPress users or start fresh?~~ - **Start fresh. Create Owner manually, users re-register.**
+4. ~~What to do with WooCommerce data (if present)?~~ - **Handle separately if needed, not in scope for general migration.**
+5. ~~Should we maintain WordPress URL structure or use AECMS structure?~~ - **Use AECMS structure, create redirects for SEO (Next.js or Nginx).**
 
 ## Success Criteria
 
