@@ -8,6 +8,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CapabilitiesModule } from './capabilities/capabilities.module';
 import { MediaModule } from './media/media.module';
+import { CategoriesModule } from './categories/categories.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -21,6 +23,8 @@ import { MediaModule } from './media/media.module';
     AuthModule,
     CapabilitiesModule,
     MediaModule,
+    CategoriesModule,
+    TagsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
