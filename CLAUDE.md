@@ -20,10 +20,26 @@
 **Phase 1**: ✅ COMPLETE - Database schema (30+ models), JWT auth, tests passing
 **Phase 2**: ✅ COMPLETE - Capability-based RBAC (27 capabilities, guards, decorators)
 **Phase 3**: ✅ COMPLETE - Content Management (Media, Categories, Tags, Articles, Pages)
-**Phase 4**: 🔄 IN PROGRESS - Ecommerce Core (Products, Cart, Orders)
+**Phase 4**: ✅ COMPLETE - Ecommerce Core (Products, Cart, Orders)
+**Phase 5**: 🔄 NEXT - Payments Integration (Stripe, PayPal)
 
 **Test Status**: 42 unit tests passing, 16 E2E tests passing
-**API Endpoints**: 31 total (Auth: 5, Capabilities: 7, Media: 6, Categories: 5, Tags: 5, Articles: 6, Pages: 7)
+**API Endpoints**: 51 total
+
+## API Endpoint Summary
+
+| Module | Endpoints |
+|--------|-----------|
+| Auth | 5 |
+| Capabilities | 7 |
+| Media | 6 |
+| Categories | 5 |
+| Tags | 5 |
+| Articles | 6 |
+| Pages | 7 |
+| Products | 7 |
+| Cart | 6 |
+| Orders | 7 |
 
 ## Key Architecture Decisions
 
@@ -98,19 +114,16 @@ docker-compose logs -f
 - Run tests after changes: `npm run test && npm run build`
 - Commit incrementally with descriptive messages
 
-## Phase 4: Ecommerce Core (Current)
+## Phase 5: Payments Integration (Next)
 
 **Modules to implement**:
-1. Products Module - CRUD, visibility, categories, stock tracking
-2. Cart Module - Session-based and persistent carts
-3. Orders Module - Checkout flow, status tracking
+1. Stripe Integration - Payment Intents, webhooks
+2. PayPal Integration - Orders API
+3. Payment processing flow
 
 **Existing Schema** (from Phase 1):
-- Product, ProductCategory, ProductMedia, ProductReview
-- CartItem, Order, OrderItem, OrderStatusHistory
-- Payment (Stripe, PayPal, Amazon Pay support)
+- Payment model with provider, intent_id, status fields
+- Support for Stripe, PayPal, Amazon Pay
 
 **Capabilities Available**:
-- product.create, product.edit, product.delete
-- order.view.all, order.edit, order.refund
-- review.moderate
+- order.refund
