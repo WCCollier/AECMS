@@ -16,4 +16,5 @@ export interface TokenPayload {
   sub: string; // user id
   email: string;
   role: UserRole;
+  jti?: string; // JWT ID - unique identifier for each token
 }

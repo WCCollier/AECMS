@@ -254,12 +254,6 @@ export class AuthService {
     email: string,
     role: UserRole,
   ): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload: TokenPayload = {
-      sub: userId,
-      email,
-      role,
-    };
-
     const jwtSecret = this.configService.get<string>('jwt.secret');
     const jwtExpiration = this.configService.get<string>('jwt.expiresIn');
     const refreshExpiration = this.configService.get<string>('jwt.refreshExpiresIn');
@@ -268,12 +262,28 @@ export class AuthService {
       throw new Error('JWT configuration is missing');
     }
 
+    // Create unique access token payload
+    const accessPayload: TokenPayload = {
+      sub: userId,
+      email,
+      role,
+      jti: crypto.randomUUID(), // Unique identifier for access token
+    };
+
+    // Create unique refresh token payload
+    const refreshPayload: TokenPayload = {
+      sub: userId,
+      email,
+      role,
+      jti: crypto.randomUUID(), // Unique identifier for refresh token
+    };
+
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync(accessPayload, {
         secret: jwtSecret,
         expiresIn: jwtExpiration as any,
       }),
-      this.jwtService.signAsync(payload, {
+      this.jwtService.signAsync(refreshPayload, {
         secret: jwtSecret,
         expiresIn: refreshExpiration as any,
       }),
