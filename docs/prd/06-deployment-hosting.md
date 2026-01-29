@@ -1,7 +1,7 @@
 # PRD 06: Deployment & Hosting Strategy
 
-**Version:** 1.0
-**Date:** 2026-01-27
+**Version:** 1.1
+**Date:** 2026-01-29
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -53,6 +53,8 @@ All components run in Docker containers for maximum portability:
 ┌─────▼──────┐         ┌──────▼─────┐
 │ PostgreSQL │         │   Redis    │
 │ Container  │         │ Container  │
+│            │         │ (Cache +   │
+│            │         │  BullMQ)   │
 └────────────┘         └────────────┘
       │
 ┌─────▼──────┐
@@ -269,15 +271,18 @@ REDIS_URL=redis://localhost:6379
 # JWT
 JWT_SECRET=your-secret-here
 JWT_EXPIRATION=15m
-REFRESH_TOKEN_EXPIRATION=7d
+REFRESH_TOKEN_EXPIRATION_FRONT_DOOR=persistent  # No expiry until logout
+REFRESH_TOKEN_EXPIRATION_BACK_DOOR=7d           # 7-day max for admin
 
-# Stripe
+# Payments
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-
-# PayPal
 PAYPAL_CLIENT_ID=...
 PAYPAL_CLIENT_SECRET=...
+AMAZON_PAY_PUBLIC_KEY_ID=...
+AMAZON_PAY_PRIVATE_KEY_PATH=...
+AMAZON_PAY_STORE_ID=...
+AMAZON_PAY_MERCHANT_ID=...
 
 # Google OAuth
 GOOGLE_CLIENT_ID=...
@@ -296,11 +301,23 @@ S3_SECRET_KEY=...
 S3_ENDPOINT=...  # For S3-compatible services
 
 # Email
-EMAIL_PROVIDER=smtp  # or sendgrid, ses
+EMAIL_PROVIDER=smtp  # or sendgrid, ses, aws-ses
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=...
 SMTP_PASS=...
+AWS_SES_REGION=us-east-1
+AWS_SES_ACCESS_KEY=...
+AWS_SES_SECRET_KEY=...
+
+# AI Moderation (Comment filtering)
+OPENAI_API_KEY=...  # Free tier for Moderation API
+
+# Security
+API_KEY_ENCRYPTION_KEY=...  # 32-byte hex for encrypting API keys in database
+
+# Message Queue (Bull/BullMQ with Redis)
+BULL_REDIS_URL=${REDIS_URL}  # Uses same Redis as cache
 ```
 
 ### 3. Storage Abstraction

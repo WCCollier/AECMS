@@ -1,7 +1,7 @@
 # PRD 07: MVP Scope & Priorities
 
-**Version:** 1.0
-**Date:** 2026-01-27
+**Version:** 1.1
+**Date:** 2026-01-29
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -32,14 +32,23 @@ This document defines the Minimum Viable Product (MVP) scope for AECMS based on 
 - ✅ Apple Sign-In
 - ✅ Email/Password (fallback)
 
-**User Roles**:
-- Admin (full access)
-- Customer (view public content, make purchases)
+**User Roles** (Capability-Based RBAC):
+- ✅ Owner (super-admin, all capabilities)
+- ✅ Admin (configurable capabilities)
+- ✅ Member (standard logged-in user)
+- ✅ Guest (unauthenticated visitor)
+
+**Authentication Pathways**:
+- ✅ **Front Door** (header login): Members, persistent sessions
+- ✅ **Back Door** (`/admin`): Admin/Owner, 7-day max, mandatory 2FA
 
 **Security**:
-- JWT-based authentication
-- Secure password storage (bcrypt)
-- Session management
+- ✅ JWT-based authentication (15-min access tokens)
+- ✅ Refresh tokens (persistent front door, 7-day back door)
+- ✅ Secure password storage (bcrypt cost 12)
+- ✅ Email verification for all Members
+- ✅ TOTP 2FA (mandatory for Admin/Owner back door)
+- ✅ Session management with device tracking
 
 ### 2. Content Management (Articles)
 
@@ -59,6 +68,19 @@ This document defines the Minimum Viable Product (MVP) scope for AECMS based on 
 - Category archive pages
 - Tag archive pages
 - Search functionality
+
+**Comments System (MVP)**:
+- ✅ Unified comments/reviews for articles and products
+- ✅ Members can comment (logged-in only)
+- ✅ AI-powered moderation (OpenAI Moderation API + profanity bleeping)
+- ✅ Reactive moderation (post immediately, flag for review)
+- ✅ Admin moderation dashboard
+
+**Content Permissions (MVP)**:
+- ✅ Per-article permission flags (author_can_edit/delete, admin_can_edit/delete)
+- ✅ Visibility controls (public, logged-in-only, admin-only)
+- ✅ Version control (optional, required for legal documents)
+- ✅ User acceptance tracking for legal documents
 
 ### 3. Media Management
 
@@ -92,15 +114,31 @@ This document defines the Minimum Viable Product (MVP) scope for AECMS based on 
 - ✅ Checkout flow
 
 **Payment Processing**:
-- ✅ Stripe integration (credit/debit cards)
+- ✅ Stripe integration (Payment Intents API)
 - ✅ PayPal integration
+- ✅ Amazon Pay integration
 - ✅ Order confirmation email
-- ✅ Basic order management (admin)
+- ✅ Order management (admin)
+- ✅ CSV reporting for orders, products, customers
+
+**Product Reviews (MVP)**:
+- ✅ Members can review products (5-star rating + text)
+- ✅ Reviews display on product pages
+- ✅ AI moderation for review content
+- ✅ Verified purchase badges
+
+**Digital Products - eBooks (MVP)**:
+- ✅ EPUB format support (max 16 MB)
+- ✅ Personalization/stamping with customer info
+- ✅ Secure download delivery (7-day expiry, 5 download limit)
+- ✅ "Send to Kindle" email delivery via AWS SES
 
 **Product Embedding**:
-- ✅ Embed products in articles (shortcode or component)
-- ✅ Embed products in pages
-- ✅ Product showcase widgets
+- ✅ Dual display modes (full page + embedded widget)
+- ✅ Embed in articles via TipTap picker, shortcode, or Markdown
+- ✅ Display variants: card (default), inline, grid
+- ✅ Real-time stock and price updates in embeds
+- ✅ Functional add-to-cart within articles
 
 ### 5. Page & Layout System
 
@@ -164,10 +202,45 @@ This document defines the Minimum Viable Product (MVP) scope for AECMS based on 
 **Payment Settings**:
 - Stripe API keys
 - PayPal credentials
+- Amazon Pay credentials
 
 **OAuth Settings**:
 - Google OAuth credentials
 - Apple OAuth credentials
+
+**Email Settings (SMTP)**:
+- SMTP configuration (host, port, credentials)
+- AWS SES configuration (for Send to Kindle)
+- Email templates
+
+### 8. Audit Trail & Compliance (MVP)
+
+**Audit Logging**:
+- ✅ Immutable, tamper-evident logging (50+ event types)
+- ✅ 7-year retention for legal compliance
+- ✅ Searchable, filterable admin dashboard
+- ✅ CSV export for compliance audits
+- ✅ IP address and user agent tracking
+
+**Events Tracked**:
+- User actions (login, logout, password changes)
+- Content changes (create, edit, delete)
+- Ecommerce (orders, payments, refunds)
+- Admin actions (role changes, system config)
+
+### 9. User Management
+
+**Account Management**:
+- ✅ Email verification required for Members
+- ✅ Password requirements (16 chars, uppercase + special char)
+- ✅ Admin/Owner created by elevation (not direct creation)
+- ✅ Capability-based permission system
+- ✅ Owner can assign capabilities to roles
+
+**Password Reset**:
+- ✅ Self-initiated password reset
+- ✅ Admin-initiated password reset (capability-based)
+- ✅ Password reset also resets 2FA for Admin/Owner
 
 ## MVP Nice-to-Have Features
 
@@ -193,32 +266,31 @@ This document defines the Minimum Viable Product (MVP) scope for AECMS based on 
 
 ### Content Features
 - ❌ Multi-language support
-- ❌ Content versioning/revisions
-- ❌ Workflow/approval system
-- ❌ Commenting system
+- ❌ Workflow/approval system (Review status reserved for future)
 - ❌ Content scheduling (publish later)
 - ❌ Content import/export (except WordPress migration script)
+- ❌ AI writing assistance
 
 ### Ecommerce Features
 - ❌ Variable products (size, color variants)
-- ❌ Digital/downloadable products
+- ❌ PDF/audiobook digital products (eBooks only in MVP)
 - ❌ Subscription products
 - ❌ Coupon/discount codes
 - ❌ Shipping calculation/zones
 - ❌ Abandoned cart recovery
-- ❌ Product reviews/ratings
 - ❌ Inventory alerts
-- ❌ Multi-currency support
+- ❌ Multi-currency support (USD only)
+- ❌ Wholesale/bulk pricing
+- ❌ Gift cards/store credit
 
 ### Advanced Features
 - ❌ Email marketing integration
-- ❌ Analytics dashboard (beyond basic stats)
+- ❌ Analytics dashboard (beyond basic stats and CSV reports)
 - ❌ A/B testing
 - ❌ Advanced SEO tools (sitemap/robots.txt are OK)
-- ❌ Multi-user collaboration
-- ❌ Custom user roles
-- ❌ Activity logs/audit trail
-- ❌ Two-factor authentication (MFA)
+- ❌ Multi-user collaboration (beyond owner/admin/member)
+- ❌ Custom CSS editor
+- ❌ Theme extensibility/plugins
 
 ### Infrastructure
 - ❌ Multi-tenancy
@@ -325,17 +397,28 @@ This document defines the Minimum Viable Product (MVP) scope for AECMS based on 
 ### Database Schema (MVP)
 
 **Core Tables**:
-- users (id, email, name, password_hash, oauth_provider, role)
-- articles (id, title, slug, content, excerpt, featured_image_id, author_id, status)
-- pages (id, title, slug, content, template, parent_id)
+- users (id, email, name, password_hash, email_verified, oauth_provider, role, totp_secret)
+- articles (id, title, slug, content, excerpt, featured_image_id, author_id, status, visibility, version_control_enabled, require_acceptance, current_version)
+- pages (id, title, slug, content, template, parent_id, visibility)
 - categories (id, name, slug, type [article/product], parent_id)
 - tags (id, name, slug)
 - media (id, filename, path, mime_type, size, alt_text)
-- products (id, title, slug, description, price, stock_status, sku)
-- orders (id, customer_id, total, status, stripe_payment_intent_id)
+- products (id, title, slug, description, price, stock_status, sku, visibility, guest_purchaseable, product_type [physical/digital])
+- digital_products (id, product_id, file_path, file_size, download_limit, expiry_days)
+- orders (id, customer_id, total, status, payment_provider, payment_intent_id)
 - order_items (id, order_id, product_id, quantity, price)
+- order_downloads (id, order_item_id, token, downloads_remaining, expires_at)
 - carts (id, user_id, session_id, items [jsonb])
 - settings (key, value)
+- comments (id, entity_type, entity_id, user_id, content, is_review, rating, status, flagged)
+- article_versions (id, article_id, version_number, content, change_summary, created_by)
+- user_document_acceptance (id, user_id, article_id, version_number, ip_address, user_agent, accepted_at)
+- audit_logs (id, timestamp, event_type, user_id, target_type, target_id, action, details, ip_address, user_agent, previous_hash, entry_hash)
+- roles (id, name)
+- capabilities (id, name, description, category)
+- role_capabilities (role_id, capability_id)
+- email_verification_tokens (id, user_id, token, expires_at)
+- refresh_tokens (id, user_id, token_hash, device_fingerprint, expires_at)
 
 **Junction Tables**:
 - article_categories
@@ -495,11 +578,11 @@ This document defines the Minimum Viable Product (MVP) scope for AECMS based on 
 
 ## Open Questions
 
-1. Should we include a demo/seeded data for new installations?
-2. Do you want product inventory management in MVP (or just in/out of stock)?
-3. Should order emails include PDF invoice?
-4. Do you need tax calculation (simple percentage or Stripe Tax)?
-5. Should we include basic site analytics (page views, popular articles) in MVP?
+1. Should we include a demo/seeded data for new installations? - **TBD**
+2. ~~Do you want product inventory management in MVP (or just in/out of stock)?~~ - **Simple in/out of stock (MVP)**
+3. Should order emails include PDF invoice? - **TBD (nice-to-have, not MVP)**
+4. ~~Do you need tax calculation (simple percentage or Stripe Tax)?~~ - **No tax calculation in MVP (manual handling)**
+5. Should we include basic site analytics (page views, popular articles) in MVP? - **TBD (basic stats dashboard is okay)**
 
 ## Approval
 
