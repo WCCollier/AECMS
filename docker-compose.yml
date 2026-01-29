@@ -43,7 +43,7 @@ services:
       target: development
     container_name: aecms-backend
     environment:
-      DATABASE_URL: postgresql://aecms:${DB_PASSWORD}@postgres:5432/aecms
+      DATABASE_URL: postgresql://aecms:cwnVRSAKCRfmVPmIuniAYzDMzCx1AJ%2FR8fIeeC8TPdU%3D@postgres:5432/aecms
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION}
