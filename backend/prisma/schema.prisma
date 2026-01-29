@@ -1,14 +1,721 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ============================================================================
+// AECMS Database Schema
+// ============================================================================
+// Comprehensive schema for Advanced Ecommerce Content Management System
+// Supports: Users, RBAC, Content, Ecommerce, Comments, Audit Trail
+//
+// Generated: Phase 1 - Database Schema & Authentication
+// Version: 1.0
+// ============================================================================
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+// ============================================================================
+// USER MANAGEMENT & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  password_hash         String?   // Null for OAuth-only users
+  first_name            String?
+  last_name             String?
+  avatar_url            String?
+  role                  UserRole  @default(member)
+  email_verified        Boolean   @default(false)
+  email_verification_token String?
+  email_verification_expires DateTime?
+  password_reset_token  String?
+  password_reset_expires DateTime?
+  totp_secret           String?   // Encrypted TOTP secret
+  totp_enabled          Boolean   @default(false)
+  totp_backup_codes     String[]  // Encrypted recovery codes
+  last_login_at         DateTime?
+  last_login_ip         String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  deleted_at            DateTime? // Soft delete
+
+  // Relations
+  oauth_accounts        OAuthAccount[]
+  refresh_tokens        RefreshToken[]
+  capabilities          UserCapability[]
+  articles              Article[]
+  comments              Comment[]
+  product_reviews       ProductReview[]
+  orders                Order[]
+  cart_items            CartItem[]
+  kindle_devices        KindleDevice[]
+  audit_logs            AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  owner
+  admin
+  member
+  guest
+}
+
+model OAuthAccount {
+  id              String   @id @default(uuid())
+  user_id         String
+  provider        String   // 'google' | 'apple'
+  provider_user_id String
+  access_token    String?  // Encrypted
+  refresh_token   String?  // Encrypted
+  expires_at      DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider, provider_user_id])
+  @@index([user_id])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id              String    @id @default(uuid())
+  user_id         String
+  token_hash      String    @unique
+  device_info     String?   // User agent
+  ip_address      String?
+  expires_at      DateTime
+  created_at      DateTime  @default(now())
+  revoked_at      DateTime? // For "logout all devices"
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([token_hash])
+  @@map("refresh_tokens")
+}
+
+// ============================================================================
+// CAPABILITY-BASED RBAC
+// ============================================================================
+
+model Capability {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g., 'article.create', 'product.edit'
+  category    String   // 'content', 'ecommerce', 'users', 'system'
+  description String
+  created_at  DateTime @default(now())
+
+  user_capabilities UserCapability[]
+  role_capabilities RoleCapability[]
+
+  @@index([category])
+  @@map("capabilities")
+}
+
+model UserCapability {
+  id            String   @id @default(uuid())
+  user_id       String
+  capability_id String
+  granted_by    String   // User ID of admin who granted this
+  granted_at    DateTime @default(now())
+
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  capability Capability @relation(fields: [capability_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, capability_id])
+  @@map("user_capabilities")
+}
+
+model RoleCapability {
+  id            String   @id @default(uuid())
+  role          UserRole
+  capability_id String
+  enabled       Boolean  @default(true)
+  updated_at    DateTime @updatedAt
+
+  capability Capability @relation(fields: [capability_id], references: [id], onDelete: Cascade)
+
+  @@unique([role, capability_id])
+  @@map("role_capabilities")
+}
+
+// ============================================================================
+// CONTENT MANAGEMENT
+// ============================================================================
+
+model Article {
+  id                  String      @id @default(uuid())
+  title               String
+  slug                String      @unique
+  content             String      @db.Text
+  excerpt             String?
+  featured_image_id   String?
+  author_id           String
+  status              ContentStatus @default(draft)
+  visibility          ContentVisibility @default(public)
+  published_at        DateTime?
+  meta_title          String?
+  meta_description    String?
+
+  // Granular permissions (PRD 12)
+  author_can_edit     Boolean     @default(true)
+  author_can_delete   Boolean     @default(true)
+  admin_can_edit      Boolean     @default(true)
+  admin_can_delete    Boolean     @default(true)
+
+  // Version control (optional)
+  version_control_enabled Boolean @default(false)
+  current_version     Int         @default(1)
+
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  deleted_at          DateTime?
+
+  author          User            @relation(fields: [author_id], references: [id])
+  featured_image  MediaFile?      @relation("ArticleFeaturedImage", fields: [featured_image_id], references: [id])
+  categories      ArticleCategory[]
+  tags            ArticleTag[]
+  media           ArticleMedia[]
+  comments        Comment[]
+  versions        ArticleVersion[]
+
+  @@index([slug])
+  @@index([author_id])
+  @@index([status])
+  @@index([visibility])
+  @@index([published_at])
+  @@map("articles")
+}
+
+enum ContentStatus {
+  draft
+  published
+  archived
+}
+
+enum ContentVisibility {
+  public
+  logged_in_only
+  admin_only
+}
+
+model ArticleVersion {
+  id               String   @id @default(uuid())
+  article_id       String
+  version_number   Int
+  title            String
+  content          String   @db.Text
+  change_summary   String?
+  created_by       String
+  created_at       DateTime @default(now())
+
+  article Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+
+  acceptances UserAcceptance[]
+
+  @@unique([article_id, version_number])
+  @@map("article_versions")
+}
+
+model UserAcceptance {
+  id               String   @id @default(uuid())
+  version_id       String
+  user_id          String?  // Nullable for guest acceptance
+  ip_address       String
+  user_agent       String
+  accepted_at      DateTime @default(now())
+
+  version ArticleVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@map("user_acceptances")
+}
+
+model Page {
+  id                  String      @id @default(uuid())
+  title               String
+  slug                String      @unique
+  content             String      @db.Text
+  parent_id           String?
+  template            String      @default("full-width")
+  status              ContentStatus @default(draft)
+  visibility          ContentVisibility @default(public)
+  published_at        DateTime?
+  meta_title          String?
+  meta_description    String?
+
+  // Granular permissions
+  author_can_edit     Boolean     @default(true)
+  author_can_delete   Boolean     @default(true)
+  admin_can_edit      Boolean     @default(true)
+  admin_can_delete    Boolean     @default(true)
+
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  deleted_at          DateTime?
+
+  parent   Page?  @relation("PageHierarchy", fields: [parent_id], references: [id])
+  children Page[] @relation("PageHierarchy")
+
+  @@index([slug])
+  @@index([parent_id])
+  @@map("pages")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  parent_id   String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  parent   Category? @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  articles ArticleCategory[]
+  products ProductCategory[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+model Tag {
+  id         String   @id @default(uuid())
+  name       String
+  slug       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  articles ArticleTag[]
+  products ProductTag[]
+
+  @@index([slug])
+  @@map("tags")
+}
+
+model ArticleCategory {
+  article_id  String
+  category_id String
+
+  article  Article  @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@id([article_id, category_id])
+  @@map("article_categories")
+}
+
+model ArticleTag {
+  article_id String
+  tag_id     String
+
+  article Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([article_id, tag_id])
+  @@map("article_tags")
+}
+
+model MediaFile {
+  id            String   @id @default(uuid())
+  filename      String
+  original_name String
+  mime_type     String
+  size          Int      // bytes
+  width         Int?
+  height        Int?
+  alt_text      String?
+  caption       String?
+  storage_path  String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  article_featured Article[] @relation("ArticleFeaturedImage")
+  article_media    ArticleMedia[]
+  product_media    ProductMedia[]
+
+  @@index([mime_type])
+  @@map("media_files")
+}
+
+model ArticleMedia {
+  article_id String
+  media_id   String
+  order      Int @default(0)
+
+  article Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  media   MediaFile @relation(fields: [media_id], references: [id], onDelete: Cascade)
+
+  @@id([article_id, media_id])
+  @@map("article_media")
+}
+
+// ============================================================================
+// ECOMMERCE
+// ============================================================================
+
+model Product {
+  id                  String      @id @default(uuid())
+  name                String
+  slug                String      @unique
+  description         String      @db.Text
+  short_description   String?
+  price               Decimal     @db.Decimal(10, 2)
+  sku                 String?     @unique
+  stock_quantity      Int         @default(0)
+  stock_status        StockStatus @default(in_stock)
+  status              ContentStatus @default(draft)
+  visibility          ContentVisibility @default(public)
+  guest_purchaseable  Boolean     @default(false)
+
+  // Product type
+  product_type        ProductType @default(physical)
+
+  // Granular permissions
+  author_can_edit     Boolean     @default(true)
+  author_can_delete   Boolean     @default(true)
+  admin_can_edit      Boolean     @default(true)
+  admin_can_delete    Boolean     @default(true)
+
+  // SEO
+  meta_title          String?
+  meta_description    String?
+
+  published_at        DateTime?
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  deleted_at          DateTime?
+
+  categories       ProductCategory[]
+  tags             ProductTag[]
+  media            ProductMedia[]
+  reviews          ProductReview[]
+  cart_items       CartItem[]
+  order_items      OrderItem[]
+  digital_files    DigitalProductFile[]
+
+  @@index([slug])
+  @@index([sku])
+  @@index([product_type])
+  @@map("products")
+}
+
+enum StockStatus {
+  in_stock
+  out_of_stock
+  backorder
+}
+
+enum ProductType {
+  physical
+  digital
+}
+
+model DigitalProductFile {
+  id                      String      @id @default(uuid())
+  product_id              String
+  format                  FileFormat
+  file_id                 String      // References MediaFile
+  personalization_enabled Boolean     @default(false)
+  max_downloads           Int         @default(5)
+  created_at              DateTime    @default(now())
+  updated_at              DateTime    @updatedAt
+
+  product  Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  downloads DigitalDownload[]
+
+  @@unique([product_id, format])
+  @@map("digital_product_files")
+}
+
+enum FileFormat {
+  epub
+  pdf
+}
+
+model DigitalDownload {
+  id                String   @id @default(uuid())
+  digital_file_id   String
+  order_id          String
+  user_id           String?
+  download_token    String   @unique
+  download_count    Int      @default(0)
+  max_downloads     Int      @default(5)
+  expires_at        DateTime
+  created_at        DateTime @default(now())
+  last_downloaded_at DateTime?
+
+  digital_file DigitalProductFile @relation(fields: [digital_file_id], references: [id])
+  order        Order              @relation(fields: [order_id], references: [id])
+
+  @@index([download_token])
+  @@index([order_id])
+  @@map("digital_downloads")
+}
+
+model KindleDevice {
+  id            String    @id @default(uuid())
+  user_id       String
+  friendly_name String
+  kindle_email  String
+  is_default    Boolean   @default(false)
+  last_used_at  DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("kindle_devices")
+}
+
+model ProductCategory {
+  product_id  String
+  category_id String
+
+  product  Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@id([product_id, category_id])
+  @@map("product_categories")
+}
+
+model ProductTag {
+  product_id String
+  tag_id     String
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([product_id, tag_id])
+  @@map("product_tags")
+}
+
+model ProductMedia {
+  product_id String
+  media_id   String
+  order      Int     @default(0)
+  is_primary Boolean @default(false)
+
+  product Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  media   MediaFile @relation(fields: [media_id], references: [id], onDelete: Cascade)
+
+  @@id([product_id, media_id])
+  @@map("product_media")
+}
+
+// ============================================================================
+// CART & ORDERS
+// ============================================================================
+
+model Cart {
+  id         String   @id @default(uuid())
+  session_id String?  @unique
+  user_id    String?  @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  cart_id    String
+  product_id String
+  user_id    String?  // For logged-in users
+  quantity   Int      @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id])
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  @@unique([cart_id, product_id])
+  @@map("cart_items")
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  order_number      String      @unique
+  user_id           String?
+  email             String
+  status            OrderStatus @default(pending)
+
+  // Amounts
+  subtotal          Decimal     @db.Decimal(10, 2)
+  tax               Decimal     @db.Decimal(10, 2) @default(0)
+  shipping          Decimal     @db.Decimal(10, 2) @default(0)
+  total             Decimal     @db.Decimal(10, 2)
+
+  // Payment
+  payment_method    String      // 'stripe', 'paypal', 'amazon_pay'
+  payment_intent_id String?
+  paid_at           DateTime?
+
+  // Shipping (null for digital-only orders)
+  shipping_name     String?
+  shipping_address  String?
+  shipping_city     String?
+  shipping_state    String?
+  shipping_zip      String?
+  shipping_country  String?
+
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+
+  user           User?            @relation(fields: [user_id], references: [id])
+  items          OrderItem[]
+  digital_downloads DigitalDownload[]
+
+  @@index([order_number])
+  @@index([user_id])
+  @@index([status])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  pending
+  processing
+  completed
+  cancelled
+  refunded
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  order_id   String
+  product_id String
+  quantity   Int
+  price      Decimal @db.Decimal(10, 2) // Price at time of purchase
+
+  order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@map("order_items")
+}
+
+// ============================================================================
+// COMMENTS & REVIEWS
+// ============================================================================
+
+model Comment {
+  id                String        @id @default(uuid())
+  article_id        String?
+  user_id           String?       // Nullable for guest comments (future)
+  author_name       String?       // For guest comments
+  author_email      String?       // For guest comments
+  content           String        @db.Text
+  status            CommentStatus @default(pending)
+
+  // AI Moderation
+  moderation_status ModerationStatus @default(pending)
+  moderation_flags  String[]      // Array of flags from OpenAI
+  profanity_detected Boolean      @default(false)
+
+  parent_id         String?       // For nested replies
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+  deleted_at        DateTime?
+
+  article Article?  @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  user    User?     @relation(fields: [user_id], references: [id])
+  parent  Comment?  @relation("CommentReplies", fields: [parent_id], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([article_id])
+  @@index([user_id])
+  @@index([status])
+  @@map("comments")
+}
+
+enum CommentStatus {
+  pending
+  approved
+  rejected
+  spam
+}
+
+enum ModerationStatus {
+  pending
+  approved
+  flagged
+  rejected
+}
+
+model ProductReview {
+  id                String           @id @default(uuid())
+  product_id        String
+  user_id           String
+  rating            Int              // 1-5
+  title             String?
+  content           String           @db.Text
+  status            CommentStatus    @default(pending)
+
+  // AI Moderation
+  moderation_status ModerationStatus @default(pending)
+  moderation_flags  String[]
+  profanity_detected Boolean         @default(false)
+
+  verified_purchase Boolean          @default(false)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  deleted_at        DateTime?
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id])
+
+  @@index([product_id])
+  @@index([user_id])
+  @@map("product_reviews")
+}
+
+// ============================================================================
+// AUDIT TRAIL
+// ============================================================================
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  event_type      String   // e.g., 'user.login', 'article.create'
+  user_id         String?
+  ip_address      String?
+  user_agent      String?
+  resource_type   String?  // 'article', 'product', 'user', etc.
+  resource_id     String?
+  changes         Json?    // Before/after values
+  metadata        Json?    // Additional context
+  previous_hash   String?  // Hash of previous log entry (blockchain-like)
+  entry_hash      String   // Hash of this entry
+  created_at      DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([event_type])
+  @@index([user_id])
+  @@index([resource_type, resource_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// SYSTEM SETTINGS
+// ============================================================================
+
+model Setting {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String   @db.Text
+  encrypted  Boolean  @default(false) // For API keys
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("settings")
 }
