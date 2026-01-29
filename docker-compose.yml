@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: aecms-postgres
+    environment:
+      POSTGRES_DB: aecms
+      POSTGRES_USER: aecms
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aecms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aecms-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: aecms-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aecms-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: aecms-backend
+    environment:
+      DATABASE_URL: postgresql://aecms:${DB_PASSWORD}@postgres:5432/aecms
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION}
+      NODE_ENV: ${NODE_ENV}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      FRONTEND_ADMIN_URL: ${FRONTEND_ADMIN_URL}
+      # Codespaces auto-detection variables (auto-provided by GitHub)
+      CODESPACES: ${CODESPACES:-false}
+      CODESPACE_NAME: ${CODESPACE_NAME:-}
+      GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: ${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}
+      # Future phase placeholders
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_CLIENT_SECRET: ${APPLE_CLIENT_SECRET:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID:-}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET:-}
+      PAYPAL_MODE: ${PAYPAL_MODE:-sandbox}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AWS_SES_REGION: ${AWS_SES_REGION:-us-east-1}
+      AWS_SES_ACCESS_KEY_ID: ${AWS_SES_ACCESS_KEY_ID:-}
+      AWS_SES_SECRET_ACCESS_KEY: ${AWS_SES_SECRET_ACCESS_KEY:-}
+      AWS_SES_FROM_EMAIL: ${AWS_SES_FROM_EMAIL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - backend_uploads:/app/uploads
+    command: npm run start:dev
+    networks:
+      - aecms-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development
+    container_name: aecms-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: ${API_URL}
+      NODE_ENV: ${NODE_ENV}
+      # Codespaces detection for client-side
+      NEXT_PUBLIC_CODESPACES: ${CODESPACES:-false}
+      NEXT_PUBLIC_CODESPACE_NAME: ${CODESPACE_NAME:-}
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    networks:
+      - aecms-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_uploads:
+    driver: local
+
+networks:
+  aecms-network:
+    driver: bridge
