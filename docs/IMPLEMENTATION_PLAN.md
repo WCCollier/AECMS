@@ -1,13 +1,22 @@
 # AECMS Implementation Plan
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** 2026-01-29
 **Status:** Implementation Roadmap
-**Optimized for:** Agentic coding via Claude Code
+**Optimized for:** Agentic coding via Claude Code with clear human/AI role division
 
 ## Overview
 
-This document provides a comprehensive phased development plan for AECMS, optimized for implementation by Claude Code with automated testing and validation at each phase.
+This document provides a comprehensive phased development plan for AECMS, optimized for implementation by Claude Code with **explicit markers** for what can be done autonomously vs what requires human intervention.
+
+## Role Legend
+
+Throughout this document, tasks are marked with the following prefixes:
+
+- **🤖 [AUTONOMOUS]** - Claude Code can complete this task fully without human intervention
+- **👤 [HUMAN REQUIRED]** - Requires human action (account creation, API keys, payment setup, etc.)
+- **🤝 [HUMAN DECISION]** - Requires human choice, approval, or configuration preference
+- **👁️ [HUMAN VERIFICATION]** - Claude can automate, but human should verify/test (especially UX, payment flows)
 
 ## Guiding Principles
 
@@ -18,6 +27,7 @@ This document provides a comprehensive phased development plan for AECMS, optimi
 5. **Database-First**: Define schema early, migrate incrementally
 6. **API-First**: Backend APIs before frontend UI
 7. **Security from Start**: Authentication and authorization in Phase 1
+8. **Human-in-the-Loop**: Critical paths (payments, auth, security) require human verification
 
 ## Technology Stack
 
@@ -50,12 +60,41 @@ This document provides a comprehensive phased development plan for AECMS, optimi
 
 ## Phase 0: Project Foundation (Week 1)
 
-### Prerequisites
-- Docker installed
-- Node.js 20+ installed
-- Git repository initialized
+### 👤 [HUMAN REQUIRED] Prerequisites Setup
 
-### Deliverables
+Before Claude Code can begin development, you need to:
+
+1. **Install Docker Desktop** (if not already installed)
+   - macOS: https://docs.docker.com/desktop/install/mac-install/
+   - Windows: https://docs.docker.com/desktop/install/windows-install/
+   - Linux: https://docs.docker.com/desktop/install/linux-install/
+
+2. **Verify Node.js 20+** is installed
+   ```bash
+   node --version  # Should be v20.x.x or higher
+   ```
+
+3. **Ensure GitHub repository is initialized** (already done for AECMS)
+
+4. **Create `.env` file** in project root:
+   ```bash
+   # You'll need to generate a secure random string for JWT_SECRET
+   # Run: openssl rand -base64 32
+
+   DB_PASSWORD=your_secure_postgres_password
+   JWT_SECRET=your_generated_jwt_secret
+   JWT_EXPIRATION=15m
+   REFRESH_TOKEN_EXPIRATION=7d
+   NODE_ENV=development
+   ```
+
+**Estimated time:** 30 minutes to 1 hour (depending on Docker installation)
+
+---
+
+### 🤖 [AUTONOMOUS] Deliverables
+
+Claude Code can create these automatically:
 
 #### 0.1 Project Structure
 ```
@@ -70,16 +109,19 @@ aecms/
 │   ├── test/                # E2E tests
 │   ├── package.json
 │   ├── tsconfig.json
+│   ├── jest.config.js
 │   └── Dockerfile
 ├── frontend/
-│   ├── src/
-│   │   ├── app/             # Next.js App Router
-│   │   ├── components/      # Reusable components
-│   │   ├── lib/             # Utilities, API clients
-│   │   └── styles/          # Global styles, Tailwind
+│   ├── app/                 # Next.js App Router
+│   ├── components/          # Reusable components
+│   ├── lib/                 # Utilities, API clients
+│   ├── styles/              # Global styles, Tailwind
 │   ├── package.json
 │   ├── tsconfig.json
+│   ├── next.config.js
 │   └── Dockerfile
+├── scripts/
+│   └── validate-phase.sh    # Automated validation script
 ├── docker-compose.yml
 ├── .env.example
 ├── .gitignore
@@ -88,9 +130,12 @@ aecms/
 
 #### 0.2 Docker Compose Configuration
 ```yaml
+version: '3.8'
+
 services:
   postgres:
     image: postgres:15-alpine
+    container_name: aecms-postgres
     environment:
       POSTGRES_DB: aecms
       POSTGRES_USER: aecms
@@ -99,32 +144,55 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aecms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
+    container_name: aecms-redis
     volumes:
       - redis_data:/data
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aecms-backend
     environment:
       DATABASE_URL: postgresql://aecms:${DB_PASSWORD}@postgres:5432/aecms
       REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      NODE_ENV: ${NODE_ENV}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "4000:4000"
     volumes:
       - ./backend:/app
       - /app/node_modules
+      - backend_uploads:/app/uploads
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aecms-frontend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:4000
+      NODE_ENV: ${NODE_ENV}
     depends_on:
       - backend
     ports:
@@ -132,41 +200,171 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_uploads:
 ```
 
 #### 0.3 Backend Initialization
+
+**Commands Claude Code will run:**
 ```bash
 # Initialize NestJS
-npx @nestjs/cli new backend
+npx @nestjs/cli new backend --package-manager npm --skip-git
 
 # Install core dependencies
 cd backend
-npm install @nestjs/config @nestjs/swagger
+npm install @nestjs/config @nestjs/swagger @nestjs/jwt @nestjs/passport
+npm install @nestjs/throttler @nestjs/bull bull
 npm install @prisma/client prisma
 npm install class-validator class-transformer
-npm install bcrypt jsonwebtoken
-npm install -D @types/bcrypt @types/jsonwebtoken
+npm install bcrypt passport passport-jwt passport-google-oauth20 passport-apple
+npm install redis ioredis
+npm install -D @types/bcrypt @types/passport-jwt @types/passport-google-oauth20
+
+# Install testing dependencies
+npm install -D @nestjs/testing supertest @types/supertest
 
 # Initialize Prisma
 npx prisma init
+
+# Set up ESLint and Prettier
+npm install -D prettier eslint-config-prettier eslint-plugin-prettier
 ```
 
 #### 0.4 Frontend Initialization
+
+**Commands Claude Code will run:**
 ```bash
 # Initialize Next.js
-npx create-next-app@latest frontend --typescript --tailwind --app --no-src-dir
+npx create-next-app@latest frontend \
+  --typescript \
+  --tailwind \
+  --app \
+  --no-src-dir \
+  --import-alias "@/*" \
+  --skip-git
 
 # Install core dependencies
 cd frontend
-npm install swr axios
+npm install swr axios zod
 npm install @radix-ui/react-dialog @radix-ui/react-dropdown-menu
-npm install @tiptap/react @tiptap/starter-kit
+npm install @radix-ui/react-select @radix-ui/react-toast
+npm install @tiptap/react @tiptap/starter-kit @tiptap/extension-link
+npm install react-hook-form
+npm install lucide-react  # Icon library
+
+# Install dev dependencies
+npm install -D @playwright/test
 ```
 
-### Testing Strategy
+#### 0.5 Dockerfiles
 
-**Validation Checklist (Claude Code can run):**
+**Backend Dockerfile:**
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npx prisma generate
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+RUN addgroup -g 1001 -S nodejs && adduser -S nestjs -u 1001
+COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+USER nestjs
+EXPOSE 4000
+CMD ["node", "dist/main"]
+```
+
+**Frontend Dockerfile:**
+```dockerfile
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM node:20-alpine
+WORKDIR /app
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+USER nextjs
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+#### 0.6 Validation Script
+
+**`scripts/validate-phase.sh`:**
 ```bash
+#!/bin/bash
+# Automated validation script that Claude Code can run after each phase
+
+set -e  # Exit on any error
+
+echo "🚀 Starting Phase Validation..."
+
+# Backend validation
+echo "📦 Validating Backend..."
+cd backend
+npm run build
+npm run lint
+npm run test
+npx prisma validate
+cd ..
+
+# Frontend validation
+echo "🎨 Validating Frontend..."
+cd frontend
+npm run build
+npm run lint
+cd ..
+
+# Docker validation
+echo "🐳 Validating Docker Compose..."
+docker-compose config
+
+# Security audit
+echo "🔒 Running Security Audit..."
+cd backend && npm audit --audit-level=moderate && cd ..
+cd frontend && npm audit --audit-level=moderate && cd ..
+
+# Test coverage check
+echo "📊 Checking Test Coverage..."
+cd backend
+COVERAGE=$(npm run test:cov 2>&1 | grep "All files" | awk '{print $10}' | sed 's/%//')
+if [ "$COVERAGE" -lt 80 ]; then
+  echo "⚠️  Warning: Test coverage is below 80% ($COVERAGE%)"
+else
+  echo "✅ Test coverage: $COVERAGE%"
+fi
+cd ..
+
+echo "✅ Phase Validation Complete!"
+```
+
+---
+
+### 🤖 [AUTONOMOUS] Testing Strategy
+
+**Validation Checklist (Claude Code runs automatically):**
+```bash
+# Make validation script executable
+chmod +x scripts/validate-phase.sh
+
 # Backend health check
 cd backend
 npm run build
@@ -177,2241 +375,2595 @@ cd frontend
 npm run build
 npm run lint
 
-# Docker compose check
+# Docker compose validation
 docker-compose config
+
+# Start services
 docker-compose up -d
-docker-compose ps  # All services should be "running"
+
+# Wait for services to be healthy
+sleep 10
+
+# Check service status
+docker-compose ps
 
 # Database connection check
 docker exec aecms-postgres psql -U aecms -c "SELECT version();"
 
 # Redis connection check
-docker exec aecms-redis redis-cli ping  # Should return PONG
+docker exec aecms-redis redis-cli ping
+
+# Backend health endpoint
+curl http://localhost:4000/health || echo "Backend not responding yet (expected if not implemented)"
+
+# Frontend health
+curl http://localhost:3000 || echo "Frontend not responding yet (expected)"
 ```
 
-**Success Criteria:**
-- ✅ All services start successfully
-- ✅ Backend responds at `http://localhost:4000`
-- ✅ Frontend responds at `http://localhost:3000`
-- ✅ Database accepts connections
+---
+
+### 👁️ [HUMAN VERIFICATION] Success Criteria
+
+After Claude Code completes Phase 0, you should verify:
+
+- ✅ All services start successfully (`docker-compose ps` shows all as "running")
+- ✅ Backend responds at `http://localhost:4000` (visit in browser)
+- ✅ Frontend responds at `http://localhost:3000` (visit in browser)
+- ✅ Database accepts connections (check Docker logs)
 - ✅ Redis responds to ping
 - ✅ `npm run build` succeeds for both backend and frontend
+- ✅ `.env.example` file exists with all required variables documented
+- ✅ `.gitignore` excludes `.env`, `node_modules`, `dist`, `.next`
+
+**Verification time:** 10-15 minutes
 
 ---
 
-## Phase 1: Database Schema & Core Auth (Week 2-3)
-
-### Prerequisites
-- Phase 0 complete
-
-### Deliverables
-
-#### 1.1 Core Database Schema (Prisma)
-
-**File: `backend/prisma/schema.prisma`**
-
-Create initial schema with core models:
-- User (with roles, OAuth, 2FA fields)
-- Role & Capability tables
-- EmailVerificationToken
-- PasswordResetToken
-- RefreshToken
-- Session
-
-**Migration:**
-```bash
-npx prisma migrate dev --name init_core_schema
-npx prisma generate
-```
-
-#### 1.2 Authentication Module
-
-**Files to create:**
-- `src/modules/auth/auth.module.ts`
-- `src/modules/auth/auth.service.ts`
-- `src/modules/auth/auth.controller.ts`
-- `src/modules/auth/strategies/jwt.strategy.ts`
-- `src/modules/auth/strategies/jwt-refresh.strategy.ts`
-- `src/modules/auth/strategies/google.strategy.ts`
-- `src/modules/auth/strategies/apple.strategy.ts`
-- `src/modules/auth/guards/jwt-auth.guard.ts`
-- `src/modules/auth/guards/roles.guard.ts`
-- `src/modules/auth/decorators/current-user.decorator.ts`
-- `src/modules/auth/decorators/roles.decorator.ts`
-- `src/modules/auth/dto/register.dto.ts`
-- `src/modules/auth/dto/login.dto.ts`
-
-**API Endpoints to implement:**
-```typescript
-POST   /api/auth/register              // Email/password registration
-POST   /api/auth/login                 // Email/password login
-POST   /api/auth/refresh               // Refresh access token
-POST   /api/auth/logout                // Logout (invalidate refresh token)
-GET    /api/auth/me                    // Get current user
-POST   /api/auth/verify-email          // Verify email with token
-POST   /api/auth/resend-verification   // Resend verification email
-POST   /api/auth/forgot-password       // Request password reset
-POST   /api/auth/reset-password        // Reset password with token
-POST   /api/auth/oauth/google          // Google OAuth login
-POST   /api/auth/oauth/apple           // Apple OAuth login
-```
-
-#### 1.3 Users Module
-
-**Files to create:**
-- `src/modules/users/users.module.ts`
-- `src/modules/users/users.service.ts`
-- `src/modules/users/users.controller.ts`
-- `src/modules/users/dto/create-user.dto.ts`
-- `src/modules/users/dto/update-user.dto.ts`
-
-**API Endpoints:**
-```typescript
-GET    /api/users                      // List users (Admin+)
-GET    /api/users/:id                  // Get user by ID
-POST   /api/users                      // Create user (Admin+)
-PUT    /api/users/:id                  // Update user
-DELETE /api/users/:id                  // Delete user (Admin+)
-PUT    /api/users/:id/role             // Change user role (Owner only)
-POST   /api/users/:id/force-password-reset  // Force password reset
-```
-
-### Testing Strategy
-
-#### Unit Tests (Jest)
-
-**File: `src/modules/auth/auth.service.spec.ts`**
-```typescript
-describe('AuthService', () => {
-  it('should hash passwords with bcrypt cost 12', async () => {
-    const password = 'Test123!@#$%^&*()_+'
-    const hash = await authService.hashPassword(password)
-    expect(hash).not.toBe(password)
-    expect(await bcrypt.compare(password, hash)).toBe(true)
-  })
-
-  it('should validate password requirements', () => {
-    expect(authService.validatePassword('short')).toBe(false)
-    expect(authService.validatePassword('nouppercaseorspecial123')).toBe(false)
-    expect(authService.validatePassword('NOLOWERORSPECIAL123')).toBe(false)
-    expect(authService.validatePassword('ValidPass123!')).toBe(true)
-  })
-
-  it('should generate secure tokens', () => {
-    const token = authService.generateSecureToken()
-    expect(token.length).toBe(64) // 32 bytes hex = 64 chars
-  })
-
-  it('should create JWT with correct claims', async () => {
-    const user = { id: '123', email: 'test@example.com', role: 'member' }
-    const token = authService.createAccessToken(user)
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-    expect(decoded.sub).toBe(user.id)
-    expect(decoded.email).toBe(user.email)
-    expect(decoded.role).toBe(user.role)
-  })
-})
-```
-
-**File: `src/modules/users/users.service.spec.ts`**
-```typescript
-describe('UsersService', () => {
-  it('should not allow duplicate emails', async () => {
-    await usersService.create({ email: 'test@example.com', ... })
-    await expect(
-      usersService.create({ email: 'test@example.com', ... })
-    ).rejects.toThrow('Email already exists')
-  })
-
-  it('should soft delete users', async () => {
-    const user = await usersService.create({ ... })
-    await usersService.delete(user.id)
-    const deleted = await usersService.findById(user.id)
-    expect(deleted.deleted_at).not.toBeNull()
-  })
-})
-```
-
-#### Integration Tests (Supertest)
-
-**File: `test/auth.e2e-spec.ts`**
-```typescript
-describe('Auth (e2e)', () => {
-  beforeEach(async () => {
-    await cleanDatabase()
-  })
-
-  describe('POST /auth/register', () => {
-    it('should register new user', () => {
-      return request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          email: 'newuser@example.com',
-          password: 'ValidPassword123!',
-          displayName: 'New User'
-        })
-        .expect(201)
-        .expect(res => {
-          expect(res.body.email).toBe('newuser@example.com')
-          expect(res.body.email_verified).toBe(false)
-          expect(res.body.password_hash).toBeUndefined() // Not exposed
-        })
-    })
-
-    it('should require valid email', () => {
-      return request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          email: 'invalid-email',
-          password: 'ValidPassword123!',
-          displayName: 'Test'
-        })
-        .expect(400)
-    })
-
-    it('should require 16+ char password with uppercase and special', () => {
-      return request(app.getHttpServer())
-        .post('/auth/register')
-        .send({
-          email: 'test@example.com',
-          password: 'short',
-          displayName: 'Test'
-        })
-        .expect(400)
-    })
-  })
-
-  describe('POST /auth/login', () => {
-    beforeEach(async () => {
-      await createVerifiedUser({ email: 'test@example.com', password: 'ValidPassword123!' })
-    })
-
-    it('should login with correct credentials', () => {
-      return request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: 'test@example.com',
-          password: 'ValidPassword123!'
-        })
-        .expect(200)
-        .expect(res => {
-          expect(res.body.access_token).toBeDefined()
-          expect(res.headers['set-cookie']).toBeDefined() // Refresh token cookie
-        })
-    })
-
-    it('should not login with unverified email', async () => {
-      await createUnverifiedUser({ email: 'unverified@example.com', password: 'ValidPassword123!' })
-
-      return request(app.getHttpServer())
-        .post('/auth/login')
-        .send({
-          email: 'unverified@example.com',
-          password: 'ValidPassword123!'
-        })
-        .expect(403)
-        .expect(res => {
-          expect(res.body.message).toContain('Email not verified')
-        })
-    })
-
-    it('should rate limit after 5 failed attempts', async () => {
-      for (let i = 0; i < 5; i++) {
-        await request(app.getHttpServer())
-          .post('/auth/login')
-          .send({ email: 'test@example.com', password: 'wrong' })
-      }
-
-      return request(app.getHttpServer())
-        .post('/auth/login')
-        .send({ email: 'test@example.com', password: 'ValidPassword123!' })
-        .expect(429) // Too Many Requests
-    })
-  })
-
-  describe('POST /auth/verify-email', () => {
-    it('should verify email with valid token', async () => {
-      const { user, token } = await createUnverifiedUserWithToken()
-
-      return request(app.getHttpServer())
-        .post('/auth/verify-email')
-        .send({ token })
-        .expect(200)
-        .then(async () => {
-          const updated = await prisma.user.findUnique({ where: { id: user.id } })
-          expect(updated.email_verified).toBe(true)
-        })
-    })
-
-    it('should reject expired token', async () => {
-      const { token } = await createExpiredVerificationToken()
-
-      return request(app.getHttpServer())
-        .post('/auth/verify-email')
-        .send({ token })
-        .expect(400)
-        .expect(res => {
-          expect(res.body.message).toContain('expired')
-        })
-    })
-  })
-
-  describe('POST /auth/refresh', () => {
-    it('should refresh access token with valid refresh token', async () => {
-      const { refreshToken } = await loginUser('test@example.com', 'ValidPassword123!')
-
-      return request(app.getHttpServer())
-        .post('/auth/refresh')
-        .set('Cookie', `refreshToken=${refreshToken}`)
-        .expect(200)
-        .expect(res => {
-          expect(res.body.access_token).toBeDefined()
-          expect(res.body.access_token).not.toBe(oldAccessToken)
-        })
-    })
-
-    it('should reject revoked refresh token', async () => {
-      const { refreshToken } = await loginUser('test@example.com', 'ValidPassword123!')
-      await revokeRefreshToken(refreshToken)
-
-      return request(app.getHttpServer())
-        .post('/auth/refresh')
-        .set('Cookie', `refreshToken=${refreshToken}`)
-        .expect(401)
-    })
-  })
-})
-```
-
-**File: `test/users.e2e-spec.ts`**
-```typescript
-describe('Users (e2e)', () => {
-  let ownerToken: string
-  let adminToken: string
-  let memberToken: string
-
-  beforeEach(async () => {
-    await cleanDatabase()
-    ownerToken = await createAndLoginUser({ role: 'owner' })
-    adminToken = await createAndLoginUser({ role: 'admin' })
-    memberToken = await createAndLoginUser({ role: 'member' })
-  })
-
-  describe('GET /users', () => {
-    it('should allow Owner to list all users', () => {
-      return request(app.getHttpServer())
-        .get('/users')
-        .set('Authorization', `Bearer ${ownerToken}`)
-        .expect(200)
-        .expect(res => {
-          expect(res.body.length).toBeGreaterThan(0)
-        })
-    })
-
-    it('should allow Admin to list all users', () => {
-      return request(app.getHttpServer())
-        .get('/users')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200)
-    })
-
-    it('should forbid Member from listing users', () => {
-      return request(app.getHttpServer())
-        .get('/users')
-        .set('Authorization', `Bearer ${memberToken}`)
-        .expect(403)
-    })
-  })
-
-  describe('PUT /users/:id/role', () => {
-    it('should allow Owner to promote Member to Admin', async () => {
-      const member = await createUser({ role: 'member' })
-
-      return request(app.getHttpServer())
-        .put(`/users/${member.id}/role`)
-        .set('Authorization', `Bearer ${ownerToken}`)
-        .send({ role: 'admin' })
-        .expect(200)
-        .then(async () => {
-          const updated = await prisma.user.findUnique({ where: { id: member.id } })
-          expect(updated.role).toBe('admin')
-        })
-    })
-
-    it('should forbid Admin from promoting to Owner', async () => {
-      const member = await createUser({ role: 'member' })
-
-      return request(app.getHttpServer())
-        .put(`/users/${member.id}/role`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ role: 'owner' })
-        .expect(403)
-    })
-
-    it('should log role change in audit trail', async () => {
-      const member = await createUser({ role: 'member' })
-
-      await request(app.getHttpServer())
-        .put(`/users/${member.id}/role`)
-        .set('Authorization', `Bearer ${ownerToken}`)
-        .send({ role: 'admin' })
-
-      const auditLog = await prisma.auditLog.findFirst({
-        where: {
-          event_type: 'user_role_changed',
-          target_id: member.id
-        }
-      })
-
-      expect(auditLog).toBeDefined()
-      expect(auditLog.details.from).toBe('member')
-      expect(auditLog.details.to).toBe('admin')
-    })
-  })
-})
-```
-
-### Validation Checklist (Claude Code can run)
-
-```bash
-# Run all tests
-cd backend
-npm run test                    # Unit tests
-npm run test:e2e                # Integration tests
-npm run test:cov                # Coverage report (target: 80%+)
-
-# Type checking
-npm run build
-
-# Linting
-npm run lint
-
-# Database checks
-npx prisma validate             # Schema validation
-npx prisma migrate status       # Migration status
-
-# Manual API testing (optional)
-curl -X POST http://localhost:4000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"ValidPassword123!","displayName":"Test User"}'
-```
-
-**Success Criteria:**
-- ✅ All unit tests pass (100+ tests)
-- ✅ All E2E tests pass (50+ scenarios)
-- ✅ Test coverage ≥ 80% for auth and users modules
-- ✅ Password hashing uses bcrypt cost 12
-- ✅ JWT tokens expire in 15 minutes
-- ✅ Refresh tokens work correctly (front door: persistent, back door: 7-day)
-- ✅ Email verification required before login
-- ✅ Rate limiting works (5 login attempts per 15 min)
-- ✅ Role-based access control enforced
-- ✅ Owner can promote Member to Admin
-- ✅ Only Owner can promote to Owner
-- ✅ Audit logs created for role changes
-
----
-
-## Phase 2: Capability System & RBAC (Week 3-4)
-
-### Prerequisites
-- Phase 1 complete
-- User roles working (Owner, Admin, Member, Guest)
-
-### Deliverables
-
-#### 2.1 Database Schema Updates
-
-Add capability tables:
-- Capability
-- RoleCapability
-
-**Migration:**
-```bash
-npx prisma migrate dev --name add_capabilities
-```
-
-#### 2.2 Capabilities Module
-
-**Files to create:**
-- `src/modules/capabilities/capabilities.module.ts`
-- `src/modules/capabilities/capabilities.service.ts`
-- `src/modules/capabilities/capabilities.controller.ts`
-- `src/modules/capabilities/guards/capability.guard.ts`
-- `src/modules/capabilities/decorators/require-capability.decorator.ts`
-- `src/modules/capabilities/seeds/default-capabilities.seed.ts`
-
-**API Endpoints:**
-```typescript
-GET    /api/capabilities                     // List all capabilities (Owner)
-GET    /api/roles/:role/capabilities         // Get capabilities for role (Owner)
-PUT    /api/roles/:role/capabilities         // Update role capabilities (Owner)
-POST   /api/capabilities                     // Create new capability (Owner)
-```
-
-#### 2.3 Seed Default Capabilities
-
-**File: `backend/prisma/seeds/capabilities.ts`**
-```typescript
-const defaultCapabilities = [
-  // Content
-  { key: 'article.create', name: 'Create Articles', category: 'Content' },
-  { key: 'article.edit.own', name: 'Edit Own Articles', category: 'Content' },
-  { key: 'article.edit.any', name: 'Edit Any Articles', category: 'Content' },
-  { key: 'article.delete', name: 'Delete Articles', category: 'Content' },
-  { key: 'page.create', name: 'Create Pages', category: 'Content' },
-  { key: 'page.edit', name: 'Edit Pages', category: 'Content' },
-  { key: 'media.upload', name: 'Upload Media', category: 'Content' },
-  { key: 'media.delete', name: 'Delete Media', category: 'Content' },
-
-  // Ecommerce
-  { key: 'product.create', name: 'Create Products', category: 'Ecommerce' },
-  { key: 'product.edit', name: 'Edit Products', category: 'Ecommerce' },
-  { key: 'product.delete', name: 'Delete Products', category: 'Ecommerce' },
-  { key: 'order.view.own', name: 'View Own Orders', category: 'Ecommerce' },
-  { key: 'order.view.any', name: 'View All Orders', category: 'Ecommerce' },
-  { key: 'order.manage', name: 'Manage Orders', category: 'Ecommerce' },
-  { key: 'reports.export', name: 'Export Reports', category: 'Ecommerce' },
-
-  // Users
-  { key: 'user.create', name: 'Create Users', category: 'Users' },
-  { key: 'user.edit.own', name: 'Edit Own Profile', category: 'Users' },
-  { key: 'user.edit.any', name: 'Edit Any User', category: 'Users' },
-  { key: 'user.delete', name: 'Delete Users', category: 'Users' },
-  { key: 'users.promote', name: 'Promote to Admin', category: 'Users' },
-  { key: 'users.promote.owner', name: 'Promote to Owner', category: 'Users' },
-  { key: 'users.reset_password.member', name: 'Reset Member Passwords', category: 'Users' },
-  { key: 'users.reset_password.admin', name: 'Reset Admin Passwords', category: 'Users' },
-
-  // System
-  { key: 'system.configure', name: 'Configure System', category: 'System' },
-  { key: 'payment.configure', name: 'Configure Payments', category: 'System' },
-  { key: 'capability.assign', name: 'Assign Capabilities', category: 'System' },
-
-  // Comments
-  { key: 'comment.create', name: 'Create Comments', category: 'Community' },
-  { key: 'comment.edit.own', name: 'Edit Own Comments', category: 'Community' },
-  { key: 'comment.delete.any', name: 'Delete Any Comment', category: 'Community' },
-  { key: 'review.create', name: 'Create Reviews', category: 'Community' },
-]
-
-// Seed default role-capability mappings
-const defaultRoleCapabilities = {
-  owner: ['*'], // All capabilities
-  admin: [
-    'article.create', 'article.edit.any', 'article.delete',
-    'product.create', 'product.edit', 'product.delete',
-    'order.view.any', 'order.manage',
-    'user.create', 'user.edit.any', 'user.delete',
-    'users.reset_password.member',
-    'comment.delete.any',
-    'media.upload', 'media.delete',
-  ],
-  member: [
-    'user.edit.own',
-    'order.view.own',
-    'comment.create', 'comment.edit.own',
-    'review.create',
-  ],
+## Phase 1: Database Schema & Authentication (Weeks 2-3)
+
+### 🤖 [AUTONOMOUS] 1.1 Prisma Schema Foundation
+
+Claude Code will create the complete database schema in `backend/prisma/schema.prisma`:
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER MANAGEMENT & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id                    String    @id @default(uuid())
+  email                 String    @unique
+  password_hash         String?   // Null for OAuth-only users
+  first_name            String?
+  last_name             String?
+  avatar_url            String?
+  role                  UserRole  @default(member)
+  email_verified        Boolean   @default(false)
+  email_verification_token String?
+  email_verification_expires DateTime?
+  password_reset_token  String?
+  password_reset_expires DateTime?
+  totp_secret           String?   // Encrypted TOTP secret
+  totp_enabled          Boolean   @default(false)
+  totp_backup_codes     String[]  // Encrypted recovery codes
+  last_login_at         DateTime?
+  last_login_ip         String?
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  deleted_at            DateTime? // Soft delete
+
+  // Relations
+  oauth_accounts        OAuthAccount[]
+  refresh_tokens        RefreshToken[]
+  capabilities          UserCapability[]
+  articles              Article[]
+  comments              Comment[]
+  product_reviews       ProductReview[]
+  orders                Order[]
+  cart_items            CartItem[]
+  kindle_devices        KindleDevice[]
+  audit_logs            AuditLog[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  owner
+  admin
+  member
+  guest
+}
+
+model OAuthAccount {
+  id              String   @id @default(uuid())
+  user_id         String
+  provider        String   // 'google' | 'apple'
+  provider_user_id String
+  access_token    String?  // Encrypted
+  refresh_token   String?  // Encrypted
+  expires_at      DateTime?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([provider, provider_user_id])
+  @@index([user_id])
+  @@map("oauth_accounts")
+}
+
+model RefreshToken {
+  id              String    @id @default(uuid())
+  user_id         String
+  token_hash      String    @unique
+  device_info     String?   // User agent
+  ip_address      String?
+  expires_at      DateTime
+  created_at      DateTime  @default(now())
+  revoked_at      DateTime? // For "logout all devices"
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([token_hash])
+  @@map("refresh_tokens")
+}
+
+// ============================================================================
+// CAPABILITY-BASED RBAC
+// ============================================================================
+
+model Capability {
+  id          String   @id @default(uuid())
+  name        String   @unique // e.g., 'article.create', 'product.edit'
+  category    String   // 'content', 'ecommerce', 'users', 'system'
+  description String
+  created_at  DateTime @default(now())
+
+  user_capabilities UserCapability[]
+  role_capabilities RoleCapability[]
+
+  @@index([category])
+  @@map("capabilities")
+}
+
+model UserCapability {
+  id            String   @id @default(uuid())
+  user_id       String
+  capability_id String
+  granted_by    String   // User ID of admin who granted this
+  granted_at    DateTime @default(now())
+
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  capability Capability @relation(fields: [capability_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, capability_id])
+  @@map("user_capabilities")
+}
+
+model RoleCapability {
+  id            String   @id @default(uuid())
+  role          UserRole
+  capability_id String
+  enabled       Boolean  @default(true)
+  updated_at    DateTime @updatedAt
+
+  capability Capability @relation(fields: [capability_id], references: [id], onDelete: Cascade)
+
+  @@unique([role, capability_id])
+  @@map("role_capabilities")
+}
+
+// ============================================================================
+// CONTENT MANAGEMENT
+// ============================================================================
+
+model Article {
+  id                  String      @id @default(uuid())
+  title               String
+  slug                String      @unique
+  content             String      @db.Text
+  excerpt             String?
+  featured_image_id   String?
+  author_id           String
+  status              ContentStatus @default(draft)
+  visibility          ContentVisibility @default(public)
+  published_at        DateTime?
+  meta_title          String?
+  meta_description    String?
+
+  // Granular permissions (PRD 12)
+  author_can_edit     Boolean     @default(true)
+  author_can_delete   Boolean     @default(true)
+  admin_can_edit      Boolean     @default(true)
+  admin_can_delete    Boolean     @default(true)
+
+  // Version control (optional)
+  version_control_enabled Boolean @default(false)
+  current_version     Int         @default(1)
+
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  deleted_at          DateTime?
+
+  author          User            @relation(fields: [author_id], references: [id])
+  featured_image  MediaFile?      @relation("ArticleFeaturedImage", fields: [featured_image_id], references: [id])
+  categories      ArticleCategory[]
+  tags            ArticleTag[]
+  media           ArticleMedia[]
+  comments        Comment[]
+  versions        ArticleVersion[]
+
+  @@index([slug])
+  @@index([author_id])
+  @@index([status])
+  @@index([visibility])
+  @@index([published_at])
+  @@map("articles")
+}
+
+enum ContentStatus {
+  draft
+  published
+  archived
+}
+
+enum ContentVisibility {
+  public
+  logged_in_only
+  admin_only
+}
+
+model ArticleVersion {
+  id               String   @id @default(uuid())
+  article_id       String
+  version_number   Int
+  title            String
+  content          String   @db.Text
+  change_summary   String?
+  created_by       String
+  created_at       DateTime @default(now())
+
+  article Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+
+  acceptances UserAcceptance[]
+
+  @@unique([article_id, version_number])
+  @@map("article_versions")
+}
+
+model UserAcceptance {
+  id               String   @id @default(uuid())
+  version_id       String
+  user_id          String?  // Nullable for guest acceptance
+  ip_address       String
+  user_agent       String
+  accepted_at      DateTime @default(now())
+
+  version ArticleVersion @relation(fields: [version_id], references: [id], onDelete: Cascade)
+
+  @@map("user_acceptances")
+}
+
+model Page {
+  id                  String      @id @default(uuid())
+  title               String
+  slug                String      @unique
+  content             String      @db.Text
+  parent_id           String?
+  template            String      @default("full-width")
+  status              ContentStatus @default(draft)
+  visibility          ContentVisibility @default(public)
+  published_at        DateTime?
+  meta_title          String?
+  meta_description    String?
+
+  // Granular permissions
+  author_can_edit     Boolean     @default(true)
+  author_can_delete   Boolean     @default(true)
+  admin_can_edit      Boolean     @default(true)
+  admin_can_delete    Boolean     @default(true)
+
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  deleted_at          DateTime?
+
+  parent   Page?  @relation("PageHierarchy", fields: [parent_id], references: [id])
+  children Page[] @relation("PageHierarchy")
+
+  @@index([slug])
+  @@index([parent_id])
+  @@map("pages")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  parent_id   String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  parent   Category? @relation("CategoryHierarchy", fields: [parent_id], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+  articles ArticleCategory[]
+  products ProductCategory[]
+
+  @@index([slug])
+  @@map("categories")
+}
+
+model Tag {
+  id         String   @id @default(uuid())
+  name       String
+  slug       String   @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  articles ArticleTag[]
+  products ProductTag[]
+
+  @@index([slug])
+  @@map("tags")
+}
+
+model ArticleCategory {
+  article_id  String
+  category_id String
+
+  article  Article  @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@id([article_id, category_id])
+  @@map("article_categories")
+}
+
+model ArticleTag {
+  article_id String
+  tag_id     String
+
+  article Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([article_id, tag_id])
+  @@map("article_tags")
+}
+
+model MediaFile {
+  id            String   @id @default(uuid())
+  filename      String
+  original_name String
+  mime_type     String
+  size          Int      // bytes
+  width         Int?
+  height        Int?
+  alt_text      String?
+  caption       String?
+  storage_path  String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  article_featured Article[] @relation("ArticleFeaturedImage")
+  article_media    ArticleMedia[]
+  product_media    ProductMedia[]
+
+  @@index([mime_type])
+  @@map("media_files")
+}
+
+model ArticleMedia {
+  article_id String
+  media_id   String
+  order      Int @default(0)
+
+  article Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  media   MediaFile @relation(fields: [media_id], references: [id], onDelete: Cascade)
+
+  @@id([article_id, media_id])
+  @@map("article_media")
+}
+
+// ============================================================================
+// ECOMMERCE
+// ============================================================================
+
+model Product {
+  id                  String      @id @default(uuid())
+  name                String
+  slug                String      @unique
+  description         String      @db.Text
+  short_description   String?
+  price               Decimal     @db.Decimal(10, 2)
+  sku                 String?     @unique
+  stock_quantity      Int         @default(0)
+  stock_status        StockStatus @default(in_stock)
+  status              ContentStatus @default(draft)
+  visibility          ContentVisibility @default(public)
+  guest_purchaseable  Boolean     @default(false)
+
+  // Product type
+  product_type        ProductType @default(physical)
+
+  // Granular permissions
+  author_can_edit     Boolean     @default(true)
+  author_can_delete   Boolean     @default(true)
+  admin_can_edit      Boolean     @default(true)
+  admin_can_delete    Boolean     @default(true)
+
+  // SEO
+  meta_title          String?
+  meta_description    String?
+
+  published_at        DateTime?
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  deleted_at          DateTime?
+
+  categories       ProductCategory[]
+  tags             ProductTag[]
+  media            ProductMedia[]
+  reviews          ProductReview[]
+  cart_items       CartItem[]
+  order_items      OrderItem[]
+  digital_files    DigitalProductFile[]
+
+  @@index([slug])
+  @@index([sku])
+  @@index([product_type])
+  @@map("products")
+}
+
+enum StockStatus {
+  in_stock
+  out_of_stock
+  backorder
+}
+
+enum ProductType {
+  physical
+  digital
+}
+
+model DigitalProductFile {
+  id                      String      @id @default(uuid())
+  product_id              String
+  format                  FileFormat
+  file_id                 String      // References MediaFile
+  personalization_tested  Boolean     @default(false)
+  max_downloads           Int         @default(5)
+  created_at              DateTime    @default(now())
+  updated_at              DateTime    @updatedAt
+
+  product  Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  downloads DigitalDownload[]
+
+  @@unique([product_id, format])
+  @@map("digital_product_files")
+}
+
+enum FileFormat {
+  epub
+  pdf
+}
+
+model DigitalDownload {
+  id                String   @id @default(uuid())
+  digital_file_id   String
+  order_id          String
+  user_id           String?
+  download_token    String   @unique
+  download_count    Int      @default(0)
+  max_downloads     Int      @default(5)
+  expires_at        DateTime
+  created_at        DateTime @default(now())
+  last_downloaded_at DateTime?
+
+  digital_file DigitalProductFile @relation(fields: [digital_file_id], references: [id])
+  order        Order              @relation(fields: [order_id], references: [id])
+
+  @@index([download_token])
+  @@index([order_id])
+  @@map("digital_downloads")
+}
+
+model KindleDevice {
+  id            String    @id @default(uuid())
+  user_id       String
+  friendly_name String
+  kindle_email  String
+  is_default    Boolean   @default(false)
+  last_used_at  DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("kindle_devices")
+}
+
+model ProductCategory {
+  product_id  String
+  category_id String
+
+  product  Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+
+  @@id([product_id, category_id])
+  @@map("product_categories")
+}
+
+model ProductTag {
+  product_id String
+  tag_id     String
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  tag     Tag     @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([product_id, tag_id])
+  @@map("product_tags")
+}
+
+model ProductMedia {
+  product_id String
+  media_id   String
+  order      Int     @default(0)
+  is_primary Boolean @default(false)
+
+  product Product   @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  media   MediaFile @relation(fields: [media_id], references: [id], onDelete: Cascade)
+
+  @@id([product_id, media_id])
+  @@map("product_media")
+}
+
+// ============================================================================
+// CART & ORDERS
+// ============================================================================
+
+model Cart {
+  id         String   @id @default(uuid())
+  session_id String?  @unique
+  user_id    String?  @unique
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  items CartItem[]
+
+  @@map("carts")
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  cart_id    String
+  product_id String
+  user_id    String?  // For logged-in users
+  quantity   Int      @default(1)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  cart    Cart    @relation(fields: [cart_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id])
+  user    User?   @relation(fields: [user_id], references: [id])
+
+  @@unique([cart_id, product_id])
+  @@map("cart_items")
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  order_number      String      @unique
+  user_id           String?
+  email             String
+  status            OrderStatus @default(pending)
+
+  // Amounts
+  subtotal          Decimal     @db.Decimal(10, 2)
+  tax               Decimal     @db.Decimal(10, 2) @default(0)
+  shipping          Decimal     @db.Decimal(10, 2) @default(0)
+  total             Decimal     @db.Decimal(10, 2)
+
+  // Payment
+  payment_method    String      // 'stripe', 'paypal', 'amazon_pay'
+  payment_intent_id String?
+  paid_at           DateTime?
+
+  // Shipping (null for digital-only orders)
+  shipping_name     String?
+  shipping_address  String?
+  shipping_city     String?
+  shipping_state    String?
+  shipping_zip      String?
+  shipping_country  String?
+
+  created_at        DateTime    @default(now())
+  updated_at        DateTime    @updatedAt
+
+  user           User?            @relation(fields: [user_id], references: [id])
+  items          OrderItem[]
+  digital_downloads DigitalDownload[]
+
+  @@index([order_number])
+  @@index([user_id])
+  @@index([status])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  pending
+  processing
+  completed
+  cancelled
+  refunded
+}
+
+model OrderItem {
+  id         String  @id @default(uuid())
+  order_id   String
+  product_id String
+  quantity   Int
+  price      Decimal @db.Decimal(10, 2) // Price at time of purchase
+
+  order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [product_id], references: [id])
+
+  @@map("order_items")
+}
+
+// ============================================================================
+// COMMENTS & REVIEWS
+// ============================================================================
+
+model Comment {
+  id                String        @id @default(uuid())
+  article_id        String?
+  user_id           String?       // Nullable for guest comments (future)
+  author_name       String?       // For guest comments
+  author_email      String?       // For guest comments
+  content           String        @db.Text
+  status            CommentStatus @default(pending)
+
+  // AI Moderation
+  moderation_status ModerationStatus @default(pending)
+  moderation_flags  String[]      // Array of flags from OpenAI
+  profanity_detected Boolean      @default(false)
+
+  parent_id         String?       // For nested replies
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+  deleted_at        DateTime?
+
+  article Article?  @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  user    User?     @relation(fields: [user_id], references: [id])
+  parent  Comment?  @relation("CommentReplies", fields: [parent_id], references: [id])
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([article_id])
+  @@index([user_id])
+  @@index([status])
+  @@map("comments")
+}
+
+enum CommentStatus {
+  pending
+  approved
+  rejected
+  spam
+}
+
+enum ModerationStatus {
+  pending
+  approved
+  flagged
+  rejected
+}
+
+model ProductReview {
+  id                String           @id @default(uuid())
+  product_id        String
+  user_id           String
+  rating            Int              // 1-5
+  title             String?
+  content           String           @db.Text
+  status            CommentStatus    @default(pending)
+
+  // AI Moderation
+  moderation_status ModerationStatus @default(pending)
+  moderation_flags  String[]
+  profanity_detected Boolean         @default(false)
+
+  verified_purchase Boolean          @default(false)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  deleted_at        DateTime?
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [user_id], references: [id])
+
+  @@index([product_id])
+  @@index([user_id])
+  @@map("product_reviews")
+}
+
+// ============================================================================
+// AUDIT TRAIL
+// ============================================================================
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  event_type      String   // e.g., 'user.login', 'article.create'
+  user_id         String?
+  ip_address      String?
+  user_agent      String?
+  resource_type   String?  // 'article', 'product', 'user', etc.
+  resource_id     String?
+  changes         Json?    // Before/after values
+  metadata        Json?    // Additional context
+  previous_hash   String?  // Hash of previous log entry (blockchain-like)
+  entry_hash      String   // Hash of this entry
+  created_at      DateTime @default(now())
+
+  user User? @relation(fields: [user_id], references: [id])
+
+  @@index([event_type])
+  @@index([user_id])
+  @@index([resource_type, resource_id])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// SYSTEM SETTINGS
+// ============================================================================
+
+model Setting {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String   @db.Text
+  encrypted  Boolean  @default(false) // For API keys
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("settings")
 }
 ```
 
-### Testing Strategy
-
-#### Unit Tests
-
-**File: `src/modules/capabilities/capabilities.service.spec.ts`**
-```typescript
-describe('CapabilitiesService', () => {
-  it('should return all capabilities for Owner', async () => {
-    const owner = { role: 'owner' }
-    const canEdit = await capabilitiesService.userHasCapability(owner, 'article.edit.any')
-    expect(canEdit).toBe(true)
-  })
-
-  it('should check role capabilities for Admin', async () => {
-    const admin = { role: 'admin' }
-    const canEdit = await capabilitiesService.userHasCapability(admin, 'article.edit.any')
-    const canConfigure = await capabilitiesService.userHasCapability(admin, 'system.configure')
-    expect(canEdit).toBe(true)
-    expect(canConfigure).toBe(false)
-  })
-
-  it('should allow Owner to assign capabilities', async () => {
-    const capability = await capabilitiesService.create({ key: 'test.capability', ... })
-    await capabilitiesService.assignToRole('admin', capability.id)
-    const adminCaps = await capabilitiesService.getRoleCapabilities('admin')
-    expect(adminCaps.find(c => c.key === 'test.capability')).toBeDefined()
-  })
-})
-```
-
-#### Integration Tests
-
-**File: `test/capabilities.e2e-spec.ts`**
-```typescript
-describe('Capabilities (e2e)', () => {
-  it('should prevent Admin from accessing Owner-only endpoints', () => {
-    return request(app.getHttpServer())
-      .post('/capabilities')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ key: 'test.cap', name: 'Test', category: 'Test' })
-      .expect(403)
-  })
-
-  it('should allow Owner to create new capability', () => {
-    return request(app.getHttpServer())
-      .post('/capabilities')
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ key: 'custom.capability', name: 'Custom', category: 'Custom' })
-      .expect(201)
-  })
-
-  it('should allow Owner to assign capability to Admin role', async () => {
-    const capability = await createCapability({ key: 'test.cap' })
-
-    return request(app.getHttpServer())
-      .put('/roles/admin/capabilities')
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ add: [capability.id] })
-      .expect(200)
-      .then(async () => {
-        const roleCaps = await prisma.roleCapability.findMany({
-          where: { role: 'admin', capability_id: capability.id }
-        })
-        expect(roleCaps.length).toBe(1)
-      })
-  })
-})
-```
-
-### Validation Checklist
-
+**Claude Code will then run:**
 ```bash
-# Run tests
-npm run test
-npm run test:e2e
-
-# Seed capabilities
-npx prisma db seed
-
-# Verify seeded data
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM capabilities;"
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM role_capabilities;"
-
-# Type checking
-npm run build
+cd backend
+npx prisma migrate dev --name initial_schema
+npx prisma generate
 ```
-
-**Success Criteria:**
-- ✅ All tests pass
-- ✅ 30+ capabilities seeded
-- ✅ Owner has all capabilities
-- ✅ Admin has default capabilities assigned
-- ✅ Member has basic capabilities
-- ✅ CapabilityGuard enforces permissions
-- ✅ Owner can assign/remove capabilities
-- ✅ Capability changes logged in audit trail
 
 ---
 
-## Phase 3: Content Management (Week 4-6)
+### 👤 [HUMAN REQUIRED] 1.2 OAuth Provider Setup
 
-### Prerequisites
-- Phase 2 complete
-- Capability system working
+Before authentication can work, you need to create OAuth applications:
 
-### Deliverables
+#### Google OAuth Setup (15 minutes)
 
-#### 3.1 Database Schema Updates
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project (or select existing)
+3. Navigate to "APIs & Services" > "Credentials"
+4. Click "Create Credentials" > "OAuth 2.0 Client ID"
+5. Configure consent screen (if not done):
+   - User Type: External
+   - App name: AECMS
+   - User support email: your email
+   - Developer contact: your email
+6. Create OAuth Client ID:
+   - Application type: Web application
+   - Name: AECMS Development
+   - Authorized redirect URIs:
+     - `http://localhost:4000/api/auth/google/callback`
+     - `http://localhost:3000/api/auth/google/callback`
+7. Copy **Client ID** and **Client Secret**
 
-Add content tables:
-- Article
-- Page
-- Category
-- Tag
-- Media
-- ArticleCategory (junction)
-- ArticleTag (junction)
-- ArticleVersion (for version control)
+#### Apple OAuth Setup (30 minutes) - **OPTIONAL for MVP**
 
-**Migration:**
+Apple Sign In requires Apple Developer Program membership ($99/year). You can skip this for initial development.
+
+If setting up:
+1. Go to [Apple Developer Portal](https://developer.apple.com/)
+2. Navigate to "Certificates, Identifiers & Profiles"
+3. Create Service ID for Sign in with Apple
+4. Configure redirect URLs
+5. Generate private key and note Key ID
+6. Copy Service ID, Team ID, Key ID, and download private key
+
+#### Update .env file
+
+Add to your `.env`:
 ```bash
-npx prisma migrate dev --name add_content_tables
+# Google OAuth
+GOOGLE_CLIENT_ID=your_google_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_client_secret_here
+
+# Apple OAuth (optional)
+APPLE_CLIENT_ID=your_apple_service_id
+APPLE_TEAM_ID=your_apple_team_id
+APPLE_KEY_ID=your_apple_key_id
+APPLE_PRIVATE_KEY_PATH=./secrets/apple-auth-key.p8
+
+# Frontend URLs (for OAuth callbacks)
+FRONTEND_URL=http://localhost:3000
+FRONTEND_ADMIN_URL=http://localhost:3000/admin
 ```
 
-#### 3.2 Articles Module
+---
 
-**API Endpoints:**
+### 🤖 [AUTONOMOUS] 1.3 Authentication Module Implementation
+
+Claude Code will create complete authentication system:
+
+**Files to create:**
+- `backend/src/modules/auth/auth.module.ts`
+- `backend/src/modules/auth/auth.service.ts`
+- `backend/src/modules/auth/auth.controller.ts`
+- `backend/src/modules/auth/strategies/jwt.strategy.ts`
+- `backend/src/modules/auth/strategies/google.strategy.ts`
+- `backend/src/modules/auth/strategies/apple.strategy.ts`
+- `backend/src/modules/auth/guards/jwt-auth.guard.ts`
+- `backend/src/modules/auth/guards/roles.guard.ts`
+- `backend/src/modules/auth/guards/2fa.guard.ts`
+- `backend/src/modules/auth/dto/*.dto.ts`
+- `backend/src/modules/auth/auth.service.spec.ts` (100+ tests)
+
+**Key features implemented:**
+- ✅ Email/password registration with bcrypt (cost factor 12)
+- ✅ Email verification with token expiry
+- ✅ Login with JWT token generation
+- ✅ Refresh token rotation (persistent for front door, 7-day for back door)
+- ✅ Password reset flow
+- ✅ Google OAuth integration
+- ✅ Apple OAuth integration (if configured)
+- ✅ TOTP 2FA setup and verification
+- ✅ Role-based guards
+- ✅ Session management
+- ✅ "Logout all devices" functionality
+
+**Example test (one of 100+):**
 ```typescript
-GET    /api/articles                          // List articles (paginated, filtered)
-GET    /api/articles/:slug                    // Get article by slug
-POST   /api/articles                          // Create article (requires capability)
-PUT    /api/articles/:id                      // Update article
-DELETE /api/articles/:id                      // Delete article (soft delete)
-POST   /api/articles/:id/publish              // Publish draft
-GET    /api/articles/:id/versions             // Get version history
-POST   /api/articles/:id/versions/:version/restore  // Restore version
-```
+describe('AuthService', () => {
+  it('should reject passwords shorter than 16 characters', async () => {
+    const dto = {
+      email: 'test@example.com',
+      password: 'Short1!',  // Only 7 chars
+      first_name: 'Test',
+      last_name: 'User'
+    }
 
-#### 3.3 Media Module
-
-**API Endpoints:**
-```typescript
-GET    /api/media                             // List media (paginated)
-GET    /api/media/:id                         // Get media by ID
-POST   /api/media/upload                      // Upload file (multipart/form-data)
-DELETE /api/media/:id                         // Delete media file
-```
-
-#### 3.4 Categories & Tags Modules
-
-**API Endpoints:**
-```typescript
-GET    /api/categories                        // List categories (hierarchical)
-POST   /api/categories                        // Create category
-PUT    /api/categories/:id                    // Update category
-DELETE /api/categories/:id                    // Delete category
-
-GET    /api/tags                              // List tags
-POST   /api/tags                              // Create tag
-PUT    /api/tags/:id                          // Update tag
-DELETE /api/tags/:id                          // Delete tag
-```
-
-### Testing Strategy
-
-#### Unit Tests
-
-**File: `src/modules/articles/articles.service.spec.ts`**
-```typescript
-describe('ArticlesService', () => {
-  it('should generate unique slug from title', async () => {
-    const slug1 = await articlesService.generateSlug('My Article Title')
-    const slug2 = await articlesService.generateSlug('My Article Title')
-    expect(slug1).toBe('my-article-title')
-    expect(slug2).toBe('my-article-title-1') // Auto-increment on collision
+    await expect(authService.register(dto))
+      .rejects
+      .toThrow('Password must be at least 16 characters')
   })
 
-  it('should auto-save version when version control enabled', async () => {
-    const article = await createArticle({ version_control_enabled: true })
-    await articlesService.update(article.id, { content: 'Updated content' })
+  it('should require at least one uppercase and one special character', async () => {
+    const dto = {
+      email: 'test@example.com',
+      password: 'thisisalowercasepassword',
+      first_name: 'Test',
+      last_name: 'User'
+    }
 
-    const versions = await prisma.articleVersion.findMany({
-      where: { article_id: article.id }
+    await expect(authService.register(dto))
+      .rejects
+      .toThrow('Password must contain at least one uppercase letter and one special character')
+  })
+
+  it('should hash passwords with bcrypt cost factor 12', async () => {
+    const password = 'ValidPassword123!@#'
+    const hash = await authService.hashPassword(password)
+
+    expect(hash).not.toBe(password)
+    expect(hash.startsWith('$2b$12$')).toBe(true)  // bcrypt cost 12
+    expect(await bcrypt.compare(password, hash)).toBe(true)
+  })
+
+  it('should generate JWT with 15-minute expiration', async () => {
+    const user = await createTestUser()
+    const token = await authService.generateAccessToken(user)
+    const decoded = jwt.decode(token) as any
+
+    expect(decoded.sub).toBe(user.id)
+    expect(decoded.email).toBe(user.email)
+    expect(decoded.role).toBe(user.role)
+
+    const expiresIn = decoded.exp - decoded.iat
+    expect(expiresIn).toBe(15 * 60)  // 15 minutes in seconds
+  })
+
+  it('should create persistent refresh tokens for front-door login', async () => {
+    const user = await createTestUser({ role: 'member' })
+    const result = await authService.login(user, 'front-door')
+
+    const refreshToken = await prisma.refreshToken.findUnique({
+      where: { token_hash: hash(result.refreshToken) }
     })
-    expect(versions.length).toBe(2) // Original + update
+
+    // No expiration for front-door (persistent until logout)
+    expect(refreshToken.expires_at).toBeNull()
   })
 
-  it('should not save version when version control disabled', async () => {
-    const article = await createArticle({ version_control_enabled: false })
-    await articlesService.update(article.id, { content: 'Updated content' })
+  it('should create 7-day refresh tokens for back-door login', async () => {
+    const user = await createTestUser({ role: 'admin' })
+    const result = await authService.login(user, 'back-door')
 
-    const versions = await prisma.articleVersion.findMany({
-      where: { article_id: article.id }
+    const refreshToken = await prisma.refreshToken.findUnique({
+      where: { token_hash: hash(result.refreshToken) }
     })
-    expect(versions.length).toBe(0)
+
+    const expiresIn = refreshToken.expires_at.getTime() - Date.now()
+    const sevenDays = 7 * 24 * 60 * 60 * 1000
+
+    expect(expiresIn).toBeGreaterThan(sevenDays - 60000)  // Within 1 minute
+    expect(expiresIn).toBeLessThan(sevenDays + 60000)
   })
 
-  it('should sanitize HTML content', async () => {
-    const dirty = '<p>Hello</p><script>alert("xss")</script><p>World</p>'
-    const clean = await articlesService.sanitizeContent(dirty)
-    expect(clean).not.toContain('<script>')
-    expect(clean).toContain('<p>Hello</p>')
+  it('should enforce 2FA for back-door admin login', async () => {
+    const admin = await createTestUser({
+      role: 'admin',
+      totp_enabled: true,
+      totp_secret: 'encrypted_secret'
+    })
+
+    const result = await authService.login(admin, 'back-door')
+
+    // Should return temp token requiring 2FA verification
+    expect(result.requires2FA).toBe(true)
+    expect(result.tempToken).toBeDefined()
+    expect(result.accessToken).toBeUndefined()
   })
 })
 ```
 
-#### Integration Tests
+---
 
-**File: `test/articles.e2e-spec.ts`**
-```typescript
-describe('Articles (e2e)', () => {
-  describe('POST /articles', () => {
-    it('should create article with Admin capability', () => {
-      return request(app.getHttpServer())
-        .post('/articles')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          title: 'Test Article',
-          content: '<p>Content here</p>',
-          status: 'draft',
-          visibility: 'public'
-        })
-        .expect(201)
-        .expect(res => {
-          expect(res.body.slug).toBe('test-article')
-          expect(res.body.author_id).toBeDefined()
-        })
-    })
+### 👁️ [HUMAN VERIFICATION] 1.4 Authentication Testing
 
-    it('should forbid Member from creating article', () => {
-      return request(app.getHttpServer())
-        .post('/articles')
-        .set('Authorization', `Bearer ${memberToken}`)
-        .send({ title: 'Test', content: '<p>Test</p>' })
-        .expect(403)
-    })
+After Claude Code implements authentication, you should manually test:
 
-    it('should sanitize XSS in content', () => {
-      return request(app.getHttpServer())
-        .post('/articles')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({
-          title: 'XSS Test',
-          content: '<p>Hello</p><script>alert("xss")</script>'
-        })
-        .expect(201)
-        .expect(res => {
-          expect(res.body.content).not.toContain('<script>')
-          expect(res.body.content).toContain('<p>Hello</p>')
-        })
-    })
-  })
+**Registration Flow (5 minutes):**
+1. POST to `http://localhost:4000/api/auth/register`
+2. Check email for verification link (if SMTP configured)
+3. Verify user created in database: `docker exec aecms-postgres psql -U aecms -c "SELECT id, email, role FROM users;"`
 
-  describe('GET /articles', () => {
-    beforeEach(async () => {
-      await createArticle({ visibility: 'public', status: 'published' })
-      await createArticle({ visibility: 'logged_in_only', status: 'published' })
-      await createArticle({ visibility: 'admin_only', status: 'published' })
-      await createArticle({ visibility: 'public', status: 'draft' })
-    })
+**Login Flow (5 minutes):**
+1. POST to `http://localhost:4000/api/auth/login`
+2. Verify you receive `accessToken` and `refreshToken`
+3. Try accessing protected endpoint with token
 
-    it('should return only public published articles to Guest', () => {
-      return request(app.getHttpServer())
-        .get('/articles')
-        .expect(200)
-        .expect(res => {
-          expect(res.body.length).toBe(1) // Only public published
-        })
-    })
+**OAuth Flow (10 minutes):**
+1. Visit `http://localhost:4000/api/auth/google`
+2. Complete Google OAuth flow
+3. Verify redirect back to frontend with tokens
+4. Check `oauth_accounts` table for linked account
 
-    it('should return public + logged_in_only to Member', () => {
-      return request(app.getHttpServer())
-        .get('/articles')
-        .set('Authorization', `Bearer ${memberToken}`)
-        .expect(200)
-        .expect(res => {
-          expect(res.body.length).toBe(2)
-        })
-    })
+**2FA Flow (15 minutes):**
+1. Enable 2FA for an admin user
+2. Try logging in via back door
+3. Verify 2FA challenge is required
+4. Complete 2FA with authenticator app (Google Authenticator, Authy, etc.)
+5. Verify you receive full access token after valid TOTP
 
-    it('should return all articles to Admin', () => {
-      return request(app.getHttpServer())
-        .get('/articles')
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200)
-        .expect(res => {
-          expect(res.body.length).toBe(4) // All articles
-        })
-    })
-  })
+---
 
-  describe('Version Control', () => {
-    it('should create version on update when enabled', async () => {
-      const article = await createArticle({ version_control_enabled: true })
+### 🤖 [AUTONOMOUS] 1.5 Users Module
 
-      await request(app.getHttpServer())
-        .put(`/articles/${article.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .send({ content: 'Updated content', change_summary: 'Fixed typo' })
-        .expect(200)
+Claude Code will create user management endpoints:
 
-      return request(app.getHttpServer())
-        .get(`/articles/${article.id}/versions`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200)
-        .expect(res => {
-          expect(res.body.length).toBe(2) // Original + update
-          expect(res.body[0].change_summary).toBe('Fixed typo')
-        })
-    })
-  })
-})
-```
+**Files to create:**
+- `backend/src/modules/users/users.module.ts`
+- `backend/src/modules/users/users.service.ts`
+- `backend/src/modules/users/users.controller.ts`
+- `backend/src/modules/users/dto/*.dto.ts`
+- `backend/src/modules/users/users.service.spec.ts` (50+ tests)
 
-**File: `test/media.e2e-spec.ts`**
-```typescript
-describe('Media (e2e)', () => {
-  it('should upload image file', () => {
-    return request(app.getHttpServer())
-      .post('/media/upload')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .attach('file', './test/fixtures/test-image.jpg')
-      .field('alt_text', 'Test image')
-      .expect(201)
-      .expect(res => {
-        expect(res.body.mime_type).toBe('image/jpeg')
-        expect(res.body.path).toBeDefined()
-        expect(res.body.width).toBeGreaterThan(0)
-        expect(res.body.height).toBeGreaterThan(0)
-      })
-  })
+**Endpoints:**
+- `GET /api/users` - List users (Admin only)
+- `GET /api/users/:id` - Get user by ID
+- `PATCH /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user (Admin only)
+- `GET /api/users/me` - Get current user profile
+- `PATCH /api/users/me` - Update current user profile
 
-  it('should reject non-image files', () => {
-    return request(app.getHttpServer())
-      .post('/media/upload')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .attach('file', './test/fixtures/malicious.exe')
-      .expect(400)
-  })
+---
 
-  it('should reject files > 50MB', () => {
-    return request(app.getHttpServer())
-      .post('/media/upload')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .attach('file', './test/fixtures/large-file.jpg') // 51MB
-      .expect(413) // Payload Too Large
-  })
-})
-```
+### 🤖 [AUTONOMOUS] Phase 1 Validation
 
-### Validation Checklist
-
+Claude Code will run:
 ```bash
-# Run tests
-npm run test
-npm run test:e2e
+./scripts/validate-phase.sh
 
-# Test file upload (manual)
+# Additional Phase 1 specific tests
+cd backend
+npm run test -- auth.service.spec.ts
+npm run test -- users.service.spec.ts
+npm run test:e2e -- auth.e2e-spec.ts
+
+# Check test coverage
+npm run test:cov
+
+# Verify migrations
+npx prisma migrate status
+```
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 1 Complete
+
+**Checklist (15 minutes):**
+- ✅ Database schema deployed successfully
+- ✅ All auth tests pass (≥100 tests)
+- ✅ Registration works (email + password)
+- ✅ Login works (returns JWT tokens)
+- ✅ Google OAuth works (if configured)
+- ✅ 2FA works for admin users
+- ✅ Refresh token rotation works
+- ✅ Password reset email sent (check logs if SMTP not configured)
+- ✅ User profile endpoints work
+- ✅ Role guards enforce access control
+- ✅ Test coverage ≥80% for auth module
+
+---
+
+## Phase 2: Capability System (Week 3)
+
+### 🤖 [AUTONOMOUS] 2.1 Capability Module Implementation
+
+Claude Code will create the capability-based RBAC system:
+
+**Files to create:**
+- `backend/src/modules/capabilities/capabilities.module.ts`
+- `backend/src/modules/capabilities/capabilities.service.ts`
+- `backend/src/modules/capabilities/capabilities.controller.ts`
+- `backend/src/modules/capabilities/guards/capability.guard.ts`
+- `backend/src/modules/capabilities/decorators/requires-capability.decorator.ts`
+- `backend/src/modules/capabilities/dto/*.dto.ts`
+- `backend/src/modules/capabilities/capabilities.service.spec.ts` (30+ tests)
+
+**Capabilities to seed:**
+```typescript
+const capabilities = [
+  // Content Management
+  { name: 'article.create', category: 'content', description: 'Create articles' },
+  { name: 'article.edit.own', category: 'content', description: 'Edit own articles' },
+  { name: 'article.edit.any', category: 'content', description: 'Edit any article' },
+  { name: 'article.delete.own', category: 'content', description: 'Delete own articles' },
+  { name: 'article.delete.any', category: 'content', description: 'Delete any article' },
+  { name: 'article.publish', category: 'content', description: 'Publish articles' },
+
+  { name: 'page.create', category: 'content', description: 'Create pages' },
+  { name: 'page.edit', category: 'content', description: 'Edit pages' },
+  { name: 'page.delete', category: 'content', description: 'Delete pages' },
+
+  { name: 'media.upload', category: 'content', description: 'Upload media files' },
+  { name: 'media.delete', category: 'content', description: 'Delete media files' },
+
+  // Ecommerce
+  { name: 'product.create', category: 'ecommerce', description: 'Create products' },
+  { name: 'product.edit', category: 'ecommerce', description: 'Edit products' },
+  { name: 'product.delete', category: 'ecommerce', description: 'Delete products' },
+  { name: 'order.view.all', category: 'ecommerce', description: 'View all orders' },
+  { name: 'order.edit', category: 'ecommerce', description: 'Edit orders' },
+  { name: 'order.refund', category: 'ecommerce', description: 'Process refunds' },
+
+  // Users
+  { name: 'user.create', category: 'users', description: 'Create users' },
+  { name: 'user.edit', category: 'users', description: 'Edit users' },
+  { name: 'user.delete', category: 'users', description: 'Delete users' },
+  { name: 'user.assign_role', category: 'users', description: 'Assign user roles' },
+  { name: 'user.assign_capability', category: 'users', description: 'Assign capabilities' },
+
+  // Comments & Reviews
+  { name: 'comment.moderate', category: 'content', description: 'Moderate comments' },
+  { name: 'review.moderate', category: 'ecommerce', description: 'Moderate reviews' },
+
+  // System
+  { name: 'system.configure', category: 'system', description: 'Configure system settings' },
+  { name: 'system.view_audit', category: 'system', description: 'View audit logs' },
+  { name: 'system.export_data', category: 'system', description: 'Export data (CSV)' },
+]
+```
+
+**Default role capabilities (seed data):**
+```typescript
+// Admin default capabilities
+const adminCapabilities = [
+  'article.create', 'article.edit.any', 'article.publish',
+  'product.create', 'product.edit', 'product.delete',
+  'order.view.all', 'order.edit',
+  'user.edit', 'comment.moderate', 'review.moderate',
+]
+
+// Member default capabilities
+const memberCapabilities = [
+  // Members can only view and purchase
+]
+```
+
+**Endpoints:**
+- `GET /api/capabilities` - List all capabilities
+- `GET /api/capabilities/roles/:role` - Get capabilities for a role
+- `POST /api/capabilities/roles/:role` - Assign capability to role (Owner only)
+- `DELETE /api/capabilities/roles/:role/:capability` - Remove capability from role (Owner only)
+- `POST /api/capabilities/users/:userId` - Assign capability to specific user (Owner only)
+- `DELETE /api/capabilities/users/:userId/:capability` - Remove user capability (Owner only)
+
+**Usage example:**
+```typescript
+@Controller('articles')
+export class ArticlesController {
+  @Post()
+  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @RequiresCapability('article.create')
+  async create(@CurrentUser() user: User, @Body() dto: CreateArticleDto) {
+    return this.articlesService.create(user, dto)
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @RequiresCapability('article.edit.any', 'article.edit.own')
+  async update(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() dto: UpdateArticleDto
+  ) {
+    // CapabilityGuard checks:
+    // - If user has 'article.edit.any', allow
+    // - Else if user has 'article.edit.own' AND is article author, allow
+    // - Else deny
+    return this.articlesService.update(user, id, dto)
+  }
+}
+```
+
+---
+
+### 🤖 [AUTONOMOUS] 2.2 Database Seeding
+
+Claude Code will create seed script:
+
+**`backend/prisma/seed.ts`:**
+```typescript
+import { PrismaClient, UserRole } from '@prisma/client'
+import * as bcrypt from 'bcrypt'
+
+const prisma = new PrismaClient()
+
+async function main() {
+  console.log('🌱 Seeding database...')
+
+  // Seed capabilities
+  const capabilities = [/* ... array from above ... */]
+
+  for (const cap of capabilities) {
+    await prisma.capability.upsert({
+      where: { name: cap.name },
+      update: {},
+      create: cap,
+    })
+  }
+
+  console.log('✅ Capabilities seeded')
+
+  // Seed default role capabilities
+  const articleCreate = await prisma.capability.findUnique({ where: { name: 'article.create' } })
+  // ... (assign capabilities to admin role)
+
+  console.log('✅ Role capabilities seeded')
+
+  // Create owner user (IMPORTANT: Change these credentials!)
+  const ownerPassword = await bcrypt.hash('ChangeThisPassword1!', 12)
+
+  await prisma.user.upsert({
+    where: { email: 'owner@aecms.local' },
+    update: {},
+    create: {
+      email: 'owner@aecms.local',
+      password_hash: ownerPassword,
+      first_name: 'System',
+      last_name: 'Owner',
+      role: UserRole.owner,
+      email_verified: true,
+    },
+  })
+
+  console.log('✅ Owner user created (owner@aecms.local / ChangeThisPassword1!)')
+  console.log('⚠️  IMPORTANT: Change the owner password immediately!')
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Seeding failed:', e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
+```
+
+**Claude Code will run:**
+```bash
+cd backend
+npx prisma db seed
+```
+
+---
+
+### 👤 [HUMAN REQUIRED] 2.3 Change Default Owner Password
+
+**CRITICAL SECURITY STEP:**
+
+1. Log in as owner:
+   ```bash
+   curl -X POST http://localhost:4000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{
+       "email": "owner@aecms.local",
+       "password": "ChangeThisPassword1!"
+     }'
+   ```
+
+2. Use the access token to change password:
+   ```bash
+   curl -X PATCH http://localhost:4000/api/users/me/password \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "currentPassword": "ChangeThisPassword1!",
+       "newPassword": "YourSecure16CharPassword!"
+     }'
+   ```
+
+3. Enable 2FA for owner account:
+   ```bash
+   curl -X POST http://localhost:4000/api/auth/2fa/setup \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+   ```
+
+4. Scan QR code with authenticator app and verify:
+   ```bash
+   curl -X POST http://localhost:4000/api/auth/2fa/verify \
+     -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "token": "123456"
+     }'
+   ```
+
+**Estimated time:** 10 minutes
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 2 Complete
+
+**Checklist (10 minutes):**
+- ✅ All capability tests pass (≥30 tests)
+- ✅ Capabilities seeded in database
+- ✅ Owner account created and password changed
+- ✅ Owner 2FA enabled
+- ✅ Admin role has default capabilities assigned
+- ✅ Capability guards enforce permissions correctly
+- ✅ Test endpoint access with different roles
+
+**Test capability system:**
+```bash
+# As Owner, list all capabilities
+curl http://localhost:4000/api/capabilities \
+  -H "Authorization: Bearer OWNER_TOKEN"
+
+# As Admin, try to assign capability (should fail)
+curl -X POST http://localhost:4000/api/capabilities/roles/admin \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"capability": "system.configure"}'
+# Should return 403 Forbidden
+
+# As Owner, assign capability to Admin role
+curl -X POST http://localhost:4000/api/capabilities/roles/admin \
+  -H "Authorization: Bearer OWNER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"capability": "system.configure"}'
+# Should succeed
+```
+
+---
+
+## Phase 3: Content Management (Weeks 4-6)
+
+### 🤖 [AUTONOMOUS] 3.1 Media Module
+
+Claude Code will implement media upload and management:
+
+**Files to create:**
+- `backend/src/modules/media/media.module.ts`
+- `backend/src/modules/media/media.service.ts`
+- `backend/src/modules/media/media.controller.ts`
+- `backend/src/modules/media/dto/*.dto.ts`
+- `backend/src/modules/media/media.service.spec.ts` (25+ tests)
+
+**Features:**
+- ✅ File upload with multer (local filesystem MVP)
+- ✅ Image optimization (sharp library)
+- ✅ Thumbnail generation
+- ✅ MIME type validation
+- ✅ File size limits
+- ✅ Alt text and caption support
+- ✅ Pagination
+- ✅ Search by filename
+
+**Dependencies to install:**
+```bash
+npm install multer sharp
+npm install -D @types/multer @types/sharp
+```
+
+**Endpoints:**
+- `POST /api/media/upload` - Upload file(s)
+- `GET /api/media` - List media files (paginated)
+- `GET /api/media/:id` - Get media file details
+- `PATCH /api/media/:id` - Update media metadata (alt text, caption)
+- `DELETE /api/media/:id` - Delete media file
+- `GET /api/media/:id/download` - Download original file
+
+---
+
+### 🤖 [AUTONOMOUS] 3.2 Categories & Tags Modules
+
+Claude Code will implement taxonomy:
+
+**Categories endpoints:**
+- `GET /api/categories` - List all categories (hierarchical)
+- `GET /api/categories/:slug` - Get category by slug
+- `POST /api/categories` - Create category
+- `PATCH /api/categories/:id` - Update category
+- `DELETE /api/categories/:id` - Delete category
+
+**Tags endpoints:**
+- `GET /api/tags` - List all tags
+- `GET /api/tags/:slug` - Get tag by slug
+- `POST /api/tags` - Create tag
+- `PATCH /api/tags/:id` - Update tag
+- `DELETE /api/tags/:id` - Delete tag
+
+---
+
+### 🤖 [AUTONOMOUS] 3.3 Articles Module
+
+Claude Code will implement full article management:
+
+**Files to create:**
+- `backend/src/modules/articles/articles.module.ts`
+- `backend/src/modules/articles/articles.service.ts`
+- `backend/src/modules/articles/articles.controller.ts`
+- `backend/src/modules/articles/dto/*.dto.ts`
+- `backend/src/modules/articles/articles.service.spec.ts` (40+ tests)
+
+**Features:**
+- ✅ CRUD operations
+- ✅ Slug generation
+- ✅ Rich text content (HTML)
+- ✅ Featured image
+- ✅ Categories and tags association
+- ✅ Status management (draft/published/archived)
+- ✅ Visibility controls (public/logged_in_only/admin_only)
+- ✅ Granular permissions (author_can_edit, admin_can_edit, etc.)
+- ✅ SEO meta fields
+- ✅ Pagination and filtering
+- ✅ Full-text search (PostgreSQL)
+
+**Endpoints:**
+- `GET /api/articles` - List articles (public, paginated)
+- `GET /api/articles/:slug` - Get article by slug
+- `POST /api/articles` - Create article (requires capability)
+- `PATCH /api/articles/:id` - Update article (permission check)
+- `DELETE /api/articles/:id` - Delete article (permission check)
+- `POST /api/articles/:id/publish` - Publish article
+- `POST /api/articles/:id/archive` - Archive article
+
+**Permission evaluation logic:**
+```typescript
+async canEdit(user: User, article: Article): Promise<boolean> {
+  // 1. Owner always can
+  if (user.role === 'owner') return true
+
+  // 2. Check content-level flags (PRD 12)
+  if (user.id === article.author_id && article.author_can_edit) return true
+  if (user.role === 'admin' && article.admin_can_edit) return true
+
+  // 3. Fall back to role capabilities (PRD 09)
+  if (await user.hasCapability('article.edit.any')) return true
+  if (await user.hasCapability('article.edit.own') && user.id === article.author_id) return true
+
+  // 4. Deny
+  return false
+}
+```
+
+---
+
+### 🤖 [AUTONOMOUS] 3.4 Article Versioning Module (Optional)
+
+Claude Code will implement version control for articles:
+
+**Features:**
+- ✅ OFF by default, enable per-article
+- ✅ Track version history with change summaries
+- ✅ User acceptance tracking (for legal documents)
+- ✅ IP address and user agent logging
+- ✅ Force re-acceptance on version update
+
+**Endpoints:**
+- `GET /api/articles/:id/versions` - List versions
+- `GET /api/articles/:id/versions/:version` - Get specific version
+- `POST /api/articles/:id/versions/:version/accept` - Accept version (for legal docs)
+- `GET /api/articles/:id/acceptance-status` - Check if user accepted current version
+
+---
+
+### 🤖 [AUTONOMOUS] 3.5 Pages Module
+
+Similar to articles but for static pages:
+
+**Differences from articles:**
+- Hierarchical structure (parent/child)
+- Template selection
+- No categories/tags
+- Cannot be embedded in other content
+
+**Endpoints:**
+- `GET /api/pages` - List all pages (tree structure)
+- `GET /api/pages/:slug` - Get page by slug
+- `POST /api/pages` - Create page
+- `PATCH /api/pages/:id` - Update page
+- `DELETE /api/pages/:id` - Delete page
+
+---
+
+### 🤖 [AUTONOMOUS] Phase 3 Validation
+
+Claude Code will run:
+```bash
+./scripts/validate-phase.sh
+
+# Additional Phase 3 specific tests
+cd backend
+npm run test -- media.service.spec.ts
+npm run test -- articles.service.spec.ts
+npm run test -- pages.service.spec.ts
+npm run test:e2e -- content.e2e-spec.ts
+```
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 3 Complete
+
+**Checklist (20 minutes):**
+- ✅ Media upload works (test image upload)
+- ✅ Image optimization generates thumbnails
+- ✅ Categories created (test hierarchical structure)
+- ✅ Tags created
+- ✅ Article CRUD works
+- ✅ Article slug generation works
+- ✅ Permission system works (test author_can_edit flag)
+- ✅ Article visibility controls work
+- ✅ Version control works for enabled articles
+- ✅ Pages with parent/child hierarchy work
+- ✅ Full-text search returns results
+- ✅ Test coverage ≥80%
+
+**Manual testing:**
+```bash
+# Upload an image
 curl -X POST http://localhost:4000/api/media/upload \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -F "file=@test-image.jpg" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@/path/to/image.jpg" \
   -F "alt_text=Test image"
 
-# Verify media storage
-ls -la media/  # Check uploaded files exist
-
-# Database checks
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM articles;"
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM media;"
-```
-
-**Success Criteria:**
-- ✅ All tests pass (200+ tests total)
-- ✅ Articles CRUD works
-- ✅ Slug generation works (unique, URL-safe)
-- ✅ HTML sanitization works (no XSS)
-- ✅ Visibility controls enforced
-- ✅ Version control works (optional per article)
-- ✅ Media upload works (images, PDFs)
-- ✅ File size limits enforced
-- ✅ MIME type validation works
-- ✅ Categories hierarchical structure works
-- ✅ Tags flat structure works
-
----
-
-## Phase 4: Ecommerce Core (Week 7-9)
-
-### Prerequisites
-- Phase 3 complete
-- Content management working
-
-### Deliverables
-
-#### 4.1 Database Schema Updates
-
-Add ecommerce tables:
-- Product
-- DigitalProductFile (for eBooks)
-- ProductCategory (junction)
-- Cart
-- CartItem
-- Order
-- OrderItem
-- Download (for digital products)
-
-**Migration:**
-```bash
-npx prisma migrate dev --name add_ecommerce_tables
-```
-
-#### 4.2 Products Module
-
-**API Endpoints:**
-```typescript
-GET    /api/products                          // List products (paginated)
-GET    /api/products/:slug                    // Get product by slug
-POST   /api/products                          // Create product
-PUT    /api/products/:id                      // Update product
-DELETE /api/products/:id                      // Delete product (soft delete)
-POST   /api/products/:id/digital-files        // Upload digital product file
-POST   /api/products/:id/test-personalization // Test eBook personalization
-```
-
-#### 4.3 Cart Module
-
-**API Endpoints:**
-```typescript
-GET    /api/cart                              // Get current cart
-POST   /api/cart/items                        // Add item to cart
-PUT    /api/cart/items/:id                    // Update cart item quantity
-DELETE /api/cart/items/:id                    // Remove item from cart
-DELETE /api/cart                              // Clear cart
-```
-
-#### 4.4 Orders Module
-
-**API Endpoints:**
-```typescript
-GET    /api/orders                            // List orders (own or all)
-GET    /api/orders/:id                        // Get order details
-POST   /api/orders                            // Create order (from cart)
-PUT    /api/orders/:id/status                 // Update order status (Admin)
-POST   /api/orders/:id/refund                 // Process refund (Admin)
-GET    /api/orders/:id/download/:format       // Download digital product
-POST   /api/orders/:id/send-to-kindle         // Send eBook to Kindle
-```
-
-### Testing Strategy
-
-#### Unit Tests
-
-**File: `src/modules/products/products.service.spec.ts`**
-```typescript
-describe('ProductsService', () => {
-  it('should calculate price with tax', () => {
-    const product = { price: 100, tax_rate: 0.08 }
-    const total = productsService.calculateTotalPrice(product)
-    expect(total).toBe(108)
-  })
-
-  it('should check stock availability', async () => {
-    const product = await createProduct({ stock_status: 'in_stock', stock_quantity: 5 })
-    expect(await productsService.isAvailable(product.id, 3)).toBe(true)
-    expect(await productsService.isAvailable(product.id, 10)).toBe(false)
-  })
-})
-```
-
-**File: `src/modules/cart/cart.service.spec.ts`**
-```typescript
-describe('CartService', () => {
-  it('should calculate cart total', async () => {
-    const cart = await createCart([
-      { product_id: 'p1', quantity: 2, price: 10 },
-      { product_id: 'p2', quantity: 1, price: 25 }
-    ])
-    const total = await cartService.calculateTotal(cart.id)
-    expect(total).toBe(45) // (2 * 10) + (1 * 25)
-  })
-
-  it('should enforce max quantity per item', async () => {
-    await expect(
-      cartService.addItem(cartId, productId, 1000)
-    ).rejects.toThrow('Maximum quantity exceeded')
-  })
-})
-```
-
-#### Integration Tests
-
-**File: `test/products.e2e-spec.ts`**
-```typescript
-describe('Products (e2e)', () => {
-  it('should create physical product', () => {
-    return request(app.getHttpServer())
-      .post('/products')
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({
-        title: 'Test Product',
-        description: 'Description',
-        price: 29.99,
-        product_type: 'physical',
-        stock_status: 'in_stock',
-        visibility: 'public',
-        guest_purchaseable: true
-      })
-      .expect(201)
-  })
-
-  it('should create digital product (eBook) with EPUB', async () => {
-    const product = await createProduct({ product_type: 'digital' })
-
-    return request(app.getHttpServer())
-      .post(`/products/${product.id}/digital-files`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .attach('file', './test/fixtures/test-book.epub')
-      .field('format', 'epub')
-      .expect(201)
-      .expect(res => {
-        expect(res.body.format).toBe('epub')
-        expect(res.body.file_size_bytes).toBeGreaterThan(0)
-      })
-  })
-
-  it('should test eBook personalization', async () => {
-    const product = await createDigitalProduct({ format: 'epub' })
-
-    return request(app.getHttpServer())
-      .post(`/products/${product.id}/test-personalization`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ format: 'epub' })
-      .expect(200)
-      .expect(res => {
-        expect(res.body.test_download_url).toBeDefined()
-        expect(res.body.personalization_tested).toBe(true)
-      })
-  })
-})
-```
-
-**File: `test/cart.e2e-spec.ts`**
-```typescript
-describe('Cart (e2e)', () => {
-  let product1, product2
-
-  beforeEach(async () => {
-    product1 = await createProduct({ price: 10 })
-    product2 = await createProduct({ price: 25 })
-  })
-
-  it('should add item to cart', () => {
-    return request(app.getHttpServer())
-      .post('/cart/items')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .send({ product_id: product1.id, quantity: 2 })
-      .expect(201)
-  })
-
-  it('should get cart total', async () => {
-    await addToCart(memberToken, product1.id, 2) // 2 * 10 = 20
-    await addToCart(memberToken, product2.id, 1) // 1 * 25 = 25
-
-    return request(app.getHttpServer())
-      .get('/cart')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .expect(200)
-      .expect(res => {
-        expect(res.body.total).toBe(45)
-        expect(res.body.items.length).toBe(2)
-      })
-  })
-
-  it('should support guest cart (session-based)', async () => {
-    const agent = request.agent(app.getHttpServer())
-
-    await agent
-      .post('/cart/items')
-      .send({ product_id: product1.id, quantity: 1 })
-      .expect(201)
-
-    return agent
-      .get('/cart')
-      .expect(200)
-      .expect(res => {
-        expect(res.body.items.length).toBe(1)
-      })
-  })
-})
-```
-
-**File: `test/orders.e2e-spec.ts`**
-```typescript
-describe('Orders (e2e)', () => {
-  it('should create order from cart', async () => {
-    const product = await createProduct({ price: 29.99 })
-    await addToCart(memberToken, product.id, 1)
-
-    return request(app.getHttpServer())
-      .post('/orders')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .send({
-        shipping_address: {
-          name: 'Test User',
-          address_line1: '123 Test St',
-          city: 'Test City',
-          postal_code: '12345',
-          country: 'US'
-        }
-      })
-      .expect(201)
-      .expect(res => {
-        expect(res.body.status).toBe('pending')
-        expect(res.body.total).toBe(29.99)
-      })
-  })
-
-  it('should prevent duplicate order creation', async () => {
-    const order = await createOrder(memberToken)
-
-    return request(app.getHttpServer())
-      .post('/orders')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .expect(400)
-      .expect(res => {
-        expect(res.body.message).toContain('pending order')
-      })
-  })
-})
-```
-
-### Validation Checklist
-
-```bash
-# Run tests
-npm run test
-npm run test:e2e
-
-# Test product creation (manual)
-curl -X POST http://localhost:4000/api/products \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
+# Create an article
+curl -X POST http://localhost:4000/api/articles \
+  -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Test Product","price":29.99,"product_type":"physical"}'
+  -d '{
+    "title": "My First Article",
+    "content": "<p>This is the content...</p>",
+    "status": "published",
+    "visibility": "public"
+  }'
 
-# Database checks
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM products;"
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM orders;"
+# Verify article created
+curl http://localhost:4000/api/articles/my-first-article
 ```
-
-**Success Criteria:**
-- ✅ All tests pass (300+ tests total)
-- ✅ Products CRUD works
-- ✅ Digital product file upload works
-- ✅ eBook personalization testing works
-- ✅ Cart operations work (add, update, remove, clear)
-- ✅ Guest cart works (session-based)
-- ✅ Member cart persists across sessions
-- ✅ Order creation works
-- ✅ Stock tracking works
-- ✅ Price calculations correct
-- ✅ Visibility controls enforced for products
 
 ---
 
-## Phase 5: Payment Integration (Week 10-11)
+## Phase 4: Ecommerce Core (Weeks 7-9)
 
-### Prerequisites
-- Phase 4 complete
-- Order system working
+### 🤖 [AUTONOMOUS] 4.1 Products Module
 
-### Deliverables
-
-#### 5.1 Stripe Integration
+Claude Code will implement product management:
 
 **Files to create:**
-- `src/modules/payments/stripe/stripe.service.ts`
-- `src/modules/payments/stripe/stripe.controller.ts`
-- `src/modules/payments/stripe/stripe-webhook.controller.ts`
+- `backend/src/modules/products/products.module.ts`
+- `backend/src/modules/products/products.service.ts`
+- `backend/src/modules/products/products.controller.ts`
+- `backend/src/modules/products/dto/*.dto.ts`
+- `backend/src/modules/products/products.service.spec.ts` (50+ tests)
 
-**API Endpoints:**
-```typescript
-POST   /api/payments/stripe/create-intent     // Create Payment Intent
-POST   /api/payments/stripe/webhook           // Stripe webhook endpoint
-```
+**Features:**
+- ✅ CRUD operations
+- ✅ Product type (physical/digital)
+- ✅ Price management (Decimal type)
+- ✅ Stock tracking
+- ✅ SKU management
+- ✅ Product images (via media module)
+- ✅ Categories and tags
+- ✅ Visibility controls
+- ✅ Guest purchaseable flag
+- ✅ SEO fields
+- ✅ Granular permissions
 
-#### 5.2 PayPal Integration
-
-**Files to create:**
-- `src/modules/payments/paypal/paypal.service.ts`
-- `src/modules/payments/paypal/paypal.controller.ts`
-- `src/modules/payments/paypal/paypal-webhook.controller.ts`
-
-**API Endpoints:**
-```typescript
-POST   /api/payments/paypal/create-order      // Create PayPal order
-POST   /api/payments/paypal/capture           // Capture payment
-POST   /api/payments/paypal/webhook           // PayPal webhook endpoint
-```
-
-#### 5.3 Amazon Pay Integration
-
-**Files to create:**
-- `src/modules/payments/amazon-pay/amazon-pay.service.ts`
-- `src/modules/payments/amazon-pay/amazon-pay.controller.ts`
-- `src/modules/payments/amazon-pay/amazon-pay-webhook.controller.ts`
-
-**API Endpoints:**
-```typescript
-POST   /api/payments/amazon-pay/create-charge  // Create charge
-POST   /api/payments/amazon-pay/webhook        // Amazon Pay webhook
-```
-
-### Testing Strategy
-
-#### Unit Tests
-
-**File: `src/modules/payments/stripe/stripe.service.spec.ts`**
-```typescript
-describe('StripeService', () => {
-  it('should create Payment Intent with correct amount', async () => {
-    const order = await createOrder({ total: 29.99 })
-    const intent = await stripeService.createPaymentIntent(order)
-    expect(intent.amount).toBe(2999) // Cents
-    expect(intent.currency).toBe('usd')
-  })
-
-  it('should verify webhook signature', () => {
-    const payload = JSON.stringify({ type: 'payment_intent.succeeded' })
-    const signature = generateStripeSignature(payload)
-
-    expect(() => {
-      stripeService.verifyWebhookSignature(payload, signature)
-    }).not.toThrow()
-  })
-
-  it('should reject invalid webhook signature', () => {
-    const payload = JSON.stringify({ type: 'payment_intent.succeeded' })
-    const invalidSignature = 'invalid'
-
-    expect(() => {
-      stripeService.verifyWebhookSignature(payload, invalidSignature)
-    }).toThrow('Invalid signature')
-  })
-})
-```
-
-#### Integration Tests
-
-**File: `test/payments.e2e-spec.ts`**
-```typescript
-describe('Payments (e2e)', () => {
-  describe('Stripe', () => {
-    it('should create Payment Intent', async () => {
-      const order = await createOrder(memberToken, { total: 29.99 })
-
-      return request(app.getHttpServer())
-        .post('/payments/stripe/create-intent')
-        .set('Authorization', `Bearer ${memberToken}`)
-        .send({ order_id: order.id })
-        .expect(200)
-        .expect(res => {
-          expect(res.body.client_secret).toBeDefined()
-          expect(res.body.amount).toBe(2999) // Cents
-        })
-    })
-
-    it('should handle successful payment webhook', async () => {
-      const order = await createOrder(memberToken)
-      const payload = createStripeWebhookPayload('payment_intent.succeeded', {
-        metadata: { order_id: order.id }
-      })
-      const signature = generateStripeSignature(payload)
-
-      return request(app.getHttpServer())
-        .post('/payments/stripe/webhook')
-        .set('stripe-signature', signature)
-        .send(payload)
-        .expect(200)
-        .then(async () => {
-          const updated = await prisma.order.findUnique({ where: { id: order.id } })
-          expect(updated.status).toBe('completed')
-          expect(updated.payment_status).toBe('paid')
-        })
-    })
-
-    it('should create audit log for payment', async () => {
-      const order = await createOrder(memberToken)
-      await triggerStripeWebhook('payment_intent.succeeded', order)
-
-      const log = await prisma.auditLog.findFirst({
-        where: {
-          event_type: 'order_payment_succeeded',
-          target_id: order.id
-        }
-      })
-
-      expect(log).toBeDefined()
-      expect(log.details.amount).toBe(order.total)
-      expect(log.details.payment_provider).toBe('stripe')
-    })
-  })
-
-  describe('PayPal', () => {
-    it('should create PayPal order', async () => {
-      const order = await createOrder(memberToken)
-
-      return request(app.getHttpServer())
-        .post('/payments/paypal/create-order')
-        .set('Authorization', `Bearer ${memberToken}`)
-        .send({ order_id: order.id })
-        .expect(200)
-        .expect(res => {
-          expect(res.body.paypal_order_id).toBeDefined()
-          expect(res.body.approval_url).toBeDefined()
-        })
-    })
-  })
-})
-```
-
-### Validation Checklist
-
-```bash
-# Run tests
-npm run test:e2e
-
-# Test Stripe webhook (use Stripe CLI)
-stripe listen --forward-to localhost:4000/payments/stripe/webhook
-stripe trigger payment_intent.succeeded
-
-# Verify webhook handling
-psql $DATABASE_URL -c "SELECT * FROM orders WHERE payment_status = 'paid';"
-psql $DATABASE_URL -c "SELECT * FROM audit_logs WHERE event_type = 'order_payment_succeeded';"
-
-# Manual payment test (requires Stripe test mode)
-# Use test card: 4242 4242 4242 4242
-```
-
-**Success Criteria:**
-- ✅ All tests pass
-- ✅ Stripe Payment Intent creation works
-- ✅ PayPal order creation works
-- ✅ Amazon Pay charge creation works
-- ✅ Webhook signature verification works (all providers)
-- ✅ Order status updates on successful payment
-- ✅ Payment failures handled gracefully
-- ✅ Audit logs created for all payment events
-- ✅ Idempotent webhook handling (no duplicate processing)
+**Endpoints:**
+- `GET /api/products` - List products (public, paginated)
+- `GET /api/products/:slug` - Get product by slug
+- `POST /api/products` - Create product (requires capability)
+- `PATCH /api/products/:id` - Update product
+- `DELETE /api/products/:id` - Delete product
+- `PATCH /api/products/:id/stock` - Update stock quantity
 
 ---
 
-## Phase 6: Advanced Features (Week 12-13)
+### 🤖 [AUTONOMOUS] 4.2 Cart Module
 
-### Prerequisites
-- Phase 5 complete
-- Payment integration working
+Claude Code will implement shopping cart:
 
-### Deliverables
+**Features:**
+- ✅ Session-based carts (for guests)
+- ✅ User-based carts (for logged-in users)
+- ✅ Add/update/remove items
+- ✅ Cart persistence
+- ✅ Cart expiration (30 days inactive)
 
-#### 6.1 Comments & Reviews Module
+**Endpoints:**
+- `GET /api/cart` - Get current cart
+- `POST /api/cart/items` - Add item to cart
+- `PATCH /api/cart/items/:productId` - Update quantity
+- `DELETE /api/cart/items/:productId` - Remove item
+- `DELETE /api/cart` - Clear cart
 
-**API Endpoints:**
-```typescript
-GET    /api/comments                           // List comments (filtered by entity)
-POST   /api/comments                           // Create comment/review
-PUT    /api/comments/:id                       // Update own comment
-DELETE /api/comments/:id                       // Delete comment (own or admin)
-POST   /api/comments/:id/moderate              // Moderate comment (Admin)
-```
+---
 
-#### 6.2 AI Comment Moderation
+### 🤖 [AUTONOMOUS] 4.3 Product Reviews Module
 
-**Files to create:**
-- `src/modules/moderation/moderation.service.ts`
-- `src/modules/moderation/moderation.processor.ts` (Bull queue)
-- `src/modules/moderation/profanity-filter.ts`
+Claude Code will implement review system:
 
-#### 6.3 Granular Permissions
+**Features:**
+- ✅ 1-5 star ratings
+- ✅ Review title and content
+- ✅ Verified purchase badge
+- ✅ AI moderation (same as comments)
+- ✅ Admin approval workflow
 
-**Files to create:**
-- `src/modules/content-permissions/content-permissions.service.ts`
-- Extend Article/Product models with permission flags
+**Endpoints:**
+- `GET /api/products/:productId/reviews` - List reviews
+- `POST /api/products/:productId/reviews` - Create review (Member only)
+- `PATCH /api/reviews/:id` - Update own review
+- `DELETE /api/reviews/:id` - Delete own review
+- `POST /api/reviews/:id/approve` - Approve review (Admin)
+- `POST /api/reviews/:id/reject` - Reject review (Admin)
 
-#### 6.4 Audit Trail
+---
 
-**Files to create:**
-- `src/modules/audit/audit.service.ts`
-- `src/modules/audit/audit.interceptor.ts`
-- `src/modules/audit/audit.controller.ts`
-
-**API Endpoints:**
-```typescript
-GET    /api/audit-logs                         // List audit logs (Owner/Admin)
-GET    /api/audit-logs/:id                     // Get specific log entry
-POST   /api/audit-logs/export                  // Export logs as CSV
-```
-
-### Testing Strategy
-
-#### Unit Tests
-
-**File: `src/modules/comments/comments.service.spec.ts`**
-```typescript
-describe('CommentsService', () => {
-  it('should create comment on article', async () => {
-    const article = await createArticle()
-    const comment = await commentsService.create({
-      entity_type: 'article',
-      entity_id: article.id,
-      user_id: memberId,
-      content: 'Great article!'
-    })
-    expect(comment.entity_type).toBe('article')
-    expect(comment.status).toBe('pending') // Awaiting moderation
-  })
-
-  it('should create review with rating', async () => {
-    const product = await createProduct()
-    const review = await commentsService.create({
-      entity_type: 'product',
-      entity_id: product.id,
-      user_id: memberId,
-      content: 'Love this product!',
-      is_review: true,
-      rating: 5
-    })
-    expect(review.rating).toBe(5)
-  })
-})
-```
-
-**File: `src/modules/moderation/moderation.service.spec.ts`**
-```typescript
-describe('ModerationService', () => {
-  it('should flag profanity', async () => {
-    const result = await moderationService.moderateText('This is f***ing terrible')
-    expect(result.hasProfanity).toBe(true)
-    expect(result.cleanedText).toContain('[profanity]')
-  })
-
-  it('should call OpenAI Moderation API', async () => {
-    const result = await moderationService.moderateText('I hate you and want to hurt you')
-    expect(result.flagged).toBe(true)
-    expect(result.categories.hate).toBe(true)
-  })
-
-  it('should handle non-flagged content', async () => {
-    const result = await moderationService.moderateText('This is a nice comment')
-    expect(result.flagged).toBe(false)
-    expect(result.hasProfanity).toBe(false)
-  })
-})
-```
-
-**File: `src/modules/audit/audit.service.spec.ts`**
-```typescript
-describe('AuditService', () => {
-  it('should create tamper-evident log entry', async () => {
-    const log1 = await auditService.create({ event_type: 'test_event_1', ... })
-    const log2 = await auditService.create({ event_type: 'test_event_2', ... })
-
-    expect(log2.previous_hash).toBe(log1.entry_hash)
-  })
-
-  it('should detect tampered log entry', async () => {
-    const log = await auditService.create({ event_type: 'test' })
-    await prisma.auditLog.update({
-      where: { id: log.id },
-      data: { details: { modified: true } } // Tamper with data
-    })
-
-    const isValid = await auditService.verifyLogIntegrity(log.id)
-    expect(isValid).toBe(false)
-  })
-})
-```
-
-#### Integration Tests
-
-**File: `test/comments.e2e-spec.ts`**
-```typescript
-describe('Comments (e2e)', () => {
-  it('should allow Member to comment on article', async () => {
-    const article = await createArticle({ comment_visibility: 'public' })
-
-    return request(app.getHttpServer())
-      .post('/comments')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .send({
-        entity_type: 'article',
-        entity_id: article.id,
-        content: 'Great article!'
-      })
-      .expect(201)
-  })
-
-  it('should not allow Guest to comment', async () => {
-    const article = await createArticle()
-
-    return request(app.getHttpServer())
-      .post('/comments')
-      .send({
-        entity_type: 'article',
-        entity_id: article.id,
-        content: 'Test'
-      })
-      .expect(401)
-  })
-
-  it('should flag profanity-laden comment', async () => {
-    const article = await createArticle()
-
-    await request(app.getHttpServer())
-      .post('/comments')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .send({
-        entity_type: 'article',
-        entity_id: article.id,
-        content: 'This is f***ing terrible s***'
-      })
-      .expect(201)
-
-    // Wait for async moderation
-    await sleep(1000)
-
-    const comment = await prisma.comment.findFirst({
-      where: { entity_id: article.id },
-      orderBy: { created_at: 'desc' }
-    })
-
-    expect(comment.flagged).toBe(true)
-    expect(comment.content).not.toContain('f***')
-    expect(comment.content).toContain('[profanity]')
-  })
-})
-```
-
-**File: `test/audit.e2e-spec.ts`**
-```typescript
-describe('Audit Logs (e2e)', () => {
-  it('should log user login', async () => {
-    await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email: 'test@example.com', password: 'ValidPassword123!' })
-
-    const log = await prisma.auditLog.findFirst({
-      where: { event_type: 'user_login' },
-      orderBy: { timestamp: 'desc' }
-    })
-
-    expect(log).toBeDefined()
-    expect(log.ip_address).toBeDefined()
-    expect(log.user_agent).toBeDefined()
-  })
-
-  it('should log password change', async () => {
-    await request(app.getHttpServer())
-      .put('/users/me/password')
-      .set('Authorization', `Bearer ${memberToken}`)
-      .send({ old_password: 'Old123!', new_password: 'New123!' })
-
-    const log = await prisma.auditLog.findFirst({
-      where: { event_type: 'user_password_changed' },
-      orderBy: { timestamp: 'desc' }
-    })
-
-    expect(log).toBeDefined()
-  })
-
-  it('should allow Owner to export audit logs', () => {
-    return request(app.getHttpServer())
-      .post('/audit-logs/export')
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .send({
-        start_date: '2026-01-01',
-        end_date: '2026-01-31'
-      })
-      .expect(200)
-      .expect(res => {
-        expect(res.body.csv_data).toBeDefined()
-        expect(res.body.csv_data).toContain('event_type')
-      })
-  })
-})
-```
-
-### Validation Checklist
+### 🤖 [AUTONOMOUS] Phase 4 Validation
 
 ```bash
-# Run tests
-npm run test
-npm run test:e2e
+./scripts/validate-phase.sh
 
-# Test AI moderation (requires OpenAI API key)
-curl -X POST http://localhost:4000/api/comments \
-  -H "Authorization: Bearer $MEMBER_TOKEN" \
+cd backend
+npm run test -- products.service.spec.ts
+npm run test -- cart.service.spec.ts
+npm run test -- reviews.service.spec.ts
+```
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 4 Complete
+
+**Checklist (15 minutes):**
+- ✅ Product CRUD works
+- ✅ Stock tracking updates correctly
+- ✅ Cart operations work (add/update/remove)
+- ✅ Cart persists for logged-in users
+- ✅ Guest carts work with session
+- ✅ Reviews can be created
+- ✅ Reviews display verified purchase badge
+- ✅ AI moderation flags inappropriate reviews
+- ✅ Test coverage ≥80%
+
+---
+
+## Phase 5: Payment Integration (Weeks 10-11)
+
+### 👤 [HUMAN REQUIRED] 5.1 Payment Provider Setup
+
+Before Claude Code can implement payment integration, you need to create accounts:
+
+#### Stripe Setup (15 minutes)
+
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com/)
+2. Create account (or sign in)
+3. Navigate to "Developers" > "API keys"
+4. Copy **Publishable key** and **Secret key** (use Test mode for development)
+5. Navigate to "Developers" > "Webhooks"
+6. Add endpoint: `http://localhost:4000/api/payments/stripe/webhook`
+7. Select events:
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `charge.refunded`
+8. Copy **Webhook signing secret**
+
+#### PayPal Setup (20 minutes)
+
+1. Go to [PayPal Developer Dashboard](https://developer.paypal.com/)
+2. Create account or sign in
+3. Go to "My Apps & Credentials"
+4. Create a **Sandbox** app for testing
+5. Copy **Client ID** and **Secret**
+6. For production, create a live app later
+
+#### Amazon Pay Setup (20 minutes) - **OPTIONAL**
+
+1. Go to [Amazon Pay Merchant Portal](https://pay.amazon.com/)
+2. Create merchant account
+3. Complete seller verification (may take 1-2 days)
+4. Navigate to "Integration" > "Integration Central"
+5. Copy **Merchant ID**, **Public Key ID**, and **Private Key**
+
+#### Update .env
+
+Add to your `.env`:
+```bash
+# Stripe
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# PayPal
+PAYPAL_CLIENT_ID=...
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_MODE=sandbox  # or 'live' for production
+
+# Amazon Pay (optional)
+AMAZON_PAY_MERCHANT_ID=...
+AMAZON_PAY_PUBLIC_KEY_ID=...
+AMAZON_PAY_PRIVATE_KEY=...
+AMAZON_PAY_REGION=us  # or 'eu', 'uk', 'jp'
+AMAZON_PAY_SANDBOX=true
+```
+
+---
+
+### 🤖 [AUTONOMOUS] 5.2 Payments Module Implementation
+
+Claude Code will create complete payment integration:
+
+**Files to create:**
+- `backend/src/modules/payments/payments.module.ts`
+- `backend/src/modules/payments/payments.service.ts`
+- `backend/src/modules/payments/payments.controller.ts`
+- `backend/src/modules/payments/stripe/stripe.service.ts`
+- `backend/src/modules/payments/paypal/paypal.service.ts`
+- `backend/src/modules/payments/amazon/amazon.service.ts`
+- `backend/src/modules/payments/dto/*.dto.ts`
+- `backend/src/modules/payments/payments.service.spec.ts` (50+ tests)
+
+**Dependencies to install:**
+```bash
+npm install stripe @paypal/checkout-server-sdk amazon-pay-api-sdk-nodejs
+npm install -D @types/stripe
+```
+
+**Features:**
+- ✅ Stripe Payment Intents API
+- ✅ PayPal Orders API v2
+- ✅ Amazon Pay integration
+- ✅ Webhook handling with signature verification
+- ✅ Idempotency (prevent duplicate charges)
+- ✅ Refund processing
+- ✅ Order status tracking
+
+**Endpoints:**
+- `POST /api/payments/create-intent` - Create payment intent (Stripe)
+- `POST /api/payments/paypal/create-order` - Create PayPal order
+- `POST /api/payments/paypal/capture-order` - Capture PayPal payment
+- `POST /api/payments/amazon/create-session` - Create Amazon Pay session
+- `POST /api/payments/stripe/webhook` - Stripe webhook handler
+- `POST /api/payments/paypal/webhook` - PayPal webhook handler
+- `POST /api/payments/refund` - Process refund (Admin only)
+
+---
+
+### 🤖 [AUTONOMOUS] 5.3 Orders Module
+
+Claude Code will implement order management:
+
+**Features:**
+- ✅ Order creation from cart
+- ✅ Order number generation
+- ✅ Order status tracking
+- ✅ Email notifications (order confirmation, shipping)
+- ✅ Order history for users
+- ✅ Admin order management
+
+**Endpoints:**
+- `POST /api/orders` - Create order from cart
+- `GET /api/orders` - List own orders (or all for Admin)
+- `GET /api/orders/:orderNumber` - Get order details
+- `PATCH /api/orders/:id/status` - Update order status (Admin)
+
+---
+
+### 🤖 [AUTONOMOUS] 5.4 Checkout Flow Implementation
+
+Claude Code will create multi-step checkout:
+
+1. Cart review
+2. Shipping information (for physical products)
+3. Payment method selection
+4. Order confirmation
+
+**Endpoints:**
+- `POST /api/checkout/initiate` - Start checkout from cart
+- `POST /api/checkout/shipping` - Save shipping info
+- `POST /api/checkout/payment` - Process payment
+- `POST /api/checkout/complete` - Finalize order
+
+---
+
+### 👁️ [HUMAN VERIFICATION] 5.5 Payment Testing
+
+**CRITICAL: Test all payment flows manually (45 minutes)**
+
+#### Stripe Testing:
+
+1. Add product to cart
+2. Initiate checkout
+3. Use Stripe test card: `4242 4242 4242 4242`
+4. Verify payment succeeds
+5. Check order created in database
+6. Check webhook received and processed
+
+**Stripe test cards:**
+- Success: `4242 4242 4242 4242`
+- Declined: `4000 0000 0000 0002`
+- 3D Secure: `4000 0025 0000 3155`
+
+#### PayPal Testing:
+
+1. Add product to cart
+2. Select PayPal at checkout
+3. Use PayPal sandbox account (create at PayPal Developer Dashboard)
+4. Complete PayPal flow
+5. Verify order created
+6. Check webhook received
+
+#### Refund Testing:
+
+1. Create a test order
+2. As Admin, process refund via API
+3. Verify refund reflected in Stripe/PayPal dashboard
+4. Verify order status updated to "refunded"
+
+#### Edge Cases to Test:
+
+- Payment declined (insufficient funds card)
+- Payment abandoned (user closes window)
+- Duplicate payment attempts (idempotency)
+- Webhook failure and retry
+- Stock depleted during checkout
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 5 Complete
+
+**Checklist (45 minutes for thorough testing):**
+- ✅ Stripe payment succeeds
+- ✅ Stripe payment failure handled gracefully
+- ✅ Stripe webhook received and processed
+- ✅ PayPal payment succeeds
+- ✅ PayPal webhook received
+- ✅ Order created with correct amounts (subtotal, tax, shipping, total)
+- ✅ Order confirmation email sent (check logs)
+- ✅ Stock quantity decreased after purchase
+- ✅ Refund processing works
+- ✅ Duplicate payment prevention works (idempotency)
+- ✅ Digital products create download tokens
+- ✅ Test coverage ≥80%
+
+---
+
+## Phase 6: Advanced Features (Weeks 12-13)
+
+### 🤖 [AUTONOMOUS] 6.1 Comments Module
+
+Claude Code will implement commenting system:
+
+**Features:**
+- ✅ Comments on articles
+- ✅ Nested replies (single level)
+- ✅ Member-only commenting
+- ✅ AI moderation (OpenAI Moderation API + profanity filter)
+- ✅ Admin moderation queue
+- ✅ Reactive moderation (post immediately, flag for review)
+
+**Dependencies:**
+```bash
+npm install openai bad-words
+npm install -D @types/bad-words
+```
+
+**Endpoints:**
+- `GET /api/articles/:articleId/comments` - List comments
+- `POST /api/articles/:articleId/comments` - Create comment (Member only)
+- `POST /api/comments/:id/reply` - Reply to comment
+- `PATCH /api/comments/:id` - Edit own comment
+- `DELETE /api/comments/:id` - Delete own comment
+- `GET /api/admin/comments/flagged` - List flagged comments (Admin)
+- `POST /api/admin/comments/:id/approve` - Approve comment (Admin)
+- `POST /api/admin/comments/:id/reject` - Reject comment (Admin)
+
+---
+
+### 👤 [HUMAN REQUIRED] 6.2 OpenAI API Key Setup
+
+1. Go to [OpenAI Platform](https://platform.openai.com/)
+2. Create account or sign in
+3. Navigate to "API keys"
+4. Create new key
+5. Copy key to `.env`:
+   ```bash
+   OPENAI_API_KEY=sk-...
+   ```
+
+**Cost estimate:** OpenAI Moderation API is **FREE** for up to 1M requests/month
+
+---
+
+### 🤖 [AUTONOMOUS] 6.3 AI Moderation Service
+
+Claude Code will implement:
+
+**Files:**
+- `backend/src/modules/moderation/moderation.module.ts`
+- `backend/src/modules/moderation/moderation.service.ts`
+- `backend/src/modules/moderation/profanity.service.ts`
+- `backend/src/modules/moderation/moderation.service.spec.ts` (20+ tests)
+
+**Features:**
+- ✅ OpenAI Moderation API integration
+- ✅ Profanity detection and bleeping (bad-words library)
+- ✅ Fully redact profanity (no letter hints)
+- ✅ Click-to-reveal for readers with warnings
+- ✅ Flag aggregation (hate speech, harassment, sexual content, violence)
+- ✅ Notification to admins for flagged content
+
+**Moderation flow:**
+```
+User submits comment
+  ↓
+Check OpenAI Moderation API (async)
+  ↓
+Check profanity filter
+  ↓
+If flagged or profanity: mark for review, notify admin
+  ↓
+Post comment publicly (reactive moderation)
+  ↓
+Admin reviews and approves/rejects if needed
+```
+
+---
+
+### 🤖 [AUTONOMOUS] 6.4 Audit Trail Module
+
+Claude Code will implement immutable audit logging:
+
+**Features:**
+- ✅ 50+ event types tracked
+- ✅ Blockchain-like chaining with checksums
+- ✅ Immutable (no updates allowed)
+- ✅ 7-year retention
+- ✅ Searchable and filterable
+- ✅ CSV export
+
+**Event types to track:**
+```typescript
+const eventTypes = [
+  // User actions
+  'user.register', 'user.login', 'user.login.failed', 'user.logout',
+  'user.password.reset', 'user.email.changed', 'user.2fa.enabled',
+  'user.2fa.disabled', 'user.2fa.reset',
+
+  // Content actions
+  'article.create', 'article.update', 'article.delete', 'article.publish',
+  'page.create', 'page.update', 'page.delete',
+  'product.create', 'product.update', 'product.delete', 'product.stock.update',
+
+  // Ecommerce actions
+  'order.create', 'order.paid', 'order.shipped', 'order.completed', 'order.refunded',
+  'cart.item.added', 'cart.item.removed',
+
+  // Comments & Reviews
+  'comment.create', 'comment.update', 'comment.delete', 'comment.flagged', 'comment.approved',
+  'review.create', 'review.flagged', 'review.approved',
+
+  // Admin actions
+  'user.role.changed', 'user.capability.assigned', 'user.capability.removed',
+  'comment.moderate', 'review.moderate',
+
+  // System actions
+  'system.config.changed', 'system.backup.created', 'system.restore.completed',
+]
+```
+
+**Endpoints:**
+- `GET /api/audit` - List audit logs (Admin/Owner only)
+- `GET /api/audit/export` - Export audit logs as CSV (Admin/Owner only)
+- `GET /api/audit/verify` - Verify audit trail integrity
+
+**Blockchain-like chaining:**
+```typescript
+function createAuditEntry(event: AuditEvent): AuditLog {
+  const previousEntry = await getLastAuditEntry()
+
+  const entry = {
+    ...event,
+    previous_hash: previousEntry?.entry_hash || null,
+    entry_hash: null, // Will be calculated
+  }
+
+  // Calculate hash of this entry (excludes entry_hash field)
+  entry.entry_hash = crypto
+    .createHash('sha256')
+    .update(JSON.stringify(entry))
+    .digest('hex')
+
+  return entry
+}
+```
+
+---
+
+### 🤖 [AUTONOMOUS] 6.5 Granular Permissions Implementation
+
+Claude Code will implement per-content permission flags:
+
+**Logic already in schema, now add UI controls:**
+
+- Admin toggle switches for each article/page/product:
+  - "Author can edit" (checkbox)
+  - "Author can delete" (checkbox)
+  - "Admins can edit" (checkbox)
+  - "Admins can delete" (checkbox)
+
+- Permission evaluation (already described in Phase 3)
+
+**Endpoints:**
+- `PATCH /api/articles/:id/permissions` - Update article permissions (Owner only)
+- `PATCH /api/products/:id/permissions` - Update product permissions (Owner only)
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 6 Complete
+
+**Checklist (20 minutes):**
+- ✅ Comments can be posted on articles
+- ✅ Comments with profanity are bleached
+- ✅ OpenAI moderation flags inappropriate comments
+- ✅ Admin receives notification for flagged comments
+- ✅ Product reviews work similarly to comments
+- ✅ Audit trail logs all events correctly
+- ✅ Audit trail chain integrity verified
+- ✅ Audit log export to CSV works
+- ✅ Granular permission toggles work
+- ✅ Permission evaluation respects content-level flags
+- ✅ Test coverage ≥80%
+
+**Test AI moderation:**
+```bash
+# Post comment with profanity
+curl -X POST http://localhost:4000/api/articles/test-article/comments \
+  -H "Authorization: Bearer MEMBER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"entity_type":"article","entity_id":"...","content":"Test profanity"}'
+  -d '{"content": "This is a damn good article!"}'
 
-# Check moderation queue
-npm run queue:ui  # Bull Board dashboard
+# Check comment is posted but profanity is bleached
+curl http://localhost:4000/api/articles/test-article/comments
+# Should show: "This is a **** good article!"
 
-# Verify audit trail
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM audit_logs;"
-psql $DATABASE_URL -c "SELECT event_type, COUNT(*) FROM audit_logs GROUP BY event_type;"
+# Post comment with hate speech
+curl -X POST http://localhost:4000/api/articles/test-article/comments \
+  -H "Authorization: Bearer MEMBER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "[inappropriate content]"}'
+
+# Check admin moderation queue
+curl http://localhost:4000/api/admin/comments/flagged \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+# Should show flagged comment with OpenAI moderation flags
 ```
-
-**Success Criteria:**
-- ✅ All tests pass (400+ tests total)
-- ✅ Comments CRUD works
-- ✅ Reviews with ratings work
-- ✅ Profanity filtering works (bad-words library)
-- ✅ OpenAI moderation API integration works
-- ✅ Comments flagged for review when AI detects issues
-- ✅ Admin can approve/reject flagged comments
-- ✅ Granular content permissions work
-- ✅ Audit trail logs all events (50+ event types)
-- ✅ Audit log integrity verification works
-- ✅ CSV export works
 
 ---
 
-## Phase 7: Digital Products & eBooks (Week 14-15)
+## Phase 7: Digital Products - eBooks (Week 14)
 
-### Prerequisites
-- Phase 6 complete
-- Orders and payments working
+### 👤 [HUMAN REQUIRED] 7.1 AWS SES Setup for "Send to Kindle"
 
-### Deliverables
+1. Go to [AWS Console](https://console.aws.amazon.com/)
+2. Navigate to Amazon SES (Simple Email Service)
+3. Verify your domain or email address
+4. Request production access (if not already granted)
+5. Create SMTP credentials
+6. Add to `.env`:
+   ```bash
+   AWS_SES_REGION=us-east-1
+   AWS_SES_ACCESS_KEY_ID=...
+   AWS_SES_SECRET_ACCESS_KEY=...
+   AWS_SES_FROM_EMAIL=noreply@yourdomain.com
+   ```
 
-#### 7.1 Digital Products Module
+**Cost estimate:** $0.10 per 1,000 emails (first 62,000 per month free with EC2)
+
+**Time estimate:** 30 minutes (plus 1-2 days for production access approval)
+
+---
+
+### 🤖 [AUTONOMOUS] 7.2 Digital Products Module
+
+Claude Code will implement eBook functionality:
+
+**Dependencies:**
+```bash
+npm install adm-zip jsdom pdf-lib nodemailer
+npm install -D @types/adm-zip @types/jsdom @types/nodemailer
+npm install aws-sdk  # for SES
+```
 
 **Files to create:**
-- `src/modules/digital-products/digital-products.service.ts`
-- `src/modules/digital-products/digital-products.processor.ts` (Bull queue)
-- `src/modules/digital-products/epub-personalizer.ts`
-- `src/modules/digital-products/pdf-personalizer.ts`
+- `backend/src/modules/digital-products/digital-products.module.ts`
+- `backend/src/modules/digital-products/digital-products.service.ts`
+- `backend/src/modules/digital-products/digital-products.controller.ts`
+- `backend/src/modules/digital-products/ebook-processor.service.ts`
+- `backend/src/modules/digital-products/kindle.service.ts`
+- `backend/src/modules/digital-products/dto/*.dto.ts`
+- `backend/src/modules/digital-products/digital-products.service.spec.ts` (55+ tests)
 
-#### 7.2 Kindle Devices Module
+**Features:**
+- ✅ EPUB and PDF file upload
+- ✅ eBook personalization/stamping (customer name, order number, date)
+- ✅ Pre-publication personalization testing
+- ✅ Download token generation (7-day expiry, 5 downloads per format)
+- ✅ Download counter tracking
+- ✅ Send to Kindle email delivery
+- ✅ Kindle device management
 
-**API Endpoints:**
+**Endpoints:**
+- `POST /api/digital-products/:productId/upload` - Upload EPUB/PDF (Admin)
+- `POST /api/digital-products/:productId/test-personalization` - Test stamping (Admin)
+- `GET /api/digital-products/download/:token` - Download eBook (user)
+- `POST /api/digital-products/:productId/send-to-kindle` - Email to Kindle (user)
+- `GET /api/users/me/kindle-devices` - List Kindle devices
+- `POST /api/users/me/kindle-devices` - Add Kindle device
+- `DELETE /api/users/me/kindle-devices/:id` - Remove Kindle device
+
+**EPUB personalization logic:**
 ```typescript
-GET    /api/kindle-devices                     // List user's Kindle devices
-POST   /api/kindle-devices                     // Add Kindle device
-PUT    /api/kindle-devices/:id                 // Update device
-DELETE /api/kindle-devices/:id                 // Remove device
-POST   /api/kindle-devices/:id/set-default     // Set as default
+async personalizeEpub(
+  epubPath: string,
+  customerName: string,
+  orderNumber: string,
+  purchaseDate: Date
+): Promise<Buffer> {
+  const zip = new AdmZip(epubPath)
+
+  // Find content.opf or .html files
+  const entries = zip.getEntries()
+
+  for (const entry of entries) {
+    if (entry.entryName.endsWith('.html') || entry.entryName.endsWith('.xhtml')) {
+      let content = entry.getData().toString('utf8')
+
+      // Inject personalization at beginning of first chapter
+      const personalizationHTML = `
+        <div style="page-break-after: always; text-align: center; padding: 2em;">
+          <p><strong>This book belongs to:</strong></p>
+          <p>${customerName}</p>
+          <p><em>Purchased on ${purchaseDate.toLocaleDateString()}</em></p>
+          <p><small>Order #${orderNumber}</small></p>
+        </div>
+      `
+
+      // Insert after <body> tag
+      content = content.replace('<body>', `<body>${personalizationHTML}`)
+
+      zip.updateFile(entry, Buffer.from(content, 'utf8'))
+      break  // Only personalize first content file
+    }
+  }
+
+  return zip.toBuffer()
+}
 ```
 
-#### 7.3 Send to Kindle Module
-
-**API Endpoints:**
+**PDF personalization logic:**
 ```typescript
-POST   /api/digital-products/send-to-kindle    // Send eBook to Kindle
+async personalizePdf(
+  pdfPath: string,
+  customerName: string,
+  orderNumber: string,
+  purchaseDate: Date
+): Promise<Buffer> {
+  const existingPdfBytes = await fs.readFile(pdfPath)
+  const pdfDoc = await PDFDocument.load(existingPdfBytes)
+
+  // Create personalization page
+  const page = pdfDoc.insertPage(0)  // Insert at beginning
+  const { width, height } = page.getSize()
+  const fontSize = 12
+
+  page.drawText('This book belongs to:', {
+    x: width / 2 - 60,
+    y: height / 2 + 40,
+    size: fontSize,
+  })
+
+  page.drawText(customerName, {
+    x: width / 2 - (customerName.length * fontSize / 4),
+    y: height / 2 + 20,
+    size: fontSize + 4,
+  })
+
+  page.drawText(`Purchased on ${purchaseDate.toLocaleDateString()}`, {
+    x: width / 2 - 70,
+    y: height / 2 - 10,
+    size: fontSize - 2,
+  })
+
+  page.drawText(`Order #${orderNumber}`, {
+    x: width / 2 - 50,
+    y: height / 2 - 30,
+    size: fontSize - 4,
+  })
+
+  return Buffer.from(await pdfDoc.save())
+}
 ```
-
-### Testing Strategy
-
-#### Unit Tests
-
-**File: `src/modules/digital-products/epub-personalizer.spec.ts`**
-```typescript
-describe('EpubPersonalizer', () => {
-  it('should personalize EPUB with customer info', async () => {
-    const originalEpub = await fs.readFile('./test/fixtures/test-book.epub')
-    const personalized = await epubPersonalizer.personalize(originalEpub, {
-      customerName: 'John Doe',
-      purchaseDate: new Date(),
-      orderNumber: 'ORD-12345'
-    })
-
-    // Extract and verify content
-    const zip = new AdmZip(personalized)
-    const contentFiles = zip.getEntries().filter(e => e.entryName.includes('.xhtml'))
-    const firstContent = contentFiles[0].getData().toString('utf8')
-
-    expect(firstContent).toContain('John Doe')
-    expect(firstContent).toContain('ORD-12345')
-  })
-
-  it('should preserve EPUB structure', async () => {
-    const originalEpub = await fs.readFile('./test/fixtures/test-book.epub')
-    const personalized = await epubPersonalizer.personalize(originalEpub, { ... })
-
-    const zip = new AdmZip(personalized)
-    expect(zip.getEntry('META-INF/container.xml')).toBeDefined()
-    expect(zip.getEntry('mimetype')).toBeDefined()
-  })
-})
-```
-
-**File: `src/modules/digital-products/pdf-personalizer.spec.ts`**
-```typescript
-describe('PdfPersonalizer', () => {
-  it('should add personalization page to PDF', async () => {
-    const originalPdf = await fs.readFile('./test/fixtures/test-book.pdf')
-    const personalized = await pdfPersonalizer.personalize(originalPdf, {
-      customerName: 'John Doe',
-      purchaseDate: new Date(),
-      orderNumber: 'ORD-12345'
-    })
-
-    const pdf = await PDFDocument.load(personalized)
-    expect(pdf.getPageCount()).toBe(originalPageCount + 1)
-
-    const firstPage = pdf.getPages()[0]
-    const text = await firstPage.getTextContent()
-    expect(text).toContain('John Doe')
-  })
-})
-```
-
-#### Integration Tests
-
-**File: `test/digital-products.e2e-spec.ts`**
-```typescript
-describe('Digital Products (e2e)', () => {
-  describe('eBook Purchase Flow', () => {
-    it('should complete eBook purchase and generate download', async () => {
-      // Create digital product
-      const product = await createDigitalProduct({
-        format: 'epub',
-        price: 9.99
-      })
-
-      // Add to cart and checkout
-      await addToCart(memberToken, product.id, 1)
-      const order = await createOrder(memberToken)
-
-      // Trigger payment webhook
-      await triggerStripeWebhook('payment_intent.succeeded', order)
-
-      // Wait for personalization job
-      await waitForJob('personalize-ebook', order.id)
-
-      // Verify download link created
-      const download = await prisma.download.findFirst({
-        where: { order_id: order.id, format: 'epub' }
-      })
-
-      expect(download).toBeDefined()
-      expect(download.token).toBeDefined()
-      expect(download.expires_at).toBeInstanceOf(Date)
-      expect(download.download_limit).toBe(5)
-    })
-  })
-
-  describe('Download', () => {
-    it('should download personalized EPUB', async () => {
-      const { order, download } = await createCompletedEbookOrder()
-
-      return request(app.getHttpServer())
-        .get(`/downloads/${download.token}/epub`)
-        .expect(200)
-        .expect('Content-Type', 'application/epub+zip')
-        .expect(res => {
-          expect(res.body).toBeInstanceOf(Buffer)
-          expect(res.body.length).toBeGreaterThan(0)
-        })
-    })
-
-    it('should track download count', async () => {
-      const { order, download } = await createCompletedEbookOrder()
-
-      await request(app.getHttpServer())
-        .get(`/downloads/${download.token}/epub`)
-
-      const updated = await prisma.download.findUnique({ where: { id: download.id } })
-      expect(updated.download_count).toBe(1)
-    })
-
-    it('should enforce download limit', async () => {
-      const { order, download } = await createCompletedEbookOrder()
-
-      // Download 5 times (limit)
-      for (let i = 0; i < 5; i++) {
-        await request(app.getHttpServer())
-          .get(`/downloads/${download.token}/epub`)
-          .expect(200)
-      }
-
-      // 6th attempt should fail
-      return request(app.getHttpServer())
-        .get(`/downloads/${download.token}/epub`)
-        .expect(403)
-        .expect(res => {
-          expect(res.body.message).toContain('Download limit reached')
-        })
-    })
-
-    it('should reject expired download link', async () => {
-      const { download } = await createExpiredDownload()
-
-      return request(app.getHttpServer())
-        .get(`/downloads/${download.token}/epub`)
-        .expect(403)
-        .expect(res => {
-          expect(res.body.message).toContain('expired')
-        })
-    })
-  })
-
-  describe('Send to Kindle', () => {
-    it('should send eBook to Kindle device', async () => {
-      const device = await createKindleDevice(memberId, {
-        friendly_name: 'My Kindle',
-        kindle_email: 'test_kindle@kindle.com'
-      })
-      const { order } = await createCompletedEbookOrder(memberId)
-
-      return request(app.getHttpServer())
-        .post('/digital-products/send-to-kindle')
-        .set('Authorization', `Bearer ${memberToken}`)
-        .send({
-          order_id: order.id,
-          kindle_device_id: device.id,
-          format: 'epub'
-        })
-        .expect(200)
-        .expect(res => {
-          expect(res.body.message).toContain('sent to Kindle')
-        })
-    })
-
-    it('should log Send to Kindle in audit trail', async () => {
-      const device = await createKindleDevice(memberId)
-      const { order } = await createCompletedEbookOrder(memberId)
-
-      await sendToKindle(memberToken, order.id, device.id, 'epub')
-
-      const log = await prisma.auditLog.findFirst({
-        where: {
-          event_type: 'ebook_sent_to_kindle',
-          user_id: memberId
-        }
-      })
-
-      expect(log).toBeDefined()
-      expect(log.details.kindle_device_id).toBe(device.id)
-      expect(log.details.format).toBe('epub')
-    })
-  })
-})
-```
-
-### Validation Checklist
-
-```bash
-# Run tests
-npm run test
-npm run test:e2e
-
-# Test EPUB personalization
-node scripts/test-epub-personalization.js
-
-# Test PDF personalization
-node scripts/test-pdf-personalization.js
-
-# Check message queue
-npm run queue:ui
-
-# Verify downloads
-psql $DATABASE_URL -c "SELECT * FROM downloads WHERE download_count > 0;"
-```
-
-**Success Criteria:**
-- ✅ All tests pass (450+ tests total)
-- ✅ EPUB personalization works (adm-zip + jsdom)
-- ✅ PDF personalization works (pdf-lib)
-- ✅ Download token generation works
-- ✅ Download limits enforced (5x per format)
-- ✅ Download expiration works (7 days)
-- ✅ Kindle device management works
-- ✅ Send to Kindle works (AWS SES)
-- ✅ Multiple format support works (EPUB + PDF)
-- ✅ Personalization queue processes asynchronously
 
 ---
 
-## Phase 8: Frontend Implementation (Week 16-18)
+### 👁️ [HUMAN VERIFICATION] 7.3 eBook Testing
 
-### Prerequisites
-- All backend phases complete
-- All APIs tested and working
+**CRITICAL: Test eBook personalization manually (30 minutes)**
 
-### Deliverables
+1. **Upload test EPUB:**
+   ```bash
+   curl -X POST http://localhost:4000/api/digital-products/PRODUCT_ID/upload \
+     -H "Authorization: Bearer ADMIN_TOKEN" \
+     -F "file=@/path/to/test.epub" \
+     -F "format=epub"
+   ```
 
-#### 8.1 Frontend Authentication
+2. **Test personalization:**
+   ```bash
+   curl -X POST http://localhost:4000/api/digital-products/PRODUCT_ID/test-personalization \
+     -H "Authorization: Bearer ADMIN_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"format": "epub"}'
+   ```
+   Download the returned file and open in an eReader (Calibre, Apple Books, etc.)
+   Verify personalization page appears at the beginning.
+
+3. **Purchase product and test download:**
+   - Complete checkout flow
+   - Check order confirmation email for download link
+   - Click download link
+   - Verify personalized eBook downloads
+   - Verify customer name, order number, and date are correct
+
+4. **Test download limits:**
+   - Download the eBook 5 times (per format)
+   - Attempt 6th download
+   - Verify error message: "Download limit exceeded"
+
+5. **Test Kindle delivery:**
+   - Add Kindle device to account
+   - Click "Send to Kindle" for purchased eBook
+   - Check Kindle email inbox
+   - Verify email received with attachment
+   - Verify eBook appears on Kindle device
+
+6. **Test multi-format:**
+   - Purchase product with both EPUB and PDF
+   - Download EPUB (counter: 1/5 for EPUB)
+   - Download PDF (counter: 1/5 for PDF)
+   - Verify counters are independent
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 7 Complete
+
+**Checklist (30 minutes):**
+- ✅ EPUB upload works
+- ✅ PDF upload works
+- ✅ Personalization test creates readable eBook
+- ✅ Personalization includes customer name, order number, date
+- ✅ Download tokens work and expire after 7 days
+- ✅ Download counter enforces limits (5 per format)
+- ✅ Send to Kindle email delivery works
+- ✅ Kindle device management works (add/remove/list)
+- ✅ Multi-format products work with independent counters
+- ✅ Test coverage ≥80%
+
+---
+
+## Phase 8: Frontend Application (Weeks 15-17)
+
+### 🤖 [AUTONOMOUS] 8.1 Frontend Foundation
+
+Claude Code will create Next.js application structure:
+
+**Files to create:**
+- `frontend/lib/api-client.ts` - API client with authentication
+- `frontend/lib/auth-context.tsx` - Auth context provider
+- `frontend/hooks/use-auth.ts` - Auth hook
+- `frontend/hooks/use-cart.ts` - Cart hook
+- `frontend/components/layout/header.tsx`
+- `frontend/components/layout/footer.tsx`
+- `frontend/components/ui/*.tsx` - Reusable UI components
+
+**Install additional dependencies:**
+```bash
+cd frontend
+npm install @headlessui/react @heroicons/react
+npm install date-fns zod
+npm install js-cookie
+npm install -D @types/js-cookie
+```
+
+---
+
+### 🤖 [AUTONOMOUS] 8.2 Public Pages
+
+Claude Code will create public-facing pages:
 
 **Pages to create:**
-- `/login` - Login modal/page
-- `/register` - Registration flow
-- `/verify-email` - Email verification
-- `/forgot-password` - Password reset request
-- `/reset-password` - Password reset completion
+- `app/page.tsx` - Homepage
+- `app/articles/page.tsx` - Articles list
+- `app/articles/[slug]/page.tsx` - Article detail
+- `app/shop/page.tsx` - Product catalog
+- `app/shop/[slug]/page.tsx` - Product detail page
+- `app/cart/page.tsx` - Shopping cart
+- `app/checkout/page.tsx` - Checkout flow
+- `app/login/page.tsx` - Login modal/page
+- `app/register/page.tsx` - Registration
 
-#### 8.2 Public Pages
+**Features:**
+- ✅ Server-side rendering (SSR) for SEO
+- ✅ Static generation (SSG) for published content
+- ✅ Image optimization with next/image
+- ✅ Responsive design (mobile-first)
+- ✅ Loading states
+- ✅ Error boundaries
 
-**Pages:**
-- `/` - Homepage
-- `/articles` - Article list
-- `/articles/[slug]` - Article detail
-- `/shop` - Product catalog
-- `/product/[slug]` - Product detail
-- `/cart` - Shopping cart
-- `/checkout` - Checkout flow
+---
 
-#### 8.3 Admin Dashboard
+### 🤖 [AUTONOMOUS] 8.3 Admin Dashboard
 
-**Pages:**
-- `/admin` - Dashboard
-- `/admin/articles` - Article management
-- `/admin/products` - Product management
-- `/admin/orders` - Order management
-- `/admin/users` - User management
-- `/admin/settings` - System settings
+Claude Code will create admin interface:
 
-### Testing Strategy
+**Pages to create:**
+- `app/admin/page.tsx` - Dashboard overview
+- `app/admin/login/page.tsx` - Admin login with 2FA
+- `app/admin/articles/page.tsx` - Articles management
+- `app/admin/articles/new/page.tsx` - Create article
+- `app/admin/articles/[id]/edit/page.tsx` - Edit article
+- `app/admin/products/page.tsx` - Products management
+- `app/admin/products/new/page.tsx` - Create product
+- `app/admin/products/[id]/edit/page.tsx` - Edit product
+- `app/admin/orders/page.tsx` - Orders management
+- `app/admin/orders/[id]/page.tsx` - Order detail
+- `app/admin/users/page.tsx` - User management
+- `app/admin/media/page.tsx` - Media library
+- `app/admin/comments/page.tsx` - Comment moderation
+- `app/admin/settings/page.tsx` - System settings
 
-#### E2E Tests (Playwright)
+**Features:**
+- ✅ Rich text editor (TipTap) for content
+- ✅ Media picker for images
+- ✅ Drag-and-drop file upload
+- ✅ Form validation with React Hook Form
+- ✅ Data tables with pagination, sorting, filtering
+- ✅ Role-based UI visibility
 
-**File: `tests/e2e/auth.spec.ts`**
+---
+
+### 🤖 [AUTONOMOUS] 8.4 Product Embedding in TipTap
+
+Claude Code will create TipTap extension:
+
+**Files:**
+- `frontend/components/editor/product-picker.tsx`
+- `frontend/components/editor/extensions/product-embed.ts`
+- `frontend/components/product-embed.tsx` - Render embedded product
+
+**Features:**
+- ✅ TipTap command: "Insert → Product"
+- ✅ Visual product picker modal
+- ✅ Display modes: card, inline, grid
+- ✅ Real-time price/stock updates
+- ✅ Functional add-to-cart within article
+
+---
+
+### 🤖 [AUTONOMOUS] 8.5 E2E Tests with Playwright
+
+Claude Code will create end-to-end tests:
+
+**Test files:**
+- `frontend/tests/auth.spec.ts` - Authentication flows
+- `frontend/tests/articles.spec.ts` - Article browsing and reading
+- `frontend/tests/shop.spec.ts` - Product browsing and cart
+- `frontend/tests/checkout.spec.ts` - Complete checkout flow
+- `frontend/tests/admin.spec.ts` - Admin dashboard operations
+
+**Example E2E test:**
 ```typescript
 import { test, expect } from '@playwright/test'
 
-test.describe('Authentication', () => {
-  test('should register new user', async ({ page }) => {
-    await page.goto('/register')
-    await page.fill('[name="email"]', 'newuser@example.com')
-    await page.fill('[name="password"]', 'ValidPassword123!')
-    await page.fill('[name="displayName"]', 'New User')
-    await page.click('button[type="submit"]')
+test.describe('Checkout Flow', () => {
+  test('guest can purchase product with Stripe', async ({ page }) => {
+    // Navigate to shop
+    await page.goto('http://localhost:3000/shop')
 
-    await expect(page).toHaveURL('/verify-email')
-    await expect(page.locator('text=Check your email')).toBeVisible()
-  })
-
-  test('should login existing user', async ({ page }) => {
-    await page.goto('/login')
-    await page.fill('[name="email"]', 'test@example.com')
-    await page.fill('[name="password"]', 'ValidPassword123!')
-    await page.click('button[type="submit"]')
-
-    await expect(page).toHaveURL('/')
-    await expect(page.locator('text=My Account')).toBeVisible()
-  })
-
-  test('should show validation errors', async ({ page }) => {
-    await page.goto('/register')
-    await page.fill('[name="email"]', 'invalid-email')
-    await page.fill('[name="password"]', 'short')
-    await page.click('button[type="submit"]')
-
-    await expect(page.locator('text=Invalid email')).toBeVisible()
-    await expect(page.locator('text=Password must be at least 16 characters')).toBeVisible()
-  })
-})
-```
-
-**File: `tests/e2e/shopping.spec.ts`**
-```typescript
-test.describe('Shopping Flow', () => {
-  test('should complete purchase', async ({ page }) => {
-    // Browse products
-    await page.goto('/shop')
-    await expect(page.locator('.product-card')).toHaveCount.greaterThan(0)
+    // Click first product
+    await page.click('[data-testid="product-card"]:first-child')
 
     // Add to cart
-    await page.click('.product-card:first-child')
-    await page.click('button:has-text("Add to Cart")')
-    await expect(page.locator('.cart-count')).toHaveText('1')
+    await page.click('[data-testid="add-to-cart"]')
 
     // Go to cart
-    await page.click('[href="/cart"]')
-    await expect(page.locator('.cart-item')).toBeVisible()
+    await page.goto('http://localhost:3000/cart')
+
+    // Verify item in cart
+    await expect(page.locator('[data-testid="cart-item"]')).toHaveCount(1)
 
     // Proceed to checkout
-    await page.click('button:has-text("Checkout")')
-    await expect(page).toHaveURL('/checkout')
+    await page.click('[data-testid="checkout-button"]')
 
     // Fill shipping info
+    await page.fill('[name="email"]', 'test@example.com')
     await page.fill('[name="name"]', 'Test User')
     await page.fill('[name="address"]', '123 Test St')
     await page.fill('[name="city"]', 'Test City')
-    await page.fill('[name="postal_code"]', '12345')
+    await page.fill('[name="zip"]', '12345')
+    await page.click('[data-testid="continue-to-payment"]')
 
-    // Enter payment (use Stripe test card)
-    const stripeFrame = page.frameLocator('iframe[name*="stripe"]')
-    await stripeFrame.fill('[name="cardNumber"]', '4242424242424242')
-    await stripeFrame.fill('[name="cardExpiry"]', '1234')
-    await stripeFrame.fill('[name="cardCvc"]', '123')
+    // Fill Stripe test card
+    const stripeFrame = page.frameLocator('[name*="stripe"]')
+    await stripeFrame.locator('[name="cardnumber"]').fill('4242424242424242')
+    await stripeFrame.locator('[name="exp-date"]').fill('12/34')
+    await stripeFrame.locator('[name="cvc"]').fill('123')
+    await stripeFrame.locator('[name="postal"]').fill('12345')
 
     // Complete payment
-    await page.click('button:has-text("Pay")')
+    await page.click('[data-testid="complete-order"]')
 
-    // Verify success
-    await expect(page).toHaveURL(/\/orders\/.*/)
-    await expect(page.locator('text=Order Completed')).toBeVisible()
+    // Wait for confirmation
+    await expect(page.locator('[data-testid="order-confirmation"]')).toBeVisible()
+
+    // Verify order number displayed
+    await expect(page.locator('[data-testid="order-number"]')).toContainText('ORD-')
   })
 
-  test('should persist cart across sessions', async ({ page, context }) => {
-    // Add item to cart
-    await page.goto('/shop')
-    await page.click('.product-card:first-child')
-    await page.click('button:has-text("Add to Cart")')
+  test('member can login and see order history', async ({ page }) => {
+    // Login
+    await page.goto('http://localhost:3000/login')
+    await page.fill('[name="email"]', 'member@example.com')
+    await page.fill('[name="password"]', 'MemberPassword123!')
+    await page.click('[data-testid="login-submit"]')
 
-    // Close and reopen browser
-    await context.close()
-    const newContext = await browser.newContext({ storageState: 'auth-state.json' })
-    const newPage = await newContext.newPage()
+    // Navigate to orders
+    await page.click('[data-testid="user-menu"]')
+    await page.click('[data-testid="my-orders"]')
 
-    // Cart should persist
-    await newPage.goto('/cart')
-    await expect(newPage.locator('.cart-item')).toBeVisible()
-  })
-})
-```
-
-**File: `tests/e2e/admin.spec.ts`**
-```typescript
-test.describe('Admin Dashboard', () => {
-  test.use({ storageState: 'admin-auth.json' })
-
-  test('should create article', async ({ page }) => {
-    await page.goto('/admin/articles')
-    await page.click('button:has-text("New Article")')
-
-    await page.fill('[name="title"]', 'Test Article')
-    await page.fill('.tiptap-editor', '<p>Content here</p>')
-    await page.click('button:has-text("Publish")')
-
-    await expect(page.locator('text=Article published')).toBeVisible()
+    // Verify orders page
+    await expect(page.locator('[data-testid="order-list"]')).toBeVisible()
   })
 
-  test('should upload media', async ({ page }) => {
-    await page.goto('/admin/media')
-    await page.setInputFiles('input[type="file"]', './test-image.jpg')
+  test('admin can login with 2FA', async ({ page }) => {
+    // Navigate to admin
+    await page.goto('http://localhost:3000/admin')
 
-    await expect(page.locator('text=Upload successful')).toBeVisible()
-    await expect(page.locator('img[alt="test-image.jpg"]')).toBeVisible()
-  })
+    // Fill admin credentials
+    await page.fill('[name="email"]', 'admin@example.com')
+    await page.fill('[name="password"]', 'AdminPassword123!')
+    await page.click('[data-testid="admin-login"]')
 
-  test('should manage orders', async ({ page }) => {
-    await page.goto('/admin/orders')
-    await expect(page.locator('.order-row')).toHaveCount.greaterThan(0)
+    // 2FA challenge should appear
+    await expect(page.locator('[data-testid="2fa-challenge"]')).toBeVisible()
 
-    // Update order status
-    await page.click('.order-row:first-child')
-    await page.selectOption('[name="status"]', 'shipped')
-    await page.click('button:has-text("Update")')
-
-    await expect(page.locator('text=Order updated')).toBeVisible()
+    // Note: Can't test actual TOTP without hardcoding secret or using test mode
+    // In real test, you'd use a test TOTP generator
   })
 })
 ```
 
-### Validation Checklist
-
+**Run E2E tests:**
 ```bash
-# Install Playwright
-npm install -D @playwright/test
-npx playwright install
-
-# Run E2E tests
 cd frontend
 npx playwright test
-
-# Run tests with UI
-npx playwright test --ui
-
-# Generate test report
-npx playwright show-report
-
-# Visual regression testing
-npx playwright test --update-snapshots
-
-# Accessibility testing
-npm run test:a11y
 ```
-
-**Success Criteria:**
-- ✅ All E2E tests pass (50+ scenarios)
-- ✅ Authentication flows work
-- ✅ Shopping cart works
-- ✅ Checkout completes successfully
-- ✅ Admin dashboard functional
-- ✅ Article creation works (TipTap editor)
-- ✅ Product management works
-- ✅ Order management works
-- ✅ Mobile responsive (tested on mobile viewports)
-- ✅ Accessibility score ≥ 90 (Lighthouse)
-- ✅ Performance score ≥ 85 (Lighthouse)
 
 ---
 
-## Phase 9: WordPress Migration (Week 19)
+### 🤝 [HUMAN DECISION] 8.6 Design and UX Review
 
-### Prerequisites
-- All phases complete
-- System fully functional
+While Claude Code can build functional UI, you should review:
 
-### Deliverables
+**Areas for human input (1-2 hours):**
+- Color scheme and branding
+- Typography choices
+- Layout preferences (sidebar vs no sidebar)
+- Navigation structure
+- Button styles and hover states
+- Mobile responsive breakpoints
+- Accessibility improvements (contrast, focus states)
 
-#### 9.1 Migration Script
+**Process:**
+1. Claude Code builds functional UI with basic Tailwind styling
+2. You review in browser and provide feedback
+3. Claude Code adjusts based on your preferences
+4. Iterate until satisfied
 
-**File: `scripts/migrate-wordpress/migrate.js`**
+---
 
-Implement migration as per PRD 08.
+### 👁️ [HUMAN VERIFICATION] Phase 8 Complete
 
-### Testing Strategy
+**Checklist (1-2 hours for thorough testing):**
 
-**Test Migration:**
+**Public Site:**
+- ✅ Homepage loads and looks good
+- ✅ Articles list displays
+- ✅ Individual articles render correctly
+- ✅ Shop displays products
+- ✅ Product detail page shows all information
+- ✅ Add to cart works
+- ✅ Cart updates correctly (add/remove/update quantity)
+- ✅ Checkout flow completes successfully
+- ✅ Login/registration works
+- ✅ OAuth login works (Google)
+- ✅ Mobile responsive (test on phone or resize browser)
+
+**Admin Dashboard:**
+- ✅ Admin login with 2FA works
+- ✅ Dashboard overview displays stats
+- ✅ Create article with TipTap editor
+- ✅ Upload media to article
+- ✅ Embed product in article (TipTap picker)
+- ✅ Create product with images
+- ✅ View orders list
+- ✅ Update order status
+- ✅ Moderate flagged comments
+- ✅ View audit logs
+- ✅ Export audit logs to CSV
+- ✅ Update system settings
+
+**E2E Tests:**
+- ✅ All Playwright tests pass (25+ tests)
+
+**Performance:**
+- ✅ Homepage loads in < 2 seconds
+- ✅ Article pages load in < 1 second
+- ✅ Product pages load in < 1 second
+- ✅ Admin dashboard loads in < 2 seconds
+
+---
+
+## Phase 9: WordPress Migration (Week 18)
+
+### 👤 [HUMAN REQUIRED] 9.1 WordPress Database Export
+
+Before Claude Code can run migration:
+
+1. Log into your WordPress site
+2. Go to phpMyAdmin or use CLI:
+   ```bash
+   mysqldump -u username -p wordpress_db > wordpress-export.sql
+   ```
+3. Download the SQL file
+4. Place it in `scripts/migrate-wordpress/wordpress-export.sql`
+
+**Alternative:** Export via WordPress admin (Tools → Export), but database export is more comprehensive.
+
+---
+
+### 🤖 [AUTONOMOUS] 9.2 WordPress Migration Script
+
+Claude Code will create migration tool:
+
+**Files:**
+- `scripts/migrate-wordpress/migrate.ts`
+- `scripts/migrate-wordpress/parsers/posts.parser.ts`
+- `scripts/migrate-wordpress/parsers/pages.parser.ts`
+- `scripts/migrate-wordpress/parsers/categories.parser.ts`
+- `scripts/migrate-wordpress/parsers/media.parser.ts`
+- `scripts/migrate-wordpress/parsers/comments.parser.ts`
+- `scripts/migrate-wordpress/transformers/html.transformer.ts`
+- `scripts/migrate-wordpress/transformers/shortcode.transformer.ts`
+
+**Features:**
+- ✅ Parse WordPress SQL export
+- ✅ Transform wp_posts → articles/pages
+- ✅ Transform wp_terms → categories/tags
+- ✅ Transform wp_comments → comments
+- ✅ Download media from wp-content/uploads
+- ✅ Transform WordPress shortcodes to AECMS equivalents
+- ✅ Generate redirect map for SEO
+- ✅ AI moderation for imported comments
+
+**Run migration:**
 ```bash
-# Export WordPress database
-mysqldump -u user -p wordpress > wordpress-dump.sql
-
-# Run migration (dry run)
-node scripts/migrate-wordpress/migrate.js \
-  --wp-dump wordpress-dump.sql \
-  --dry-run
-
-# Review output
-less migration-report.txt
-
-# Run actual migration
-node scripts/migrate-wordpress/migrate.js \
-  --wp-dump wordpress-dump.sql \
-  --media-path /path/to/wp-content/uploads
-
-# Verify migration
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM articles;"
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM media;"
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM comments;"
+cd scripts/migrate-wordpress
+npm install
+npm run migrate -- --sql-file=wordpress-export.sql --wp-url=https://oldsite.com
 ```
-
-**Success Criteria:**
-- ✅ All WordPress posts migrated to articles
-- ✅ All WordPress pages migrated to pages
-- ✅ All categories migrated
-- ✅ All tags migrated
-- ✅ All media files downloaded and uploaded
-- ✅ All approved comments migrated (with AI moderation)
-- ✅ Redirect map generated for SEO
-- ✅ No data loss
-- ✅ Migration completes in < 1 hour for typical blog
 
 ---
 
-## Phase 10: Production Deployment (Week 20)
+### 👁️ [HUMAN VERIFICATION] 9.3 Migration Validation
 
-### Prerequisites
-- All phases complete
-- All tests passing
-- WordPress migration complete (if needed)
+**Checklist (1 hour):**
+- ✅ All articles imported (count matches)
+- ✅ All pages imported with correct hierarchy
+- ✅ Categories and tags imported
+- ✅ Media files downloaded and linked
+- ✅ Featured images set correctly
+- ✅ Comments imported and moderated
+- ✅ URLs in content transformed correctly
+- ✅ Shortcodes converted
+- ✅ Redirect map generated (`redirects.json`)
 
-### Deliverables
+**Spot check articles:**
+- Open 5-10 random articles
+- Verify formatting looks correct
+- Verify images display
+- Verify links work
+- Verify categories/tags assigned
 
-#### 10.1 Production Environment Setup
+---
 
-**Infrastructure:**
-```yaml
-# docker-compose.prod.yml
-services:
-  backend:
-    image: aecms/backend:latest
-    restart: always
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 512M
+## Phase 10: Production Deployment (Weeks 19-20)
 
-  frontend:
-    image: aecms/frontend:latest
-    restart: always
-    environment:
-      NODE_ENV: production
-      NEXT_PUBLIC_API_URL: ${API_URL}
+### 🤖 [AUTONOMOUS] 10.1 CI/CD Pipeline
 
-  caddy:
-    image: caddy:2-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-```
+Claude Code will create GitHub Actions workflow:
 
-#### 10.2 CI/CD Pipeline
+**File:** `.github/workflows/ci-cd.yml`
 
-**File: `.github/workflows/ci.yml`**
 ```yaml
 name: CI/CD
 
@@ -2422,322 +2974,357 @@ on:
     branches: [main]
 
 jobs:
-  test-backend:
+  test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:7
-
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: cd backend && npm ci
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
 
-      - name: Run linter
-        run: cd backend && npm run lint
+      - name: Run backend linter
+        working-directory: ./backend
+        run: npm run lint
 
-      - name: Run type check
-        run: cd backend && npm run build
+      - name: Run backend tests
+        working-directory: ./backend
+        run: npm run test:cov
 
-      - name: Run unit tests
-        run: cd backend && npm run test:cov
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run frontend linter
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Run frontend build
+        working-directory: ./frontend
+        run: npm run build
 
       - name: Run E2E tests
-        run: cd backend && npm run test:e2e
+        working-directory: ./frontend
+        run: npx playwright test
 
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
-        with:
-          directory: ./backend/coverage
-
-  test-frontend:
+  docker:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: cd frontend && npm ci
-
-      - name: Run linter
-        run: cd frontend && npm run lint
-
-      - name: Run type check
-        run: cd frontend && npm run build
-
-      - name: Run Playwright tests
-        run: cd frontend && npx playwright test
-
-      - uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: playwright-report
-          path: frontend/playwright-report/
-
-  deploy-production:
+    needs: test
     if: github.ref == 'refs/heads/main'
-    needs: [test-backend, test-frontend]
-    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
 
-      - name: Deploy to production
-        run: |
-          # Deploy to your hosting platform
-          # Examples: Railway, Vercel, VPS via SSH
-```
+      - name: Build Docker images
+        run: docker-compose build
 
-### Testing Strategy
+      - name: Run Docker Compose
+        run: docker-compose up -d
 
-#### Production Smoke Tests
+      - name: Wait for services
+        run: sleep 30
 
-**File: `tests/smoke/production.spec.ts`**
-```typescript
-test.describe('Production Smoke Tests', () => {
-  test('should load homepage', async ({ page }) => {
-    await page.goto(process.env.PRODUCTION_URL)
-    await expect(page).toHaveTitle(/AECMS/)
-    await expect(page.locator('header')).toBeVisible()
-  })
+      - name: Check services health
+        run: docker-compose ps
 
-  test('should have valid SSL certificate', async ({ page }) => {
-    const response = await page.goto(process.env.PRODUCTION_URL)
-    expect(response.securityDetails()).toBeTruthy()
-  })
-
-  test('should have correct security headers', async ({ page }) => {
-    const response = await page.goto(process.env.PRODUCTION_URL)
-    const headers = response.headers()
-    expect(headers['strict-transport-security']).toBeDefined()
-    expect(headers['x-content-type-options']).toBe('nosniff')
-    expect(headers['x-frame-options']).toBe('DENY')
-  })
-
-  test('should complete health checks', async ({ request }) => {
-    const response = await request.get(`${process.env.PRODUCTION_URL}/api/health`)
-    expect(response.ok()).toBeTruthy()
-    const data = await response.json()
-    expect(data.status).toBe('healthy')
-    expect(data.database).toBe('connected')
-    expect(data.redis).toBe('connected')
-  })
-})
-```
-
-### Validation Checklist
-
-```bash
-# Pre-deployment checks
-npm run test            # All unit tests
-npm run test:e2e        # All E2E tests
-npm run test:security   # Security audit
-npm audit               # Dependency audit
-
-# Build for production
-cd backend && npm run build
-cd frontend && npm run build
-
-# Deploy to staging
-./scripts/deploy-staging.sh
-
-# Run smoke tests on staging
-PRODUCTION_URL=https://staging.aecms.com npx playwright test tests/smoke
-
-# Deploy to production
-./scripts/deploy-production.sh
-
-# Run smoke tests on production
-PRODUCTION_URL=https://aecms.com npx playwright test tests/smoke
-
-# Monitor for errors
-./scripts/monitor-errors.sh
-```
-
-**Success Criteria:**
-- ✅ All tests pass in CI/CD
-- ✅ Code coverage ≥ 80%
-- ✅ Build succeeds without warnings
-- ✅ Security audit shows no critical issues
-- ✅ Staging deployment successful
-- ✅ Smoke tests pass on staging
-- ✅ Production deployment successful
-- ✅ Smoke tests pass on production
-- ✅ SSL certificate valid
-- ✅ Security headers present
-- ✅ Performance metrics acceptable (Lighthouse)
-- ✅ No errors in production logs (first 24 hours)
-
----
-
-## Automated Testing Summary
-
-### Test Coverage Goals
-
-| Area | Unit Tests | Integration Tests | E2E Tests | Total Coverage |
-|------|------------|-------------------|-----------|----------------|
-| Authentication | 30+ | 20+ | 10+ | ≥ 85% |
-| Users | 20+ | 15+ | 8+ | ≥ 80% |
-| Capabilities | 15+ | 10+ | 5+ | ≥ 80% |
-| Articles | 30+ | 20+ | 12+ | ≥ 85% |
-| Products | 25+ | 18+ | 10+ | ≥ 85% |
-| Cart | 15+ | 12+ | 8+ | ≥ 85% |
-| Orders | 20+ | 15+ | 10+ | ≥ 85% |
-| Payments | 25+ | 20+ | 8+ | ≥ 85% |
-| Comments | 20+ | 15+ | 8+ | ≥ 80% |
-| Digital Products | 25+ | 20+ | 12+ | ≥ 85% |
-| Admin Dashboard | N/A | N/A | 25+ | ≥ 70% |
-| **Total** | **225+** | **165+** | **116+** | **≥ 80%** |
-
-### Claude Code Validation Commands
-
-**Quick validation script for Claude to run:**
-```bash
-#!/bin/bash
-# validate-phase.sh - Run by Claude Code after each phase
-
-set -e  # Exit on error
-
-echo "=== Phase Validation ==="
-echo "Running validation checks..."
-
-# Type checking
-echo "1. Type checking..."
-cd backend && npm run build
-cd ../frontend && npm run build
-
-# Linting
-echo "2. Linting..."
-cd ../backend && npm run lint
-cd ../frontend && npm run lint
-
-# Unit tests
-echo "3. Unit tests..."
-cd ../backend && npm run test
-
-# Integration tests
-echo "4. Integration tests..."
-cd ../backend && npm run test:e2e
-
-# Database checks
-echo "5. Database validation..."
-cd ../backend
-npx prisma validate
-npx prisma migrate status
-
-# Security checks
-echo "6. Security audit..."
-npm audit --audit-level=moderate
-
-# E2E tests (if frontend phase)
-if [ -f "../frontend/playwright.config.ts" ]; then
-  echo "7. E2E tests..."
-  cd ../frontend && npx playwright test
-fi
-
-# Coverage report
-echo "8. Coverage report..."
-cd ../backend && npm run test:cov
-
-echo ""
-echo "=== Validation Complete ==="
-echo "✅ All checks passed!"
-```
-
-**Usage by Claude Code:**
-```bash
-# After completing a phase
-./scripts/validate-phase.sh
-
-# If all checks pass, proceed to next phase
-# If any checks fail, fix issues and re-run
+      - name: Stop services
+        run: docker-compose down
 ```
 
 ---
 
-## Estimated Timeline Summary
+### 👤 [HUMAN REQUIRED] 10.2 Production Hosting Setup
 
-| Phase | Duration | Cumulative | Key Deliverables |
-|-------|----------|------------|------------------|
-| 0: Foundation | 1 week | 1 week | Project structure, Docker setup |
-| 1: Auth & Users | 2 weeks | 3 weeks | JWT, OAuth, email verification, RBAC |
-| 2: Capabilities | 1 week | 4 weeks | Capability system, permission guards |
-| 3: Content | 2 weeks | 6 weeks | Articles, media, categories, tags |
-| 4: Ecommerce | 3 weeks | 9 weeks | Products, cart, orders |
-| 5: Payments | 2 weeks | 11 weeks | Stripe, PayPal, Amazon Pay |
-| 6: Advanced | 2 weeks | 13 weeks | Comments, AI moderation, audit trail |
-| 7: Digital Products | 2 weeks | 15 weeks | eBooks, personalization, Kindle |
-| 8: Frontend | 3 weeks | 18 weeks | All public pages, admin dashboard |
-| 9: Migration | 1 week | 19 weeks | WordPress migration script |
-| 10: Production | 1 week | 20 weeks | CI/CD, deployment, monitoring |
-| **Total** | **20 weeks** | **~5 months** | **Full MVP deployed** |
+Choose one of the following deployment options:
 
----
+#### Option A: Railway (Recommended for MVP)
 
-## Development Best Practices
+1. Go to [Railway.app](https://railway.app/)
+2. Sign up with GitHub
+3. Create new project
+4. Deploy from GitHub repository
+5. Add PostgreSQL database (free tier: 512 MB)
+6. Add Redis (free tier: 100 MB)
+7. Set environment variables in Railway dashboard
+8. Deploy
 
-### For Claude Code
+**Cost:** Free for hobby projects, $5/month after free trial
 
-1. **Read Before Writing**: Always read existing files before modifying
-2. **Test-Driven**: Write tests first or alongside implementation
-3. **Incremental Commits**: Commit after each logical unit of work
-4. **Validation After Changes**: Run validation script after each phase
-5. **Documentation**: Update comments and docs as you code
-6. **Error Handling**: Implement comprehensive error handling
-7. **Security First**: Validate all inputs, sanitize outputs
-8. **Performance Conscious**: Use indexes, caching, pagination
-9. **Type Safety**: Use TypeScript strict mode, avoid `any`
-10. **Code Review**: Review generated code before committing
+#### Option B: Oracle Cloud (Free Tier Forever)
 
-### Testing Philosophy
+1. Create [Oracle Cloud account](https://www.oracle.com/cloud/free/)
+2. Create VM instance (Always Free: 1GB RAM, 2 OCPUs)
+3. Install Docker and Docker Compose
+4. Clone repository
+5. Set up environment variables
+6. Run `docker-compose up -d`
 
-1. **Test Pyramid**: More unit tests, fewer integration tests, even fewer E2E tests
-2. **Fast Feedback**: Unit tests should run in < 5 seconds
-3. **Isolated Tests**: Each test should be independent
-4. **Clear Assertions**: Test one thing per test
-5. **Meaningful Names**: Test names describe what they test
-6. **Edge Cases**: Test boundary conditions and error paths
-7. **Coverage Goals**: Aim for ≥ 80% coverage, 100% on critical paths
+**Cost:** Free forever (subject to Oracle Free Tier limits)
+
+#### Option C: VPS (DigitalOcean, Linode, Vultr)
+
+1. Create account
+2. Create droplet/instance ($5-10/month)
+3. SSH into server
+4. Install Docker and Docker Compose
+5. Clone repository
+6. Set up environment variables
+7. Run `docker-compose up -d`
+8. Set up Nginx reverse proxy (optional)
+9. Configure SSL with Let's Encrypt
+
+**Cost:** $5-10/month
 
 ---
 
-## Success Metrics
+### 👤 [HUMAN REQUIRED] 10.3 Domain and SSL Setup
 
-### Technical Metrics
-- ✅ Test coverage ≥ 80%
-- ✅ Build time < 5 minutes
-- ✅ Test suite runs in < 10 minutes
-- ✅ Zero critical security vulnerabilities
-- ✅ API response time < 500ms (p95)
-- ✅ Page load time < 2 seconds
-- ✅ Lighthouse performance score ≥ 85
-- ✅ Lighthouse accessibility score ≥ 90
+1. **Purchase domain** (if not already owned):
+   - Namecheap, Google Domains, Cloudflare Registrar
+   - Cost: $10-15/year
 
-### Functional Metrics
-- ✅ All PRD requirements implemented
-- ✅ All user stories completed
-- ✅ All API endpoints working
-- ✅ All pages responsive
-- ✅ Payment flows working
-- ✅ Digital product delivery working
-- ✅ WordPress migration successful
+2. **Configure DNS** (at Cloudflare - free):
+   - Add domain to Cloudflare
+   - Point A records to your server IP
+   - Enable Cloudflare proxy (orange cloud) for free SSL and DDoS protection
+
+3. **Configure SSL**:
+   - If using Cloudflare proxy: Automatic
+   - If not using Cloudflare: Use Let's Encrypt with Certbot
 
 ---
 
-**Last Updated:** 2026-01-29
-**Version:** 1.0
-**Status:** Ready for Implementation
+### 🤖 [AUTONOMOUS] 10.4 Production Environment Configuration
+
+Claude Code will create production configs:
+
+**Files:**
+- `docker-compose.prod.yml` - Production Docker Compose
+- `backend/.env.production.example` - Production env template
+- `frontend/.env.production.example` - Frontend production env
+- `nginx.conf` - Nginx configuration (if self-hosting)
+
+**Production optimizations:**
+- Enable compression
+- Set cache headers
+- Rate limiting (Redis-backed)
+- Security headers (Helmet.js)
+- HTTPS-only cookies
+- Production logging (Winston)
+
+---
+
+### 👁️ [HUMAN VERIFICATION] 10.5 Production Smoke Tests
+
+**Critical tests to run on production (30 minutes):**
+
+1. **Basic functionality:**
+   - ✅ Homepage loads
+   - ✅ Can browse articles
+   - ✅ Can browse products
+   - ✅ Can add to cart
+   - ✅ Can register account
+   - ✅ Can login (front door)
+   - ✅ Admin login works (back door + 2FA)
+
+2. **Payment processing (REAL MONEY - test carefully):**
+   - ✅ Stripe production keys configured
+   - ✅ Complete ONE test purchase with real card
+   - ✅ Verify order created
+   - ✅ Verify payment in Stripe dashboard
+   - ✅ Verify order confirmation email received
+   - ✅ IMMEDIATELY REFUND test order
+
+3. **Security:**
+   - ✅ HTTPS enabled (padlock in browser)
+   - ✅ HTTP redirects to HTTPS
+   - ✅ 2FA required for admin login
+   - ✅ No sensitive data in browser console
+   - ✅ API rate limiting works (try rapid requests)
+   - ✅ SQL injection test fails (try `' OR '1'='1` in search)
+   - ✅ XSS test fails (try `<script>alert('XSS')</script>` in comment)
+
+4. **Performance:**
+   - ✅ Google PageSpeed Insights score > 80
+   - ✅ Homepage loads < 2 seconds
+   - ✅ Images optimized and lazy-loaded
+   - ✅ Mobile performance acceptable
+
+5. **Monitoring:**
+   - ✅ Error logging configured (logs visible in hosting dashboard)
+   - ✅ Database backups enabled (check hosting provider settings)
+   - ✅ Uptime monitoring configured (UptimeRobot or similar)
+
+---
+
+### 👁️ [HUMAN VERIFICATION] Phase 10 Complete
+
+**Final Production Checklist:**
+
+**Deployment:**
+- ✅ GitHub Actions CI/CD passing
+- ✅ Production environment deployed
+- ✅ Domain configured and SSL enabled
+- ✅ Database migrations run successfully
+- ✅ Seed data loaded (owner account, capabilities)
+
+**Configuration:**
+- ✅ All environment variables set in production
+- ✅ Stripe production keys configured
+- ✅ PayPal production credentials configured
+- ✅ OAuth production credentials (Google/Apple)
+- ✅ AWS SES production access granted
+- ✅ OpenAI API key configured
+
+**Security:**
+- ✅ Owner password changed from default
+- ✅ Owner 2FA enabled
+- ✅ Database password strong and unique
+- ✅ JWT secret random and secure
+- ✅ API key encryption key set
+- ✅ HTTPS enforced
+- ✅ Security headers configured
+- ✅ Rate limiting enabled
+
+**Functionality:**
+- ✅ Public site works (articles, shop, cart, checkout)
+- ✅ Authentication works (login, register, OAuth)
+- ✅ Admin dashboard works (2FA required)
+- ✅ Payments work (Stripe test completed and refunded)
+- ✅ Email delivery works (order confirmations, Send to Kindle)
+- ✅ Comments and reviews work with AI moderation
+- ✅ Digital product downloads work
+- ✅ Audit trail logging enabled
+
+**Monitoring & Backups:**
+- ✅ Database backups configured (daily recommended)
+- ✅ Error logging configured
+- ✅ Uptime monitoring configured
+- ✅ Disk space alerts configured
+
+**Documentation:**
+- ✅ README.md updated with deployment instructions
+- ✅ Environment variables documented in `.env.example`
+- ✅ API documentation generated (Swagger UI accessible)
+
+---
+
+## 🎉 Project Complete!
+
+**Total Duration:** 20 weeks (moderate pace)
+
+**Total Test Coverage:**
+- Backend: ≥80% (500+ tests)
+- Frontend: ≥70% (100+ component tests)
+- E2E: 25+ critical flow tests
+
+**What Claude Code Built Autonomously:**
+- ✅ Complete database schema (Prisma)
+- ✅ Authentication system (JWT, OAuth, 2FA)
+- ✅ Capability-based RBAC
+- ✅ Content management (articles, pages, media)
+- ✅ Ecommerce (products, cart, orders)
+- ✅ Payment integration (Stripe, PayPal, Amazon Pay)
+- ✅ Comments & reviews with AI moderation
+- ✅ Audit trail logging
+- ✅ Digital products (eBooks with personalization)
+- ✅ Frontend application (Next.js)
+- ✅ Admin dashboard (full-featured)
+- ✅ WordPress migration script
+- ✅ CI/CD pipeline
+- ✅ 600+ automated tests
+- ✅ Complete documentation
+
+**What Required Human Intervention:**
+- Account creation (OAuth providers, payment processors, AWS, OpenAI)
+- API key configuration
+- Domain and SSL setup
+- Production deployment choices
+- Design/UX review and preferences
+- Final production smoke testing
+- Payment testing with real money
+- Security verification
+
+---
+
+## Maintenance & Next Steps
+
+### 🤖 [AUTONOMOUS] Ongoing Development
+
+Claude Code can continue to help with:
+- Adding new features
+- Bug fixes
+- Performance optimizations
+- Security updates
+- Database migrations
+- Test additions
+
+### 👤 [HUMAN REQUIRED] Regular Maintenance
+
+You should handle:
+- Monitoring server health
+- Reviewing audit logs (weekly)
+- Moderating flagged comments
+- Processing refunds
+- Updating dependencies (monthly)
+- Database backups verification (weekly)
+- Security updates (as needed)
+- Content creation and publishing
+
+---
+
+## Summary of Human Involvement
+
+### Setup Phase (Phase 0-1):
+- **~2 hours:** Install Docker, Node.js, generate secrets, create OAuth apps
+
+### Authentication Phase (Phase 2):
+- **~15 minutes:** Change default owner password, enable 2FA
+
+### Payment Phase (Phase 5):
+- **~1 hour:** Create Stripe, PayPal, Amazon Pay accounts
+- **~45 minutes:** Test all payment flows thoroughly
+
+### Digital Products Phase (Phase 7):
+- **~30 minutes:** AWS SES setup
+- **~30 minutes:** Test eBook personalization and Kindle delivery
+
+### Frontend Phase (Phase 8):
+- **~1-2 hours:** Review design, provide UX feedback
+- **~1-2 hours:** Manual testing of all features
+
+### Migration Phase (Phase 9):
+- **~30 minutes:** Export WordPress database
+- **~1 hour:** Validate migrated content
+
+### Production Phase (Phase 10):
+- **~2-3 hours:** Set up hosting, domain, SSL
+- **~30 minutes:** Production smoke tests
+- **~15 minutes:** Configure monitoring and backups
+
+**Total Human Time:** ~10-15 hours over 20 weeks
+
+**Claude Code Autonomous Time:** ~160-180 hours of development work
+
+---
+
+## Contact & Support
+
+If you encounter issues during development:
+
+1. Check error logs (Docker logs, browser console)
+2. Verify environment variables are set correctly
+3. Ensure all services are running (`docker-compose ps`)
+4. Check database connectivity
+5. Review test output for specific failures
+6. Ask Claude Code to debug specific issues
+
+For Claude Code questions: `/help`
+
+---
+
+**End of Implementation Plan v2.0**
