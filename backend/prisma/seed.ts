@@ -2,11 +2,20 @@ import { PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { config } from 'dotenv';
 import * as path from 'path';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 // Load environment variables
 config({ path: path.join(__dirname, '..', '.env') });
 
-const prisma = new PrismaClient({});
+// Create PostgreSQL connection pool
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Create Prisma adapter
+const adapter = new PrismaPg(pool);
+
+// Initialize PrismaClient with adapter
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('Starting database seeding...');
@@ -90,4 +99,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });
