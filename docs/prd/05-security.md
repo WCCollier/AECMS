@@ -934,24 +934,45 @@ upgrade-insecure-requests;
 - Data processing agreement with third parties
 - User acceptance tracking for legal documents
 
-### Version Control for Legal Documents
+### Article Version Control
 
-**Required for Compliance:**
-- EULA (End User License Agreement)
-- Privacy Policy
-- Terms of Service
-- Cookie Policy
+**Optional Feature for Any Article:**
+- Can be enabled on any article, page, or product
+- **OFF by default** for all content
+- **Must be enabled** for legal documents (EULA, Privacy Policy, Terms of Service, Cookie Policy)
+- Owner/Admin can toggle version control per article
 
 **Features:**
-- **OFF by default** for regular articles, **ON for legal documents**
 - Version history with change summaries
-- User acceptance tracking (user ID, IP, user agent, timestamp)
-- Force re-acceptance when major changes occur
+- View/restore previous versions
+- Compare versions (diff view)
+- Track who made each change
+- User acceptance tracking (optional, for legal documents)
+- Force re-acceptance when major changes occur (legal documents only)
 - Audit trail of document changes
-- Compliance with GDPR Article 7 (consent records)
+- Compliance with GDPR Article 7 (consent records for legal docs)
+
+**Use Cases:**
+- **Legal documents** (required): EULA, Privacy Policy, ToS, Cookie Policy
+- **Important announcements**: Company policies, guidelines
+- **Evolving content**: Tutorials, documentation that changes over time
+- **Collaborative articles**: Track contributions from multiple authors
+- **Sensitive content**: Maintain change history for accountability
 
 **Database Schema:**
 ```typescript
+model Article {
+  id                      String   @id @default(uuid())
+  title                   String
+  content                 String
+  // ... other fields
+  version_control_enabled Boolean  @default(false)  // Can be toggled by Admin/Owner
+  require_acceptance      Boolean  @default(false)  // Only for legal documents
+  current_version         Int      @default(1)      // Increments on each save if versioning enabled
+  versions                ArticleVersion[]
+  acceptances             UserDocumentAcceptance[]
+}
+
 model ArticleVersion {
   id              String   @id @default(uuid())
   article_id      String
@@ -960,9 +981,10 @@ model ArticleVersion {
   change_summary  String   // What changed in this version
   created_at      DateTime @default(now())
   created_by      String   // Admin/Owner who published
-  article         Article  @relation(fields: [article_id], references: [id])
+  article         Article  @relation(fields: [article_id], references: [id], onDelete: Cascade)
 
   @@unique([article_id, version_number])
+  @@index([article_id, version_number])
 }
 
 model UserDocumentAcceptance {
@@ -974,18 +996,56 @@ model UserDocumentAcceptance {
   ip_address      String
   user_agent      String
   user            User?    @relation(fields: [user_id], references: [id])
+  article         Article  @relation(fields: [article_id], references: [id], onDelete: Cascade)
 
+  @@unique([user_id, article_id, version_number]) // Prevent duplicate acceptances
   @@index([user_id, article_id])
+  @@index([article_id, version_number])
 }
 ```
 
 **Implementation:**
+
+*Enabling Version Control:*
+- Admin/Owner toggles "Enable Version Control" checkbox on any article/page
+- Optionally toggle "Require User Acceptance" (for legal documents only)
+- When enabled, every save creates a new version entry
+- Change summary required when publishing new version
+
+*Version Management:*
+- View version history in admin dashboard
+- Compare versions side-by-side (diff view)
+- Restore previous version (creates new version, doesn't delete history)
+- Download version as backup
+
+*User Acceptance (Legal Documents):*
 - Admin toggles "Require Acceptance" on Privacy Policy/EULA articles
 - When document changes, version number increments
-- Users who previously accepted see "Updated - Please Review"
+- Users who previously accepted see "Updated - Please Review" banner
 - Cannot proceed (checkout, commenting) until accepted
 - Acceptance logged with IP and user agent for legal proof
 - 7-year retention for acceptance records
+
+*Admin UI:*
+```
+[ ] Enable Version Control
+    └─ [ ] Require User Acceptance (legal documents only)
+
+Version History:
+v3 (Current) - 2026-01-29 - Updated privacy policy for GDPR compliance - by admin@example.com
+v2 - 2026-01-15 - Added cookie policy section - by admin@example.com
+v1 - 2026-01-01 - Initial version - by owner@example.com
+
+[View] [Compare] [Restore]
+```
+
+*API Endpoints:*
+- `GET /api/articles/:id/versions` - List all versions
+- `GET /api/articles/:id/versions/:version` - Get specific version
+- `POST /api/articles/:id/versions` - Create new version
+- `POST /api/articles/:id/restore/:version` - Restore previous version
+- `GET /api/articles/:id/versions/:v1/compare/:v2` - Compare two versions
+- `POST /api/articles/:id/accept` - User accepts current version (legal docs)
 
 ### CCPA (California Consumer Privacy Act)
 
