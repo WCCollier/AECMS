@@ -113,6 +113,7 @@ docker-compose logs -f
 - Keep solutions simple (YAGNI)
 - Run tests after changes: `npm run test && npm run build`
 - Commit incrementally with descriptive messages
+- **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
 
 ## Phase 5: Payments Integration (Next)
 
