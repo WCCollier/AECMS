@@ -1,7 +1,7 @@
 # PRD 09: User Management & Authentication
 
-**Version:** 1.1
-**Date:** 2026-01-28
+**Version:** 1.2
+**Date:** 2026-01-29
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -417,7 +417,7 @@ enum CommentStatus {
 1. User visits site and clicks "Sign Up" (front door)
 2. User enters:
    - Email address
-   - Password (min 12 characters)
+   - Password (min 16 characters, at least one uppercase + one special character)
    - Display name
 3. System validates input and creates account with `email_verified = false`
 4. System sends verification email with unique token (valid 24 hours)
@@ -639,8 +639,7 @@ Dropdown menu:
 │                                         │
 │  [Verify]                               │
 │                                         │
-│  [Use Recovery Code]                    │
-│  [Resend Code] (if SMS)                 │
+│  Lost device? [Reset via Email]         │
 └─────────────────────────────────────────┘
 ```
 
@@ -683,7 +682,7 @@ Dropdown menu:
 - JWT access tokens (15 minutes, auto-refresh)
 - Refresh tokens (7 days maximum, httpOnly cookie, sliding window)
 - Session expires after 7 days or explicit logout (whichever comes first)
-- **2FA Required** (TOTP or SMS)
+- **2FA Required** (TOTP only, no SMS)
 - Rate limiting on login attempts (3 per 15 minutes per IP)
 - IP allowlisting (optional, Owner-configurable)
 - Audit logging of all admin actions
@@ -716,7 +715,7 @@ Dropdown menu:
 
 **Security Considerations**:
 - OAuth tokens are not 2FA - they prove identity but not possession of device
-- 2FA (TOTP/SMS) proves possession of second factor (phone/authenticator)
+- 2FA (TOTP) proves possession of second factor (authenticator app)
 - Layering OAuth + 2FA provides defense in depth
 
 **Recommendation**: **Yes, allow OAuth for back-door with mandatory 2FA**
@@ -727,8 +726,8 @@ Dropdown menu:
 2. Chooses OAuth login (Google/Apple)
 3. OAuth provider authenticates
 4. System checks role (Admin/Owner required)
-5. System prompts for 2FA code
-6. Admin enters TOTP/SMS code
+5. System prompts for 2FA code (TOTP)
+6. Admin enters 6-digit TOTP code from authenticator app
 7. Access granted to admin dashboard
 ```
 
@@ -754,13 +753,13 @@ Dropdown menu:
 - Costs: **$0** (open-source libraries)
 
 **User Setup Flow**:
-1. Admin/Owner enables 2FA in account settings
-2. System generates secret key
-3. Display QR code
-4. User scans with authenticator app
-5. User enters verification code to confirm
-6. System saves encrypted secret
-7. User downloads recovery codes
+1. Admin/Owner navigates to account settings (or prompted on first back-door login)
+2. System generates TOTP secret key
+3. System displays QR code + manual entry code
+4. User scans QR code with authenticator app (Google Authenticator, Authy, 1Password, etc.)
+5. User enters 6-digit verification code to confirm setup
+6. System saves encrypted TOTP secret
+7. 2FA now required for all future back-door logins
 
 **Pros**:
 - Free, no ongoing costs
@@ -772,80 +771,27 @@ Dropdown menu:
 - Requires smartphone with authenticator app
 - Can be lost if phone lost (recovery codes needed)
 
-#### Option 2: SMS-Based 2FA - LOW COST
-**Backup option**
+#### Option 2: SMS-Based 2FA - ❌ NOT IMPLEMENTED
+**Rejected due to costs and security concerns**
 
-**How it works**:
-- System sends 6-digit code via SMS
-- User enters code to verify
-
-**Implementation**:
-- Service: Twilio, AWS SNS, Vonage
-- Library: Twilio Node SDK
-
-**Costs**:
-- Twilio: $0.0079 per SMS (US)
-- AWS SNS: $0.00645 per SMS (US)
-- For low traffic: ~$1-5/month
-
-**User Setup Flow**:
-1. Admin/Owner enables SMS 2FA
-2. Enters phone number
-3. System sends verification SMS
-4. User enters code to confirm
-5. Phone number saved
-
-**Pros**:
-- Works on any phone (no app required)
-- Familiar to users
-- Good backup to TOTP
-
-**Cons**:
-- Ongoing SMS costs (small)
-- Requires phone signal
-- Vulnerable to SIM swapping (less secure than TOTP)
+- Ongoing SMS costs (~$1-5/month)
+- Vulnerable to SIM swapping attacks
 - SMS delivery delays
+- Not needed when TOTP is free and more secure
 
-#### Option 3: Email-Based 2FA - FREE
-**Least secure, not recommended for admin**
+#### Option 3: Email-Based 2FA - ❌ NOT IMPLEMENTED
+**Rejected - Not secure enough for admin access**
 
-**How it works**:
-- System sends 6-digit code via email
-- User enters code to verify
-
-**Pros**:
-- Free
-- No phone required
-
-**Cons**:
-- Less secure (email can be compromised)
-- Not recommended for admin access
+- Email compromise = account compromise
+- Defeats purpose of 2FA
 - Slower than TOTP
 
-#### Option 4: Hardware Security Keys - USER COST
-**Most secure, optional**
+#### Option 4: Hardware Security Keys - ❌ NOT IN MVP
+**Future consideration, not part of MVP**
 
-**How it works**:
-- Physical USB/NFC key (YubiKey, Titan Key)
-- User inserts key and taps button
-
-**Implementation**:
-- WebAuthn API
-- Library: `@simplewebauthn/server`
-
-**Costs**:
-- YubiKey: $25-70 per key (user purchases)
-- Implementation: Free (open standard)
-
-**Pros**:
-- Most secure option
-- Phishing-resistant
-- No ongoing costs
-
-**Cons**:
-- User must purchase hardware key
-- Can be lost (backup key recommended)
+- Requires user hardware purchase ($25-70)
 - More complex setup
+- TOTP provides adequate security for MVP
 
 ### Recommended 2FA Strategy for AECMS ✅ **CONFIRMED**
 
@@ -907,7 +853,7 @@ Dropdown menu:
 2. User enters email address
 3. System sends password reset email with unique token (valid 1 hour)
 4. User clicks link in email: `/auth/reset-password?token=xxx`
-5. User enters new password (min 12 characters)
+5. User enters new password (min 16 characters, at least one uppercase + one special character)
 6. System validates token and updates password
 7. **If user has back-door access (Admin/Owner)**: System clears 2FA secret (forces 2FA reconfiguration)
 8. User receives email confirmation of password change
@@ -1213,20 +1159,21 @@ PUT    /api/roles/:role/capabilities    # Update role capabilities (Owner)
 
 ### Front Door Security
 - JWT access tokens (15 minutes)
-- Refresh tokens (7 days, httpOnly cookie)
+- Refresh tokens (persistent, no expiry until logout, httpOnly cookie)
+- "Log Out All Devices" feature to revoke all refresh tokens
 - Rate limiting: 5 login attempts per 15 minutes per IP
-- No 2FA required (optional future)
+- No 2FA required (optional future feature for Members)
 - OAuth with verified email only
 
 ### Back Door Security
 - JWT access tokens (15 minutes)
 - Refresh tokens (7 days, httpOnly cookie)
-- **2FA mandatory** (TOTP or SMS)
+- **2FA mandatory** (TOTP only, no SMS/recovery codes)
 - Rate limiting: 3 login attempts per 15 minutes per IP
 - IP allowlisting (optional, Owner-configurable)
 - Audit logging of all admin actions
 - Session timeout: 30 minutes of inactivity
-- OAuth with 2FA verification
+- OAuth with 2FA verification (TOTP)
 
 ### Capability Security
 - Only Owners can assign capabilities
@@ -1241,13 +1188,13 @@ PUT    /api/roles/:role/capabilities    # Update role capabilities (Owner)
 
 ## Open Questions
 
-1. Should we implement "Remember Me" functionality for front door login?
-2. Should we allow Admins to reset their own 2FA, or require Owner intervention?
-3. Should we implement session concurrency limits (max N active sessions per user)?
-4. Should we implement automatic logout on role downgrade (e.g., Owner → Member)?
-5. Should we support federated identity (SAML, OpenID Connect) for enterprise deployments?
-6. Should we implement "Login as User" feature for Owners (for support purposes)?
-7. Should comment moderation be automatic (AI-based) or manual queue?
+1. ~~Should we implement "Remember Me" functionality for front door login?~~ → **YES - Front door sessions are persistent by default (no expiry until logout)**
+2. ~~Should we allow Admins to reset their own 2FA, or require Owner intervention?~~ → **YES - Self-service via password reset (also resets 2FA)**
+3. Should we implement session concurrency limits (max N active sessions per user)? → **TBD - Not MVP, consider for security enhancement**
+4. Should we implement automatic logout on role downgrade (e.g., Owner → Member)? → **YES - Security best practice, invalidate sessions on role change**
+5. Should we support federated identity (SAML, OpenID Connect) for enterprise deployments? → **NO - Out of scope, personal CMS focus**
+6. Should we implement "Login as User" feature for Owners (for support purposes)? → **TBD - Nice-to-have for support, requires careful audit logging**
+7. ~~Should comment moderation be automatic (AI-based) or manual queue?~~ → **BOTH - Reactive AI moderation (post immediately, flag for manual review)**
 
 ## Success Criteria
 
