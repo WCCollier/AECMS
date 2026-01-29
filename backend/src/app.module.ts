@@ -12,6 +12,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { TagsModule } from './tags/tags.module';
 import { ArticlesModule } from './articles/articles.module';
 import { PagesModule } from './pages/pages.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { PagesModule } from './pages/pages.module';
     TagsModule,
     ArticlesModule,
     PagesModule,
+    ProductsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
