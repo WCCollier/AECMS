@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -25,6 +25,9 @@ describe('Authentication (e2e)', () => {
     await app.init();
 
     prisma = app.get<PrismaService>(PrismaService);
+
+    // Clean up refresh tokens from previous test runs
+    await prisma.refreshToken.deleteMany({});
   });
 
   afterAll(async () => {
