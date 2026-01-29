@@ -9,6 +9,23 @@
 
 This document defines the comprehensive user management, role-based access control (RBAC), and authentication strategy for AECMS, including a capability-based permission system and dual authentication pathways ("front door" and "back door").
 
+**Related Documents:**
+- **[PRD 12: Granular Permissions & Audit Trail](./12-granular-permissions-audit.md)** - Extends this document with:
+  - Per-content permission flags (overrides role capabilities at content level)
+  - Version control for legal documents with user acceptance tracking
+  - System-wide audit trail logging (logs all user actions defined here)
+
+**Scope of this document:**
+- User roles and hierarchy (Owner, Admin, Member, Guest)
+- Role-based capabilities (what each role CAN do system-wide)
+- Authentication flows and security
+- Visibility controls (what content users CAN see)
+
+**NOT in this document (see PRD 12):**
+- Content-level permission overrides (author_can_edit, admin_can_delete flags)
+- Article version control and user acceptance tracking
+- Audit trail implementation (logs the actions but implementation is in PRD 12)
+
 ## User Roles & Hierarchy
 
 ### Role Categories
@@ -130,6 +147,14 @@ Users fall into two broad categories:
 ### Overview
 
 AECMS implements a **capability-based RBAC system** where permissions are defined as granular capabilities that can be assigned to roles. This allows Owners to customize role permissions as new features are added.
+
+**⚠️ Important:** This section defines **role-level capabilities** (system-wide permissions). For **content-level permission overrides** (per-article/product flags that override role capabilities), see **[PRD 12: Part 1 - Granular Content Permissions](./12-granular-permissions-audit.md#part-1-granular-content-permissions)**.
+
+**Permission Evaluation Order:**
+1. Check if user is Owner → Always allowed
+2. Check content-level flags (PRD 12) → If match, allowed
+3. Check role capability (this document) → If has capability, allowed
+4. Otherwise → Denied
 
 ### Capability Framework
 
@@ -405,6 +430,8 @@ enum CommentStatus {
 - **Members**: Can create, edit, delete own comments/reviews
 - **Admin/Owner**: Can moderate (approve/reject), edit, delete any comments/reviews
 - **Guests**: Cannot comment, can view (if visibility allows)
+
+**⚠️ Note:** All comment/review actions are logged in the audit trail. See **[PRD 12: Part 3 - Audit Trail](./12-granular-permissions-audit.md#part-3-audit-trail-compliance-logging)** for event types: `comment.create`, `comment.edit`, `comment.delete`, `comment.moderate`, `review.create`, etc.
 
 ## Account Creation & Verification
 
@@ -914,13 +941,15 @@ async function resetPassword(token: string, newPassword: string) {
     body: 'Your password has been successfully changed. If you did not make this change, contact support immediately.'
   })
 
-  // Log in audit trail
+  // Log in audit trail (see PRD 12 for audit implementation)
   await auditLog.create({
     action: 'password_reset',
     userId: resetToken.user_id,
     metadata: { method: 'self_initiated' }
   })
 }
+
+// See PRD 12: Part 3 for complete audit trail implementation and event types
 ```
 
 ### Admin-Initiated Password Reset (Force Reset)

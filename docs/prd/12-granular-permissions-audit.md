@@ -1,7 +1,7 @@
 # PRD 12: Granular Permissions & Audit Trail
 
-**Version:** 1.0
-**Date:** 2026-01-28
+**Version:** 1.1
+**Date:** 2026-01-29
 **Status:** Draft - MVP Feature
 **Parent:** [Master PRD](./00-master-prd.md)
 **Related**: [PRD 09: User Management & Authentication](./09-user-management-auth.md)
@@ -10,11 +10,51 @@
 
 This document defines the granular permission system for content ownership, version control for legal documents, and legally robust audit trail logging.
 
+**⚠️ Relationship to PRD 09:**
+This document **extends** PRD 09's capability-based RBAC system with:
+1. **Content-level permission overrides** (Part 1) - Overrides role capabilities at individual content level
+2. **Version control** (Part 2) - Tracks content changes, requires user acceptance for legal docs
+3. **Audit trail** (Part 3) - Logs all user actions defined in PRD 09 (login, role changes, password resets, etc.) plus content and ecommerce events
+
+**When implementing:**
+- Read **[PRD 09](./09-user-management-auth.md)** first for role/capability system
+- Then implement content-level overrides (Part 1 of this doc)
+- Permission evaluation: Owner always allowed → Content flags (this doc) → Role capabilities (PRD 09) → Deny
+
+**Scope of this document:**
+- Per-content permission flags that override role capabilities
+- Article/page/product version control with change tracking
+- System-wide audit logging for compliance (7-year retention)
+
 ## Part 1: Granular Content Permissions
 
 ### Overview
 
-While the capability system (PRD 09) defines **role-level permissions**, this system defines **content-level permissions** that can override role capabilities on a per-item basis.
+While the capability system **([PRD 09](./09-user-management-auth.md#capability-based-permission-system))** defines **role-level permissions** (system-wide, "Admin can edit all articles"), this system defines **content-level permissions** that can override role capabilities on a per-item basis (per-article, "Admin can NOT edit this specific article").
+
+**Key Difference:**
+- **PRD 09 Capabilities**: Role-based, system-wide (e.g., `article.edit.any` capability)
+- **This Document (Part 1)**: Content-based, per-item flags (e.g., `admin_can_edit = false` on Article #123)
+
+**Permission Evaluation Logic:**
+```typescript
+function canEditArticle(user: User, article: Article): boolean {
+  // 1. Owner always can
+  if (user.role === 'owner') return true
+
+  // 2. Check content-level flags (THIS DOCUMENT)
+  if (user.id === article.author_id && article.author_can_edit) return true
+  if (user.role === 'admin' && article.admin_can_edit) return true
+
+  // 3. Fall back to role capabilities (PRD 09)
+  if (await user.hasCapability('article.edit.any')) return true
+
+  // 4. Deny
+  return false
+}
+```
+
+See **[PRD 09: Capability Framework](./09-user-management-auth.md#capability-framework)** for role capability definitions.
 
 ### Content Ownership Model
 
@@ -373,11 +413,21 @@ async function recordAcceptance(
 └─────────────────────────────────────────────┘
 ```
 
-## Part 3: Audit Trail Log
+## Part 3: Audit Trail & Compliance Logging
 
 ### Overview
 
 A **legally robust audit trail** that tracks all significant user actions, content changes, and system events for compliance, security, and dispute resolution.
+
+**⚠️ Cross-Reference to PRD 09:**
+This audit trail logs all user management and authentication events defined in **[PRD 09](./09-user-management-auth.md)**:
+- User registration and email verification → `user_signup`, `email_verified`
+- Front door/back door logins → `user_login`, `admin_login`, `admin_login_2fa`
+- Password resets (self and admin-initiated) → `user_password_reset_requested`, `password_reset_forced`
+- Role changes (Member elevation to Admin/Owner) → `user_role_changed`
+- Capability assignments → `capability_granted`, `capability_revoked`
+
+See **[PRD 09: Database Schema](./09-user-management-auth.md#database-schema)** for user/role/capability tables that generate these events.
 
 ### Audit Log Requirements
 
@@ -406,14 +456,17 @@ A **legally robust audit trail** that tracks all significant user actions, conte
 - `user_deleted` - Account deletion
 - `user_suspended` - Account suspended by Admin
 
-#### Authentication & Authorization
+#### Authentication & Authorization (See PRD 09)
 - `oauth_login_google` - Google OAuth login
 - `oauth_login_apple` - Apple OAuth login
-- `2fa_enabled` - User enabled 2FA
-- `2fa_disabled` - User disabled 2FA
-- `2fa_recovery_code_used` - Recovery code utilized
+- `2fa_enabled` - User enabled 2FA (TOTP)
+- `2fa_reset` - 2FA reset via password reset (Admin/Owner only)
 - `capability_granted` - Capability assigned to user/role
 - `capability_revoked` - Capability removed
+
+**Not logged (not implemented):**
+- ~~`2fa_disabled`~~ - 2FA cannot be disabled for Admin/Owner
+- ~~`2fa_recovery_code_used`~~ - No recovery codes (use password reset)
 
 #### Ecommerce Events
 - `order_created` - Order initiated
