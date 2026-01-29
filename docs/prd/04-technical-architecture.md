@@ -1,7 +1,7 @@
 # PRD 04: Technical Architecture
 
-**Version:** 1.0
-**Date:** 2026-01-27
+**Version:** 1.1
+**Date:** 2026-01-28
 **Status:** Draft
 **Parent:** [Master PRD](./00-master-prd.md)
 
@@ -800,13 +800,274 @@ npm run dev
 - Analytics platform
 - Uptime monitoring
 
-## Open Questions
+## Open Questions & Answers
 
-1. Should we use GraphQL instead of REST for more flexible queries?
-2. Do we need real-time features (WebSockets) for admin dashboard?
-3. Should we implement server-side rendering for all pages or use static generation where possible?
-4. Do we need multi-tenancy support from the start?
-5. Should we use a message queue for async tasks (email sending, image processing)?
+### Answered Questions ✅
+
+1. ~~Should we use GraphQL instead of REST for more flexible queries?~~ → **REST** - Small app, keep it simple. REST is sufficient for query needs.
+
+2. ~~Do we need real-time features (WebSockets) for admin dashboard?~~ → **NO WebSockets/real-time needed** - Low traffic site doesn't require real-time updates. However, **entity locking required** for concurrent editing (see [Entity Locking](#entity-locking-for-concurrent-editing) section below).
+
+3. ~~Should we implement server-side rendering for all pages or use static generation where possible?~~ → **Server-Side Rendering (SSR)** - Traffic is low, no need to add complexity with ISR or heavy client-side rendering.
+
+4. ~~Do we need multi-tenancy support from the start?~~ → **NO - Single-tenant only** (see Master PRD). Each deployment of AECMS implements a single website. No multi-tenancy support needed or planned.
+
+5. ~~Should we use a message queue for async tasks?~~ → **YES - Use Bull/BullMQ (Redis-based)** (see [Message Queue Strategy](#message-queue-strategy) section below).
+
+## Entity Locking for Concurrent Editing
+
+### Problem
+
+When multiple users (Admins/Owners) edit the same entity simultaneously, changes can conflict and overwrite each other, causing data loss.
+
+### Solution: Optimistic Locking with Edit Session Tracking
+
+**Approach**: Track active edit sessions and warn users if entity is being edited, but allow override if needed.
+
+### Edit Session Tracking
+
+**When user starts editing** (clicks "Edit" button):
+
+1. Check if entity has active edit session
+2. If locked by another user:
+   - Show warning: "User X is currently editing this. Continue anyway?"
+   - User can proceed (override) or cancel
+3. Create edit session record:
+   - Entity type and ID
+   - User ID
+   - Session start time
+   - Last activity time (heartbeat)
+4. Return entity data with current version number
+
+**While editing** (heartbeat):
+
+- Frontend sends heartbeat every 30 seconds
+- Backend updates `last_activity` timestamp
+- Keeps session alive
+
+**Edit session timeout**:
+
+- Sessions expire after **5 minutes of inactivity**
+- Automatic cleanup via background job
+- If user returns after timeout, check if entity was modified
+
+**On save**:
+
+1. Check entity version number (optimistic locking)
+2. If version changed:
+   - Show warning: "This entity was modified by User X at [time]. Your changes may conflict."
+   - Options:
+     - View current version
+     - Overwrite anyway (dangerous)
+     - Save as draft (if applicable)
+     - Cancel and reload
+3. If version unchanged:
+   - Save changes
+   - Increment version number
+   - Delete edit session
+4. Release lock
+
+**On cancel/navigate away**:
+
+- Delete edit session
+- Release lock
+
+### Database Schema
+
+```typescript
+model EditSession {
+  id              String   @id @default(uuid())
+  entity_type     String   // 'article', 'page', 'product', 'user'
+  entity_id       String
+  user_id         String
+  user            User     @relation(fields: [user_id])
+  started_at      DateTime @default(now())
+  last_activity   DateTime @default(now())
+
+  @@unique([entity_type, entity_id]) // Only one active session per entity
+  @@index([entity_type, entity_id])
+  @@index([last_activity]) // For cleanup query
+}
+
+// Add version field to entities
+model Article {
+  // ... existing fields
+  version         Int      @default(1) // Incremented on each save
+}
+
+model Page {
+  // ... existing fields
+  version         Int      @default(1)
+}
+
+model Product {
+  // ... existing fields
+  version         Int      @default(1)
+}
+```
+
+### Implementation Details
+
+See full implementation examples in the code blocks above, including:
+- API endpoints for session management
+- Optimistic locking on save
+- Background cleanup job for expired sessions
+- Frontend React hooks for session management
+- Local storage caching for draft recovery
+
+### Edit Session Timeout & Recovery
+
+**Scenario**: User starts editing, closes browser/tab, returns later.
+
+**Solution**: Cache draft in browser localStorage
+
+- Before unload, save current form state to localStorage
+- On return, check for cached draft
+- If entity version unchanged: restore draft
+- If entity version changed: warn user and offer options
+
+## Message Queue Strategy
+
+### Overview
+
+Use **Bull/BullMQ** (Redis-based message queue) for asynchronous background tasks.
+
+### Why Message Queues?
+
+**Problem**: Some operations are slow and shouldn't block HTTP requests:
+- Email sending (SMTP can be slow, can fail and need retries)
+- Image processing (thumbnails, compression, optimization)
+- eBook personalization (EPUB modification, CPU intensive)
+- Send to Kindle (external SMTP, can be slow)
+- CSV report generation (large datasets)
+- AI comment moderation (OpenAI API calls)
+
+**Solution**: Put tasks in a queue, return immediately to user, process in background.
+
+### Technology Choice: Bull/BullMQ ✅ **CONFIRMED**
+
+**Why Bull/BullMQ**:
+- ✅ Already using Redis for caching/sessions (no new infrastructure)
+- ✅ Very lightweight (just npm install)
+- ✅ Automatic retries with exponential backoff
+- ✅ Built-in monitoring dashboard
+- ✅ Perfect for low-traffic sites
+- ✅ Industry standard for Node.js
+- ✅ **Cost: $0** (uses existing Redis)
+
+**Alternatives Considered**:
+
+| Solution | Pros | Cons | Verdict |
+|----------|------|------|---------|
+| **Bull/BullMQ** | Lightweight, uses existing Redis, retries | Requires Redis | ✅ **CHOSEN** |
+| Simple async functions | No dependencies | No retries, no monitoring | ❌ Too basic |
+| RabbitMQ | Very robust, feature-rich | Separate service, overkill for MVP | ❌ Too heavy |
+| AWS SQS | Managed, scalable | Vendor lock-in, costs money | ❌ Against project goals |
+| PostgreSQL-based queue | No new service | Not ideal for high-volume | ⚠️ Backup option |
+
+### Queue Types
+
+**1. Email Queue** (High Priority)
+- Order confirmations
+- Password resets
+- Email verification
+- Admin notifications
+- **Retry**: 3 attempts with exponential backoff (2s, 4s, 8s)
+
+**2. Media Processing Queue** (Medium Priority)
+- Image optimization
+- Thumbnail generation
+- Video processing (future)
+- **Retry**: 2 attempts
+
+**3. eBook Queue** (Medium Priority)
+- EPUB personalization (can take 10-30 seconds)
+- Send to Kindle
+- **Retry**: 3 attempts
+
+**4. Reports Queue** (Low Priority)
+- CSV generation
+- Analytics reports
+- **Retry**: None (user can re-generate)
+
+**5. Moderation Queue** (Low Priority)
+- AI comment moderation (OpenAI API)
+- **Retry**: 2 attempts
+
+### Implementation Example
+
+```typescript
+// queue/index.ts
+import Bull from 'bull'
+
+export const emailQueue = new Bull('emails', {
+  redis: process.env.REDIS_URL,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+    removeOnComplete: 100,
+    removeOnFail: 500
+  }
+})
+
+// Adding jobs (non-blocking)
+@Post('/api/checkout/complete')
+async completeOrder(@Body() orderData: OrderDto) {
+  const order = await this.ordersService.create(orderData)
+
+  // Queue email (returns immediately)
+  await emailQueue.add('order-confirmation', {
+    email: order.customer_email,
+    orderId: order.id
+  })
+
+  return { success: true, orderId: order.id }
+}
+
+// Worker processes jobs in background
+emailQueue.process('order-confirmation', async (job) => {
+  const { email, orderId } = job.data
+  await sendOrderConfirmationEmail(email, orderId)
+})
+```
+
+### Monitoring Dashboard
+
+Bull provides a web UI for monitoring:
+
+```typescript
+import { createBullBoard } from '@bull-board/api'
+import { BullAdapter } from '@bull-board/api/bullAdapter'
+import { ExpressAdapter } from '@bull-board/express'
+
+const serverAdapter = new ExpressAdapter()
+serverAdapter.setBasePath('/admin/queues')
+
+createBullBoard({
+  queues: [
+    new BullAdapter(emailQueue),
+    new BullAdapter(mediaQueue),
+    new BullAdapter(ebookQueue)
+  ],
+  serverAdapter
+})
+
+app.use('/admin/queues', serverAdapter.getRouter())
+// Access at: https://yourdomain.com/admin/queues (Owner only)
+```
+
+Dashboard shows:
+- Active, waiting, completed, failed jobs
+- Job details and retry history
+- Performance metrics
+- Manual job retry/deletion
+
+### Performance
+
+- **Cost**: $0 (uses existing Redis)
+- **Throughput**: 1000+ jobs/minute
+- **Overhead**: <10ms to add job to queue
+- **Perfect** for low-traffic sites
 
 ## Success Metrics
 
