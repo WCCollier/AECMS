@@ -60,7 +60,7 @@ enum ProductType {
 enum FileFormat {
   epub
   pdf
-  // Future: mobi, azw3, audiobook formats
+  // Future: audiobook formats only (no MOBI - Amazon auto-converts EPUB)
 }
 ```
 
@@ -902,7 +902,7 @@ Essentially free for MVP scale.
 
 ## Open Questions
 
-1. ~~Should we support MOBI format (Kindle native) in addition to EPUB?~~ → **YES, support PDF as well as EPUB. Each product can have master files in multiple formats. Customers select format to download/send. Each format has download + Send to Kindle buttons.**
+1. ~~Should we support MOBI format (Kindle native) in addition to EPUB?~~ → **NO - MOBI not needed (Amazon auto-converts EPUB). Instead, support PDF as well as EPUB. Each product can have master files in multiple formats. Customers select format to download/send. Each format has download + Send to Kindle buttons.**
 
 2. ~~Should customers be able to update their Kindle email for past purchases?~~ → **YES, implement full Kindle device management. Users store multiple Kindle device addresses with friendly names. On Send to Kindle, users select from saved devices or add new.**
 
