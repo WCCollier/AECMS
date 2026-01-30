@@ -10,13 +10,14 @@
 
 ## Executive Summary
 
-Phase 5 autonomous implementation has been completed successfully. The payments module with Stripe and PayPal integration is fully built and ready for testing once API credentials are configured.
+Phase 5 autonomous implementation has been completed successfully. The payments module with Stripe, PayPal, and Amazon Pay integration is fully built and ready for testing once API credentials are configured.
 
 - ✅ PaymentsModule - Payment processing abstraction layer
 - ✅ StripeProvider - Full Payment Intents API integration
 - ✅ PayPalProvider - Full Orders API v2 integration
+- ✅ AmazonPayProvider - Full Checkout v2 API integration
 - ✅ Test Mode - Development without real API keys
-- ✅ Webhook Handlers - Payment confirmation processing
+- ✅ Webhook Handlers - Payment confirmation processing for all providers
 
 **Testing Results**:
 - Unit tests: 42/42 passing (100%)
@@ -24,9 +25,9 @@ Phase 5 autonomous implementation has been completed successfully. The payments 
 - Code compiles with 0 errors
 - Backend starts successfully with all routes mapped
 
-**Total API Endpoints**: 58 (7 new in Phase 5)
+**Total API Endpoints**: 61 (10 new in Phase 5)
 
-**Human Action Required**: Configure Stripe and PayPal API credentials in environment
+**Human Action Required**: Configure Stripe, PayPal, and Amazon Pay API credentials in environment
 
 ---
 
@@ -109,22 +110,67 @@ PAYPAL_MODE=sandbox  # or 'live' for production
 - `GET /v2/checkout/orders/{id}` - Get order status
 - `POST /v2/payments/captures/{id}/refund` - Refund payment
 
-### 5.4 Payments Service (✅ Complete)
+### 5.3.1 Amazon Pay Provider (✅ Complete)
 
-**File**: `src/payments/payments.service.ts` (404 lines)
+**File**: `src/payments/providers/amazon-pay.provider.ts`
+
+**Features**:
+- Checkout v2 API integration
+- Multi-region support (NA, EU, FE)
+- Sandbox/Live mode based on environment
+- Checkout session creation
+- Payment capture and refund support
+- SNS webhook (IPN) handling
+- Button configuration for frontend
+
+**Environment Variables Required**:
+```bash
+AMAZON_PAY_MERCHANT_ID=...
+AMAZON_PAY_PUBLIC_KEY_ID=...
+AMAZON_PAY_PRIVATE_KEY=...  # PEM format
+AMAZON_PAY_REGION=na        # na, eu, or fe
+AMAZON_PAY_SANDBOX=true     # or 'false' for production
+```
+
+**Amazon Pay API Endpoints Used**:
+- `POST /v2/checkoutSessions` - Create checkout session
+- `POST /v2/checkoutSessions/{id}/complete` - Complete checkout
+- `POST /v2/charges` - Create and capture charge
+- `GET /v2/charges/{id}` - Get charge status
+- `POST /v2/refunds` - Process refund
+
+**Amazon Pay Status Mapping**:
+| Amazon Pay Status | AECMS Status |
+|-------------------|--------------|
+| Open | requires_action |
+| Authorized | requires_confirmation |
+| AuthorizationInitiated | processing |
+| Captured | succeeded |
+| CaptureInitiated | processing |
+| Completed | succeeded |
+| Declined | failed |
+| Canceled | cancelled |
+
+### 5.5 Payments Service (✅ Complete)
+
+**File**: `src/payments/payments.service.ts` (~500 lines)
 
 **Methods**:
 1. `getAvailableProviders()` - List configured providers
 2. `createPaymentIntent(dto, userId?)` - Create payment for order
 3. `capturePayPalPayment(dto, userId?)` - Capture PayPal after approval
-4. `refund(orderId, dto)` - Process refund
-5. `handleStripeWebhook(payload, signature)` - Process Stripe webhooks
-6. `handlePayPalWebhook(payload, signature)` - Process PayPal webhooks
-7. `simulatePaymentCompletion(orderId)` - Test mode only
+4. `captureAmazonPayPayment(dto, userId?)` - Capture Amazon Pay after approval
+5. `getAmazonPayButtonConfig()` - Get button config for frontend
+6. `refund(orderId, dto)` - Process refund
+7. `handleStripeWebhook(payload, signature)` - Process Stripe webhooks
+8. `handlePayPalWebhook(payload, signature)` - Process PayPal webhooks
+9. `handleAmazonPayWebhook(payload, signature)` - Process Amazon Pay IPN
+10. `simulatePaymentCompletion(orderId)` - Test mode only
 
 **Webhook Events Handled**:
 - Stripe: `payment_intent.succeeded`, `payment_intent.payment_failed`
 - PayPal: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`
+- Amazon Pay: `CHARGE.COMPLETED`, `CHARGE.DECLINED`, `REFUND.COMPLETED`
 
 **Test Mode**:
 - Enabled via `PAYMENT_TEST_MODE=true`
@@ -132,7 +178,7 @@ PAYPAL_MODE=sandbox  # or 'live' for production
 - Simulates full payment flow without real providers
 - Useful for development and testing
 
-### 5.5 Payments Controller (✅ Complete)
+### 5.6 Payments Controller (✅ Complete)
 
 **File**: `src/payments/payments.controller.ts`
 
@@ -142,12 +188,15 @@ PAYPAL_MODE=sandbox  # or 'live' for production
 | GET | `/payments/providers` | None | List available payment providers |
 | POST | `/payments/create-intent` | Optional JWT | Create payment intent for order |
 | POST | `/payments/capture-paypal` | Optional JWT | Capture PayPal payment |
+| POST | `/payments/capture-amazon-pay` | Optional JWT | Capture Amazon Pay payment |
+| GET | `/payments/amazon-pay/button-config` | None | Amazon Pay button config |
 | POST | `/payments/refund/:orderId` | JWT + `order.refund` | Process refund |
 | POST | `/payments/webhooks/stripe` | None | Stripe webhook handler |
 | POST | `/payments/webhooks/paypal` | None | PayPal webhook handler |
+| POST | `/payments/webhooks/amazon-pay` | None | Amazon Pay IPN handler |
 | POST | `/payments/test/simulate/:orderId` | JWT | Simulate payment (test mode) |
 
-### 5.6 DTOs (✅ Complete)
+### 5.7 DTOs (✅ Complete)
 
 **Files Created**:
 - `src/payments/dto/create-payment.dto.ts`
@@ -158,13 +207,19 @@ PAYPAL_MODE=sandbox  # or 'live' for production
 // Create payment intent
 CreatePaymentIntentDto {
   order_id: string;      // UUID of order
-  provider: 'stripe' | 'paypal';
+  provider: 'stripe' | 'paypal' | 'amazon_pay';
 }
 
 // Capture PayPal payment
 CapturePayPalPaymentDto {
   paypal_order_id: string;  // PayPal order ID
   order_id: string;         // AECMS order ID
+}
+
+// Capture Amazon Pay payment
+CaptureAmazonPayPaymentDto {
+  checkout_session_id: string;  // Amazon Pay checkout session ID
+  order_id: string;             // AECMS order ID
 }
 
 // Process refund
@@ -177,12 +232,12 @@ RefundPaymentDto {
 PaymentIntentResponseDto {
   payment_id: string;
   client_secret: string;
-  provider: 'stripe' | 'paypal';
+  provider: 'stripe' | 'paypal' | 'amazon_pay';
   status: string;
 }
 ```
 
-### 5.7 Supporting Components (✅ Complete)
+### 5.8 Supporting Components (✅ Complete)
 
 **OptionalJwtAuthGuard**: `src/auth/guards/optional-jwt-auth.guard.ts`
 - Allows endpoints to work with or without authentication
@@ -201,7 +256,7 @@ PaymentIntentResponseDto {
 @Module({
   imports: [PrismaModule, OrdersModule, CapabilitiesModule],
   controllers: [PaymentsController],
-  providers: [PaymentsService, StripeProvider, PayPalProvider],
+  providers: [PaymentsService, StripeProvider, PayPalProvider, AmazonPayProvider],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}
@@ -282,9 +337,10 @@ Client                     Backend                    PayPal
 **Enable**: Set `PAYMENT_TEST_MODE=true` in environment
 
 **Behavior**:
-- `getAvailableProviders()` returns ['stripe', 'paypal'] even without credentials
+- `getAvailableProviders()` returns ['stripe', 'paypal', 'amazon_pay'] even without credentials
 - `createPaymentIntent()` returns mock payment ID and client secret
 - `capturePayPalPayment()` immediately marks order as paid
+- `captureAmazonPayPayment()` immediately marks order as paid
 - `refund()` immediately marks order as refunded
 - `simulatePaymentCompletion()` endpoint available
 
@@ -351,6 +407,32 @@ Client                     Backend                    PayPal
    PAYPAL_CLIENT_SECRET=...
    PAYPAL_MODE=sandbox  # or 'live'
    ```
+
+### Amazon Pay Setup
+
+1. **Create Amazon Pay Merchant Account**: https://pay.amazon.com/merchant
+
+2. **Register in Seller Central** (Seller Central → Integration → MWS Access):
+   - Create new API credentials
+   - Download your private key (PEM format)
+   - Note your Merchant ID and Public Key ID
+
+3. **Configure IPN (Instant Payment Notification)**:
+   - Endpoint URL: `https://your-domain.com/payments/webhooks/amazon-pay`
+   - Amazon Pay uses SNS for notifications
+
+4. **Set Environment Variables**:
+   ```bash
+   AMAZON_PAY_MERCHANT_ID=A3...
+   AMAZON_PAY_PUBLIC_KEY_ID=LIVE-...
+   AMAZON_PAY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+   AMAZON_PAY_REGION=na       # na (North America), eu (Europe), fe (Far East)
+   AMAZON_PAY_SANDBOX=true    # or 'false' for production
+   ```
+
+5. **Frontend Integration**:
+   - Include Amazon Pay SDK: `https://static-na.payments-amazon.com/checkout.js`
+   - Use button config from `/payments/amazon-pay/button-config` endpoint
 
 ### NestJS Raw Body Configuration
 
@@ -498,7 +580,7 @@ Simulate payment completion (test mode only).
 ### Without API Credentials (Test Mode)
 
 1. ✅ Set `PAYMENT_TEST_MODE=true`
-2. ✅ GET /payments/providers returns both providers
+2. ✅ GET /payments/providers returns all three providers
 3. ✅ POST /payments/create-intent returns mock response
 4. ✅ POST /payments/test/simulate marks order as paid
 
@@ -520,19 +602,30 @@ Simulate payment completion (test mode only).
 5. ⏳ Capture payment via API
 6. ⏳ Verify order status updates to 'paid'
 
+### With Amazon Pay Credentials
+
+1. ⏳ Configure AMAZON_PAY_MERCHANT_ID, PUBLIC_KEY_ID, and PRIVATE_KEY
+2. ⏳ Create test order
+3. ⏳ Create checkout session (get session ID)
+4. ⏳ Complete payment in Amazon Pay sandbox
+5. ⏳ Capture payment via API
+6. ⏳ Verify IPN receives payment confirmation
+7. ⏳ Verify order status updates to 'paid'
+
 ---
 
 ## Files Created/Modified
 
-**New Files** (11):
+**New Files** (12):
 - `src/payments/payments.module.ts`
-- `src/payments/payments.service.ts` (404 lines)
-- `src/payments/payments.controller.ts` (101 lines)
+- `src/payments/payments.service.ts` (~500 lines)
+- `src/payments/payments.controller.ts` (~130 lines)
 - `src/payments/dto/create-payment.dto.ts`
 - `src/payments/dto/index.ts`
 - `src/payments/providers/payment-provider.interface.ts`
 - `src/payments/providers/stripe.provider.ts` (156 lines)
 - `src/payments/providers/paypal.provider.ts` (210 lines)
+- `src/payments/providers/amazon-pay.provider.ts` (310 lines)
 - `src/auth/guards/optional-jwt-auth.guard.ts`
 - `docs/PHASE_5_PLAN.md`
 - `docs/PHASE_5_COMPLETION_REPORT.md`
@@ -542,7 +635,7 @@ Simulate payment completion (test mode only).
 - `package.json` - Added stripe dependency
 - `package-lock.json` - Updated dependencies
 
-**Lines of Code Added**: ~1,400
+**Lines of Code Added**: ~1,900
 
 ---
 
@@ -550,6 +643,9 @@ Simulate payment completion (test mode only).
 
 1. `ad5c1cc` - feat(phase5): Implement Payments Module - Stripe and PayPal integration
 2. `734d6c7` - fix: Export all payment DTOs from index
+3. `bdb1c3a` - docs: Add Phase 5 Completion Report - Payments Integration
+4. `1701f4a` - docs: Update CLAUDE.md - Phase 5 complete, add Phase 6 roadmap
+5. `469b792` - feat(phase5): Add Amazon Pay provider - tertiary MVP payment method
 
 ---
 
@@ -565,19 +661,26 @@ Simulate payment completion (test mode only).
    - Configure webhook endpoint
    - Set environment variables
 
-3. **Frontend Integration**:
+3. **Configure Amazon Pay**:
+   - Create merchant account
+   - Download private key from Seller Central
+   - Configure IPN endpoint
+   - Set environment variables
+
+4. **Frontend Integration**:
    - Integrate Stripe.js for card payments
    - Integrate PayPal SDK for PayPal payments
-   - Implement checkout UI
+   - Integrate Amazon Pay SDK for Amazon Pay
+   - Implement checkout UI with all three options
 
-4. **Test End-to-End**:
-   - Complete test purchases with both providers
-   - Verify webhook handling
+5. **Test End-to-End**:
+   - Complete test purchases with all three providers
+   - Verify webhook/IPN handling
    - Test refund flow
 
-5. **Production Deployment**:
-   - Switch to live API keys
-   - Configure production webhook URLs
+6. **Production Deployment**:
+   - Switch to live API keys for all providers
+   - Configure production webhook/IPN URLs
    - Test with real payments (small amounts)
 
 ---
@@ -586,14 +689,14 @@ Simulate payment completion (test mode only).
 
 | Metric | Value |
 |--------|-------|
-| New Endpoints | 7 |
-| Total Endpoints | 58 |
-| New Files | 11 |
-| Lines of Code | ~1,400 |
+| New Endpoints | 10 |
+| Total Endpoints | 61 |
+| New Files | 12 |
+| Lines of Code | ~1,900 |
 | Unit Tests | 42 passing |
 | E2E Tests | 16 passing |
 | Build Errors | 0 |
-| Commits | 2 |
+| Commits | 5 |
 
 **Phase Status**: ✅ Autonomous work complete - Ready for human configuration and testing
 

@@ -21,11 +21,11 @@
 **Phase 2**: ✅ COMPLETE - Capability-based RBAC (27 capabilities, guards, decorators)
 **Phase 3**: ✅ COMPLETE - Content Management (Media, Categories, Tags, Articles, Pages)
 **Phase 4**: ✅ COMPLETE - Ecommerce Core (Products, Cart, Orders)
-**Phase 5**: ✅ AUTONOMOUS COMPLETE - Payments Module (Stripe, PayPal) - Pending human config
+**Phase 5**: ✅ AUTONOMOUS COMPLETE - Payments Module (Stripe, PayPal, Amazon Pay) - Pending human config
 **Phase 6**: 🔄 NEXT - Frontend (Next.js) + Integration Testing
 
 **Test Status**: 42 unit tests passing, 16 E2E tests passing
-**API Endpoints**: 58 total (7 new from Payments)
+**API Endpoints**: 61 total (10 new from Payments)
 
 ## API Endpoint Summary
 
@@ -41,7 +41,7 @@
 | Products | 7 |
 | Cart | 6 |
 | Orders | 7 |
-| Payments | 7 |
+| Payments | 10 |
 
 ## Key Architecture Decisions
 
@@ -126,13 +126,15 @@ docker-compose logs -f
 - ✅ PaymentsModule with provider abstraction pattern
 - ✅ StripeProvider - Payment Intents API, webhooks
 - ✅ PayPalProvider - Orders API v2, OAuth2 tokens
+- ✅ AmazonPayProvider - Checkout v2 API, IPN webhooks
 - ✅ Test mode for development without API keys
 - ✅ OptionalJwtAuthGuard for guest checkout
 
 **Human Configuration Required** (see `docs/PHASE_5_COMPLETION_REPORT.md`):
 1. **Stripe**: Get API keys, configure webhooks, set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
 2. **PayPal**: Create app, configure webhooks, set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET
-3. **Test**: Use test mode first (PAYMENT_TEST_MODE=true), then test with real sandbox credentials
+3. **Amazon Pay**: Create merchant account, get credentials, set AMAZON_PAY_* environment variables
+4. **Test**: Use test mode first (PAYMENT_TEST_MODE=true), then test with real sandbox credentials
 
 ## Phase 6: Frontend (Next)
 
