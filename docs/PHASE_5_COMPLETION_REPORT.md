@@ -31,6 +31,78 @@ Phase 5 autonomous implementation has been completed successfully. The payments 
 
 ---
 
+## 🎯 YOUR NEXT STEPS (Start Here)
+
+**Detailed instructions**: See [PHASE_5_PLAN.md](./PHASE_5_PLAN.md)
+
+### Quick Overview (~45-60 minutes total)
+
+| Task | Provider | Time | Priority |
+|------|----------|------|----------|
+| 1 | Stripe | ~10 min | Primary - Do first |
+| 2 | PayPal | ~15 min | Secondary |
+| 3 | Amazon Pay | ~20 min | Tertiary |
+
+### Immediate Actions
+
+**Step 1: Verify Test Mode Works**
+```bash
+# Add to backend/.env
+PAYMENT_TEST_MODE=true
+
+# Start backend
+cd backend && npm run dev
+
+# Test
+curl http://localhost:4000/payments/providers
+# Expected: {"providers":["stripe","paypal","amazon_pay"]}
+```
+
+**Step 2: Configure Stripe (Primary)**
+1. Go to https://dashboard.stripe.com → Developers → API Keys
+2. Copy `sk_test_...` (Secret Key)
+3. Set up webhook at Developers → Webhooks
+4. Add to `backend/.env`:
+   ```
+   STRIPE_SECRET_KEY=sk_test_...
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
+
+**Step 3: Configure PayPal (Secondary)**
+1. Go to https://developer.paypal.com → My Apps & Credentials
+2. Create app, copy Client ID and Secret
+3. Add to `backend/.env`:
+   ```
+   PAYPAL_CLIENT_ID=...
+   PAYPAL_CLIENT_SECRET=...
+   PAYPAL_MODE=sandbox
+   ```
+
+**Step 4: Configure Amazon Pay (Tertiary)**
+1. Go to https://pay.amazon.com/merchant → Seller Central
+2. Generate API credentials, download private key
+3. Add to `backend/.env`:
+   ```
+   AMAZON_PAY_MERCHANT_ID=A...
+   AMAZON_PAY_PUBLIC_KEY_ID=LIVE-...
+   AMAZON_PAY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+   AMAZON_PAY_REGION=na
+   AMAZON_PAY_SANDBOX=true
+   ```
+
+**Step 5: Disable Test Mode & Verify**
+```bash
+# Update backend/.env
+PAYMENT_TEST_MODE=false
+
+# Restart and verify
+npm run dev
+curl http://localhost:4000/payments/providers
+# Should only show providers you configured
+```
+
+---
+
 ## Deliverables Completed
 
 ### 5.1 Payment Provider Interface (✅ Complete)

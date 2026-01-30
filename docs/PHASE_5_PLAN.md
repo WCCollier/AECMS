@@ -1,153 +1,363 @@
-# Phase 5: Payments Integration - Implementation Plan
+# Phase 5: Payments Integration - Human Configuration Guide
 
-## Overview
+**Status**: Code Complete - Awaiting Your Configuration
+**Estimated Time**: 45-60 minutes for all three providers
 
-Phase 5 implements payment processing with Stripe (primary) and PayPal (secondary). This document outlines what can be built autonomously and what requires human intervention.
+---
 
-## What Can Be Built Autonomously
+## Quick Start (Test Mode First)
 
-### 1. Payment Service Infrastructure ✅
-- Abstract PaymentProvider interface
-- Stripe service implementation (code structure)
-- PayPal service implementation (code structure)
-- Payment controller with endpoints
-- DTOs for payment requests/responses
-- Webhook handlers (Stripe, PayPal)
-
-### 2. Database Integration ✅
-- Payment model already exists in schema
-- Order payment fields ready
-- Digital download generation on payment
-
-### 3. Environment Configuration ✅
-- Environment variable validation
-- Configuration module updates
-- Mock/test mode for development
-
-### 4. Testing Infrastructure ✅
-- Unit tests with mocked payment providers
-- E2E tests with test mode
-- Webhook signature verification tests
-
-## What Requires Human Intervention
-
-### 1. Stripe Setup (User Action Required)
-- [ ] Create Stripe account at https://stripe.com
-- [ ] Get API keys from Dashboard → Developers → API keys
-- [ ] Set environment variables:
-  - `STRIPE_SECRET_KEY` - sk_test_... or sk_live_...
-  - `STRIPE_PUBLISHABLE_KEY` - pk_test_... or pk_live_...
-  - `STRIPE_WEBHOOK_SECRET` - whsec_...
-- [ ] Configure webhook endpoint in Stripe Dashboard:
-  - URL: `{API_URL}/payments/webhooks/stripe`
-  - Events: `payment_intent.succeeded`, `payment_intent.payment_failed`
-
-### 2. PayPal Setup (User Action Required)
-- [ ] Create PayPal Developer account at https://developer.paypal.com
-- [ ] Create app in Dashboard → My Apps & Credentials
-- [ ] Set environment variables:
-  - `PAYPAL_CLIENT_ID`
-  - `PAYPAL_CLIENT_SECRET`
-  - `PAYPAL_MODE` - 'sandbox' or 'live'
-- [ ] Configure webhook in PayPal Dashboard:
-  - URL: `{API_URL}/payments/webhooks/paypal`
-  - Events: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.DENIED`
-
-### 3. Testing with Real Providers
-- [ ] Test Stripe with test card 4242424242424242
-- [ ] Test PayPal with sandbox accounts
-- [ ] Verify webhook delivery
-
-## Implementation Phases
-
-### Phase 5a: Core Infrastructure (Autonomous) ✅
-1. Create payments module structure
-2. Implement PaymentProvider interface
-3. Create Stripe service with full implementation
-4. Create PayPal service with full implementation
-5. Implement webhook handlers
-6. Add payment endpoints to orders flow
-7. Write unit tests with mocks
-
-### Phase 5b: Configuration & Documentation (Autonomous) ✅
-1. Update environment validation
-2. Create setup documentation
-3. Create test mode that works without keys
-4. Document all required environment variables
-
-### Phase 5c: Integration Testing (Requires User)
-1. User configures Stripe test keys
-2. User configures PayPal sandbox
-3. Test full checkout flow
-4. Test webhook handling
-5. Test refund flow
-
-## API Endpoints to Create
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/payments/create-intent` | POST | Create Stripe PaymentIntent |
-| `/payments/create-paypal-order` | POST | Create PayPal order |
-| `/payments/capture-paypal/:orderId` | POST | Capture PayPal payment |
-| `/payments/webhooks/stripe` | POST | Stripe webhook handler |
-| `/payments/webhooks/paypal` | POST | PayPal webhook handler |
-| `/payments/refund/:orderId` | POST | Process refund |
-
-## Environment Variables Required
+Before configuring real payment providers, verify the system works in test mode:
 
 ```bash
-# Stripe (Required for Stripe payments)
+# Add to backend/.env
+PAYMENT_TEST_MODE=true
+
+# Start the backend
+cd backend && npm run dev
+
+# Test the endpoints
+curl http://localhost:4000/payments/providers
+# Should return: {"providers":["stripe","paypal","amazon_pay"]}
+```
+
+---
+
+## Your Configuration Tasks
+
+### Task 1: Stripe Setup (Primary Provider)
+
+**Time**: ~10 minutes
+
+#### Step 1.1: Create/Access Stripe Account
+1. Go to https://dashboard.stripe.com
+2. Sign up or log in
+3. Make sure you're in **Test Mode** (toggle in top-right)
+
+#### Step 1.2: Get API Keys
+1. Go to **Developers** → **API keys**
+2. Copy the **Secret key** (starts with `sk_test_`)
+3. Copy the **Publishable key** (starts with `pk_test_`) - for frontend later
+
+#### Step 1.3: Configure Webhook
+1. Go to **Developers** → **Webhooks**
+2. Click **Add endpoint**
+3. Enter your webhook URL:
+   - Local development: Use [Stripe CLI](https://stripe.com/docs/stripe-cli) or ngrok
+   - Production: `https://your-domain.com/payments/webhooks/stripe`
+4. Select events to listen to:
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+5. Click **Add endpoint**
+6. Copy the **Signing secret** (starts with `whsec_`)
+
+#### Step 1.4: Set Environment Variables
+Add to `backend/.env`:
+```bash
+STRIPE_SECRET_KEY=sk_test_your_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_secret_here
+```
+
+#### Step 1.5: Test Stripe Integration
+```bash
+# Restart backend
+npm run dev
+
+# Verify Stripe is available
+curl http://localhost:4000/payments/providers
+# Should include "stripe" in the list
+
+# Create a test order first (requires auth), then:
+# POST /payments/create-intent with {"order_id": "...", "provider": "stripe"}
+```
+
+**Test Card Numbers**:
+- Success: `4242 4242 4242 4242`
+- Decline: `4000 0000 0000 0002`
+- Requires authentication: `4000 0025 0000 3155`
+
+---
+
+### Task 2: PayPal Setup (Secondary Provider)
+
+**Time**: ~15 minutes
+
+#### Step 2.1: Create/Access PayPal Developer Account
+1. Go to https://developer.paypal.com
+2. Log in with your PayPal account (or create one)
+
+#### Step 2.2: Create Sandbox App
+1. Go to **Dashboard** → **My Apps & Credentials**
+2. Make sure you're in **Sandbox** mode
+3. Click **Create App**
+4. Enter app name: "AECMS Store" (or your preference)
+5. Select **Merchant** as the app type
+6. Click **Create App**
+
+#### Step 2.3: Get Credentials
+1. On your app page, copy:
+   - **Client ID**
+   - **Secret** (click "Show" to reveal)
+
+#### Step 2.4: Configure Webhook
+1. Scroll down to **Webhooks** section
+2. Click **Add Webhook**
+3. Enter your webhook URL:
+   - Local: Use ngrok tunnel
+   - Production: `https://your-domain.com/payments/webhooks/paypal`
+4. Select events:
+   - `PAYMENT.CAPTURE.COMPLETED`
+   - `PAYMENT.CAPTURE.DENIED`
+5. Click **Save**
+
+#### Step 2.5: Set Environment Variables
+Add to `backend/.env`:
+```bash
+PAYPAL_CLIENT_ID=your_client_id_here
+PAYPAL_CLIENT_SECRET=your_secret_here
+PAYPAL_MODE=sandbox
+```
+
+#### Step 2.6: Test PayPal Integration
+```bash
+# Restart backend
+npm run dev
+
+# Verify PayPal is available
+curl http://localhost:4000/payments/providers
+# Should include "paypal" in the list
+```
+
+**Sandbox Test Accounts**:
+- Go to **Sandbox** → **Accounts** in PayPal Developer Dashboard
+- Use the auto-generated buyer account for testing
+- Email format: `sb-xxxxx@personal.example.com`
+- Password: View in account details
+
+---
+
+### Task 3: Amazon Pay Setup (Tertiary Provider)
+
+**Time**: ~20 minutes
+
+#### Step 3.1: Register for Amazon Pay
+1. Go to https://pay.amazon.com/merchant
+2. Click **Register** or **Sign In**
+3. Complete merchant registration if new
+
+#### Step 3.2: Access Seller Central
+1. Go to https://sellercentral.amazon.com
+2. Navigate to **Integration** → **MWS Access** (or Amazon Pay Integration)
+
+#### Step 3.3: Create API Credentials
+1. In Seller Central, go to **Integration Central**
+2. Click **Amazon Pay**
+3. Generate new API credentials:
+   - Note your **Merchant ID** (starts with `A`)
+   - Note your **Public Key ID**
+   - Download your **Private Key** (PEM file) - SAVE THIS SECURELY
+
+#### Step 3.4: Configure IPN (Instant Payment Notification)
+1. In Amazon Pay settings, find **IPN Settings**
+2. Add your IPN URL:
+   - Production: `https://your-domain.com/payments/webhooks/amazon-pay`
+   - Note: Amazon Pay uses SNS for notifications
+
+#### Step 3.5: Set Environment Variables
+Add to `backend/.env`:
+```bash
+AMAZON_PAY_MERCHANT_ID=A1B2C3D4E5F6G7
+AMAZON_PAY_PUBLIC_KEY_ID=LIVE-XXXXXXXX
+AMAZON_PAY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----
+YOUR_PRIVATE_KEY_CONTENT_HERE
+-----END RSA PRIVATE KEY-----"
+AMAZON_PAY_REGION=na
+AMAZON_PAY_SANDBOX=true
+```
+
+**Note**: For the private key, you can either:
+- Paste the entire key as a single line with `\n` for newlines
+- Or set `AMAZON_PAY_PRIVATE_KEY_PATH=/path/to/key.pem` (requires code modification)
+
+#### Step 3.6: Test Amazon Pay Integration
+```bash
+# Restart backend
+npm run dev
+
+# Verify Amazon Pay is available
+curl http://localhost:4000/payments/providers
+# Should include "amazon_pay" in the list
+
+# Get button config for frontend
+curl http://localhost:4000/payments/amazon-pay/button-config
+```
+
+---
+
+## Complete Environment Variables
+
+Here's your complete `backend/.env` additions:
+
+```bash
+# ===================
+# PAYMENT CONFIGURATION
+# ===================
+
+# Test Mode (set to false when using real credentials)
+PAYMENT_TEST_MODE=false
+
+# Frontend URL (for payment redirects)
+FRONTEND_URL=http://localhost:3000
+
+# Store name (shown to customers)
+STORE_NAME=AECMS Store
+
+# ----- Stripe -----
 STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# PayPal (Required for PayPal payments)
+# ----- PayPal -----
 PAYPAL_CLIENT_ID=...
 PAYPAL_CLIENT_SECRET=...
-PAYPAL_MODE=sandbox  # or 'live'
+PAYPAL_MODE=sandbox
 
-# Optional - enables test mode without real keys
-PAYMENT_TEST_MODE=true
+# ----- Amazon Pay -----
+AMAZON_PAY_MERCHANT_ID=A...
+AMAZON_PAY_PUBLIC_KEY_ID=LIVE-...
+AMAZON_PAY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
+AMAZON_PAY_REGION=na
+AMAZON_PAY_SANDBOX=true
 ```
 
-## Files to Create
+---
 
+## Testing Checklist
+
+### Basic Verification
+- [ ] `PAYMENT_TEST_MODE=false` in `.env`
+- [ ] Backend restarts without errors
+- [ ] `GET /payments/providers` returns configured providers
+
+### Stripe Testing
+- [ ] Create order via `POST /orders`
+- [ ] Create payment intent via `POST /payments/create-intent`
+- [ ] Receive `client_secret` in response
+- [ ] (Frontend) Complete payment with test card `4242424242424242`
+- [ ] Verify webhook received at `/payments/webhooks/stripe`
+- [ ] Verify order status changed to `paid`
+
+### PayPal Testing
+- [ ] Create order via `POST /orders`
+- [ ] Create payment intent via `POST /payments/create-intent` with `provider: "paypal"`
+- [ ] Receive approval URL in response
+- [ ] (Frontend) Redirect user to PayPal approval URL
+- [ ] User approves payment in PayPal sandbox
+- [ ] Capture payment via `POST /payments/capture-paypal`
+- [ ] Verify order status changed to `paid`
+
+### Amazon Pay Testing
+- [ ] Create order via `POST /orders`
+- [ ] Create payment intent via `POST /payments/create-intent` with `provider: "amazon_pay"`
+- [ ] Receive checkout session ID in response
+- [ ] (Frontend) Initialize Amazon Pay button with session ID
+- [ ] User completes payment in Amazon Pay sandbox
+- [ ] Capture payment via `POST /payments/capture-amazon-pay`
+- [ ] Verify order status changed to `paid`
+
+### Refund Testing
+- [ ] Create and complete a payment
+- [ ] Process refund via `POST /payments/refund/:orderId`
+- [ ] Verify refund appears in provider dashboard
+- [ ] Verify order status changed to `refunded`
+
+---
+
+## Webhook Testing (Local Development)
+
+For local development, you need to expose your localhost to receive webhooks.
+
+### Option 1: Stripe CLI (Recommended for Stripe)
+```bash
+# Install Stripe CLI
+brew install stripe/stripe-cli/stripe  # macOS
+# or download from https://stripe.com/docs/stripe-cli
+
+# Login
+stripe login
+
+# Forward webhooks to local server
+stripe listen --forward-to localhost:4000/payments/webhooks/stripe
+
+# Copy the webhook signing secret it provides
 ```
-src/payments/
-├── payments.module.ts
-├── payments.controller.ts
-├── payments.service.ts
-├── providers/
-│   ├── payment-provider.interface.ts
-│   ├── stripe.provider.ts
-│   └── paypal.provider.ts
-├── dto/
-│   ├── create-payment-intent.dto.ts
-│   ├── capture-payment.dto.ts
-│   └── index.ts
-└── payments.service.spec.ts
+
+### Option 2: ngrok (Works for all providers)
+```bash
+# Install ngrok
+brew install ngrok  # macOS
+# or download from https://ngrok.com
+
+# Expose your backend
+ngrok http 4000
+
+# Use the https URL (e.g., https://abc123.ngrok.io) for webhooks
 ```
 
-## Checklist for User Return
+---
 
-When you return, you'll need to:
+## Troubleshooting
 
-1. **Set up Stripe** (~10 minutes)
-   - Create account / login
-   - Copy test API keys to environment
-   - Set up webhook endpoint
+### "Provider not available" error
+- Check environment variables are set correctly
+- Restart the backend after changing `.env`
+- Check backend logs for initialization errors
 
-2. **Set up PayPal** (~15 minutes)
-   - Create developer account / login
-   - Create sandbox app
-   - Copy credentials to environment
-   - Set up webhook
+### Webhooks not receiving
+- Verify webhook URL is publicly accessible
+- Check webhook secret matches
+- Look at provider's webhook logs for delivery attempts
 
-3. **Test the integration**
-   - Run E2E tests with real test keys
-   - Test checkout flow in browser
-   - Verify webhooks are received
+### Payment fails silently
+- Check backend console for errors
+- Verify order exists and is in `pending` status
+- Check provider dashboard for failed attempts
 
-4. **Review and approve**
-   - Check the implementation
-   - Approve for production use
+### Amazon Pay signature errors
+- Verify private key is correctly formatted
+- Check region matches your merchant account
+- Ensure sandbox mode matches account type
+
+---
+
+## Production Checklist
+
+Before going live:
+
+- [ ] Switch all providers from test/sandbox to live mode
+- [ ] Update environment variables with live API keys
+- [ ] Update webhook URLs to production domain
+- [ ] Test with small real payments
+- [ ] Enable HTTPS on all webhook endpoints
+- [ ] Set up monitoring for payment failures
+- [ ] Configure error alerting
+
+---
+
+## API Reference
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/payments/providers` | GET | None | List available providers |
+| `/payments/create-intent` | POST | Optional | Create payment for order |
+| `/payments/capture-paypal` | POST | Optional | Capture PayPal payment |
+| `/payments/capture-amazon-pay` | POST | Optional | Capture Amazon Pay payment |
+| `/payments/amazon-pay/button-config` | GET | None | Get Amazon Pay button config |
+| `/payments/refund/:orderId` | POST | JWT + `order.refund` | Process refund |
+| `/payments/webhooks/stripe` | POST | None | Stripe webhook |
+| `/payments/webhooks/paypal` | POST | None | PayPal webhook |
+| `/payments/webhooks/amazon-pay` | POST | None | Amazon Pay IPN |
+| `/payments/test/simulate/:orderId` | POST | JWT | Simulate payment (test mode) |
+
+---
+
+*Last updated: 2026-01-30*
