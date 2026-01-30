@@ -14,7 +14,7 @@ Before configuring real payment providers, verify the system works in test mode:
 PAYMENT_TEST_MODE=true
 
 # Start the backend
-cd backend && npm run dev
+cd backend && npm run start:dev
 
 # Test the endpoints
 curl http://localhost:4000/payments/providers
@@ -61,7 +61,7 @@ STRIPE_WEBHOOK_SECRET=whsec_your_secret_here
 #### Step 1.5: Test Stripe Integration
 ```bash
 # Restart backend
-npm run dev
+npm run start:dev
 
 # Verify Stripe is available
 curl http://localhost:4000/payments/providers
@@ -121,7 +121,7 @@ PAYPAL_MODE=sandbox
 #### Step 2.6: Test PayPal Integration
 ```bash
 # Restart backend
-npm run dev
+npm run start:dev
 
 # Verify PayPal is available
 curl http://localhost:4000/payments/providers
@@ -182,7 +182,7 @@ AMAZON_PAY_SANDBOX=true
 #### Step 3.6: Test Amazon Pay Integration
 ```bash
 # Restart backend
-npm run dev
+npm run start:dev
 
 # Verify Amazon Pay is available
 curl http://localhost:4000/payments/providers

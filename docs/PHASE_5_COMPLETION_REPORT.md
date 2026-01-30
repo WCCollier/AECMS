@@ -51,7 +51,7 @@ Phase 5 autonomous implementation has been completed successfully. The payments 
 PAYMENT_TEST_MODE=true
 
 # Start backend
-cd backend && npm run dev
+cd backend && npm run start:dev
 
 # Test
 curl http://localhost:4000/payments/providers
@@ -96,7 +96,7 @@ curl http://localhost:4000/payments/providers
 PAYMENT_TEST_MODE=false
 
 # Restart and verify
-npm run dev
+npm run start:dev
 curl http://localhost:4000/payments/providers
 # Should only show providers you configured
 ```
