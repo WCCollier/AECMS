@@ -15,6 +15,7 @@ import { PaymentsService } from './payments.service';
 import {
   CreatePaymentIntentDto,
   CapturePayPalPaymentDto,
+  CaptureAmazonPayPaymentDto,
   RefundPaymentDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -56,6 +57,22 @@ export class PaymentsController {
     return this.paymentsService.capturePayPalPayment(dto, user?.id);
   }
 
+  @Post('capture-amazon-pay')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Capture Amazon Pay payment after user approval' })
+  captureAmazonPayPayment(
+    @Body() dto: CaptureAmazonPayPaymentDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.paymentsService.captureAmazonPayPayment(dto, user?.id);
+  }
+
+  @Get('amazon-pay/button-config')
+  @ApiOperation({ summary: 'Get Amazon Pay button configuration for frontend' })
+  getAmazonPayButtonConfig() {
+    return this.paymentsService.getAmazonPayButtonConfig();
+  }
+
   @Post('refund/:orderId')
   @UseGuards(JwtAuthGuard, CapabilityGuard)
   @RequiresCapability('order.refund')
@@ -89,6 +106,20 @@ export class PaymentsController {
       throw new Error('Missing raw body');
     }
     return this.paymentsService.handlePayPalWebhook(payload, signature || '');
+  }
+
+  @Post('webhooks/amazon-pay')
+  @ApiOperation({ summary: 'Amazon Pay webhook (IPN) handler' })
+  async handleAmazonPayWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('x-amz-sns-message-type') messageType: string,
+  ) {
+    const payload = req.rawBody;
+    if (!payload) {
+      throw new Error('Missing raw body');
+    }
+    // Amazon Pay uses SNS for notifications, signature is embedded in the message
+    return this.paymentsService.handleAmazonPayWebhook(payload, messageType || '');
   }
 
   @Post('test/simulate/:orderId')

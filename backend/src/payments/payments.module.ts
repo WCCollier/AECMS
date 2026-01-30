@@ -6,11 +6,12 @@ import { OrdersModule } from '../orders/orders.module';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import { StripeProvider } from './providers/stripe.provider';
 import { PayPalProvider } from './providers/paypal.provider';
+import { AmazonPayProvider } from './providers/amazon-pay.provider';
 
 @Module({
   imports: [PrismaModule, OrdersModule, CapabilitiesModule],
   controllers: [PaymentsController],
-  providers: [PaymentsService, StripeProvider, PayPalProvider],
+  providers: [PaymentsService, StripeProvider, PayPalProvider, AmazonPayProvider],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

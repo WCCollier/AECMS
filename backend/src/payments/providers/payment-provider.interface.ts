@@ -48,7 +48,7 @@ export interface CreatePaymentParams {
 export interface WebhookEvent {
   type: string;
   data: any;
-  provider: 'stripe' | 'paypal';
+  provider: 'stripe' | 'paypal' | 'amazon_pay';
 }
 
 export interface PaymentProvider {
