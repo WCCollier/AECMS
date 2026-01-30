@@ -82,7 +82,7 @@
 
 ```bash
 # Backend development
-cd backend && npm run dev
+cd backend && npm run start:dev
 
 # Run tests
 npm run test          # Unit tests
