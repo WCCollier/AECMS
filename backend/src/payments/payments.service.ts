@@ -9,9 +9,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
 import { StripeProvider } from './providers/stripe.provider';
 import { PayPalProvider } from './providers/paypal.provider';
+import { AmazonPayProvider } from './providers/amazon-pay.provider';
 import {
   CreatePaymentIntentDto,
   CapturePayPalPaymentDto,
+  CaptureAmazonPayPaymentDto,
   RefundPaymentDto,
 } from './dto';
 import { PaymentProvider, WebhookEvent } from './providers/payment-provider.interface';
@@ -28,12 +30,14 @@ export class PaymentsService {
     private configService: ConfigService,
     private stripeProvider: StripeProvider,
     private paypalProvider: PayPalProvider,
+    private amazonPayProvider: AmazonPayProvider,
   ) {
     this.testMode = this.configService.get<string>('PAYMENT_TEST_MODE') === 'true';
 
     this.providers = new Map();
     this.providers.set('stripe', stripeProvider);
     this.providers.set('paypal', paypalProvider);
+    this.providers.set('amazon_pay', amazonPayProvider);
 
     this.logAvailableProviders();
   }
@@ -115,11 +119,24 @@ export class PaymentsService {
         },
       });
 
+      let clientSecret: string;
+      switch (dto.provider) {
+        case 'stripe':
+          clientSecret = `test_secret_${mockPaymentId}`;
+          break;
+        case 'paypal':
+          clientSecret = `https://sandbox.paypal.com/checkoutnow?token=${mockPaymentId}`;
+          break;
+        case 'amazon_pay':
+          clientSecret = mockPaymentId; // Checkout session ID
+          break;
+        default:
+          clientSecret = `test_secret_${mockPaymentId}`;
+      }
+
       return {
         payment_id: mockPaymentId,
-        client_secret: dto.provider === 'stripe'
-          ? `test_secret_${mockPaymentId}`
-          : `https://sandbox.paypal.com/checkoutnow?token=${mockPaymentId}`,
+        client_secret: clientSecret,
         provider: dto.provider,
         status: 'requires_action',
         test_mode: true,
@@ -211,6 +228,65 @@ export class PaymentsService {
   }
 
   /**
+   * Capture Amazon Pay payment after user approval
+   */
+  async captureAmazonPayPayment(dto: CaptureAmazonPayPaymentDto, userId?: string) {
+    // Get order
+    const order = await this.prisma.order.findUnique({
+      where: { id: dto.order_id },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Verify ownership
+    if (order.user_id && order.user_id !== userId) {
+      throw new BadRequestException('Access denied');
+    }
+
+    // Test mode
+    if (this.testMode) {
+      await this.ordersService.markAsPaid(order.id, dto.checkout_session_id);
+      return {
+        success: true,
+        order_id: order.id,
+        payment_id: dto.checkout_session_id,
+        test_mode: true,
+      };
+    }
+
+    const provider = this.providers.get('amazon_pay') as AmazonPayProvider;
+    if (!provider || !provider.isAvailable()) {
+      throw new BadRequestException('Amazon Pay is not available');
+    }
+
+    const capture = await provider.capturePayment(dto.checkout_session_id);
+
+    if (capture.status === 'succeeded') {
+      await this.ordersService.markAsPaid(order.id, capture.id);
+    }
+
+    return {
+      success: capture.status === 'succeeded',
+      order_id: order.id,
+      payment_id: capture.id,
+      status: capture.status,
+    };
+  }
+
+  /**
+   * Get Amazon Pay button configuration for frontend
+   */
+  getAmazonPayButtonConfig() {
+    const provider = this.providers.get('amazon_pay') as AmazonPayProvider;
+    if (!provider) {
+      return null;
+    }
+    return provider.getButtonConfig();
+  }
+
+  /**
    * Process refund
    */
   async refund(orderId: string, dto: RefundPaymentDto) {
@@ -298,6 +374,19 @@ export class PaymentsService {
   }
 
   /**
+   * Handle Amazon Pay webhook (IPN)
+   */
+  async handleAmazonPayWebhook(payload: string | Buffer, signature: string) {
+    const provider = this.providers.get('amazon_pay') as AmazonPayProvider;
+    if (!provider || !provider.isAvailable()) {
+      throw new BadRequestException('Amazon Pay is not configured');
+    }
+
+    const event = await provider.verifyWebhook(payload, signature);
+    return this.processWebhookEvent(event);
+  }
+
+  /**
    * Process webhook event
    */
   private async processWebhookEvent(event: WebhookEvent) {
@@ -320,6 +409,17 @@ export class PaymentsService {
         await this.handlePaymentFailed(event);
         break;
 
+      // Amazon Pay events
+      case 'CHARGE.COMPLETED':
+        await this.handlePaymentSucceeded(event);
+        break;
+      case 'CHARGE.DECLINED':
+        await this.handlePaymentFailed(event);
+        break;
+      case 'REFUND.COMPLETED':
+        this.logger.log('Amazon Pay refund completed');
+        break;
+
       default:
         this.logger.log(`Unhandled webhook event: ${event.type}`);
     }
@@ -337,6 +437,12 @@ export class PaymentsService {
     if (event.provider === 'stripe') {
       orderId = event.data.metadata?.order_id;
       paymentId = event.data.id;
+    } else if (event.provider === 'amazon_pay') {
+      // Amazon Pay - extract from merchant metadata
+      const customInfo = event.data.merchantMetadata?.customInformation;
+      const metadata = customInfo ? JSON.parse(customInfo) : {};
+      orderId = event.data.merchantMetadata?.merchantReferenceId || metadata.order_id;
+      paymentId = event.data.chargeId || event.data.id;
     } else {
       // PayPal
       orderId = event.data.custom_id || event.data.purchase_units?.[0]?.custom_id;
@@ -364,6 +470,10 @@ export class PaymentsService {
 
     if (event.provider === 'stripe') {
       orderId = event.data.metadata?.order_id;
+    } else if (event.provider === 'amazon_pay') {
+      const customInfo = event.data.merchantMetadata?.customInformation;
+      const metadata = customInfo ? JSON.parse(customInfo) : {};
+      orderId = event.data.merchantMetadata?.merchantReferenceId || metadata.order_id;
     } else {
       orderId = event.data.custom_id || event.data.purchase_units?.[0]?.custom_id;
     }
