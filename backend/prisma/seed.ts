@@ -120,9 +120,19 @@ async function main() {
 
     // Comments & Reviews
     {
+      name: 'comment.view.all',
+      category: 'content',
+      description: 'View all comments',
+    },
+    {
       name: 'comment.moderate',
       category: 'content',
       description: 'Moderate comments',
+    },
+    {
+      name: 'comment.delete',
+      category: 'content',
+      description: 'Delete any comment',
     },
     {
       name: 'review.moderate',
@@ -246,7 +256,9 @@ async function main() {
     'order.view.all',
     'order.edit',
     'user.edit',
+    'comment.view.all',
     'comment.moderate',
+    'comment.delete',
     'review.moderate',
   ];
 
