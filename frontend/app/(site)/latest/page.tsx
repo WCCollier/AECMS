@@ -28,8 +28,8 @@ export default function BlogPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-bold">Blog</h1>
-          <p className="text-foreground/60 mt-1">Latest articles and updates</p>
+          <h1 className="text-3xl font-bold">Latest</h1>
+          <p className="text-foreground/60 mt-1">Articles and updates</p>
         </div>
 
         {/* Search */}

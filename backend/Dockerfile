@@ -9,6 +9,10 @@ FROM node:20-alpine AS development
 
 WORKDIR /app
 
+# Install system dependencies for native modules (sharp, etc.)
+RUN apk add --no-cache python3 make g++ vips-dev \
+    && npm install -g node-gyp
+
 # Install dependencies first (better layer caching)
 COPY package*.json ./
 RUN npm ci
@@ -31,6 +35,10 @@ CMD ["npm", "run", "start:dev"]
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+# Install system dependencies for native modules (sharp, etc.)
+RUN apk add --no-cache python3 make g++ vips-dev \
+    && npm install -g node-gyp
 
 # Install dependencies
 COPY package*.json ./

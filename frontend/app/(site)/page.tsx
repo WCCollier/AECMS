@@ -17,8 +17,8 @@ export default function HomePage() {
             <Link href="/shop">
               <Button size="lg">Browse Shop</Button>
             </Link>
-            <Link href="/blog">
-              <Button variant="outline" size="lg">Read Blog</Button>
+            <Link href="/latest">
+              <Button variant="outline" size="lg">Read Latest</Button>
             </Link>
           </div>
         </div>
