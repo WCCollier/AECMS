@@ -17,7 +17,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
   };
 
   return (
-    <Link href={`/blog/${article.slug}`} className="group">
+    <Link href={`/latest/${article.slug}`} className="group">
       <article className="bg-background border border-foreground/10 rounded-lg overflow-hidden hover:border-foreground/20 transition-colors">
         {/* Image */}
         <div className="aspect-video relative bg-foreground/5">

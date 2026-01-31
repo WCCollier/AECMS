@@ -40,9 +40,9 @@ export default function ArticlePage() {
   if (isError || !article) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Link href="/blog" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
+        <Link href="/latest" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
           <ArrowLeft className="w-4 h-4" />
-          Back to Blog
+          Back to Latest
         </Link>
         <div className="text-center py-12">
           <p className="text-foreground/60">Article not found.</p>
@@ -54,9 +54,9 @@ export default function ArticlePage() {
   return (
     <article className="container mx-auto px-4 py-8 max-w-3xl">
       {/* Back Link */}
-      <Link href="/blog" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
+      <Link href="/latest" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
         <ArrowLeft className="w-4 h-4" />
-        Back to Blog
+        Back to Latest
       </Link>
 
       {/* Featured Image */}
@@ -82,7 +82,7 @@ export default function ArticlePage() {
           {article.categories.map((cat) => (
             <Link
               key={cat.id}
-              href={`/blog?category=${cat.slug}`}
+              href={`/latest?category=${cat.slug}`}
               className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-foreground/10 transition-colors"
             >
               {cat.name}

@@ -42,8 +42,8 @@ export function Footer() {
             <h4 className="font-semibold mb-4">Content</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link href="/blog" className="text-foreground/60 hover:text-foreground transition-colors">
-                  Blog
+                <Link href="/latest" className="text-foreground/60 hover:text-foreground transition-colors">
+                  Latest
                 </Link>
               </li>
               <li>

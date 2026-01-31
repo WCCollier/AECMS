@@ -28,8 +28,8 @@ export function Header() {
             <Link href="/shop" className="text-foreground/70 hover:text-foreground transition-colors">
               Shop
             </Link>
-            <Link href="/blog" className="text-foreground/70 hover:text-foreground transition-colors">
-              Blog
+            <Link href="/latest" className="text-foreground/70 hover:text-foreground transition-colors">
+              Latest
             </Link>
             {isAdmin && (
               <Link href="/admin" className="text-foreground/70 hover:text-foreground transition-colors">
@@ -91,11 +91,11 @@ export function Header() {
                 Shop
               </Link>
               <Link
-                href="/blog"
+                href="/latest"
                 className="text-foreground/70 hover:text-foreground transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Blog
+                Latest
               </Link>
               <Link
                 href="/cart"
