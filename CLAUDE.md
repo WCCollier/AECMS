@@ -23,10 +23,11 @@
 **Phase 4**: ✅ COMPLETE - Ecommerce Core (Products, Cart, Orders)
 **Phase 5**: ✅ COMPLETE - Payments Module (Stripe, PayPal) - Configured
 **Phase 6**: ✅ COMPLETE - Frontend (Next.js 16, React 19, Tailwind v4)
-**Phase 7**: 🔄 NEXT - Polish & Production (build fixes, CRUD forms, optimization)
+**Phase 6B**: ✅ COMPLETE - Comments & AI Moderation (OpenAI + profanity filter)
+**Phase 7**: 🔄 NEXT - Digital Products (eBooks, Send to Kindle)
 
-**Test Status**: 72 frontend + 42 backend unit tests, 16 E2E tests (all passing)
-**API Endpoints**: 61 total
+**Test Status**: 72 frontend + 75 backend unit tests, 16 E2E tests (all passing)
+**API Endpoints**: 72 total (11 new from Comments)
 
 ## API Endpoint Summary
 
@@ -43,6 +44,7 @@
 | Cart | 6 |
 | Orders | 7 |
 | Payments | 10 |
+| Comments | 11 |
 
 ## Key Architecture Decisions
 
@@ -121,6 +123,7 @@ Check usage with: `docker system df`
 - `docs/PHASE_5_COMPLETION_REPORT.md` - Payments integration details
 - `docs/PHASE_5_PLAN.md` - Payments human configuration requirements
 - `docs/PHASE_6_COMPLETION_REPORT.md` - Frontend implementation details
+- `docs/PHASE_6B_COMPLETION_REPORT.md` - Comments & AI moderation details
 - `docs/prd/` - 12 PRD documents with full specifications
 
 ## Notes for Claude
