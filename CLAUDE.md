@@ -10,7 +10,7 @@
 
 - **Backend**: NestJS + PostgreSQL 15 + Prisma + Redis + TypeScript
 - **Frontend**: Next.js 14+ + Tailwind CSS + Radix UI + TipTap
-- **Payments**: Stripe (primary), PayPal, Amazon Pay
+- **Payments**: Stripe (primary - cards, Apple Pay, Google Pay, Amazon Pay via Checkout), PayPal (secondary)
 - **Auth**: JWT + OAuth (Google, Apple) + 2FA for admin
 - **Deployment**: Docker Compose (portable)
 
@@ -96,7 +96,19 @@ npx prisma generate
 # Docker
 docker-compose up -d
 docker-compose logs -f
+
+# Docker cache maintenance (run regularly to preserve storage)
+docker system prune -af --volumes  # Remove all unused data
+docker builder prune -af           # Clear build cache
 ```
+
+## Storage Management
+
+**IMPORTANT**: Regularly trim Docker cache to preserve storage space. Run before/after major work:
+```bash
+docker system prune -af --volumes && docker builder prune -af
+```
+Check usage with: `docker system df`
 
 ## Phase Documentation
 
@@ -120,21 +132,27 @@ docker-compose logs -f
 - Commit incrementally with descriptive messages
 - **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
 
-## Phase 5: Payments Integration (AUTONOMOUS COMPLETE)
+## Phase 5: Payments Integration (✅ CONFIGURED)
+
+**Architecture** (simplified):
+- **Stripe (Primary)**: Cards, Apple Pay, Google Pay, Amazon Pay - all via Stripe Checkout
+- **PayPal (Secondary)**: Alternative payment method for customers who prefer PayPal
 
 **Implemented**:
 - ✅ PaymentsModule with provider abstraction pattern
 - ✅ StripeProvider - Payment Intents API, webhooks
 - ✅ PayPalProvider - Orders API v2, OAuth2 tokens
-- ✅ AmazonPayProvider - Checkout v2 API, IPN webhooks
 - ✅ Test mode for development without API keys
 - ✅ OptionalJwtAuthGuard for guest checkout
 
-**Human Configuration Required** (see `docs/PHASE_5_COMPLETION_REPORT.md`):
-1. **Stripe**: Get API keys, configure webhooks, set STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
-2. **PayPal**: Create app, configure webhooks, set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET
-3. **Amazon Pay**: Create merchant account, get credentials, set AMAZON_PAY_* environment variables
-4. **Test**: Use test mode first (PAYMENT_TEST_MODE=true), then test with real sandbox credentials
+**Configuration Status**:
+- ✅ Stripe sandbox keys configured (via Codespaces Secrets)
+- ✅ PayPal sandbox keys configured (via Codespaces Secrets)
+- ⏸️ AmazonPayProvider deprecated (Amazon Pay handled via Stripe Checkout)
+
+**Secrets Management**:
+- Development/Sandbox keys → Codespaces Secrets (current)
+- Production keys → Production environment only (NOT in Codespaces)
 
 ## Phase 6: Frontend (Next)
 

@@ -2,22 +2,32 @@
 
 **Project**: AECMS - Advanced Ecommerce Content Management System
 **Phase**: Phase 5 - Payments Integration
-**Status**: ✅ AUTONOMOUS WORK COMPLETE - Pending Human Configuration
-**Completed**: 2026-01-29
-**Duration**: ~1 hour (autonomous execution)
+**Status**: ✅ COMPLETE - Configured and Working
+**Completed**: 2026-01-31
+**Duration**: ~1 hour (autonomous execution) + configuration
 
 ---
 
 ## Executive Summary
 
-Phase 5 autonomous implementation has been completed successfully. The payments module with Stripe, PayPal, and Amazon Pay integration is fully built and ready for testing once API credentials are configured.
+Phase 5 is complete. The payments module is configured and working with:
 
+- **Stripe (Primary)** - Cards, Apple Pay, Google Pay, Amazon Pay via Stripe Checkout
+- **PayPal (Secondary)** - Alternative payment method
+
+### Architecture Decision (2026-01-31)
+Amazon Pay, Google Pay, and Apple Pay are now handled through **Stripe Checkout** rather than separate integrations. This simplifies:
+- Code maintenance (single integration point)
+- PCI compliance (Stripe handles all card data)
+- Payment method updates (enable/disable in Stripe Dashboard)
+
+### Implementation Summary
 - ✅ PaymentsModule - Payment processing abstraction layer
 - ✅ StripeProvider - Full Payment Intents API integration
 - ✅ PayPalProvider - Full Orders API v2 integration
-- ✅ AmazonPayProvider - Full Checkout v2 API integration
+- ⏸️ AmazonPayProvider - Deprecated (Amazon Pay via Stripe instead)
 - ✅ Test Mode - Development without real API keys
-- ✅ Webhook Handlers - Payment confirmation processing for all providers
+- ✅ Webhook Handlers - Payment confirmation processing
 
 **Testing Results**:
 - Unit tests: 42/42 passing (100%)
@@ -27,79 +37,42 @@ Phase 5 autonomous implementation has been completed successfully. The payments 
 
 **Total API Endpoints**: 61 (10 new in Phase 5)
 
-**Human Action Required**: Configure Stripe, PayPal, and Amazon Pay API credentials in environment
+**Configuration**: Sandbox credentials configured via GitHub Codespaces Secrets
 
 ---
 
-## 🎯 YOUR NEXT STEPS (Start Here)
+## 🎯 Configuration Status
 
-**Detailed instructions**: See [PHASE_5_PLAN.md](./PHASE_5_PLAN.md)
+**All sandbox credentials are configured via GitHub Codespaces Secrets.**
 
-### Quick Overview (~45-60 minutes total)
+### Verified Working
 
-| Task | Provider | Time | Priority |
-|------|----------|------|----------|
-| 1 | Stripe | ~10 min | Primary - Do first |
-| 2 | PayPal | ~15 min | Secondary |
-| 3 | Amazon Pay | ~20 min | Tertiary |
-
-### Immediate Actions
-
-**Step 1: Verify Test Mode Works**
 ```bash
-# Add to backend/.env
-PAYMENT_TEST_MODE=true
+# Backend logs confirm:
+[StripeProvider] Stripe provider initialized
+[PayPalProvider] PayPal provider initialized (sandbox mode)
 
-# Start backend
-cd backend && npm run start:dev
-
-# Test
+# API returns:
 curl http://localhost:4000/payments/providers
-# Expected: {"providers":["stripe","paypal","amazon_pay"]}
+# {"providers":["stripe","paypal"]}
 ```
 
-**Step 2: Configure Stripe (Primary)**
-1. Go to https://dashboard.stripe.com → Developers → API Keys
-2. Copy `sk_test_...` (Secret Key)
-3. Set up webhook at Developers → Webhooks
-4. Add to `backend/.env`:
-   ```
-   STRIPE_SECRET_KEY=sk_test_...
-   STRIPE_WEBHOOK_SECRET=whsec_...
-   ```
+### Secrets Management
 
-**Step 3: Configure PayPal (Secondary)**
-1. Go to https://developer.paypal.com → My Apps & Credentials
-2. Create app, copy Client ID and Secret
-3. Add to `backend/.env`:
-   ```
-   PAYPAL_CLIENT_ID=...
-   PAYPAL_CLIENT_SECRET=...
-   PAYPAL_MODE=sandbox
-   ```
+| Environment | Where to Store | What to Store |
+|-------------|----------------|---------------|
+| Development (Codespaces) | Codespaces Secrets | Sandbox/test keys |
+| Production | Production env vars | Live keys only |
 
-**Step 4: Configure Amazon Pay (Tertiary)**
-1. Go to https://pay.amazon.com/merchant → Seller Central
-2. Generate API credentials, download private key
-3. Add to `backend/.env`:
-   ```
-   AMAZON_PAY_MERCHANT_ID=A...
-   AMAZON_PAY_PUBLIC_KEY_ID=LIVE-...
-   AMAZON_PAY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-   AMAZON_PAY_REGION=na
-   AMAZON_PAY_SANDBOX=true
-   ```
+**Important**: Production keys should NEVER be in Codespaces.
 
-**Step 5: Disable Test Mode & Verify**
-```bash
-# Update backend/.env
-PAYMENT_TEST_MODE=false
+### Enabling Additional Payment Methods
 
-# Restart and verify
-npm run start:dev
-curl http://localhost:4000/payments/providers
-# Should only show providers you configured
-```
+Apple Pay, Google Pay, and Amazon Pay are enabled in **Stripe Dashboard**:
+1. Go to **Settings** → **Payment methods**
+2. Enable the methods you want
+3. For Apple Pay: Verify your domain
+4. No code changes needed - Stripe Checkout handles the UI
 
 ---
 
@@ -182,46 +155,19 @@ PAYPAL_MODE=sandbox  # or 'live' for production
 - `GET /v2/checkout/orders/{id}` - Get order status
 - `POST /v2/payments/captures/{id}/refund` - Refund payment
 
-### 5.3.1 Amazon Pay Provider (✅ Complete)
+### 5.3.1 Amazon Pay Provider (⏸️ Deprecated)
 
 **File**: `src/payments/providers/amazon-pay.provider.ts`
 
-**Features**:
-- Checkout v2 API integration
-- Multi-region support (NA, EU, FE)
-- Sandbox/Live mode based on environment
-- Checkout session creation
-- Payment capture and refund support
-- SNS webhook (IPN) handling
-- Button configuration for frontend
+**Status**: This provider is deprecated as of 2026-01-31. Amazon Pay is now handled through **Stripe Checkout** instead of a separate integration.
 
-**Environment Variables Required**:
-```bash
-AMAZON_PAY_MERCHANT_ID=...
-AMAZON_PAY_PUBLIC_KEY_ID=...
-AMAZON_PAY_PRIVATE_KEY=...  # PEM format
-AMAZON_PAY_REGION=na        # na, eu, or fe
-AMAZON_PAY_SANDBOX=true     # or 'false' for production
-```
+**Why deprecated**:
+- Simpler architecture (single Stripe integration)
+- Stripe handles PCI compliance for all payment methods
+- Enable/disable payment methods in Stripe Dashboard without code changes
+- Apple Pay, Google Pay, Amazon Pay all work through Stripe Payment Elements
 
-**Amazon Pay API Endpoints Used**:
-- `POST /v2/checkoutSessions` - Create checkout session
-- `POST /v2/checkoutSessions/{id}/complete` - Complete checkout
-- `POST /v2/charges` - Create and capture charge
-- `GET /v2/charges/{id}` - Get charge status
-- `POST /v2/refunds` - Process refund
-
-**Amazon Pay Status Mapping**:
-| Amazon Pay Status | AECMS Status |
-|-------------------|--------------|
-| Open | requires_action |
-| Authorized | requires_confirmation |
-| AuthorizationInitiated | processing |
-| Captured | succeeded |
-| CaptureInitiated | processing |
-| Completed | succeeded |
-| Declined | failed |
-| Canceled | cancelled |
+**Migration**: No action needed. Enable Amazon Pay in your Stripe Dashboard under Settings → Payment methods.
 
 ### 5.5 Payments Service (✅ Complete)
 
@@ -437,74 +383,41 @@ Client                     Backend                    PayPal
 
 ---
 
-## Human Configuration Required
+## Configuration (Complete)
 
-### Stripe Setup
+### Current Setup
 
-1. **Create Stripe Account**: https://dashboard.stripe.com/register
+All sandbox credentials are configured via **GitHub Codespaces Secrets**:
 
-2. **Get API Keys** (Dashboard → Developers → API Keys):
-   - Secret key: `sk_test_...` (test) or `sk_live_...` (production)
+| Provider | Status | Credentials Source |
+|----------|--------|-------------------|
+| Stripe | ✅ Working | Codespaces Secrets |
+| PayPal | ✅ Working | Codespaces Secrets |
+| Amazon Pay | ⏸️ Via Stripe | Enable in Stripe Dashboard |
 
-3. **Configure Webhook** (Dashboard → Developers → Webhooks):
-   - Endpoint URL: `https://your-domain.com/payments/webhooks/stripe`
-   - Events to listen for:
-     - `payment_intent.succeeded`
-     - `payment_intent.payment_failed`
-   - Copy webhook signing secret: `whsec_...`
+### Production Setup (Future)
 
-4. **Set Environment Variables**:
-   ```bash
-   STRIPE_SECRET_KEY=sk_test_...
-   STRIPE_WEBHOOK_SECRET=whsec_...
-   ```
+For production deployment, configure these environment variables in your production environment (NOT in Codespaces):
 
-### PayPal Setup
+**Stripe**:
+```bash
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...  # From production webhook
+```
 
-1. **Create PayPal Developer Account**: https://developer.paypal.com/
+**PayPal**:
+```bash
+PAYPAL_CLIENT_ID=...  # Live credentials
+PAYPAL_CLIENT_SECRET=...
+PAYPAL_MODE=live
+```
 
-2. **Create App** (My Apps & Credentials → Create App):
-   - Select "Merchant" type
-   - Copy Client ID and Secret
+### Additional Payment Methods
 
-3. **Configure Webhook** (Webhooks → Add Webhook):
-   - Endpoint URL: `https://your-domain.com/payments/webhooks/paypal`
-   - Events to subscribe:
-     - `PAYMENT.CAPTURE.COMPLETED`
-     - `PAYMENT.CAPTURE.DENIED`
-
-4. **Set Environment Variables**:
-   ```bash
-   PAYPAL_CLIENT_ID=...
-   PAYPAL_CLIENT_SECRET=...
-   PAYPAL_MODE=sandbox  # or 'live'
-   ```
-
-### Amazon Pay Setup
-
-1. **Create Amazon Pay Merchant Account**: https://pay.amazon.com/merchant
-
-2. **Register in Seller Central** (Seller Central → Integration → MWS Access):
-   - Create new API credentials
-   - Download your private key (PEM format)
-   - Note your Merchant ID and Public Key ID
-
-3. **Configure IPN (Instant Payment Notification)**:
-   - Endpoint URL: `https://your-domain.com/payments/webhooks/amazon-pay`
-   - Amazon Pay uses SNS for notifications
-
-4. **Set Environment Variables**:
-   ```bash
-   AMAZON_PAY_MERCHANT_ID=A3...
-   AMAZON_PAY_PUBLIC_KEY_ID=LIVE-...
-   AMAZON_PAY_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----"
-   AMAZON_PAY_REGION=na       # na (North America), eu (Europe), fe (Far East)
-   AMAZON_PAY_SANDBOX=true    # or 'false' for production
-   ```
-
-5. **Frontend Integration**:
-   - Include Amazon Pay SDK: `https://static-na.payments-amazon.com/checkout.js`
-   - Use button config from `/payments/amazon-pay/button-config` endpoint
+Enable Apple Pay, Google Pay, and Amazon Pay in **Stripe Dashboard**:
+1. Settings → Payment methods
+2. Toggle on the methods you want
+3. For Apple Pay: Complete domain verification
 
 ### NestJS Raw Body Configuration
 
@@ -649,40 +562,34 @@ Simulate payment completion (test mode only).
 
 ## Testing Checklist
 
-### Without API Credentials (Test Mode)
+### Test Mode (Development without credentials)
 
 1. ✅ Set `PAYMENT_TEST_MODE=true`
-2. ✅ GET /payments/providers returns all three providers
+2. ✅ GET /payments/providers returns providers
 3. ✅ POST /payments/create-intent returns mock response
 4. ✅ POST /payments/test/simulate marks order as paid
 
-### With Stripe Credentials
+### Stripe (Configured ✅)
 
-1. ⏳ Configure STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET
-2. ⏳ Create test order
-3. ⏳ Create payment intent
-4. ⏳ Use Stripe.js on frontend to complete payment
-5. ⏳ Verify webhook receives payment confirmation
-6. ⏳ Verify order status updates to 'paid'
+1. ✅ STRIPE_SECRET_KEY configured in Codespaces Secrets
+2. ✅ STRIPE_WEBHOOK_SECRET configured in Codespaces Secrets
+3. ✅ Backend initializes Stripe provider successfully
+4. ⏳ Create test order (requires frontend)
+5. ⏳ Create payment intent
+6. ⏳ Complete payment with test card `4242424242424242`
+7. ⏳ Verify webhook receives confirmation
+8. ⏳ Verify order status updates to 'paid'
 
-### With PayPal Credentials
+### PayPal (Configured ✅)
 
-1. ⏳ Configure PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET
-2. ⏳ Create test order
-3. ⏳ Create payment intent (get approval URL)
-4. ⏳ Complete payment in PayPal sandbox
-5. ⏳ Capture payment via API
-6. ⏳ Verify order status updates to 'paid'
-
-### With Amazon Pay Credentials
-
-1. ⏳ Configure AMAZON_PAY_MERCHANT_ID, PUBLIC_KEY_ID, and PRIVATE_KEY
-2. ⏳ Create test order
-3. ⏳ Create checkout session (get session ID)
-4. ⏳ Complete payment in Amazon Pay sandbox
-5. ⏳ Capture payment via API
-6. ⏳ Verify IPN receives payment confirmation
-7. ⏳ Verify order status updates to 'paid'
+1. ✅ PAYPAL_CLIENT_ID configured in Codespaces Secrets
+2. ✅ PAYPAL_CLIENT_SECRET configured in Codespaces Secrets
+3. ✅ Backend initializes PayPal provider successfully
+4. ⏳ Create test order (requires frontend)
+5. ⏳ Create payment intent (get approval URL)
+6. ⏳ Complete payment in PayPal sandbox
+7. ⏳ Capture payment via API
+8. ⏳ Verify order status updates to 'paid'
 
 ---
 
@@ -721,39 +628,37 @@ Simulate payment completion (test mode only).
 
 ---
 
-## Next Steps (Human Required)
+## Next Steps
 
-1. **Configure Stripe**:
-   - Create account and get API keys
-   - Configure webhook endpoint
-   - Set environment variables
+### Phase 6: Frontend
 
-2. **Configure PayPal**:
-   - Create developer account and app
-   - Configure webhook endpoint
-   - Set environment variables
+1. **Next.js App Router Setup**
+   - Initialize Next.js 14+ with App Router
+   - Configure Tailwind CSS and Radix UI
 
-3. **Configure Amazon Pay**:
-   - Create merchant account
-   - Download private key from Seller Central
-   - Configure IPN endpoint
-   - Set environment variables
+2. **Checkout UI**:
+   - Integrate Stripe Elements for card payments
+   - Add PayPal button as alternative
+   - Implement checkout flow with order creation
 
-4. **Frontend Integration**:
-   - Integrate Stripe.js for card payments
-   - Integrate PayPal SDK for PayPal payments
-   - Integrate Amazon Pay SDK for Amazon Pay
-   - Implement checkout UI with all three options
-
-5. **Test End-to-End**:
-   - Complete test purchases with all three providers
-   - Verify webhook/IPN handling
+3. **Test End-to-End**:
+   - Complete test purchases with Stripe
+   - Complete test purchases with PayPal
+   - Verify webhook handling updates order status
    - Test refund flow
 
-6. **Production Deployment**:
-   - Switch to live API keys for all providers
-   - Configure production webhook/IPN URLs
-   - Test with real payments (small amounts)
+### Production (Future)
+
+1. **Switch to Live Keys**:
+   - Configure production environment with live Stripe keys
+   - Configure production environment with live PayPal keys
+   - Configure production webhook URLs
+
+2. **Enable Additional Payment Methods**:
+   - Enable Apple Pay in Stripe Dashboard
+   - Enable Google Pay in Stripe Dashboard
+   - Enable Amazon Pay in Stripe Dashboard
+   - Verify domain for Apple Pay
 
 ---
 
@@ -770,9 +675,14 @@ Simulate payment completion (test mode only).
 | Build Errors | 0 |
 | Commits | 5 |
 
-**Phase Status**: ✅ Autonomous work complete - Ready for human configuration and testing
+**Architecture**: Stripe (primary) + PayPal (secondary)
+- Apple Pay, Google Pay, Amazon Pay → via Stripe Checkout
+- No separate Amazon Pay integration needed
+
+**Phase Status**: ✅ Complete - Sandbox credentials configured, ready for frontend integration
 
 ---
 
 *Report generated: 2026-01-29*
+*Updated: 2026-01-31 - Architecture simplified, Amazon Pay via Stripe*
 *Generated by: Claude Opus 4.5*
