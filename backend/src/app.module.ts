@@ -17,6 +17,9 @@ import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CommentsModule } from './comments/comments.module';
+import { StorageModule } from './storage/storage.module';
+import { EmailModule } from './email/email.module';
+import { DigitalProductsModule } from './digital-products/digital-products.module';
 
 @Module({
   imports: [
@@ -39,6 +42,9 @@ import { CommentsModule } from './comments/comments.module';
     OrdersModule,
     PaymentsModule,
     CommentsModule,
+    StorageModule,
+    EmailModule,
+    DigitalProductsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

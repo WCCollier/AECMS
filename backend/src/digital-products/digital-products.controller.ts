@@ -1,0 +1,182 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Param,
+  Body,
+  Query,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  Res,
+  ParseUUIDPipe,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { DigitalProductsService } from './digital-products.service';
+import {
+  CreateDigitalFileDto,
+  UpdateDigitalFileDto,
+  PersonalizationOptionsDto,
+} from './dto/digital-product.dto';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+
+@Controller('digital-products')
+export class DigitalProductsController {
+  constructor(private readonly digitalProductsService: DigitalProductsService) {}
+
+  /**
+   * Upload a digital file for a product (Admin only)
+   */
+  @Post('files')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @Body() dto: CreateDigitalFileDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      return { error: 'No file uploaded' };
+    }
+
+    return this.digitalProductsService.uploadDigitalFile(
+      dto,
+      file.buffer,
+      file.originalname,
+    );
+  }
+
+  /**
+   * Get all digital files for a product
+   */
+  @Get('products/:productId/files')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  async getProductFiles(@Param('productId', ParseUUIDPipe) productId: string) {
+    return this.digitalProductsService.getProductFiles(productId);
+  }
+
+  /**
+   * Get a specific digital file
+   */
+  @Get('files/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  async getDigitalFile(@Param('id', ParseUUIDPipe) id: string) {
+    return this.digitalProductsService.getDigitalFile(id);
+  }
+
+  /**
+   * Update digital file settings
+   */
+  @Put('files/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  async updateDigitalFile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateDigitalFileDto,
+  ) {
+    return this.digitalProductsService.updateDigitalFile(id, dto);
+  }
+
+  /**
+   * Delete a digital file
+   */
+  @Delete('files/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  async deleteDigitalFile(@Param('id', ParseUUIDPipe) id: string) {
+    await this.digitalProductsService.deleteDigitalFile(id);
+    return { message: 'Digital file deleted successfully' };
+  }
+
+  /**
+   * Create download tokens for an order (Admin or system use)
+   */
+  @Post('orders/:orderId/downloads')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  async createOrderDownloads(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @Query('expiryDays') expiryDays?: string,
+  ) {
+    const days = expiryDays ? parseInt(expiryDays, 10) : 30;
+    return this.digitalProductsService.createDownloadTokensForOrder(orderId, days);
+  }
+
+  /**
+   * Get download tokens for an order
+   */
+  @Get('orders/:orderId/downloads')
+  @UseGuards(JwtAuthGuard)
+  async getOrderDownloads(
+    @Param('orderId', ParseUUIDPipe) orderId: string,
+    @CurrentUser() user: any,
+  ) {
+    // TODO: Verify user owns this order or is admin
+    return this.digitalProductsService.getOrderDownloads(orderId);
+  }
+
+  /**
+   * Get current user's downloads
+   */
+  @Get('my-downloads')
+  @UseGuards(JwtAuthGuard)
+  async getMyDownloads(@CurrentUser() user: any) {
+    return this.digitalProductsService.getUserDownloads(user.id);
+  }
+
+  /**
+   * Validate a download token (public endpoint)
+   */
+  @Get('validate/:token')
+  async validateToken(@Param('token') token: string) {
+    return this.digitalProductsService.validateToken(token);
+  }
+
+  /**
+   * Download a file using token (public endpoint)
+   */
+  @Get('download/:token')
+  async downloadFile(
+    @Param('token') token: string,
+    @Query('customerName') customerName: string | undefined,
+    @Res() res: Response,
+  ) {
+    const personalizationOptions: PersonalizationOptionsDto = {};
+    if (customerName) {
+      personalizationOptions.customerName = customerName;
+    }
+
+    const { buffer, filename, contentType } =
+      await this.digitalProductsService.downloadFile(token, personalizationOptions);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(filename)}"`,
+    );
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  }
+
+  /**
+   * Regenerate a download token (Admin only)
+   */
+  @Post('downloads/:id/regenerate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'owner')
+  async regenerateToken(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('expiryDays') expiryDays?: string,
+  ) {
+    const days = expiryDays ? parseInt(expiryDays, 10) : 30;
+    return this.digitalProductsService.regenerateToken(id, days);
+  }
+}

@@ -76,7 +76,7 @@ api.interceptors.response.use(
           }
           return api(originalRequest);
         }
-      } catch (refreshError) {
+      } catch (_refreshError) {
         // Refresh failed - clear tokens and redirect to login
         setAccessToken(null);
         if (typeof window !== 'undefined') {

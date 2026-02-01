@@ -1,0 +1,33 @@
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
+import type { Media, PaginatedResponse } from '@/types';
+
+interface UseMediaOptions {
+  page?: number;
+  limit?: number;
+  search?: string;
+}
+
+export function useMedia(options: UseMediaOptions = {}) {
+  const { page = 1, limit = 20, search } = options;
+
+  const params = new URLSearchParams();
+  params.set('page', page.toString());
+  params.set('limit', limit.toString());
+  if (search) params.set('search', search);
+
+  const { data, error, isLoading, mutate } = useSWR<PaginatedResponse<Media>>(
+    `/media?${params.toString()}`,
+    fetcher
+  );
+
+  return {
+    media: data?.data ?? [],
+    total: data?.total ?? 0,
+    totalPages: data?.total_pages ?? 0,
+    isLoading,
+    isError: !!error,
+    error,
+    mutate,
+  };
+}
