@@ -2,15 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { CommentStatus, ModerationStatus } from '@prisma/client';
 
-// Mock the modules that have ESM issues
-jest.mock('bad-words', () => {
-  return jest.fn().mockImplementation(() => ({
-    isProfane: jest.fn(() => false),
-    clean: jest.fn((text: string) => text),
-    addWords: jest.fn(),
-  }));
-});
-
+// Mock the openai module which has ESM issues
 jest.mock('openai', () => {
   return jest.fn().mockImplementation(() => ({
     moderations: { create: jest.fn() },

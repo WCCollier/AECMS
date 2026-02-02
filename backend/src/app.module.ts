@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import configuration from './config/configuration';
@@ -20,6 +22,7 @@ import { CommentsModule } from './comments/comments.module';
 import { StorageModule } from './storage/storage.module';
 import { EmailModule } from './email/email.module';
 import { DigitalProductsModule } from './digital-products/digital-products.module';
+import { DomainAliasesModule } from './domain-aliases/domain-aliases.module';
 
 @Module({
   imports: [
@@ -28,6 +31,27 @@ import { DigitalProductsModule } from './digital-products/digital-products.modul
       load: [configuration],
       validate,
       envFilePath: '.env',
+    }),
+    // Serve WordPress uploads directory for migrated content
+    ServeStaticModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => [
+        {
+          // Serve files from the uploads directory
+          // In Docker: /app/uploads, in local dev: ../uploads relative to backend
+          rootPath: configService.get<string>(
+            'UPLOADS_PATH',
+            path.join(process.cwd(), 'uploads'),
+          ),
+          // Files will be accessible at /uploads/...
+          serveRoot: '/uploads',
+          // Don't serve index.html for directories
+          serveStaticOptions: {
+            index: false,
+          },
+        },
+      ],
+      inject: [ConfigService],
     }),
     PrismaModule,
     AuthModule,
@@ -45,6 +69,7 @@ import { DigitalProductsModule } from './digital-products/digital-products.modul
     StorageModule,
     EmailModule,
     DigitalProductsModule,
+    DomainAliasesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,8 +1,47 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Filter = require('bad-words');
+
+// Simple profanity filter implementation to avoid bad-words ESM issues
+// These are root words - we'll also match variants like "fucking", "shitty", etc.
+const PROFANITY_ROOTS = [
+  'ass', 'asshole', 'bastard', 'bitch', 'bullshit', 'cock', 'crap', 'cunt',
+  'damn', 'dick', 'douche', 'dumbass', 'fag', 'fuck', 'goddamn', 'hell',
+  'jackass', 'motherfucker', 'nigger', 'piss', 'pussy', 'shit', 'slut',
+  'whore',
+];
+
+class SimpleProfanityFilter {
+  private roots: string[];
+
+  constructor() {
+    this.roots = PROFANITY_ROOTS.map(w => w.toLowerCase());
+  }
+
+  isProfane(text: string): boolean {
+    const lowerText = text.toLowerCase();
+    // Check if any profanity root is contained in any word
+    return this.roots.some(root => {
+      // Match word boundaries or word-like patterns containing the root
+      const regex = new RegExp(`\\b\\w*${this.escapeRegex(root)}\\w*\\b`, 'i');
+      return regex.test(lowerText);
+    });
+  }
+
+  clean(text: string): string {
+    let cleaned = text;
+    for (const root of this.roots) {
+      // Replace words containing the profanity root
+      const regex = new RegExp(`\\b(\\w*${this.escapeRegex(root)}\\w*)\\b`, 'gi');
+      cleaned = cleaned.replace(regex, (match) => '*'.repeat(match.length));
+    }
+    return cleaned;
+  }
+
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+}
 
 export interface ModerationResult {
   flagged: boolean;
@@ -46,11 +85,8 @@ export class ModerationService {
       );
     }
 
-    // Initialize profanity filter
-    this.profanityFilter = new Filter();
-
-    // Add custom bad words if needed
-    // this.profanityFilter.addWords('customword1', 'customword2');
+    // Initialize profanity filter (using simple implementation to avoid ESM issues)
+    this.profanityFilter = new SimpleProfanityFilter();
   }
 
   /**

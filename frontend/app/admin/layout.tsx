@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   X,
+  Globe,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/articles', label: 'Articles', icon: FileText },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/admin/domains', label: 'Domains', icon: Globe, ownerOnly: true },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -36,6 +38,7 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const isOwner = user?.role === 'owner';
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || !isAdmin)) {
@@ -87,27 +90,29 @@ export default function AdminLayout({
 
             {/* Navigation */}
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    className={`
-                      flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors
-                      ${isActive
-                        ? 'bg-foreground text-background'
-                        : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
-                      }
-                    `}
-                  >
-                    <Icon className="w-5 h-5" />
-                    {item.label}
-                  </Link>
-                );
-              })}
+              {navItems
+                .filter((item) => !item.ownerOnly || isOwner)
+                .map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`
+                        flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors
+                        ${isActive
+                          ? 'bg-foreground text-background'
+                          : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
+                        }
+                      `}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
             </nav>
 
             {/* User Section */}

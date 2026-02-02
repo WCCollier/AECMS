@@ -1,0 +1,193 @@
+# ============================================================================
+# AECMS Production Docker Compose Configuration
+# ============================================================================
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+#   1. Copy .env.production.example to .env.production
+#   2. Fill in all required values in .env.production
+#   3. Build images: docker-compose -f docker-compose.prod.yml build
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # PostgreSQL Database
+  # --------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: aecms-postgres-prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: aecms
+      POSTGRES_USER: aecms
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aecms -d aecms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - aecms-network
+    # Do NOT expose ports externally in production
+    # Access via internal network only
+
+  # --------------------------------------------------------------------------
+  # Redis Cache
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: aecms-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - aecms-network
+    # Do NOT expose ports externally in production
+
+  # --------------------------------------------------------------------------
+  # Backend API (NestJS)
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: aecms-backend-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION}
+      REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION}
+      # URLs
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      FRONTEND_URL: ${FRONTEND_URL}
+      FRONTEND_ADMIN_URL: ${FRONTEND_ADMIN_URL}
+      STORE_NAME: ${STORE_NAME}
+      # Payments
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      PAYPAL_CLIENT_ID: ${PAYPAL_CLIENT_ID}
+      PAYPAL_CLIENT_SECRET: ${PAYPAL_CLIENT_SECRET}
+      PAYPAL_MODE: ${PAYPAL_MODE}
+      PAYMENT_TEST_MODE: ${PAYMENT_TEST_MODE:-false}
+      # AI Moderation
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_CLIENT_SECRET: ${APPLE_CLIENT_SECRET:-}
+      # Email
+      EMAIL_PROVIDER_TYPE: ${EMAIL_PROVIDER_TYPE:-smtp}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      # AWS SES (alternative to SMTP)
+      AWS_SES_REGION: ${AWS_SES_REGION:-}
+      AWS_SES_ACCESS_KEY_ID: ${AWS_SES_ACCESS_KEY_ID:-}
+      AWS_SES_SECRET_ACCESS_KEY: ${AWS_SES_SECRET_ACCESS_KEY:-}
+      AWS_SES_FROM_EMAIL: ${AWS_SES_FROM_EMAIL:-}
+      # Storage
+      STORAGE_PROVIDER_TYPE: ${STORAGE_PROVIDER_TYPE:-local}
+      STORAGE_PATH: /app/uploads
+      # Security
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - backend_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - aecms-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # --------------------------------------------------------------------------
+  # Frontend (Next.js)
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL}
+        NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+    container_name: aecms-frontend-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${API_URL}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)}).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - aecms-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+# ----------------------------------------------------------------------------
+# Volumes
+# ----------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_uploads:
+    driver: local
+
+# ----------------------------------------------------------------------------
+# Networks
+# ----------------------------------------------------------------------------
+networks:
+  aecms-network:
+    driver: bridge

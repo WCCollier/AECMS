@@ -80,7 +80,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - backend_uploads:/app/uploads
+      - ./uploads:/app/uploads
     command: npm run start:dev
     networks:
       - aecms-network
@@ -113,8 +113,6 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
-    driver: local
-  backend_uploads:
     driver: local
 
 networks:

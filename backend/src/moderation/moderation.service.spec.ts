@@ -1,26 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 
-// Mock bad-words module before importing ModerationService
-jest.mock('bad-words', () => {
-  return jest.fn().mockImplementation(() => ({
-    isProfane: jest.fn((text: string) => {
-      const badWords = ['shit', 'fuck', 'damn', 'hell', 'ass', 'bullshit'];
-      return badWords.some(word => text.toLowerCase().includes(word));
-    }),
-    clean: jest.fn((text: string) => {
-      const badWords = ['shit', 'fuck', 'damn', 'hell', 'ass', 'bullshit'];
-      let cleaned = text;
-      badWords.forEach(word => {
-        const regex = new RegExp(word, 'gi');
-        cleaned = cleaned.replace(regex, '****');
-      });
-      return cleaned;
-    }),
-    addWords: jest.fn(),
-  }));
-});
-
 // Mock openai module
 jest.mock('openai', () => {
   return jest.fn().mockImplementation(() => ({

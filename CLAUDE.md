@@ -25,16 +25,16 @@
 **Phase 6**: ✅ COMPLETE - Frontend (Next.js 16, React 19, Tailwind v4)
 **Phase 6B**: ✅ COMPLETE - Comments & AI Moderation (OpenAI + profanity filter)
 **Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
-**Phase 8**: 🔄 NEXT - Polish & Production
+**Phase 8**: 🔄 IN PROGRESS - Polish & Production (Domain Aliasing, Email Verification)
 
-**Test Status**: 72 frontend + 121 backend unit tests, 16 E2E tests (all passing)
-**API Endpoints**: 100 total (18 new from Digital Products)
+**Test Status**: 72 frontend + 144 backend unit tests, 16 E2E tests (all passing)
+**API Endpoints**: 112 total
 
 ## API Endpoint Summary
 
 | Module | Endpoints |
 |--------|-----------|
-| Auth | 5 |
+| Auth | 7 |
 | Capabilities | 7 |
 | Media | 6 |
 | Categories | 5 |
@@ -48,6 +48,7 @@
 | Comments | 11 |
 | Digital Products | 11 |
 | Kindle | 7 |
+| Domain Aliases | 10 |
 
 ## Key Architecture Decisions
 
@@ -128,6 +129,7 @@ Check usage with: `docker system df`
 - `docs/PHASE_6_COMPLETION_REPORT.md` - Frontend implementation details
 - `docs/PHASE_6B_COMPLETION_REPORT.md` - Comments & AI moderation details
 - `docs/PHASE_7_COMPLETION_REPORT.md` - Digital products details
+- `docs/PHASE_8_COMPLETION_REPORT.md` - Domain aliasing & email verification
 - `docs/prd/` - 12 PRD documents with full specifications
 
 ## Notes for Claude
@@ -206,12 +208,30 @@ SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 ```
 
-## Phase 8: Polish & Production (Next)
+## Phase 8: Polish & Production (🔄 IN PROGRESS)
 
-**Planned**:
+**Implemented**:
+- ✅ Domain Aliasing Module (Owner configurable route-domain mapping)
+- ✅ Email Verification (required for new registrations)
+- ✅ 23 new unit tests (144 total backend)
+
+**Domain Aliasing Features**:
+- DNS TXT record verification for domain ownership
+- Admin UI endpoint for managing aliases
+- Auto-activation on verification
+- Owner-only access
+
+**Email Verification Features**:
+- Verification email sent on registration
+- 24-hour token expiry
+- Resend verification endpoint
+- Login blocked until verified
+
+**Remaining**:
 1. Fix Next.js build issue
 2. Add loading skeletons and toast notifications
 3. Implement CRUD forms in admin
 4. Image upload in admin
 5. Responsive design improvements
 6. SEO and performance optimization
+7. WordPress migration scripts

@@ -9,6 +9,7 @@ export interface AuthResponse {
     firstName?: string;
     lastName?: string;
     role: UserRole;
+    emailVerified?: boolean;
   };
 }
 

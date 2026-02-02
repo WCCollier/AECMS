@@ -187,3 +187,29 @@ export interface Media {
   caption: string | null;
   created_at: string;
 }
+
+// Domain Alias types
+export interface DomainAlias {
+  id: string;
+  domain: string;
+  target_route: string;
+  is_verified: boolean;
+  is_active: boolean;
+  verification_token: string;
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DomainAliasCreateData {
+  domain: string;
+  target_route: string;
+}
+
+export interface DomainVerificationInstructions {
+  domain: string;
+  record_type: string;
+  record_name: string;
+  record_value: string;
+  instructions: string;
+}

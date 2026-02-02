@@ -1,0 +1,1 @@
+export { ResendVerification } from './ResendVerification';

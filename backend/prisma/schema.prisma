@@ -55,6 +55,7 @@ model User {
   kindle_devices        KindleDevice[]
   audit_logs            AuditLog[]
   media_uploads         Media[]       @relation("MediaUploader")
+  domain_aliases        DomainAlias[]
 
   @@index([email])
   @@index([role])
@@ -725,4 +726,26 @@ model Setting {
   updated_at DateTime @updatedAt
 
   @@map("settings")
+}
+
+// ============================================================================
+// DOMAIN ALIASING
+// ============================================================================
+
+model DomainAlias {
+  id                  String    @id @default(uuid())
+  domain              String    @unique // e.g., "wccollier.com"
+  target_route        String    // e.g., "/author"
+  is_active           Boolean   @default(false)
+  verification_token  String?   // DNS TXT record token for verification
+  verified_at         DateTime?
+  owner_id            String
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  owner User @relation(fields: [owner_id], references: [id])
+
+  @@index([domain])
+  @@index([owner_id])
+  @@map("domain_aliases")
 }
