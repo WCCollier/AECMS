@@ -52,3 +52,5 @@ redis_data/
 # Prisma
 backend/prisma/migrations/*.sql
 !backend/prisma/migrations/migration_lock.toml
+*.tar
+*.tar.gz
