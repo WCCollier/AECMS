@@ -1,13 +1,26 @@
 # AECMS Comprehensive Testing Guide
 
-**Version**: 1.0
-**Last Updated**: 2026-02-01
+**Version**: 1.1
+**Last Updated**: 2026-02-06
 **Status**: Phase 8 - Production Readiness Testing
 
 ---
 
 ## Quick Start
 
+### Option 1: Docker Compose (Recommended)
+```bash
+# Start all services
+docker-compose up -d
+
+# Wait for services to be healthy
+docker-compose ps
+
+# Backend: http://localhost:4000
+# Frontend: http://localhost:3000
+```
+
+### Option 2: Manual Development
 ```bash
 # 1. Start services
 docker-compose up -d postgres redis
@@ -30,13 +43,16 @@ cd frontend && npm run test
 1. [Test Credentials](#test-credentials)
 2. [Automated Testing](#automated-testing)
 3. [Authentication Testing](#authentication-testing)
-4. [Content Management Testing](#content-management-testing)
-5. [Ecommerce Testing](#ecommerce-testing)
-6. [Payments Testing](#payments-testing)
-7. [Digital Products Testing](#digital-products-testing)
-8. [Comments & Moderation Testing](#comments--moderation-testing)
-9. [Frontend E2E Testing](#frontend-e2e-testing)
-10. [Production Checklist](#production-checklist)
+4. [Email Verification Testing](#email-verification-testing)
+5. [Content Management Testing](#content-management-testing)
+6. [Ecommerce Testing](#ecommerce-testing)
+7. [Payments Testing](#payments-testing)
+8. [Digital Products Testing](#digital-products-testing)
+9. [Comments & Moderation Testing](#comments--moderation-testing)
+10. [Domain Aliases Testing](#domain-aliases-testing)
+11. [Frontend E2E Testing](#frontend-e2e-testing)
+12. [Manual Browser Testing](#manual-browser-testing)
+13. [Production Checklist](#production-checklist)
 
 ---
 
@@ -50,9 +66,10 @@ cd frontend && npm run test
 
 **Get Auth Token**:
 ```bash
+# Note: Response uses 'accessToken' (camelCase)
 TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"owner@aecms.local","password":"Admin123!@#"}' | jq -r '.access_token')
+  --data-raw '{"email":"owner@aecms.local","password":"Admin123!@#"}' | jq -r '.accessToken')
 
 echo $TOKEN
 ```
@@ -61,20 +78,35 @@ echo $TOKEN
 
 ## Automated Testing
 
-### Backend Unit Tests (121 tests)
+### Backend Unit Tests (144 tests)
 ```bash
 cd backend && npm run test
 ```
+
+**Test Suites:**
+- `auth.service.spec.ts` - Authentication logic
+- `capabilities.service.spec.ts` - RBAC capabilities
+- `comments.service.spec.ts` - Comments CRUD
+- `moderation.service.spec.ts` - AI/profanity moderation
+- `digital-products.service.spec.ts` - File management
+- `kindle.service.spec.ts` - Kindle delivery
+- `personalization.service.spec.ts` - File watermarking
+- `domain-aliases.service.spec.ts` - Domain mapping
 
 ### Backend E2E Tests (16 tests)
 ```bash
 cd backend && npm run test:e2e
 ```
 
-### Frontend Unit Tests (72 tests)
+### Frontend Unit Tests (90 tests)
 ```bash
 cd frontend && npm run test
 ```
+
+**Test Suites:**
+- Components: Button, Input, Card, Header, Footer
+- Hooks: useAuth, useCart, useArticles, useProducts
+- Pages: Login, Register, Shop, Cart, Admin
 
 ### Frontend E2E Tests (Playwright)
 ```bash
@@ -125,6 +157,56 @@ curl http://localhost:4000/auth/me \
 - [ ] Token refresh works before expiry
 - [ ] Protected routes reject invalid tokens
 - [ ] Password validation enforces requirements
+
+---
+
+## Email Verification Testing
+
+### 1. Register New User
+```bash
+curl -X POST http://localhost:4000/auth/register \
+  -H "Content-Type: application/json" \
+  --data-raw '{
+    "email": "newuser@example.com",
+    "password": "Test123!@#",
+    "first_name": "Test",
+    "last_name": "User"
+  }'
+```
+**Expected**: Returns message to check email, user created with `email_verified: false`
+
+### 2. Check Verification Status (Login Should Fail)
+```bash
+curl -X POST http://localhost:4000/auth/login \
+  -H "Content-Type: application/json" \
+  --data-raw '{"email":"newuser@example.com","password":"Test123!@#"}'
+```
+**Expected**: 401 error "Please verify your email before logging in"
+
+### 3. Resend Verification Email
+```bash
+curl -X POST http://localhost:4000/auth/resend-verification \
+  -H "Content-Type: application/json" \
+  --data-raw '{"email":"newuser@example.com"}'
+```
+
+### 4. Verify Email (with token from email)
+```bash
+curl "http://localhost:4000/auth/verify-email?token=<TOKEN_FROM_EMAIL>"
+```
+**Expected**: 200 success, user can now login
+
+### 5. Frontend Verification Page
+- Navigate to `http://localhost:3000/auth/verify-email?token=<TOKEN>`
+- Should show success or error message
+
+### Checklist
+- [ ] Registration requires email verification
+- [ ] Unverified users cannot login
+- [ ] Verification email is sent (check console in dev mode)
+- [ ] Resend verification works
+- [ ] Token expires after 24 hours
+- [ ] Frontend verify-email page works
 
 ---
 
@@ -538,6 +620,89 @@ curl -X POST http://localhost:4000/comments \
 
 ---
 
+## Domain Aliases Testing
+
+**Note**: Domain Aliases is Owner-only functionality.
+
+### 1. Create Domain Alias
+```bash
+# Get owner token first
+TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
+  -H "Content-Type: application/json" \
+  --data-raw '{"email":"owner@aecms.local","password":"Admin123!@#"}' | jq -r '.accessToken')
+
+# Create alias
+curl -X POST http://localhost:4000/domain-aliases \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-raw '{"domain":"example.com","target_route":"/shop"}'
+```
+**Expected**: Returns alias with `verification_token` and DNS instructions
+
+### 2. List Domain Aliases
+```bash
+curl http://localhost:4000/domain-aliases \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 3. Get Verification Instructions
+```bash
+curl http://localhost:4000/domain-aliases/<ALIAS_ID>/instructions \
+  -H "Authorization: Bearer $TOKEN"
+```
+**Expected**: DNS TXT record instructions for domain verification
+
+### 4. Verify Domain (after adding TXT record)
+```bash
+curl -X POST http://localhost:4000/domain-aliases/<ALIAS_ID>/verify \
+  -H "Authorization: Bearer $TOKEN"
+```
+**Expected**: Domain marked as verified and active (if TXT record found)
+
+### 5. Update Alias
+```bash
+curl -X PATCH http://localhost:4000/domain-aliases/<ALIAS_ID> \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  --data-raw '{"target_route":"/blog"}'
+```
+
+### 6. Delete Alias
+```bash
+curl -X DELETE http://localhost:4000/domain-aliases/<ALIAS_ID> \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### 7. Test Access Control (Non-Owner Should Fail)
+```bash
+# Get member token
+MEMBER_TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
+  -H "Content-Type: application/json" \
+  --data-raw '{"email":"member@aecms.local","password":"Member123!@#"}' | jq -r '.accessToken')
+
+# Try to access domain aliases (should fail with 403)
+curl http://localhost:4000/domain-aliases \
+  -H "Authorization: Bearer $MEMBER_TOKEN"
+```
+**Expected**: 403 Forbidden
+
+### 8. Admin UI
+- Login as owner at `http://localhost:3000/auth/login`
+- Navigate to `http://localhost:3000/admin/domains`
+- Create, view, and manage domain aliases
+
+### Checklist
+- [ ] Create alias with domain and target_route
+- [ ] Verification token generated
+- [ ] DNS instructions returned
+- [ ] Domain verification checks TXT record
+- [ ] Only owner can access endpoints
+- [ ] Admin UI shows domain management
+- [ ] Alias update works
+- [ ] Alias deletion works
+
+---
+
 ## Frontend E2E Testing
 
 ### Run Playwright Tests
@@ -641,11 +806,11 @@ npx playwright test e2e/auth.spec.ts
 
 ---
 
-## Quick Reference: API Endpoints (100 total)
+## Quick Reference: API Endpoints (112 total)
 
 | Module | Endpoints | Auth Required |
 |--------|-----------|---------------|
-| Auth | 5 | Partial |
+| Auth | 7 | Partial |
 | Capabilities | 7 | Yes |
 | Media | 6 | Yes |
 | Categories | 5 | Partial |
@@ -659,6 +824,7 @@ npx playwright test e2e/auth.spec.ts
 | Comments | 11 | Partial |
 | Digital Products | 11 | Yes |
 | Kindle | 7 | Yes |
+| Domain Aliases | 10 | Owner Only |
 
 ---
 
