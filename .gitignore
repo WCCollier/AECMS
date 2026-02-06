@@ -54,3 +54,6 @@ backend/prisma/migrations/*.sql
 !backend/prisma/migrations/migration_lock.toml
 *.tar
 *.tar.gz
+
+# WordPress migration (contains sensitive data)
+migration/
