@@ -42,7 +42,7 @@ export class ArticlesController {
   @ApiResponse({ status: 409, description: 'Article slug already exists' })
   @ApiResponse({ status: 400, description: 'Invalid category or tag IDs' })
   async create(@Body() dto: CreateArticleDto, @Req() req: Request) {
-    const userId = (req.user as any).userId;
+    const userId = (req.user as any).id;
     return this.articlesService.create(dto, userId);
   }
 
@@ -62,7 +62,7 @@ export class ArticlesController {
   @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
   async findAll(@Query() query: QueryArticlesDto, @Req() req: Request) {
     const user = req.user as any;
-    const userId = user?.userId;
+    const userId = user?.id;
     const isAdmin = user?.capabilities?.includes('system.configure') || false;
     return this.articlesService.findAll(query, userId, isAdmin);
   }
@@ -76,7 +76,7 @@ export class ArticlesController {
   @ApiResponse({ status: 403, description: 'Access denied' })
   async findById(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as any;
-    const userId = user?.userId;
+    const userId = user?.id;
     const isAdmin = user?.capabilities?.includes('system.configure') || false;
     return this.articlesService.findById(id, userId, isAdmin);
   }
@@ -90,7 +90,7 @@ export class ArticlesController {
   @ApiResponse({ status: 403, description: 'Access denied' })
   async findBySlug(@Param('slug') slug: string, @Req() req: Request) {
     const user = req.user as any;
-    const userId = user?.userId;
+    const userId = user?.id;
     const isAdmin = user?.capabilities?.includes('system.configure') || false;
     return this.articlesService.findBySlug(slug, userId, isAdmin);
   }
@@ -110,7 +110,7 @@ export class ArticlesController {
     @Req() req: Request,
   ) {
     const user = req.user as any;
-    const userId = user.userId;
+    const userId = user.id;
     const isAdmin = user.capabilities?.includes('article.edit.any') || false;
     return this.articlesService.update(id, dto, userId, isAdmin);
   }
@@ -126,7 +126,7 @@ export class ArticlesController {
   @ApiResponse({ status: 403, description: 'Permission denied' })
   async remove(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as any;
-    const userId = user.userId;
+    const userId = user.id;
     const isAdmin = user.capabilities?.includes('article.delete.any') || false;
     await this.articlesService.remove(id, userId, isAdmin);
   }
