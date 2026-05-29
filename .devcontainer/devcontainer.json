@@ -1,0 +1,51 @@
+{
+  "name": "TypeScript REST CMS + Commerce Dev",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",  // Official, includes Node 22 + TS tools
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22",
+      "nodeGypDependencies": true
+    },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {},  // Claude Code CLI + VS Code extension
+    "ghcr.io/devcontainers/features/github-cli:1": {},              // gh for PRs/workflows
+    "ghcr.io/devcontainers/features/docker-in-docker:1": {}         // Useful for building Cloud Run images
+  },
+  "forwardPorts": [3000, 5432, 6379],  // API, Postgres, Redis
+  "portsAttributes": {
+    "3000": { "label": "App API", "onAutoForward": "notify" }
+  },
+  "postCreateCommand": "npm ci && npm run build && echo '✅ Dev environment ready! Run npm run dev to start.'",
+  "postStartCommand": "npm run dev",  // Optional: auto-start dev server
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",           // If using Tailwind
+        "ms-vscode.vscode-typescript-next",
+        "Prisma.prisma",                       // If using Prisma
+        "redhat.vscode-yaml",                  // For docker-compose etc.
+        "github.copilot",                      // Optional complement to Claude
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "typescript.preferences.importModuleSpecifier": "relative",
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.exclude": {
+          "**/.git": true,
+          "**/node_modules": true,
+          "**/dist": true
+        }
+      }
+    }
+  },
+  "remoteUser": "node",
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind,consistency=cached"  // Persist Claude memory
+  ],
+  "containerEnv": {
+    "NODE_ENV": "development"
+  }
+}
