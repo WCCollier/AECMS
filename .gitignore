@@ -57,3 +57,7 @@ backend/prisma/migrations/*.sql
 
 # WordPress migration (contains sensitive data)
 migration/
+
+# WordPress import source files (large, not part of codebase)
+seed_data/
+backend/uploads/

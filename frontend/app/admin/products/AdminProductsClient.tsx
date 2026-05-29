@@ -11,11 +11,11 @@ export function AdminProductsClient() {
   const [search, setSearch] = useState('');
   const { products, totalPages, isLoading } = useProducts({ page, limit: 10, search: search || undefined });
 
-  const formatPrice = (cents: number) => {
+  const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(cents / 100);
+    }).format(price);
   };
 
   return (

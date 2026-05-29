@@ -49,7 +49,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
       slug: initialData?.slug || '',
       description: initialData?.description || '',
       short_description: initialData?.short_description || '',
-      price: initialData?.price ? initialData.price / 100 : 0,
+      price: initialData?.price ? Number(initialData.price) : 0,
       sku: initialData?.sku || '',
       stock_quantity: initialData?.stock_quantity || 0,
       track_inventory: initialData?.track_inventory ?? true,
@@ -92,7 +92,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
         ...data,
         description,
         featured_image_url: featuredImage,
-        price: Math.round(data.price * 100), // Convert dollars to cents
+        price: data.price,
       };
 
       if (productId) {

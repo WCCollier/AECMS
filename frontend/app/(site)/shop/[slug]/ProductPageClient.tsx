@@ -18,11 +18,11 @@ export function ProductPageClient() {
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
 
-  const formatPrice = (cents: number) => {
+  const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(cents / 100);
+    }).format(price);
   };
 
   const handleAddToCart = async () => {

@@ -29,11 +29,11 @@ export function CheckoutPageClient() {
     country: 'US',
   });
 
-  const formatPrice = (cents: number) => {
+  const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
-    }).format(cents / 100);
+    }).format(price);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
