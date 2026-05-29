@@ -1,74 +1,71 @@
 @import "tailwindcss";
 
-:root {
-  /* ── Midnight / teal theme ─────────────────────────────── */
-  --background:          #080d18;   /* deep midnight */
-  --surface:             #0f1929;   /* card / panel layer */
-  --surface-raised:      #162035;   /* hover / elevated */
-  --foreground:          #dce8f0;   /* cool near-white */
-  --muted:               #6b88a0;   /* secondary text */
-  --border:              #1a2840;   /* subtle blue-tinted border */
+/* ── Tell Tailwind v4 where to scan for class usage ─────── */
+@source "../app/**/*.{tsx,ts}";
+@source "../components/**/*.{tsx,ts}";
+@source "../hooks/**/*.{tsx,ts}";
+@source "../contexts/**/*.{tsx,ts}";
 
-  --accent:              #2dd4bf;   /* teal-400 — primary CTA */
-  --accent-hover:        #14b8a6;   /* teal-500 */
-  --accent-dim:          #0d9488;   /* teal-600 — pressed / dark accent */
-  --accent-subtle:       rgba(45,212,191,0.12);  /* teal wash for badges */
-  --accent-foreground:   #06111f;   /* dark text on teal bg */
+/* ── Midnight / teal theme — direct hex values for v4 ───── */
+@theme {
+  --color-background:        #080d18;
+  --color-surface:           #0f1929;
+  --color-surface-raised:    #162035;
+  --color-foreground:        #dce8f0;
+  --color-muted:             #6b88a0;
+  --color-border:            #1a2840;
+  --color-accent:            #2dd4bf;
+  --color-accent-hover:      #14b8a6;
+  --color-accent-dim:        #0d9488;
+  --color-accent-foreground: #06111f;
 
-  --danger:              #f87171;
-  --danger-bg:           rgba(248,113,113,0.12);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background:        var(--background);
-  --color-surface:           var(--surface);
-  --color-surface-raised:    var(--surface-raised);
-  --color-foreground:        var(--foreground);
-  --color-muted:             var(--muted);
-  --color-border:            var(--border);
-  --color-accent:            var(--accent);
-  --color-accent-hover:      var(--accent-hover);
-  --color-accent-dim:        var(--accent-dim);
-  --color-accent-subtle:     var(--accent-subtle);
-  --color-accent-foreground: var(--accent-foreground);
-  --font-sans: var(--font-inter), system-ui, sans-serif;
+/* ── Runtime CSS vars (available in raw CSS) ─────────────── */
+:root {
+  --accent-subtle: rgba(45, 212, 191, 0.12);
+  --danger:        #f87171;
+  --danger-bg:     rgba(248, 113, 113, 0.12);
 }
 
 /* ── Base ────────────────────────────────────────────────── */
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: #080d18;
+  color: #dce8f0;
 }
 
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--background); }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
+::-webkit-scrollbar-track { background: #080d18; }
+::-webkit-scrollbar-thumb { background: #1a2840; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #0d9488; }
 
 /* ── Selection ───────────────────────────────────────────── */
-::selection { background: var(--accent-subtle); color: var(--accent); }
+::selection { background: rgba(45,212,191,0.15); color: #2dd4bf; }
 
 /* ── Focus ring ──────────────────────────────────────────── */
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
 
 /* ── Prose / article body ────────────────────────────────── */
 .prose-article {
-  color: var(--foreground);
+  color: #dce8f0;
   line-height: 1.8;
   font-size: 1.05rem;
+  max-width: 68ch;
 }
-.prose-article p  { margin-bottom: 1.25em; }
+.prose-article p   { margin-bottom: 1.25em; }
 .prose-article h1,
 .prose-article h2,
-.prose-article h3 { color: var(--foreground); margin: 1.5em 0 0.6em; font-weight: 700; }
-.prose-article h2 { border-left: 3px solid var(--accent); padding-left: 0.75rem; }
-.prose-article strong { color: var(--accent); font-weight: 600; }
-.prose-article a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.prose-article h3  { color: #dce8f0; margin: 1.6em 0 0.5em; font-weight: 700; }
+.prose-article h2  { border-left: 3px solid #2dd4bf; padding-left: 0.75rem; }
+.prose-article strong { color: #2dd4bf; font-weight: 600; }
+.prose-article em  { color: #a8c5d8; font-style: italic; }
+.prose-article a   { color: #2dd4bf; text-decoration: underline; text-underline-offset: 3px; }
 .prose-article blockquote {
-  border-left: 3px solid var(--accent-dim);
+  border-left: 3px solid #0d9488;
   padding-left: 1rem;
-  color: var(--muted);
+  color: #6b88a0;
   font-style: italic;
   margin: 1.5em 0;
 }

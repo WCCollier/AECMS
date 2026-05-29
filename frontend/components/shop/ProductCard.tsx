@@ -35,9 +35,9 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Link href={`/shop/${product.slug}`} className="group">
-      <div className="bg-background border border-foreground/10 rounded-lg overflow-hidden hover:border-foreground/20 transition-colors">
+      <div className="bg-surface border border-border rounded-xl overflow-hidden hover:border-accent/30 transition-colors">
         {/* Image */}
-        <div className="aspect-square relative bg-foreground/5">
+        <div className="aspect-square relative bg-surface-raised">
           {product.featured_image_url ? (
             <Image
               src={product.featured_image_url}

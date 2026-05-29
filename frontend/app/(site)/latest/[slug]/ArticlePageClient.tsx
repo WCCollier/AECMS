@@ -59,9 +59,9 @@ export function ArticlePageClient() {
         Back to Latest
       </Link>
 
-      {/* Featured Image */}
-      {article.featured_image_url ? (
-        <div className="aspect-video relative bg-foreground/5 rounded-lg overflow-hidden mb-8">
+      {/* Featured Image — only when one actually exists */}
+      {article.featured_image_url && (
+        <div className="aspect-video relative bg-surface rounded-xl overflow-hidden mb-8">
           <Image
             src={article.featured_image_url}
             alt={article.title}
@@ -69,10 +69,6 @@ export function ArticlePageClient() {
             className="object-cover"
             priority
           />
-        </div>
-      ) : (
-        <div className="aspect-video relative bg-foreground/5 rounded-lg overflow-hidden mb-8 flex items-center justify-center">
-          <FileText className="w-24 h-24 text-foreground/20" />
         </div>
       )}
 
@@ -83,7 +79,7 @@ export function ArticlePageClient() {
             <Link
               key={cat.id}
               href={`/latest?category=${cat.slug}`}
-              className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-foreground/10 transition-colors"
+              className="text-xs px-3 py-1 bg-accent/10 text-accent rounded-full hover:bg-accent/20 transition-colors font-medium"
             >
               {cat.name}
             </Link>
@@ -92,16 +88,10 @@ export function ArticlePageClient() {
       )}
 
       {/* Title */}
-      <h1 className="text-4xl font-bold mb-4">{article.title}</h1>
+      <h1 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">{article.title}</h1>
 
       {/* Meta */}
-      <div className="flex items-center gap-6 text-sm text-foreground/60 mb-8 pb-8 border-b border-foreground/10">
-        {article.author && (
-          <span className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            {article.author.display_name || article.author.username}
-          </span>
-        )}
+      <div className="flex items-center gap-6 text-sm text-muted mb-8 pb-6 border-b border-border">
         {article.published_at && (
           <span className="flex items-center gap-2">
             <Calendar className="w-4 h-4" />
@@ -112,15 +102,7 @@ export function ArticlePageClient() {
 
       {/* Content */}
       <div
-        className="prose prose-lg max-w-none
-          prose-headings:text-foreground
-          prose-p:text-foreground/80
-          prose-a:text-foreground prose-a:underline
-          prose-strong:text-foreground
-          prose-code:text-foreground prose-code:bg-foreground/10 prose-code:px-1 prose-code:rounded
-          prose-pre:bg-foreground/5 prose-pre:border prose-pre:border-foreground/10
-          prose-blockquote:border-foreground/20 prose-blockquote:text-foreground/70
-          prose-img:rounded-lg"
+        className="prose-article"
         dangerouslySetInnerHTML={{ __html: article.content }}
       />
 
