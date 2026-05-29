@@ -12,8 +12,17 @@ export interface User {
 }
 
 export interface AuthTokens {
-  access_token: string;
-  refresh_token: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  role: 'owner' | 'admin' | 'member' | 'guest';
+  emailVerified: boolean;
 }
 
 export interface LoginCredentials {

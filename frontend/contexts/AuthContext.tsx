@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import api, { setAccessToken, getAccessToken, getErrorMessage } from '@/lib/api';
-import type { User, LoginCredentials, RegisterData, AuthTokens } from '@/types';
+import type { User, AuthUser, LoginCredentials, RegisterData, AuthTokens } from '@/types';
 
 interface AuthContextType {
   user: User | null;
@@ -52,15 +52,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (credentials: LoginCredentials) => {
     try {
-      const response = await api.post<AuthTokens & { user: User }>('/auth/login', credentials);
-      const { access_token, refresh_token, user: userData } = response.data;
+      const response = await api.post<AuthTokens & { user: AuthUser }>('/auth/login', credentials);
+      const { accessToken, refreshToken, user: userData } = response.data;
 
-      setAccessToken(access_token);
+      setAccessToken(accessToken);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('refresh_token', refresh_token);
+        localStorage.setItem('refresh_token', refreshToken);
       }
 
-      setUser(userData);
+      setUser(userData as unknown as User);
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -68,15 +68,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const register = async (data: RegisterData) => {
     try {
-      const response = await api.post<AuthTokens & { user: User }>('/auth/register', data);
-      const { access_token, refresh_token, user: userData } = response.data;
-
-      setAccessToken(access_token);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('refresh_token', refresh_token);
-      }
-
-      setUser(userData);
+      const response = await api.post<{ message: string; userId: string }>('/auth/register', data);
+      // Registration now requires email verification — no tokens returned
+      void response;
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -84,7 +78,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout');
+      const refreshToken = typeof window !== 'undefined'
+        ? localStorage.getItem('refresh_token')
+        : null;
+      await api.post('/auth/logout', { refreshToken: refreshToken ?? '' });
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
