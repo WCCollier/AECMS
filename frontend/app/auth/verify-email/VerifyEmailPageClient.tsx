@@ -10,7 +10,7 @@ type VerificationStatus = 'loading' | 'success' | 'error' | 'no-token';
 
 export function VerifyEmailPageClient() {
   const searchParams = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams?.get('token') ?? null;
 
   const [status, setStatus] = useState<VerificationStatus>('loading');
   const [errorMessage, setErrorMessage] = useState('');

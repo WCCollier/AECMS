@@ -34,6 +34,7 @@ describe('AuthService', () => {
   const mockPrismaService = {
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
     },
@@ -52,7 +53,7 @@ describe('AuthService', () => {
 
   const mockConfigService = {
     get: jest.fn((key: string, defaultValue?: string) => {
-      const config = {
+      const config: Record<string, string> = {
         'jwt.secret': 'test-secret',
         'jwt.expiresIn': '15m',
         'jwt.refreshExpiresIn': '7d',

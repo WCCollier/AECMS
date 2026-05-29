@@ -27,7 +27,7 @@
 **Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
 **Phase 8**: 🔄 IN PROGRESS - Polish & Production (Domain Aliasing, Email Verification)
 
-**Test Status**: 72 frontend + 144 backend unit tests, 16 E2E tests (all passing)
+**Test Status**: 90 frontend + 144 backend unit tests (all passing); 16 backend E2E tests (require Docker)
 **API Endpoints**: 112 total
 
 ## API Endpoint Summary
@@ -111,11 +111,25 @@ docker builder prune -af           # Clear build cache
 
 ## Storage Management
 
-**IMPORTANT**: Regularly trim Docker cache to preserve storage space. Run before/after major work:
+**IMPORTANT**: Keep Codespaces storage clean to avoid running out of space. Run these periodically and before/after major work:
 ```bash
+# Docker (biggest culprit)
 docker system prune -af --volumes && docker builder prune -af
+
+# npm caches
+npm cache clean --force
+cd backend && npm cache clean --force
+cd ../frontend && npm cache clean --force
+
+# Check usage
+docker system df
+df -h /
 ```
-Check usage with: `docker system df`
+
+If disk is >80% full, also clear build artifacts:
+```bash
+rm -rf backend/dist frontend/.next
+```
 
 ## Phase Documentation
 
@@ -183,9 +197,7 @@ Check usage with: `docker system df`
 - ✅ Shop pages (listing, detail, cart, checkout)
 - ✅ Blog pages (listing, detail)
 - ✅ Admin dashboard (products, articles, orders)
-- ✅ 72 unit tests (Jest + React Testing Library)
-
-**Known Issue**: Next.js 16 build error with React 19 compatibility - dev server works fine.
+- ✅ 90 unit tests (Jest + React Testing Library)
 
 ## Phase 7: Digital Products (✅ COMPLETE)
 
@@ -228,8 +240,7 @@ SMTP_PORT=587
 - Login blocked until verified
 
 **Remaining**:
-1. Fix Next.js build issue
-2. Add loading skeletons and toast notifications
+1. Add loading skeletons and toast notifications
 3. Implement CRUD forms in admin
 4. Image upload in admin
 5. Responsive design improvements
