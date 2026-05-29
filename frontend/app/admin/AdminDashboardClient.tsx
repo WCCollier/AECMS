@@ -8,9 +8,8 @@ import { Package, FileText, ShoppingCart, DollarSign, TrendingUp } from 'lucide-
 
 interface PaginatedResponse<T> {
   data: T[];
-  total: number;
-  page: number;
-  limit: number;
+  meta?: { total: number; page: number; limit: number; total_pages: number };
+  total?: number;
 }
 
 interface Order {

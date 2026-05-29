@@ -4,15 +4,17 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Inject,
 } from '@nestjs/common';
+import * as speakeasy from 'speakeasy';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { AuthResponse, TokenPayload } from './interfaces/auth-response.interface';
+import { AuthResponse, AdminLoginResponse, TokenPayload } from './interfaces/auth-response.interface';
 import { UserRole } from '@prisma/client';
 import * as crypto from 'crypto';
 import { EMAIL_PROVIDER } from '../email/email.interface';
@@ -128,6 +130,155 @@ export class AuthService {
         emailVerified: user.email_verified,
       },
     };
+  }
+
+  /**
+   * Admin back-door login — enforces admin/owner role, handles 2FA gating
+   */
+  async adminLogin(loginDto: LoginDto): Promise<AdminLoginResponse> {
+    const user = await this.prisma.user.findUnique({
+      where: { email: loginDto.email },
+    });
+
+    if (!user || !user.password_hash) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password_hash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.email_verified) {
+      throw new UnauthorizedException('Email not verified');
+    }
+
+    if (user.role !== 'admin' && user.role !== 'owner') {
+      throw new ForbiddenException('Admin access required');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { last_login_at: new Date() },
+    });
+
+    if (user.totp_enabled) {
+      const preAuthToken = await this.generatePreAuthToken(user.id);
+      return { requiresTwoFactor: true, preAuthToken };
+    }
+
+    // 2FA not yet set up — grant access with 7-day tokens and flag setup required
+    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d');
+    await this.storeRefreshToken(user.id, tokens.refreshToken, '7d');
+
+    return {
+      requiresTwoFactor: false,
+      twoFactorSetupRequired: true,
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name || undefined,
+        lastName: user.last_name || undefined,
+        role: user.role,
+        emailVerified: user.email_verified,
+      },
+    };
+  }
+
+  /**
+   * Verify TOTP code during back-door login — exchanges pre-auth token for full tokens
+   */
+  async verifyTwoFactor(preAuthToken: string, code: string): Promise<AuthResponse> {
+    const jwtSecret = this.configService.get<string>('jwt.secret');
+    if (!jwtSecret) throw new Error('JWT secret not configured');
+
+    let payload: TokenPayload;
+    try {
+      payload = this.jwtService.verify<TokenPayload>(preAuthToken, { secret: jwtSecret });
+    } catch {
+      throw new UnauthorizedException('Session expired. Please log in again.');
+    }
+
+    if (payload.scope !== 'pre_2fa') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user || !user.totp_secret || !user.totp_enabled) {
+      throw new UnauthorizedException('2FA not configured for this account');
+    }
+
+    const isValid = speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: code, window: 1 });
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid authenticator code');
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d');
+    await this.storeRefreshToken(user.id, tokens.refreshToken, '7d');
+
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name || undefined,
+        lastName: user.last_name || undefined,
+        role: user.role,
+        emailVerified: user.email_verified,
+      },
+    };
+  }
+
+  /**
+   * Generate TOTP secret and return QR code URL for authenticator app setup
+   */
+  async setupTwoFactor(userId: string): Promise<{ secret: string; otpauthUrl: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.totp_enabled) throw new BadRequestException('2FA is already enabled');
+
+    const generated = speakeasy.generateSecret({ name: `AECMS:${user.email}`, length: 20 });
+    const secret = generated.base32;
+    const otpauthUrl = generated.otpauth_url ?? speakeasy.otpauthURL({ secret, label: user.email, issuer: 'AECMS', encoding: 'base32' });
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { totp_secret: secret },
+    });
+
+    return { secret, otpauthUrl };
+  }
+
+  /**
+   * Verify setup code and permanently enable 2FA for the user
+   */
+  async enableTwoFactor(userId: string, code: string): Promise<{ success: boolean }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || !user.totp_secret) throw new BadRequestException('2FA setup not initiated');
+    if (user.totp_enabled) throw new BadRequestException('2FA is already enabled');
+
+    const isValid = speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: code, window: 1 });
+    if (!isValid) throw new BadRequestException('Invalid verification code');
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { totp_enabled: true },
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Issue a short-lived (5 min) pre-auth token scoped only to 2FA verification
+   */
+  private async generatePreAuthToken(userId: string): Promise<string> {
+    const jwtSecret = this.configService.get<string>('jwt.secret');
+    if (!jwtSecret) throw new Error('JWT secret not configured');
+    return this.jwtService.signAsync(
+      { sub: userId, scope: 'pre_2fa' },
+      { secret: jwtSecret, expiresIn: '5m' },
+    );
   }
 
   /**
@@ -386,16 +537,18 @@ export class AuthService {
   }
 
   /**
-   * Generate access and refresh tokens
+   * Generate access and refresh tokens. refreshExpiryOverride allows the admin
+   * back-door to enforce a fixed 7-day expiry independent of global config.
    */
   private async generateTokens(
     userId: string,
     email: string,
     role: UserRole,
+    refreshExpiryOverride?: string,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const jwtSecret = this.configService.get<string>('jwt.secret');
     const jwtExpiration = this.configService.get<string>('jwt.expiresIn');
-    const refreshExpiration = this.configService.get<string>('jwt.refreshExpiresIn');
+    const refreshExpiration = refreshExpiryOverride ?? this.configService.get<string>('jwt.refreshExpiresIn');
 
     if (!jwtSecret || !jwtExpiration || !refreshExpiration) {
       throw new Error('JWT configuration is missing');
@@ -437,8 +590,9 @@ export class AuthService {
   private async storeRefreshToken(
     userId: string,
     token: string,
+    expiryOverride?: string,
   ): Promise<void> {
-    const refreshExpiration = this.configService.get<string>('jwt.refreshExpiresIn');
+    const refreshExpiration = expiryOverride ?? this.configService.get<string>('jwt.refreshExpiresIn');
     if (!refreshExpiration) {
       throw new Error('Refresh token expiration not configured');
     }

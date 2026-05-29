@@ -13,9 +13,19 @@ export interface AuthResponse {
   };
 }
 
+export interface AdminLoginResponse {
+  requiresTwoFactor: boolean;
+  twoFactorSetupRequired?: boolean;
+  preAuthToken?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  user?: AuthResponse['user'];
+}
+
 export interface TokenPayload {
-  sub: string; // user id
+  sub: string;
   email: string;
   role: UserRole;
-  jti?: string; // JWT ID - unique identifier for each token
+  jti?: string;
+  scope?: string; // 'pre_2fa' for pre-auth tokens
 }

@@ -21,6 +21,8 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
+import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('auth')
@@ -108,6 +110,49 @@ export class AuthController {
       lastName: user.last_name,
       role: user.role,
       emailVerified: user.email_verified,
+      totpEnabled: user.totp_enabled,
     };
+  }
+
+  // ── Back-door / Admin login ────────────────────────────────────────────────
+
+  @Post('admin/login')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Admin back-door login (enforces admin/owner role)' })
+  @ApiResponse({ status: 200, description: 'Login successful or 2FA required' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
+  async adminLogin(@Body() loginDto: LoginDto) {
+    return this.authService.adminLogin(loginDto);
+  }
+
+  @Post('2fa/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify TOTP code to complete admin login' })
+  @ApiResponse({ status: 200, description: 'Authentication complete, tokens issued' })
+  @ApiResponse({ status: 401, description: 'Invalid code or expired session' })
+  async verifyTwoFactor(@Body() dto: VerifyTwoFactorDto) {
+    return this.authService.verifyTwoFactor(dto.preAuthToken, dto.code);
+  }
+
+  @Post('2fa/setup')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate TOTP secret for 2FA enrollment' })
+  @ApiResponse({ status: 200, description: 'Secret and QR code URL returned' })
+  async setupTwoFactor(@Request() req: any) {
+    return this.authService.setupTwoFactor(req.user.id);
+  }
+
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Confirm TOTP code and enable 2FA' })
+  @ApiResponse({ status: 200, description: '2FA enabled successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid verification code' })
+  async enableTwoFactor(@Request() req: any, @Body() dto: EnableTwoFactorDto) {
+    return this.authService.enableTwoFactor(req.user.id, dto.code);
   }
 }

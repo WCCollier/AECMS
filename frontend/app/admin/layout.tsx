@@ -39,12 +39,21 @@ export default function AdminLayout({
 
   const isAdmin = user?.role === 'owner' || user?.role === 'admin';
   const isOwner = user?.role === 'owner';
+  const isLoginRoute = pathname?.startsWith('/admin/login') ?? false;
 
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || !isAdmin)) {
-      router.push('/auth/login');
+    if (isLoginRoute) return;
+    if (!isLoading && !isAuthenticated) {
+      router.push('/admin/login');
+    } else if (!isLoading && isAuthenticated && !isAdmin) {
+      router.push('/');
     }
-  }, [isLoading, isAuthenticated, isAdmin, router]);
+  }, [isLoading, isAuthenticated, isAdmin, isLoginRoute, router]);
+
+  // Login pages render without the admin shell
+  if (isLoginRoute) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (
