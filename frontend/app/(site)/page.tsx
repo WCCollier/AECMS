@@ -5,72 +5,83 @@ import { Button } from '@/components/ui';
 export default function HomePage() {
   return (
     <>
-      {/* Hero Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-4xl text-center">
-          <h1 className="text-5xl font-bold mb-6">
-            Welcome to AECMS
+      {/* Hero */}
+      <section className="relative py-28 px-4 overflow-hidden">
+        {/* subtle radial glow */}
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="w-[600px] h-[600px] rounded-full bg-accent/5 blur-3xl" />
+        </div>
+        <div className="relative container mx-auto max-w-4xl text-center">
+          <p className="text-accent text-sm font-semibold tracking-widest uppercase mb-4">
+            Fantasy v Reality
+          </p>
+          <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+            Ideas worth{' '}
+            <span className="text-accent">fighting</span>{' '}
+            for
           </h1>
-          <p className="text-xl text-foreground/70 mb-8 max-w-2xl mx-auto">
-            Advanced Ecommerce Content Management System - A modern, lightweight alternative to WordPress with integrated ecommerce.
+          <p className="text-lg text-foreground/60 mb-10 max-w-2xl mx-auto leading-relaxed">
+            Philosophy, fiction, and firearms — written from principle, not from permission.
           </p>
-          <div className="flex gap-4 justify-center">
-            <Link href="/shop">
-              <Button size="lg">Browse Shop</Button>
-            </Link>
+          <div className="flex flex-wrap gap-4 justify-center">
             <Link href="/latest">
-              <Button variant="outline" size="lg">Read Latest</Button>
+              <Button size="lg">Read Latest</Button>
+            </Link>
+            <Link href="/shop">
+              <Button variant="outline" size="lg">Browse Shop</Button>
             </Link>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 px-4 bg-foreground/5">
+      {/* Divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4" />
+
+      {/* Content pillars */}
+      <section className="py-20 px-4 bg-surface/40">
         <div className="container mx-auto max-w-6xl">
-          <h2 className="text-3xl font-bold text-center mb-12">
-            Why Choose AECMS?
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <FeatureCard
-              title="Lightweight & Fast"
-              description="Built with modern technologies for optimal performance. No bloat, just what you need."
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <PillarCard
+              label="Short Thoughts"
+              title="Philosophy"
+              description="Brief, direct takes on ideas that matter — rights, language, courage, government, and what it means to be a warrior."
+              href="/latest"
+              count="50+"
             />
-            <FeatureCard
-              title="Integrated Ecommerce"
-              description="Full shopping cart, checkout, and payment processing with Stripe and PayPal."
+            <PillarCard
+              label="Book Reviews"
+              title="Reading"
+              description="Honest reviews of fiction and non-fiction — sci-fi, military, fantasy, and Christian literature."
+              href="/latest"
+              count="15+"
             />
-            <FeatureCard
-              title="Content Management"
-              description="Powerful article and page management with rich text editing and media library."
+            <PillarCard
+              label="Shop"
+              title="American Shooter"
+              description="Curriculum for gun owners who want to think clearly about firearms, safety, and self-defense."
+              href="/shop"
+              count="3 courses"
             />
           </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 px-4">
-        <div className="container mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold mb-4">
-            Ready to get started?
-          </h2>
-          <p className="text-foreground/70 mb-8">
-            Create an account today and start building your online presence.
-          </p>
-          <Link href="/auth/register">
-            <Button size="lg">Create Account</Button>
-          </Link>
         </div>
       </section>
     </>
   );
 }
 
-function FeatureCard({ title, description }: { title: string; description: string }) {
+function PillarCard({
+  label, title, description, href, count,
+}: {
+  label: string; title: string; description: string; href: string; count: string;
+}) {
   return (
-    <div className="bg-background p-6 rounded-lg border border-foreground/10">
-      <h3 className="text-xl font-semibold mb-3">{title}</h3>
-      <p className="text-foreground/70">{description}</p>
-    </div>
+    <Link href={href} className="group block bg-surface border border-border hover:border-accent/40 rounded-xl p-6 transition-colors">
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-xs font-semibold text-accent tracking-widest uppercase">{label}</span>
+        <span className="text-xs text-muted">{count}</span>
+      </div>
+      <h3 className="text-xl font-bold mb-2 group-hover:text-accent transition-colors">{title}</h3>
+      <p className="text-foreground/60 text-sm leading-relaxed">{description}</p>
+    </Link>
   );
 }

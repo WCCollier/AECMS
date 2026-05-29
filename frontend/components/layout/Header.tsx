@@ -14,44 +14,40 @@ export function Header() {
 
   const isAdmin = user?.role === 'owner' || user?.role === 'admin';
 
+  const navLink = 'text-foreground/60 hover:text-accent transition-colors text-sm font-medium';
+
   return (
-    <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-foreground/10">
+    <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="text-xl font-bold">
+          <Link href="/" className="text-xl font-bold tracking-tight text-accent">
             AECMS
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/shop" className="text-foreground/70 hover:text-foreground transition-colors">
-              Shop
-            </Link>
-            <Link href="/latest" className="text-foreground/70 hover:text-foreground transition-colors">
-              Latest
-            </Link>
+          <nav className="hidden md:flex items-center gap-7">
+            <Link href="/shop" className={navLink}>Shop</Link>
+            <Link href="/latest" className={navLink}>Latest</Link>
             {isAdmin && (
-              <Link href="/admin" className="text-foreground/70 hover:text-foreground transition-colors">
-                Admin
-              </Link>
+              <Link href="/admin" className={navLink}>Admin</Link>
             )}
           </nav>
 
           {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-4">
-            <Link href="/cart" className="relative p-2 hover:bg-foreground/5 rounded-lg transition-colors">
+          <div className="hidden md:flex items-center gap-3">
+            <Link href="/cart" className="relative p-2 hover:bg-surface-raised rounded-lg transition-colors text-foreground/60 hover:text-accent">
               <ShoppingCart className="w-5 h-5" />
               {itemCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-foreground text-background text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                <span className="absolute -top-1 -right-1 bg-accent text-accent-foreground text-xs w-5 h-5 flex items-center justify-center rounded-full font-bold">
                   {itemCount > 99 ? '99+' : itemCount}
                 </span>
               )}
             </Link>
 
             {isAuthenticated ? (
-              <div className="flex items-center gap-3">
-                <Link href="/account" className="p-2 hover:bg-foreground/5 rounded-lg transition-colors">
+              <div className="flex items-center gap-2">
+                <Link href="/account" className="p-2 hover:bg-surface-raised rounded-lg transition-colors text-foreground/60 hover:text-accent">
                   <User className="w-5 h-5" />
                 </Link>
                 <Button variant="ghost" size="sm" onClick={() => logout()}>
@@ -72,7 +68,7 @@ export function Header() {
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2"
+            className="md:hidden p-2 text-foreground/60 hover:text-accent transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -81,74 +77,26 @@ export function Header() {
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden py-4 border-t border-foreground/10">
+          <div className="md:hidden py-4 border-t border-border">
             <nav className="flex flex-col gap-4">
-              <Link
-                href="/shop"
-                className="text-foreground/70 hover:text-foreground transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Shop
-              </Link>
-              <Link
-                href="/latest"
-                className="text-foreground/70 hover:text-foreground transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Latest
-              </Link>
-              <Link
-                href="/cart"
-                className="text-foreground/70 hover:text-foreground transition-colors flex items-center gap-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Cart {itemCount > 0 && `(${itemCount})`}
+              <Link href="/shop" className={navLink} onClick={() => setMobileMenuOpen(false)}>Shop</Link>
+              <Link href="/latest" className={navLink} onClick={() => setMobileMenuOpen(false)}>Latest</Link>
+              <Link href="/cart" className={`${navLink} flex items-center gap-2`} onClick={() => setMobileMenuOpen(false)}>
+                Cart {itemCount > 0 && <span className="bg-accent text-accent-foreground text-xs px-1.5 rounded-full font-bold">{itemCount}</span>}
               </Link>
               {isAdmin && (
-                <Link
-                  href="/admin"
-                  className="text-foreground/70 hover:text-foreground transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Admin
-                </Link>
+                <Link href="/admin" className={navLink} onClick={() => setMobileMenuOpen(false)}>Admin</Link>
               )}
-              <hr className="border-foreground/10" />
+              <hr className="border-border" />
               {isAuthenticated ? (
                 <>
-                  <Link
-                    href="/account"
-                    className="text-foreground/70 hover:text-foreground transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    My Account
-                  </Link>
-                  <button
-                    className="text-left text-foreground/70 hover:text-foreground transition-colors"
-                    onClick={() => {
-                      logout();
-                      setMobileMenuOpen(false);
-                    }}
-                  >
-                    Logout
-                  </button>
+                  <Link href="/account" className={navLink} onClick={() => setMobileMenuOpen(false)}>My Account</Link>
+                  <button className={`text-left ${navLink}`} onClick={() => { logout(); setMobileMenuOpen(false); }}>Logout</button>
                 </>
               ) : (
                 <>
-                  <Link
-                    href="/auth/login"
-                    className="text-foreground/70 hover:text-foreground transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/auth/register"
-                    className="text-foreground/70 hover:text-foreground transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Sign Up
-                  </Link>
+                  <Link href="/auth/login" className={navLink} onClick={() => setMobileMenuOpen(false)}>Login</Link>
+                  <Link href="/auth/register" className={navLink} onClick={() => setMobileMenuOpen(false)}>Sign Up</Link>
                 </>
               )}
             </nav>

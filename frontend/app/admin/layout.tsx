@@ -68,10 +68,10 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-foreground/5">
+    <div className="min-h-screen bg-background">
       {/* Mobile Header */}
-      <div className="lg:hidden bg-background border-b border-foreground/10 p-4 flex items-center justify-between">
-        <Link href="/admin" className="text-xl font-bold">
+      <div className="lg:hidden bg-surface border-b border-border p-4 flex items-center justify-between">
+        <Link href="/admin" className="text-xl font-bold text-accent">
           AECMS Admin
         </Link>
         <button onClick={() => setSidebarOpen(!sidebarOpen)}>
@@ -84,15 +84,15 @@ export default function AdminLayout({
         <aside
           className={`
             fixed lg:static inset-y-0 left-0 z-40
-            w-64 bg-background border-r border-foreground/10
+            w-64 bg-surface border-r border-border
             transform transition-transform lg:transform-none
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
         >
           <div className="h-full flex flex-col">
             {/* Logo */}
-            <div className="p-6 border-b border-foreground/10 hidden lg:block">
-              <Link href="/admin" className="text-xl font-bold">
+            <div className="p-6 border-b border-border hidden lg:block">
+              <Link href="/admin" className="text-xl font-bold text-accent">
                 AECMS Admin
               </Link>
             </div>
@@ -112,8 +112,8 @@ export default function AdminLayout({
                       className={`
                         flex items-center gap-3 px-4 py-2.5 rounded-lg transition-colors
                         ${isActive
-                          ? 'bg-foreground text-background'
-                          : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
+                          ? 'bg-accent/10 text-accent border border-accent/20'
+                          : 'text-foreground/60 hover:bg-surface-raised hover:text-foreground'
                         }
                       `}
                     >
@@ -125,9 +125,9 @@ export default function AdminLayout({
             </nav>
 
             {/* User Section */}
-            <div className="p-4 border-t border-foreground/10">
+            <div className="p-4 border-t border-border">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-foreground/10 rounded-full flex items-center justify-center">
+                <div className="w-10 h-10 bg-accent/10 text-accent rounded-full flex items-center justify-center font-bold">
                   {user?.display_name?.[0] || user?.username?.[0] || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -140,13 +140,13 @@ export default function AdminLayout({
               <div className="flex gap-2">
                 <Link
                   href="/"
-                  className="flex-1 px-3 py-2 text-sm text-center border border-foreground/20 rounded-lg hover:bg-foreground/5"
+                  className="flex-1 px-3 py-2 text-sm text-center border border-border rounded-lg hover:bg-surface-raised hover:text-accent transition-colors"
                 >
                   View Site
                 </Link>
                 <button
                   onClick={() => logout()}
-                  className="px-3 py-2 text-sm border border-foreground/20 rounded-lg hover:bg-foreground/5"
+                  className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-surface-raised hover:text-accent transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
