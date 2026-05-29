@@ -90,6 +90,17 @@ const ARTICLE_TITLES: Record<number, string> = {
   733: 'Sample Chapter: Discoveries',
 };
 
+// Original WordPress publish dates keyed by wp_id
+const ARTICLE_DATES: Record<number, string> = {
+  381: '2021-04-29 15:26:13',
+  383: '2021-04-29 15:33:33',
+  385: '2021-04-29 15:36:04',
+  387: '2021-04-29 15:39:15',
+  465: '2021-06-27 08:24:00',
+  591: '2022-05-23 15:12:46',
+  733: '2024-11-20 05:59:50',
+};
+
 // Excerpt overrides keyed by wp_id
 const ARTICLE_EXCERPTS: Record<number, string> = {
   381: 'A short(ish) explanation of why you were taught to write the way you were taught in English class, the art we call Rhetoric.',
@@ -446,7 +457,8 @@ async function main() {
         author_can_delete: true,
         admin_can_edit: true,
         admin_can_delete: true,
-        published_at: new Date(),
+        published_at: ARTICLE_DATES[raw.wp_id] ? new Date(ARTICLE_DATES[raw.wp_id]) : new Date(),
+        created_at: ARTICLE_DATES[raw.wp_id] ? new Date(ARTICLE_DATES[raw.wp_id]) : new Date(),
       },
     });
 
