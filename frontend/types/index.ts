@@ -48,7 +48,7 @@ export interface Article {
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   status: 'draft' | 'published' | 'archived';
   published_at: string | null;
-  author: User;
+  author: User & { first_name?: string; last_name?: string; email?: string };
   categories: Category[];
   tags: Tag[];
   created_at: string;
@@ -169,10 +169,17 @@ export interface ShippingAddress {
 // Pagination types
 export interface PaginatedResponse<T> {
   data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  total_pages: number;
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    total_pages: number;
+  };
+  // Legacy flat shape (some endpoints)
+  total?: number;
+  page?: number;
+  limit?: number;
+  total_pages?: number;
 }
 
 // Payment types

@@ -29,21 +29,21 @@ export function AdminDashboardClient() {
   const stats = [
     {
       label: 'Total Products',
-      value: productsData?.total || 0,
+      value: productsData?.meta?.total ?? productsData?.total ?? 0,
       icon: Package,
       href: '/admin/products',
       color: 'text-blue-500',
     },
     {
       label: 'Published Articles',
-      value: articlesData?.total || 0,
+      value: articlesData?.meta?.total ?? articlesData?.total ?? 0,
       icon: FileText,
       href: '/admin/articles',
       color: 'text-green-500',
     },
     {
       label: 'Total Orders',
-      value: ordersData?.total || 0,
+      value: ordersData?.meta?.total ?? ordersData?.total ?? 0,
       icon: ShoppingCart,
       href: '/admin/orders',
       color: 'text-purple-500',
