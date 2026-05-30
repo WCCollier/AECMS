@@ -1,8 +1,8 @@
 # AECMS Comprehensive Testing Guide
 
-**Version**: 1.1
-**Last Updated**: 2026-02-06
-**Status**: Phase 8 - Production Readiness Testing
+**Version**: 1.2
+**Last Updated**: 2026-05-30
+**Status**: Phase 9 - User Testing (Steps 1–3, 6 complete)
 
 ---
 
@@ -96,19 +96,17 @@ This section covers the structured manual testing sequence for Phase 9. Testing 
 
 ---
 
-### Step 2 — Anonymous Shop Browsing
+### Step 2 — Anonymous Shop Browsing ✅ Done
 
 - Browse `/shop` and verify product grid loads
 - Click a product — verify detail page (title, price, description, image)
 - Check that "Add to Cart" button is visible without login
 
 **Checklist**
-- [ ] Product listing loads with prices
-- [ ] Product detail page loads
-- [ ] No JS errors in console
-- [ ] Out-of-stock products handled gracefully
-
-**Likely issues**: Product images absent (seeded products may have no featured images); "Add to Cart" may error without session handling.
+- [x] Product listing loads with prices
+- [x] Product detail page loads
+- [x] No JS errors in console
+- [x] Out-of-stock products handled gracefully
 
 ---
 
@@ -283,7 +281,7 @@ This section covers the structured manual testing sequence for Phase 9. Testing 
 
 ## Automated Testing
 
-### Backend Unit Tests (144 tests)
+### Backend Unit Tests (152 tests)
 ```bash
 cd backend && npm run test
 ```
@@ -1011,7 +1009,7 @@ npx playwright test e2e/auth.spec.ts
 
 ---
 
-## Quick Reference: API Endpoints (112 total)
+## Quick Reference: API Endpoints (114 total)
 
 | Module | Endpoints | Auth Required |
 |--------|-----------|---------------|
@@ -1026,7 +1024,7 @@ npx playwright test e2e/auth.spec.ts
 | Cart | 6 | Optional |
 | Orders | 7 | Yes |
 | Payments | 10 | Partial |
-| Comments | 11 | Partial |
+| Comments | 12 | Partial |
 | Digital Products | 11 | Yes |
 | Kindle | 7 | Yes |
 | Domain Aliases | 10 | Owner Only |

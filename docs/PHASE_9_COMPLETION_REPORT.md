@@ -22,7 +22,7 @@ See `TESTING_GUIDE.md → Phase 9: User Testing` for the full step-by-step seque
 | Step | Area | Status | Notes |
 |------|------|--------|-------|
 | 1 | Anonymous article browsing | ✅ Done | Category/tag filtering fixed |
-| 2 | Anonymous shop browsing | ✅ Done | Products recovered; images, badges, service UI working |
+| 2 | Anonymous shop browsing | ✅ Done | Products recovered; images, badges, service UI working; all 4 checklist items verified by user |
 | 3 | Anonymous cart mechanics | ✅ Done | NaN price fixed, cart images fixed, stock validation added |
 | 4 | Member login + browsing | ⏸ Pending | |
 | 5 | Member cart mechanics | ⏸ Pending | |
