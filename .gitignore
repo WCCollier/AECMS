@@ -41,9 +41,11 @@ coverage/
 .temp/
 .tmp/
 
-# Uploads (development only)
-backend/uploads/
-uploads/
+# Uploads (development only — user-uploaded files are not tracked)
+# wp-import/ is the exception: those images are committed as seed assets
+backend/uploads/*
+!backend/uploads/wp-import
+/uploads/
 
 # Docker volumes (persistent data handled by Docker)
 postgres_data/
@@ -58,9 +60,8 @@ backend/prisma/migrations/*.sql
 # WordPress migration (contains sensitive data)
 migration/
 
-# WordPress import source files (large, not part of codebase)
-seed_data/
-backend/uploads/
+# WordPress import source files — no longer needed; images committed directly
+# seed_data/ can be deleted once backend/uploads/wp-import/ is committed
 
 # Test artifacts
 test-results/
