@@ -191,10 +191,10 @@ This section covers the structured manual testing sequence for Phase 9. Testing 
 - Complete checkout with test card
 
 **Checklist**
-- [ ] Guest checkout collects email
-- [ ] `OptionalJwtAuthGuard` allows unauthenticated checkout
-- [ ] Order created with guest email
-- [ ] Confirmation shown
+- [x] Guest checkout collects email
+- [x] `OptionalJwtAuthGuard` allows unauthenticated checkout
+- [x] Order created with guest email
+- [x] Confirmation shown
 
 ---
 
