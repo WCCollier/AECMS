@@ -19,6 +19,19 @@ export const api = axios.create({
 // Token storage (client-side only)
 let accessToken: string | null = null;
 
+// Anonymous session ID for guest cart
+const SESSION_ID_KEY = 'aecms_session_id';
+
+export const getSessionId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  let id = localStorage.getItem(SESSION_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem(SESSION_ID_KEY, id);
+  }
+  return id;
+};
+
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
   if (typeof window !== 'undefined' && token) {
@@ -36,12 +49,20 @@ export const getAccessToken = (): string | null => {
   return accessToken;
 };
 
-// Request interceptor - add auth token
+// Request interceptor - add auth token and anonymous session ID
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (config.headers) {
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        // Inject guest session ID for anonymous cart support
+        const sessionId = getSessionId();
+        if (sessionId) {
+          config.headers['x-session-id'] = sessionId;
+        }
+      }
     }
     return config;
   },

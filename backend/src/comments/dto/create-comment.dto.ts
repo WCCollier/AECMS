@@ -1,12 +1,18 @@
 import { IsString, IsUUID, IsOptional, MinLength, MaxLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateCommentDto {
-  @ApiProperty({ description: 'Article ID to comment on' })
+  @ApiPropertyOptional({ description: 'Article ID to comment on' })
+  @IsOptional()
   @IsUUID()
-  article_id: string;
+  article_id?: string;
 
-  @ApiProperty({ description: 'Comment content', minLength: 1, maxLength: 5000 })
+  @ApiPropertyOptional({ description: 'Product ID to comment on' })
+  @IsOptional()
+  @IsUUID()
+  product_id?: string;
+
+  @ApiPropertyOptional({ description: 'Comment content', minLength: 1, maxLength: 5000 })
   @IsString()
   @MinLength(1)
   @MaxLength(5000)

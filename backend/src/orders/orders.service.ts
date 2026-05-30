@@ -53,8 +53,10 @@ export class OrdersService {
       }
 
       if (
-        product.stock_status === 'out_of_stock' ||
-        (product.stock_quantity < item.quantity && product.stock_status !== 'backorder')
+        product.product_type !== 'service' && (
+          product.stock_status === 'out_of_stock' ||
+          (product.stock_quantity != null && product.stock_quantity < item.quantity && product.stock_status !== 'backorder')
+        )
       ) {
         throw new BadRequestException(`Insufficient stock for ${product.name}`);
       }
@@ -113,7 +115,7 @@ export class OrdersService {
       const updated = await this.prisma.product.findUnique({
         where: { id: item.product_id },
       });
-      if (updated && updated.stock_quantity <= 0) {
+      if (updated && updated.product_type !== 'service' && updated.stock_quantity != null && updated.stock_quantity <= 0) {
         await this.prisma.product.update({
           where: { id: item.product_id },
           data: { stock_status: 'out_of_stock' },

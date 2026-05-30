@@ -31,7 +31,9 @@ export function ProductCard({ product }: ProductCardProps) {
     }
   };
 
-  const isOutOfStock = product.track_inventory && product.stock_quantity <= 0 && !product.allow_backorder;
+  const isService = product.product_type === 'service';
+  const isUnavailable = isService && product.stock_status === 'unavailable';
+  const isOutOfStock = !isService && product.stock_quantity != null && product.stock_quantity <= 0;
 
   return (
     <Link href={`/shop/${product.slug}`} className="group">
@@ -50,9 +52,19 @@ export function ProductCard({ product }: ProductCardProps) {
               <ShoppingCart className="w-12 h-12" />
             </div>
           )}
+          {isUnavailable && (
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+              <span className="text-sm font-medium">Not Available</span>
+            </div>
+          )}
           {isOutOfStock && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
               <span className="text-sm font-medium">Out of Stock</span>
+            </div>
+          )}
+          {isService && !isUnavailable && (
+            <div className="absolute top-2 right-2 bg-accent/90 text-white text-xs px-2 py-0.5 rounded-full">
+              Lesson
             </div>
           )}
         </div>
@@ -80,9 +92,9 @@ export function ProductCard({ product }: ProductCardProps) {
               size="sm"
               variant="secondary"
               onClick={handleAddToCart}
-              disabled={isOutOfStock}
+              disabled={isOutOfStock || isUnavailable}
             >
-              Add
+              {isService ? 'Reserve' : 'Add'}
             </Button>
           </div>
         </div>

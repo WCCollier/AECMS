@@ -23,20 +23,24 @@ export class CommentsService {
    * Create a new comment on an article
    */
   async create(dto: CreateCommentDto, user: User) {
-    // Verify article exists and is published
-    const article = await this.prisma.article.findUnique({
-      where: { id: dto.article_id },
-    });
-
-    if (!article) {
-      throw new NotFoundException('Article not found');
+    if (!dto.article_id && !dto.product_id) {
+      throw new BadRequestException('Either article_id or product_id is required');
     }
 
-    if (article.status !== 'published') {
-      throw new BadRequestException('Cannot comment on unpublished articles');
+    // Verify target exists and is published
+    if (dto.article_id) {
+      const article = await this.prisma.article.findUnique({ where: { id: dto.article_id } });
+      if (!article) throw new NotFoundException('Article not found');
+      if (article.status !== 'published') throw new BadRequestException('Cannot comment on unpublished articles');
     }
 
-    // If replying, verify parent comment exists and belongs to same article
+    if (dto.product_id) {
+      const product = await this.prisma.product.findUnique({ where: { id: dto.product_id } });
+      if (!product || product.deleted_at) throw new NotFoundException('Product not found');
+      if (product.status !== 'published') throw new BadRequestException('Cannot comment on unpublished products');
+    }
+
+    // If replying, verify parent comment exists and belongs to the same target
     if (dto.parent_id) {
       const parentComment = await this.prisma.comment.findUnique({
         where: { id: dto.parent_id },
@@ -46,8 +50,12 @@ export class CommentsService {
         throw new NotFoundException('Parent comment not found');
       }
 
-      if (parentComment.article_id !== dto.article_id) {
+      if (dto.article_id && parentComment.article_id !== dto.article_id) {
         throw new BadRequestException('Parent comment belongs to different article');
+      }
+
+      if (dto.product_id && parentComment.product_id !== dto.product_id) {
+        throw new BadRequestException('Parent comment belongs to different product');
       }
 
       // Only allow single-level nesting
@@ -59,7 +67,8 @@ export class CommentsService {
     // Create comment with pending status (reactive moderation)
     const comment = await this.prisma.comment.create({
       data: {
-        article_id: dto.article_id,
+        article_id: dto.article_id ?? null,
+        product_id: dto.product_id ?? null,
         user_id: user.id,
         content: dto.content,
         parent_id: dto.parent_id,
@@ -79,6 +88,13 @@ export class CommentsService {
           select: {
             id: true,
             title: true,
+            slug: true,
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            name: true,
             slug: true,
           },
         },
@@ -193,6 +209,38 @@ export class CommentsService {
       limit,
       total_pages: Math.ceil(total / limit),
     };
+  }
+
+  /**
+   * Get comments for a product (public, approved only)
+   */
+  async findByProduct(productId: string, page: number = 1, limit: number = 20) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product || product.deleted_at) throw new NotFoundException('Product not found');
+
+    const skip = (page - 1) * limit;
+
+    const [comments, total] = await Promise.all([
+      this.prisma.comment.findMany({
+        where: { product_id: productId, parent_id: null, status: CommentStatus.approved, deleted_at: null },
+        include: {
+          user: { select: { id: true, email: true, first_name: true, last_name: true } },
+          replies: {
+            where: { status: CommentStatus.approved, deleted_at: null },
+            include: { user: { select: { id: true, email: true, first_name: true, last_name: true } } },
+            orderBy: { created_at: 'asc' },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.comment.count({
+        where: { product_id: productId, parent_id: null, status: CommentStatus.approved, deleted_at: null },
+      }),
+    ]);
+
+    return { data: comments, total, page, limit, total_pages: Math.ceil(total / limit) };
   }
 
   /**
@@ -315,7 +363,7 @@ export class CommentsService {
    * Admin: Get all comments with filters
    */
   async findAll(query: QueryCommentsDto) {
-    const { article_id, status, moderation_status, page = 1, limit = 20 } = query;
+    const { article_id, product_id, status, moderation_status, page = 1, limit = 20 } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {
@@ -323,6 +371,7 @@ export class CommentsService {
     };
 
     if (article_id) where.article_id = article_id;
+    if (product_id) where.product_id = product_id;
     if (status) where.status = status;
     if (moderation_status) where.moderation_status = moderation_status;
 

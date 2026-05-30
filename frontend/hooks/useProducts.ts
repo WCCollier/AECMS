@@ -25,8 +25,8 @@ export function useProducts(options: UseProductsOptions = {}) {
 
   return {
     products: data?.data ?? [],
-    total: data?.total ?? 0,
-    totalPages: data?.total_pages ?? 0,
+    total: data?.meta?.total ?? data?.total ?? 0,
+    totalPages: data?.meta?.total_pages ?? data?.total_pages ?? 0,
     isLoading,
     isError: !!error,
     error,

@@ -2,8 +2,8 @@
 
 **Project**: AECMS - Advanced Ecommerce Content Management System
 **Phase**: Phase 8 - Polish & Production (MVP Features)
-**Status**: 🔄 IN PROGRESS
-**Updated**: 2026-02-02
+**Status**: ✅ COMPLETE
+**Updated**: 2026-05-30
 
 ---
 
@@ -329,37 +329,31 @@ PRIMARY_DOMAIN=fantasyvreality.com
 
 ---
 
-## Remaining Phase 8 Tasks
+## Phase 8 Bugs Fixed (discovered during Phase 9 user testing)
 
-1. **Frontend Polish**
-   - [ ] Fix Next.js build issue
-   - [ ] Add loading skeletons
-   - [ ] Toast notifications
-   - [ ] CRUD forms in admin
+- **Category/tag filtering** (articles listing): Three-layer bug — `LatestPageClient` never read `?category=` URL param; backend DTO rejected slugs with `@IsUUID()` validator; service had no slug-based Prisma filter. Fixed by adding `category`/`tag` slug params to DTO and wiring `categories.some.category.slug` queries in the service.
+- **Pagination shape mismatch**: `useArticles` hook read `data.total` / `data.total_pages` but API returns `data.meta.total` / `data.meta.total_pages`. Fixed with `meta.*` primary + flat fallback.
 
-2. **Admin Features**
-   - [ ] Image upload in admin
-   - [ ] Domain alias management UI
-   - [ ] User management UI
+## Deferred to Phase 9
 
-3. **Production Readiness**
-   - [ ] Responsive design improvements
-   - [ ] SEO optimization
-   - [ ] Performance tuning
-   - [ ] Security audit
+The following Phase 8 tasks were de-scoped to allow user testing to begin. They will be addressed as bugs surface during Phase 9:
 
-4. **Migration**
-   - [ ] WordPress content migration scripts
-   - [ ] Media import from wp_uploads.tar
+1. **Frontend Polish** — loading skeletons, toast notifications
+2. **Admin CRUD forms** — article/product create and edit forms
+3. **Image upload in admin**
+4. **Domain alias management UI**
+5. **Responsive design improvements**
+6. **SEO and performance optimization**
+7. **WordPress migration scripts** and media import from `wp_uploads.tar`
 
 ---
 
 ## Conclusion
 
-Phase 8 begins with two critical MVP features:
+Phase 8 delivered two critical MVP features:
 
 1. **Domain Aliasing** enables multi-domain deployments without code changes, making the application truly portable and configurable at runtime.
 
 2. **Email Verification** provides essential security for user registration, preventing spam accounts and ensuring valid customer contact information.
 
-Both features follow established patterns and include comprehensive test coverage. The application now has 112 API endpoints and 144 passing tests.
+Both features follow established patterns and include comprehensive test coverage. The application has 112 API endpoints and 144 passing unit tests. Phase 9 (User Testing) begins next, exercising the full end-to-end user journey.

@@ -67,13 +67,15 @@ export class ProductsService {
         description: dto.description,
         short_description: dto.short_description,
         price: dto.price,
+        compare_at_price: dto.compare_at_price ?? null,
         sku: dto.sku,
-        stock_quantity: dto.stock_quantity ?? 0,
-        stock_status: dto.stock_status || 'in_stock',
+        stock_quantity: dto.product_type === 'service' ? null : (dto.stock_quantity ?? 0),
+        stock_status: dto.stock_status || (dto.product_type === 'service' ? 'available' : 'in_stock'),
         status: dto.status || 'draft',
         visibility: dto.visibility || 'public',
         guest_purchaseable: dto.guest_purchaseable ?? false,
         product_type: dto.product_type || 'physical',
+        author_id: dto.author_id ?? null,
         meta_title: dto.meta_title,
         meta_description: dto.meta_description,
         author_can_edit: dto.author_can_edit ?? true,
@@ -318,6 +320,7 @@ export class ProductsService {
       description: dto.description,
       short_description: dto.short_description,
       price: dto.price,
+      compare_at_price: dto.compare_at_price,
       sku: dto.sku,
       stock_quantity: dto.stock_quantity,
       stock_status: dto.stock_status,
@@ -325,6 +328,9 @@ export class ProductsService {
       visibility: dto.visibility,
       guest_purchaseable: dto.guest_purchaseable,
       product_type: dto.product_type,
+      author: dto.author_id !== undefined
+        ? (dto.author_id ? { connect: { id: dto.author_id } } : { disconnect: true })
+        : undefined,
       meta_title: dto.meta_title,
       meta_description: dto.meta_description,
       author_can_edit: dto.author_can_edit,
@@ -442,6 +448,14 @@ export class ProductsService {
    */
   private getProductIncludes() {
     return {
+      author: {
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+        },
+      },
       categories: {
         include: {
           category: true,
@@ -463,6 +477,7 @@ export class ProductsService {
       _count: {
         select: {
           reviews: true,
+          comments: true,
         },
       },
     };
@@ -494,13 +509,25 @@ export class ProductsService {
    * Transform product response
    */
   private transformProduct(product: any) {
+    const media = product.media?.map((pm: any) => pm.media) || [];
+    const primaryMedia = product.media?.find((pm: any) => pm.is_primary)?.media ?? media[0] ?? null;
+    let featured_image_url: string | null = null;
+    if (primaryMedia?.file_path) {
+      const fp = primaryMedia.file_path;
+      featured_image_url = fp.startsWith('/uploads/') ? fp
+        : fp.includes('/uploads/') ? fp.replace(/.*\/uploads\//, '/uploads/')
+        : `/uploads/${fp}`;
+    }
     return {
       ...product,
       price: parseFloat(product.price.toString()),
       categories: product.categories?.map((pc: any) => pc.category) || [],
       tags: product.tags?.map((pt: any) => pt.tag) || [],
-      media: product.media?.map((pm: any) => pm.media) || [],
+      media,
+      featured_image_url,
+      compare_at_price: product.compare_at_price ? parseFloat(product.compare_at_price.toString()) : null,
       review_count: product._count?.reviews || 0,
+      comment_count: product._count?.comments || 0,
     };
   }
 }

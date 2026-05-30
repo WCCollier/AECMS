@@ -25,10 +25,11 @@
 **Phase 6**: ✅ COMPLETE - Frontend (Next.js 16, React 19, Tailwind v4)
 **Phase 6B**: ✅ COMPLETE - Comments & AI Moderation (OpenAI + profanity filter)
 **Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
-**Phase 8**: 🔄 IN PROGRESS - Polish & Production (Domain Aliasing, Email Verification)
+**Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
+**Phase 9**: 🔄 IN PROGRESS - User Testing (structured manual QA, bug fixes)
 
 **Test Status**: 90 frontend + 144 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 112 total
+**API Endpoints**: 113 total
 
 ## API Endpoint Summary
 
@@ -45,7 +46,7 @@
 | Cart | 6 |
 | Orders | 7 |
 | Payments | 10 |
-| Comments | 11 |
+| Comments | 12 |
 | Digital Products | 11 |
 | Kindle | 7 |
 | Domain Aliases | 10 |
@@ -144,6 +145,8 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_6B_COMPLETION_REPORT.md` - Comments & AI moderation details
 - `docs/PHASE_7_COMPLETION_REPORT.md` - Digital products details
 - `docs/PHASE_8_COMPLETION_REPORT.md` - Domain aliasing & email verification
+- `docs/PHASE_9_COMPLETION_REPORT.md` - User testing progress and bugs found
+- `docs/TESTING_GUIDE.md` - Full testing guide including Phase 9 manual sequence
 - `docs/prd/` - 12 PRD documents with full specifications
 
 ## Notes for Claude
@@ -220,7 +223,7 @@ SMTP_HOST=smtp.example.com
 SMTP_PORT=587
 ```
 
-## Phase 8: Polish & Production (🔄 IN PROGRESS)
+## Phase 8: Polish & Production (✅ COMPLETE)
 
 **Implemented**:
 - ✅ Domain Aliasing Module (Owner configurable route-domain mapping)
@@ -239,10 +242,39 @@ SMTP_PORT=587
 - Resend verification endpoint
 - Login blocked until verified
 
-**Remaining**:
-1. Add loading skeletons and toast notifications
-3. Implement CRUD forms in admin
-4. Image upload in admin
-5. Responsive design improvements
-6. SEO and performance optimization
-7. WordPress migration scripts
+## Phase 9: User Testing (🔄 IN PROGRESS)
+
+**Goal**: Structured manual QA of the full user journey, fixing bugs as they surface.
+
+**Testing sequence** (see `docs/TESTING_GUIDE.md → Phase 9`):
+1. ✅ Anonymous article browsing (category/tag filtering fixed)
+2. ✅ Anonymous shop browsing (products recovered, service type added, images working)
+3. 🔄 Anonymous cart mechanics (session ID fix applied)
+4. Member login + browsing
+5. Member cart mechanics
+6. Checkout as member (Stripe sandbox)
+7. Guest checkout
+8. Admin back door — 2FA enrollment
+9. Admin CRUD — articles
+10. Admin CRUD — products
+11. Admin orders
+
+**Features added during Phase 9**:
+- Service product type (`ProductType.service`, `StockStatus.available/unavailable`, nullable stock)
+- 15 lesson products recovered from WordPress SQL dump + images
+- Product feature parity with Articles: `author_id`, `compare_at_price`, comments support
+- Product description renders TipTap HTML; Compare-at Price field in admin form
+- Anonymous cart session ID (`x-session-id`) generated in `localStorage` and auto-injected
+- Infinite scroll / paginated toggle (`ViewModeContext`, `ViewModeToggle`, `useSWRInfinite`)
+  - Per-user preference stored in `localStorage`, global across catalogue pages
+  - `?page=N` in URL forces paginated mode for that visit without changing stored preference
+  - Paginated mode writes `?page=N` to URL; each page is bookmarkable/shareable
+  - Search/filter resets scroll position in infinite mode
+
+**Deferred polish** (will fix as bugs surface during Phase 9):
+- Loading skeletons and toast notifications
+- CRUD forms in admin
+- Image upload in admin
+- Responsive design improvements
+- SEO and performance optimization
+- WordPress migration scripts

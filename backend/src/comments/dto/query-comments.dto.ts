@@ -9,6 +9,11 @@ export class QueryCommentsDto {
   @IsUUID()
   article_id?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by product ID' })
+  @IsOptional()
+  @IsUUID()
+  product_id?: string;
+
   @ApiPropertyOptional({ description: 'Filter by comment status', enum: CommentStatus })
   @IsOptional()
   @IsEnum(CommentStatus)

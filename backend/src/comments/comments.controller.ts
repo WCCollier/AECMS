@@ -56,6 +56,16 @@ export class CommentsController {
     );
   }
 
+  @Get('product/:productId')
+  @ApiOperation({ summary: 'Get comments for a product' })
+  async findByProduct(
+    @Param('productId', ParseUUIDPipe) productId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.commentsService.findByProduct(productId, page || 1, limit || 20);
+  }
+
   /**
    * Get a single comment by ID
    */

@@ -15,6 +15,7 @@ interface ProductFormData {
   short_description: string;
   featured_image_url: string | null;
   price: number;
+  compare_at_price?: number;
   sku: string;
   stock_quantity: number;
   track_inventory: boolean;
@@ -50,6 +51,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
       description: initialData?.description || '',
       short_description: initialData?.short_description || '',
       price: initialData?.price ? Number(initialData.price) : 0,
+      compare_at_price: initialData?.compare_at_price ? Number(initialData.compare_at_price) : undefined,
       sku: initialData?.sku || '',
       stock_quantity: initialData?.stock_quantity || 0,
       track_inventory: initialData?.track_inventory ?? true,
@@ -256,6 +258,23 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
                 {errors.price && (
                   <p className="text-red-500 text-sm mt-1">{errors.price.message}</p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Compare-at Price (USD)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50">$</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register('compare_at_price', {
+                      min: { value: 0, message: 'Must be positive' }
+                    })}
+                    placeholder="Original price (shown as strikethrough)"
+                    className="w-full pl-7"
+                  />
+                </div>
               </div>
 
               <div>

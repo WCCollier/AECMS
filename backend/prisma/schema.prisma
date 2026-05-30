@@ -48,6 +48,7 @@ model User {
   refresh_tokens        RefreshToken[]
   capabilities          UserCapability[]
   articles              Article[]
+  products              Product[]       @relation("ProductAuthor")
   comments              Comment[]
   product_reviews       ProductReview[]
   orders                Order[]
@@ -375,8 +376,9 @@ model Product {
   description         String      @db.Text
   short_description   String?
   price               Decimal     @db.Decimal(10, 2)
+  compare_at_price    Decimal?    @db.Decimal(10, 2)
   sku                 String?     @unique
-  stock_quantity      Int         @default(0)
+  stock_quantity      Int?        @default(0)
   stock_status        StockStatus @default(in_stock)
   status              ContentStatus @default(draft)
   visibility          ContentVisibility @default(public)
@@ -384,6 +386,9 @@ model Product {
 
   // Product type
   product_type        ProductType @default(physical)
+
+  // Author (mirrors Article)
+  author_id           String?
 
   // Granular permissions
   author_can_edit     Boolean     @default(true)
@@ -400,9 +405,11 @@ model Product {
   updated_at          DateTime    @updatedAt
   deleted_at          DateTime?
 
+  author           User?           @relation("ProductAuthor", fields: [author_id], references: [id])
   categories       ProductCategory[]
   tags             ProductTag[]
   media            ProductMedia[]
+  comments         Comment[]
   reviews          ProductReview[]
   cart_items       CartItem[]
   order_items      OrderItem[]
@@ -410,6 +417,7 @@ model Product {
 
   @@index([slug])
   @@index([sku])
+  @@index([author_id])
   @@index([product_type])
   @@map("products")
 }
@@ -418,11 +426,14 @@ enum StockStatus {
   in_stock
   out_of_stock
   backorder
+  available
+  unavailable
 }
 
 enum ProductType {
   physical
   digital
+  service
 }
 
 model DigitalProductFile {
@@ -618,6 +629,7 @@ model OrderItem {
 model Comment {
   id                String        @id @default(uuid())
   article_id        String?
+  product_id        String?
   user_id           String?       // Nullable for guest comments (future)
   author_name       String?       // For guest comments
   author_email      String?       // For guest comments
@@ -634,12 +646,14 @@ model Comment {
   updated_at        DateTime      @updatedAt
   deleted_at        DateTime?
 
-  article Article?  @relation(fields: [article_id], references: [id], onDelete: Cascade)
-  user    User?     @relation(fields: [user_id], references: [id])
-  parent  Comment?  @relation("CommentReplies", fields: [parent_id], references: [id])
-  replies Comment[] @relation("CommentReplies")
+  article  Article?  @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  product  Product?  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [user_id], references: [id])
+  parent   Comment?  @relation("CommentReplies", fields: [parent_id], references: [id])
+  replies  Comment[] @relation("CommentReplies")
 
   @@index([article_id])
+  @@index([product_id])
   @@index([user_id])
   @@index([status])
   @@map("comments")

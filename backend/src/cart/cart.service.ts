@@ -105,8 +105,13 @@ export class CartService {
       // Update quantity
       const newQuantity = existingItem.quantity + quantity;
 
-      // Check stock
-      if (newQuantity > product.stock_quantity && product.stock_status !== 'backorder') {
+      // Check stock (service products have no quantity limit)
+      if (
+        product.product_type !== 'service' &&
+        product.stock_quantity != null &&
+        newQuantity > product.stock_quantity &&
+        product.stock_status !== 'backorder'
+      ) {
         throw new BadRequestException(
           `Only ${product.stock_quantity} items available in stock`,
         );
@@ -117,8 +122,13 @@ export class CartService {
         data: { quantity: newQuantity },
       });
     } else {
-      // Check stock
-      if (quantity > product.stock_quantity && product.stock_status !== 'backorder') {
+      // Check stock (service products have no quantity limit)
+      if (
+        product.product_type !== 'service' &&
+        product.stock_quantity != null &&
+        quantity > product.stock_quantity &&
+        product.stock_status !== 'backorder'
+      ) {
         throw new BadRequestException(
           `Only ${product.stock_quantity} items available in stock`,
         );
@@ -169,8 +179,10 @@ export class CartService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check stock
+    // Check stock (service products have no quantity limit)
     if (
+      item.product.product_type !== 'service' &&
+      item.product.stock_quantity != null &&
       dto.quantity > item.product.stock_quantity &&
       item.product.stock_status !== 'backorder'
     ) {

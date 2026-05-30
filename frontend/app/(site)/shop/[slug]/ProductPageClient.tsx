@@ -73,7 +73,9 @@ export function ProductPageClient() {
     );
   }
 
-  const isOutOfStock = product.track_inventory && product.stock_quantity <= 0 && !product.allow_backorder;
+  const isService = product.product_type === 'service';
+  const isUnavailable = isService && product.stock_status === 'unavailable';
+  const isOutOfStock = !isService && product.stock_quantity != null && product.stock_quantity <= 0;
   const discount = product.compare_at_price && product.compare_at_price > product.price
     ? Math.round((1 - product.price / product.compare_at_price) * 100)
     : null;
@@ -125,19 +127,24 @@ export function ProductPageClient() {
 
           {/* Description */}
           {product.description && (
-            <div className="prose prose-sm max-w-none mb-6 text-foreground/70">
-              <p>{product.description}</p>
-            </div>
+            <div
+              className="prose prose-sm max-w-none mb-6 text-foreground/70"
+              dangerouslySetInnerHTML={{ __html: product.description }}
+            />
           )}
 
-          {/* Stock Status */}
+          {/* Stock / Availability Status */}
           <div className="mb-6">
-            {isOutOfStock ? (
+            {isService ? (
+              isUnavailable ? (
+                <span className="text-red-500 font-medium">Not Available</span>
+              ) : (
+                <span className="text-green-500 font-medium">Available — contact us to schedule</span>
+              )
+            ) : isOutOfStock ? (
               <span className="text-red-500 font-medium">Out of Stock</span>
-            ) : product.track_inventory ? (
-              <span className="text-green-500 font-medium">
-                {product.stock_quantity} in stock
-              </span>
+            ) : product.stock_quantity != null ? (
+              <span className="text-green-500 font-medium">{product.stock_quantity} in stock</span>
             ) : (
               <span className="text-green-500 font-medium">In Stock</span>
             )}
@@ -147,26 +154,29 @@ export function ProductPageClient() {
           <Card className="mb-6">
             <CardContent className="p-4">
               <div className="flex items-center gap-4">
-                <div className="flex items-center border border-foreground/20 rounded-lg">
-                  <button
-                    className="p-2 hover:bg-foreground/5"
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <span className="px-4 py-2 min-w-[3rem] text-center">{quantity}</span>
-                  <button
-                    className="p-2 hover:bg-foreground/5"
-                    onClick={() => setQuantity((q) => q + 1)}
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
+                {/* Hide quantity selector for service products */}
+                {!isService && (
+                  <div className="flex items-center border border-foreground/20 rounded-lg">
+                    <button
+                      className="p-2 hover:bg-foreground/5"
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="px-4 py-2 min-w-[3rem] text-center">{quantity}</span>
+                    <button
+                      className="p-2 hover:bg-foreground/5"
+                      onClick={() => setQuantity((q) => q + 1)}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
 
                 <Button
                   className="flex-1"
                   onClick={handleAddToCart}
-                  disabled={isOutOfStock || adding}
+                  disabled={isOutOfStock || isUnavailable || adding}
                   isLoading={adding}
                 >
                   {added ? (
@@ -177,7 +187,7 @@ export function ProductPageClient() {
                   ) : (
                     <>
                       <ShoppingCart className="w-4 h-4 mr-2" />
-                      Add to Cart
+                      {isService ? 'Reserve' : 'Add to Cart'}
                     </>
                   )}
                 </Button>

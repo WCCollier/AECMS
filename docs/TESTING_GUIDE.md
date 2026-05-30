@@ -41,17 +41,17 @@ cd frontend && npm run test
 ## Table of Contents
 
 1. [Test Credentials](#test-credentials)
-2. [Automated Testing](#automated-testing)
-3. [Authentication Testing](#authentication-testing)
-4. [Email Verification Testing](#email-verification-testing)
-5. [Content Management Testing](#content-management-testing)
-6. [Ecommerce Testing](#ecommerce-testing)
-7. [Payments Testing](#payments-testing)
-8. [Digital Products Testing](#digital-products-testing)
-9. [Comments & Moderation Testing](#comments--moderation-testing)
-10. [Domain Aliases Testing](#domain-aliases-testing)
-11. [Frontend E2E Testing](#frontend-e2e-testing)
-12. [Manual Browser Testing](#manual-browser-testing)
+2. [Phase 9: User Testing Sequence](#phase-9-user-testing-sequence)
+3. [Automated Testing](#automated-testing)
+4. [Authentication Testing](#authentication-testing)
+5. [Email Verification Testing](#email-verification-testing)
+6. [Content Management Testing](#content-management-testing)
+7. [Ecommerce Testing](#ecommerce-testing)
+8. [Payments Testing](#payments-testing)
+9. [Digital Products Testing](#digital-products-testing)
+10. [Comments & Moderation Testing](#comments--moderation-testing)
+11. [Domain Aliases Testing](#domain-aliases-testing)
+12. [Frontend E2E Testing](#frontend-e2e-testing)
 13. [Production Checklist](#production-checklist)
 
 ---
@@ -73,6 +73,217 @@ TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
 
 echo $TOKEN
 ```
+
+---
+
+## Phase 9: User Testing Sequence
+
+This section covers the structured manual testing sequence for Phase 9. Testing proceeds from the lowest-privilege path (anonymous browsing) upward to admin functions. Work through steps in order — each step's results inform whether the next step is worth attempting.
+
+### Step 1 — Anonymous Article Browsing ✅ Done
+
+- Browse `/latest` and verify article grid loads
+- Select a category filter (e.g. "Short Thoughts") in the header nav — URL becomes `?category=short-thoughts`
+- Confirm listing filters to that category, subtitle reads "Filtered by: Short Thoughts"
+- Open an article, verify content renders (paragraphs, images, embedded media)
+- Back-navigate, verify filter is still applied
+
+**Checklist**
+- [x] Article listing loads
+- [x] Category filter reads URL param and filters results
+- [x] Article detail page renders full content
+- [x] Tag filtering works the same way
+
+---
+
+### Step 2 — Anonymous Shop Browsing
+
+- Browse `/shop` and verify product grid loads
+- Click a product — verify detail page (title, price, description, image)
+- Check that "Add to Cart" button is visible without login
+
+**Checklist**
+- [ ] Product listing loads with prices
+- [ ] Product detail page loads
+- [ ] No JS errors in console
+- [ ] Out-of-stock products handled gracefully
+
+**Likely issues**: Product images absent (seeded products may have no featured images); "Add to Cart" may error without session handling.
+
+---
+
+### Step 3 — Anonymous Cart Mechanics
+
+This step is foundational — if cart is broken, all downstream checkout tests are meaningless.
+
+- Add a product to cart
+- Navigate to another page and back — cart count in header should persist
+- Go to `/cart` — verify item, quantity, subtotal
+- Change quantity — verify total updates
+- Remove item — verify cart empties
+
+**Checklist**
+- [ ] Add to cart works without login
+- [ ] Cart persists across page navigations (cookie/localStorage session)
+- [ ] Quantity update recalculates total
+- [ ] Remove item works
+- [ ] Empty cart state shows correctly
+
+**Likely issue**: Session ID may not persist across navigations, causing cart to empty.
+
+---
+
+### Step 4 — Member Login + Browsing
+
+- Sign in as `member@aecms.local / Member123!@#`
+- Verify header changes (account menu appears, "Sign Up" disappears)
+- Browse articles — check if any `logged_in_only` content now appears that was hidden anonymously
+- Browse shop
+
+**Checklist**
+- [ ] Login succeeds and redirects
+- [ ] Header reflects logged-in state
+- [ ] Auth context persists on page refresh
+- [ ] `logged_in_only` articles are visible to members
+
+**Likely issue**: Auth context `refreshUser` race condition on page load may flash the logged-out state briefly.
+
+---
+
+### Step 5 — Member Cart Mechanics
+
+- As logged-in member, repeat the cart test from Step 3
+- If you had anonymous cart items in Step 3: check whether they transferred after login (cart merge)
+
+**Checklist**
+- [ ] Cart works for logged-in user
+- [ ] Anonymous cart merges into member cart on login (or is explicitly cleared — either is acceptable, but the behavior should be consistent)
+
+---
+
+### Step 6 — Checkout as Member (Stripe Sandbox)
+
+**Stripe test card**: `4242 4242 4242 4242`, any future expiry, any 3-digit CVC.
+
+- Add items to cart, proceed to checkout
+- Fill shipping address
+- Enter test card details
+- Submit — watch backend logs (`/tmp/backend.log`) immediately after for Stripe errors
+- Verify order created and status transitions to `paid`
+
+**Checklist**
+- [ ] Checkout form renders with address + payment fields
+- [ ] Stripe Payment Intent created successfully
+- [ ] Payment processes with test card
+- [ ] Order status becomes `paid`
+- [ ] Cart clears after successful order
+- [ ] Confirmation screen shown
+
+**Likely issues**: Payment Intent creation may fail if Codespaces blocks outbound Stripe API calls. Webhook (for order status update) requires `stripe listen --forward-to localhost:4000/payments/webhooks/stripe` to be running. Check logs first on any failure.
+
+**Stripe decline test cards** (test failure paths):
+
+| Scenario | Card |
+|----------|------|
+| Generic decline | 4000 0000 0000 0002 |
+| Insufficient funds | 4000 0000 0000 9995 |
+| 3D Secure required | 4000 0025 0000 3155 |
+
+---
+
+### Step 7 — Guest Checkout
+
+- Log out
+- Add items to cart
+- Proceed to checkout — verify email collection field appears
+- Complete checkout with test card
+
+**Checklist**
+- [ ] Guest checkout collects email
+- [ ] `OptionalJwtAuthGuard` allows unauthenticated checkout
+- [ ] Order created with guest email
+- [ ] Confirmation shown
+
+---
+
+### Step 8 — Admin Back Door: 2FA Enrollment
+
+**Do this before any admin CRUD testing** — without a registered TOTP device, the owner account cannot reach the admin dashboard.
+
+- Navigate to `/admin/login`
+- Sign in as `owner@aecms.local / Admin123!@#`
+- When QR code appears, scan with authenticator app (Google Authenticator, Authy, etc.)
+- Enter the 6-digit code to complete enrollment
+- Verify you land on the admin dashboard
+
+**Checklist**
+- [ ] Admin login page loads at `/admin/login`
+- [ ] Credentials accepted, TOTP challenge shown
+- [ ] QR code scans correctly
+- [ ] 6-digit code accepted, dashboard loads
+- [ ] Subsequent logins prompt for TOTP code
+
+---
+
+### Step 9 — Admin CRUD: Articles
+
+- Create a new article via admin form
+- Edit an existing article — verify TipTap editor loads content (paragraphs, images)
+- Verify existing categories/tags pre-populate on edit form
+- Publish/unpublish toggle
+- Delete an article
+
+**Checklist**
+- [ ] Create article form submits
+- [ ] TipTap editor loads existing HTML content correctly
+- [ ] Paragraph breaks render in editor
+- [ ] Image insert works in editor
+- [ ] Categories and tags pre-populate on edit
+- [ ] Status toggle (draft/published) works
+- [ ] Delete works
+
+**Likely issue**: Edit form may not pre-populate categories/tags from the existing article — those aren't passed in `initialData` currently.
+
+---
+
+### Step 10 — Admin CRUD: Products
+
+- Create a new product
+- Edit an existing product
+- Toggle published/draft
+- Delete a product
+
+**Checklist**
+- [ ] Create product form submits with all fields
+- [ ] Price stored in cents (display correctly as dollars)
+- [ ] Stock quantity updates
+- [ ] Image upload works
+- [ ] Categories/tags pre-populate on edit
+
+---
+
+### Step 11 — Admin Orders
+
+- View the orders created in Steps 6 and 7
+- Update order status (e.g. pending → shipped)
+
+**Checklist**
+- [ ] Order list loads with correct totals
+- [ ] Order detail shows line items
+- [ ] Status update works
+- [ ] Guest orders visible (not filtered out)
+
+---
+
+### Anticipated Show-stoppers (by probability)
+
+| Area | Likely Problem |
+|------|---------------|
+| Cart | Session ID not persisted — cart empties on navigation |
+| Checkout | Stripe Payment Intent creation blocked in Codespaces network, or webhook not reachable |
+| Admin article edit | Form doesn't pre-populate existing categories/tags |
+| Admin 2FA | Blocks all admin testing until enrollment is complete |
+| Cart merge | Anonymous → logged-in cart merge probably not implemented |
 
 ---
 

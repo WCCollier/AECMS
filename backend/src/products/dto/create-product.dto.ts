@@ -43,6 +43,13 @@ export class CreateProductDto {
   @Min(0)
   price: number;
 
+  @ApiPropertyOptional({ description: 'Compare-at price (original/strikethrough price)', minimum: 0 })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @IsOptional()
+  compare_at_price?: number;
+
   @ApiPropertyOptional({ description: 'Stock Keeping Unit (unique identifier)' })
   @IsString()
   @IsOptional()
@@ -139,4 +146,9 @@ export class CreateProductDto {
   @IsBoolean()
   @IsOptional()
   admin_can_delete?: boolean;
+
+  @ApiPropertyOptional({ description: 'Author (user) ID' })
+  @IsUUID()
+  @IsOptional()
+  author_id?: string;
 }
