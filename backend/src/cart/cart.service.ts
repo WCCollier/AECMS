@@ -87,14 +87,20 @@ export class CartService {
       where: { cart_id: cart.id, product_id: dto.product_id },
     });
 
-    const quantity = dto.quantity || 1;
-    const newQuantity = existingItem ? existingItem.quantity + quantity : quantity;
+    // Service and digital products are non-quantifiable — always qty 1 per cart.
+    const isNonQuantifiable = product.product_type !== 'physical';
+    const quantity = isNonQuantifiable ? 1 : (dto.quantity || 1);
+    // Non-quantifiable: always 1 regardless of existing; physical: accumulate.
+    const newQuantity = isNonQuantifiable ? 1 : (existingItem ? existingItem.quantity + quantity : quantity);
 
-    // Virtual stock check — skips service products (no inventory).
-    // When 'digital' is added to product_type, change to: product_type === 'physical'
-    // See docs/Shape_Audit.md Item 5 for the full rationale.
+    // If a non-quantifiable item is already in the cart at qty 1, nothing to do.
+    if (isNonQuantifiable && existingItem) {
+      return this.getCart(userId, sessionId);
+    }
+
+    // Virtual stock check — physical products only.
     if (
-      product.product_type !== 'service' &&
+      !isNonQuantifiable &&
       product.stock_quantity != null &&
       product.stock_status !== 'backorder'
     ) {
@@ -169,11 +175,16 @@ export class CartService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Virtual stock check (exclude current cart so user can freely adjust their own reservation).
-    // When 'digital' is added to product_type, change to: product_type === 'physical'
-    // See docs/Shape_Audit.md Item 5.
+    const isNonQuantifiable = item.product.product_type !== 'physical';
+
+    // Service and digital products are always qty 1 — reject any other value.
+    if (isNonQuantifiable && dto.quantity !== 1) {
+      throw new BadRequestException('Quantity must be 1 for service and digital products');
+    }
+
+    // Virtual stock check for physical products only.
     if (
-      item.product.product_type !== 'service' &&
+      !isNonQuantifiable &&
       item.product.stock_quantity != null &&
       item.product.stock_status !== 'backorder'
     ) {
@@ -252,16 +263,11 @@ export class CartService {
    * Merge guest cart into user cart (on login)
    */
   async mergeCart(userId: string, sessionId: string) {
-    // Get both carts
+    // Get both carts, including product type so we can handle non-quantifiable items
+    const itemInclude = { items: { include: { product: { select: { product_type: true } } } } };
     const [guestCart, userCart] = await Promise.all([
-      this.prisma.cart.findFirst({
-        where: { session_id: sessionId },
-        include: { items: true },
-      }),
-      this.prisma.cart.findFirst({
-        where: { user_id: userId },
-        include: { items: true },
-      }),
+      this.prisma.cart.findFirst({ where: { session_id: sessionId }, include: itemInclude }),
+      this.prisma.cart.findFirst({ where: { user_id: userId }, include: itemInclude }),
     ]);
 
     if (!guestCart || guestCart.items.length === 0) {
@@ -269,14 +275,11 @@ export class CartService {
       return this.getCart(userId);
     }
 
-    // Create user cart if doesn't exist
-    let targetCart = userCart;
-    if (!targetCart) {
-      targetCart = await this.prisma.cart.create({
-        data: { user_id: userId },
-        include: { items: true },
-      });
-    }
+    // Create user cart if doesn't exist (use same include so types align)
+    const targetCart = userCart ?? await this.prisma.cart.create({
+      data: { user_id: userId },
+      include: itemInclude,
+    });
 
     // Merge items
     for (const guestItem of guestCart.items) {
@@ -285,11 +288,14 @@ export class CartService {
       );
 
       if (existingItem) {
-        // Add quantities
-        await this.prisma.cartItem.update({
-          where: { id: existingItem.id },
-          data: { quantity: existingItem.quantity + guestItem.quantity },
-        });
+        // Physical: sum quantities. Service/digital: already 1 in both carts — nothing to do.
+        if (guestItem.product.product_type === 'physical') {
+          await this.prisma.cartItem.update({
+            where: { id: existingItem.id },
+            data: { quantity: existingItem.quantity + guestItem.quantity },
+          });
+        }
+        // Non-physical guest item stays in guest cart and is deleted with it below
       } else {
         // Move item to user cart
         await this.prisma.cartItem.update({
