@@ -11,6 +11,11 @@ const nextConfig = {
         source: '/api-proxy/:path*',
         destination: `${backendUrl}/:path*`,
       },
+      {
+        // Proxy backend-served static files (media library) through same origin
+        source: '/uploads/:path*',
+        destination: `${backendUrl}/uploads/:path*`,
+      },
     ];
   },
 

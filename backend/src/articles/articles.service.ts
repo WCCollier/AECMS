@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
+import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateArticleDto, UpdateArticleDto, QueryArticlesDto } from './dto';
 import { Prisma, ContentStatus, ContentVisibility } from '@prisma/client';
@@ -602,11 +603,23 @@ export class ArticlesService {
   }
 
   /**
+   * Derive a browser-accessible URL from a media record's file_path.
+   * Files live under <cwd>/uploads/... and are served by ServeStatic at /uploads/...
+   */
+  private mediaUrl(media: any): string | null {
+    if (!media?.file_path) return null;
+    const uploadsBase = path.join(process.cwd(), 'uploads');
+    const rel = path.relative(uploadsBase, media.file_path);
+    return `/uploads/${rel}`;
+  }
+
+  /**
    * Transform article response
    */
   private transformArticle(article: any) {
     return {
       ...article,
+      featured_image_url: this.mediaUrl(article.featured_image),
       categories: article.categories?.map((ac: any) => ac.category) || [],
       tags: article.tags?.map((at: any) => at.tag) || [],
       comment_count: article._count?.comments || 0,
