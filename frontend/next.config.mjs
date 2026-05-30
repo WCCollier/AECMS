@@ -3,6 +3,17 @@ const nextConfig = {
   // Use standalone output for production deployment
   output: 'standalone',
 
+  // Proxy /api-proxy/* → backend on port 4000 (server-side, avoids browser CORS/port issues)
+  async rewrites() {
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+    return [
+      {
+        source: '/api-proxy/:path*',
+        destination: `${backendUrl}/:path*`,
+      },
+    ];
+  },
+
   // Skip type checking during build (faster builds, we use separate type check)
   typescript: {
     ignoreBuildErrors: false,

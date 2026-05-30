@@ -1,6 +1,11 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+// In the browser, use the proxy path so all requests stay on the same origin.
+// In Node.js (SSR/server actions), fall back to direct backend URL.
+const API_BASE_URL =
+  typeof window !== 'undefined'
+    ? '/api-proxy'
+    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000');
 
 // Create axios instance
 export const api = axios.create({
