@@ -2,6 +2,8 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
+  Delete,
   Body,
   Query,
   HttpCode,
@@ -23,6 +25,8 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('auth')
@@ -112,6 +116,29 @@ export class AuthController {
       emailVerified: user.email_verified,
       totpEnabled: user.totp_enabled,
     };
+  }
+
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change password for authenticated user' })
+  @ApiResponse({ status: 200, description: 'Password changed, all sessions revoked' })
+  @ApiResponse({ status: 400, description: 'Current password incorrect' })
+  async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
+    return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
+  }
+
+  @Delete('account')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete the authenticated user\'s account' })
+  @ApiResponse({ status: 200, description: 'Account deleted' })
+  @ApiResponse({ status: 400, description: 'Password incorrect' })
+  @ApiResponse({ status: 403, description: 'Owner account cannot be deleted' })
+  async deleteAccount(@Request() req: any, @Body() dto: DeleteAccountDto) {
+    return this.authService.deleteAccount(req.user.id, dto.password);
   }
 
   // ── Back-door / Admin login ────────────────────────────────────────────────

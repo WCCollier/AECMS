@@ -67,6 +67,22 @@ export class CommentsController {
   }
 
   /**
+   * Get the authenticated user's own comments and reviews
+   */
+  @Get('mine')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all comments and reviews by the current user' })
+  @ApiResponse({ status: 200, description: 'Returns paginated comments' })
+  async findMine(
+    @Request() req: any,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.commentsService.findByUser(req.user.id, page || 1, limit || 20);
+  }
+
+  /**
    * Get a single comment by ID
    */
   @Get(':id')

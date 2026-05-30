@@ -56,6 +56,7 @@ async function main() {
     {
       name: 'American Shooter Lesson 1: Marksmanship',
       slug: 'american-shooter-lesson-1-marksmanship',
+      sku: 'AS-L1-MARKS',
       price: 324.00,
       short_description: 'The first course in the American Shooter curriculum. $324 for up to 4 students.',
       description: `<p>$324 for up to 4 students</p><p>The first course in the American Shooter curriculum, in which you will learn:</p><ul><li>Fundamentals of Safe Gun Ownership and Handling, including handling, maintaining, storing, and using a firearm safely and responsibly</li><li>Marksmanship fundamentals with pistol, rifle, and shotgun</li><li>Traditional Static Shooting with pistol, rifle, and shotgun</li></ul>`,
@@ -64,6 +65,7 @@ async function main() {
     {
       name: 'American Shooter Lesson 2: Wing Shooting',
       slug: 'american-shooter-lesson-2-wing-shooting',
+      sku: 'AS-L2-WING',
       price: 225.00,
       short_description: 'The second course in the American Shooter curriculum. $225 for up to 4 students.',
       description: `<p>$225 for up to 4 students</p><p>The second course in the American Shooter curriculum, in which you will learn:</p><ul><li>Basic Wing Shooting</li><li>Introduction to Dynamic Shooting (Traditional)</li></ul>`,
@@ -72,6 +74,7 @@ async function main() {
     {
       name: 'American Shooter Lesson 3: Defensive Shooting Basics',
       slug: 'american-shooter-lesson-3-defensive-shooting-basics',
+      sku: 'AS-L3-DEF-B',
       price: 425.00,
       short_description: 'The third course in the American Shooter curriculum. $425 for up to 4 students.',
       description: `<p>$425 for up to 4 students</p><p>The third course in the American Shooter curriculum, in which you will learn:</p><ul><li>Defensive Shooting with Pistol and Carbine</li><li>Dynamic and Static Shooting in a Defensive Context</li></ul>`,
@@ -80,6 +83,7 @@ async function main() {
     {
       name: 'American Shooter Lesson 4: Defensive Shooting Additional Skills',
       slug: 'american-shooter-lesson-4-defensive-shooting-additional-skills',
+      sku: 'AS-L4-DEF-A',
       price: 425.00,
       short_description: 'The fourth course in the American Shooter curriculum. $425 for up to 4 students.',
       description: `<p>$425 for up to 4 students</p><p>The fourth course in the American Shooter curriculum, in which you will learn:</p><ul><li>Malfunction Drills</li><li>Tactical Reloads</li><li>Barricade Shooting</li></ul>`,
@@ -88,6 +92,7 @@ async function main() {
     {
       name: 'American Shooter Supplemental: Traditional Static Shooting',
       slug: 'american-shooter-supplemental-traditional-static-shooting',
+      sku: 'AS-SUPP-TSS',
       price: 175.00,
       short_description: 'Supplemental course for students who began with defensive shooting. $175 for up to 4 students.',
       description: `<p>$175 for up to 4 students</p><p>If you skipped Lesson 1 and went directly to <em>Growing Up with a Shotgun</em> or <em>Direct to Defensive Shooting</em>, you can take this course later on to go back and learn the fundamentals of Traditional Static Shooting.</p>`,
@@ -96,6 +101,7 @@ async function main() {
     {
       name: 'American Shooter Supplemental: Traditional Dynamic Shooting',
       slug: 'american-shooter-supplemental-traditional-dynamic-shooting',
+      sku: 'AS-SUPP-TDS',
       price: 175.00,
       short_description: 'Supplemental course for students who skipped wing shooting. $175 for up to 4 students.',
       description: `<p>$175 for up to 4 students</p><p>If you skipped Lesson 2 and went <em>Direct to Defensive Shooting</em>, you can take this course later on to go back and learn the fundamentals of Traditional Dynamic Shooting.</p>`,
@@ -104,6 +110,7 @@ async function main() {
     {
       name: 'American Shooter Alternative: Direct to Defensive Shooting',
       slug: 'american-shooter-alternative-direct-to-defensive-shooting',
+      sku: 'AS-ALT-DDS',
       price: 654.00,
       short_description: 'Accelerated defensive shooting for those with urgent training needs. $654 for up to 4 students.',
       description: `<p>$654 for up to 4 students</p><p>If you do not have the resources to progress through the full American Shooter core curriculum, and you need training urgently in the safe and effective use of your defensive firearm, this alternative curriculum covers the essential content of Lessons 1, 3, and 4 in a single intensive session.</p>`,
@@ -112,6 +119,7 @@ async function main() {
     {
       name: 'American Shooter: Strategies for Personal Protection',
       slug: 'american-shooter-strategies-for-personal-protection',
+      sku: 'AS-STRAT-PP',
       price: 164.00,
       short_description: 'A course in the broader context of personal protection. $164 for up to 4 students.',
       description: `<p>$164 for up to four students</p><p>You have heard it said that a gun is a tool, not a talisman. It is not the solution to your self-defense needs, but just one component (if a pivotal one) of your overall personal protection strategy. This course addresses that broader context.</p>`,
@@ -120,6 +128,7 @@ async function main() {
     {
       name: 'American Shooter: Community Training Seminar',
       slug: 'american-shooter-community-training-seminar',
+      sku: 'AS-COMM-SEM',
       price: 0.00,
       short_description: 'Contact American Shooter for pricing and scheduling.',
       description: `<p>Contact American Shooter for pricing and scheduling.</p><p>As the number of new gun-owners in the United States skyrockets, more and more communities and social organizations are discovering the need and desire for accessible, responsible firearms education. American Shooter offers community seminars tailored to your group's needs and concerns.</p>`,
@@ -128,6 +137,7 @@ async function main() {
     {
       name: 'NRA Basic Pistol',
       slug: 'nra-basic-pistol',
+      sku: 'NRA-BP',
       price: 495.00,
       short_description: 'NRA Basic Pistol course. $495 for up to 4 students; price includes NRA course materials.',
       description: `<p>$495 for up to 4 students; price includes NRA course materials</p><p>NRA Basic Pistol is a comprehensive introduction to pistol shooting for new shooters, covering safety, fundamentals, and basic marksmanship.</p>`,
@@ -136,6 +146,7 @@ async function main() {
     {
       name: 'NRA Basic Rifle',
       slug: 'nra-basic-rifle',
+      sku: 'NRA-BR',
       price: 495.00,
       short_description: 'NRA Basic Rifle course. $495 for up to 4 students; price includes NRA course materials.',
       description: `<p>$495 for up to 4 students; price includes NRA course materials</p><p>NRA Basic Rifle is a comprehensive introduction to rifle shooting covering safety, fundamentals, and basic marksmanship.</p>`,
@@ -144,6 +155,7 @@ async function main() {
     {
       name: 'NRA Personal Protection Inside the Home',
       slug: 'nra-personal-protection-inside-the-home',
+      sku: 'NRA-PPIH',
       price: 495.00,
       short_description: 'NRA Personal Protection Inside the Home. $495 for up to 4 students.',
       description: `<p>$495 for up to 4 students</p><p>NRA Personal Protection Inside the Home covers the knowledge, skills, and attitude essential for using a firearm safely and effectively in a home-defense situation.</p>`,
@@ -152,6 +164,7 @@ async function main() {
     {
       name: 'NRA Personal Protection Outside the Home',
       slug: 'nra-personal-protection-outside-the-home',
+      sku: 'NRA-PPOH',
       price: 495.00,
       short_description: 'NRA Personal Protection Outside the Home. $495 for up to 4 students; includes NRA materials.',
       description: `<p>$495 for up to 4 students; price includes NRA course materials</p><p>NRA Personal Protection Outside the Home addresses the knowledge, skills, and attitude needed to carry a concealed firearm responsibly for personal protection outside the home.</p>`,
@@ -160,6 +173,7 @@ async function main() {
     {
       name: 'American Shooter Supplemental: Classroom and Lab, Online',
       slug: 'american-shooter-supplemental-classroom-and-lab-online',
+      sku: 'AS-SUPP-CAL-O',
       price: 224.00,
       short_description: 'Online classroom/lab portion of an applicable syllabus course. $224 for up to 4 students.',
       description: `<p>$224 for up to 4 students, covers the classroom/lab portion of an applicable syllabus course.</p><p>Can't make it to a lesson in person? American Shooter offers distance-learning (via Zoom or similar) for the classroom and lab portions of applicable courses.</p>`,
@@ -168,6 +182,7 @@ async function main() {
     {
       name: 'American Shooter: Hourly Lessons',
       slug: 'american-shooter-hourly-lessons',
+      sku: 'AS-HOURLY',
       price: 94.00,
       short_description: 'Custom hourly lessons for any purpose. $94 per hour, up to 3 students.',
       description: `<p>$94 per hour up to 3 students</p><p>Custom hourly lessons can be used to serve any purpose you may have which is not covered by the standard curriculum courses. You may wish to continue after one of the standard courses, revisit skills from a previous course, or address specific needs not covered elsewhere.</p>`,
@@ -188,6 +203,7 @@ async function main() {
       data: {
         name: lesson.name,
         slug: lesson.slug,
+        sku: lesson.sku ?? null,
         description: lesson.description,
         short_description: lesson.short_description,
         price: lesson.price,

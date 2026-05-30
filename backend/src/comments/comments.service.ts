@@ -229,6 +229,22 @@ export class CommentsService {
     return { data: sorted, total, page, limit, total_pages: Math.ceil(total / limit) };
   }
 
+  async findByUser(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where = { user_id: userId, deleted_at: null, parent_id: null };
+    const [comments, total] = await Promise.all([
+      this.prisma.comment.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit,
+        include: this.commentInclude(true),
+      }),
+      this.prisma.comment.count({ where }),
+    ]);
+    return { data: comments, total, page, limit, total_pages: Math.ceil(total / limit) };
+  }
+
   async findById(id: string) {
     const comment = await this.prisma.comment.findUnique({
       where: { id },

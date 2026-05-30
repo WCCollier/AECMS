@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 
 export function LoginPageClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,7 +32,8 @@ export function LoginPageClient() {
 
     try {
       await login(formData);
-      router.push('/');
+      const returnTo = searchParams?.get('from') ?? '/';
+      router.push(returnTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
     } finally {

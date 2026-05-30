@@ -1,0 +1,307 @@
+'use client';
+
+import { useState, FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrders } from '@/hooks/useOrders';
+import { Button, Input } from '@/components/ui';
+import api, { getErrorMessage } from '@/lib/api';
+import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star } from 'lucide-react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
+import type { Comment, PaginatedResponse } from '@/types';
+
+const formatPrice = (p: number) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p);
+
+const formatDate = (s: string) =>
+  new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+
+export function AccountPageClient() {
+  const router = useRouter();
+  const { user, logout, isLoading: authLoading } = useAuth();
+  const { orders, isLoading: ordersLoading } = useOrders({ limit: 5 });
+  const { data: commentsData, isLoading: commentsLoading } = useSWR<PaginatedResponse<Comment>>(
+    user ? '/comments/mine?limit=5' : null,
+    fetcher,
+  );
+
+  const [activeSection, setActiveSection] = useState<'orders' | 'comments' | 'password' | 'delete' | null>(null);
+
+  // Change password state
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+
+  // Delete account state
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  if (authLoading) return <div className="container mx-auto px-4 py-16 text-center text-foreground/60">Loading…</div>;
+
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center">
+        <p className="text-foreground/60 mb-4">You must be logged in to view your account.</p>
+        <Link href="/auth/login?from=/account"><Button>Sign In</Button></Link>
+      </div>
+    );
+  }
+
+  async function handlePasswordChange(e: FormEvent) {
+    e.preventDefault();
+    setPwError('');
+    setPwSuccess('');
+    if (pwForm.newPassword !== pwForm.confirm) {
+      setPwError('New passwords do not match');
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const res = await api.patch('/auth/change-password', {
+        currentPassword: pwForm.currentPassword,
+        newPassword: pwForm.newPassword,
+      });
+      setPwSuccess(res.data.message);
+      setPwForm({ currentPassword: '', newPassword: '', confirm: '' });
+      // All sessions revoked — log out and redirect to login
+      setTimeout(() => { logout(); router.push('/auth/login'); }, 2000);
+    } catch (err) {
+      setPwError(getErrorMessage(err));
+    } finally {
+      setPwLoading(false);
+    }
+  }
+
+  async function handleDeleteAccount(e: FormEvent) {
+    e.preventDefault();
+    setDeleteError('');
+    setDeleteLoading(true);
+    try {
+      await api.delete('/auth/account', { data: { password: deletePassword } });
+      await logout();
+      router.push('/');
+    } catch (err) {
+      setDeleteError(getErrorMessage(err));
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  const comments = commentsData?.data ?? [];
+
+  return (
+    <div className="container mx-auto px-4 py-10 max-w-2xl">
+      <h1 className="text-2xl font-bold mb-8">My Account</h1>
+
+      {/* Profile */}
+      <section className="bg-surface border border-border rounded-xl p-6 mb-6">
+        <h2 className="font-semibold text-lg mb-4">Profile</h2>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-foreground/60">Display name</span>
+            <span className="font-medium">{user.display_name ?? user.username}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-foreground/60">Email</span>
+            <span className="font-medium">{user.email}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-foreground/60">Role</span>
+            <span className="capitalize font-medium">{user.role}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-foreground/60">Member since</span>
+            <span className="font-medium">{formatDate(user.created_at)}</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Order History */}
+      <section className="bg-surface border border-border rounded-xl mb-6 overflow-hidden">
+        <button
+          onClick={() => setActiveSection(activeSection === 'orders' ? null : 'orders')}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-raised transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <ShoppingBag className="w-5 h-5 text-accent" />
+            <span className="font-semibold">Order History</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-foreground/40 transition-transform ${activeSection === 'orders' ? 'rotate-90' : ''}`} />
+        </button>
+
+        {activeSection === 'orders' && (
+          <div className="border-t border-border px-6 py-4">
+            {ordersLoading ? (
+              <p className="text-sm text-foreground/60">Loading orders…</p>
+            ) : orders.length === 0 ? (
+              <p className="text-sm text-foreground/60">No orders yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {orders.map((order) => (
+                  <div key={order.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
+                    <div>
+                      <p className="font-medium font-mono text-xs text-foreground/50">{order.order_number}</p>
+                      <p className="font-medium">{formatPrice(order.total)}</p>
+                      <p className="text-foreground/50 text-xs">{formatDate(order.created_at)}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="capitalize text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent">{order.status}</span>
+                      <Link href={`/order-confirmation?order=${order.id}`} className="text-accent hover:underline text-xs">
+                        View
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+                {orders.length === 5 && (
+                  <p className="text-xs text-foreground/50 text-center pt-1">Showing 5 most recent orders.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Comment & Review History */}
+      <section className="bg-surface border border-border rounded-xl mb-6 overflow-hidden">
+        <button
+          onClick={() => setActiveSection(activeSection === 'comments' ? null : 'comments')}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-raised transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <MessageSquare className="w-5 h-5 text-accent" />
+            <span className="font-semibold">Comments &amp; Reviews</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-foreground/40 transition-transform ${activeSection === 'comments' ? 'rotate-90' : ''}`} />
+        </button>
+
+        {activeSection === 'comments' && (
+          <div className="border-t border-border px-6 py-4">
+            {commentsLoading ? (
+              <p className="text-sm text-foreground/60">Loading…</p>
+            ) : comments.length === 0 ? (
+              <p className="text-sm text-foreground/60">No comments or reviews yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {comments.map((c) => {
+                  const overallRating = c.ratings?.find((r) => r.title === 'Overall');
+                  return (
+                    <div key={c.id} className="py-2 border-b border-border last:border-0 text-sm">
+                      {c.title && <p className="font-medium">{c.title}</p>}
+                      {overallRating && (
+                        <div className="flex items-center gap-0.5 mb-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-3 h-3 ${i < overallRating.value ? 'fill-amber-400 text-amber-400' : 'text-foreground/20'}`}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-foreground/70 line-clamp-2">{c.content}</p>
+                      <p className="text-foreground/40 text-xs mt-1">{formatDate(c.created_at)}</p>
+                    </div>
+                  );
+                })}
+                {comments.length === 5 && (
+                  <p className="text-xs text-foreground/50 text-center pt-1">Showing 5 most recent.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Change Password */}
+      <section className="bg-surface border border-border rounded-xl mb-6 overflow-hidden">
+        <button
+          onClick={() => setActiveSection(activeSection === 'password' ? null : 'password')}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-raised transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Lock className="w-5 h-5 text-accent" />
+            <span className="font-semibold">Change Password</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-foreground/40 transition-transform ${activeSection === 'password' ? 'rotate-90' : ''}`} />
+        </button>
+
+        {activeSection === 'password' && (
+          <div className="border-t border-border px-6 py-4">
+            <form onSubmit={handlePasswordChange} className="space-y-3">
+              {pwError && <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{pwError}</p>}
+              {pwSuccess && <p className="text-sm text-green-600 bg-green-500/10 border border-green-500/20 rounded px-3 py-2">{pwSuccess} Redirecting…</p>}
+              <Input
+                label="Current password"
+                type="password"
+                name="currentPassword"
+                value={pwForm.currentPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
+                required
+                autoComplete="current-password"
+              />
+              <Input
+                label="New password"
+                type="password"
+                name="newPassword"
+                value={pwForm.newPassword}
+                onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
+                required
+                autoComplete="new-password"
+              />
+              <Input
+                label="Confirm new password"
+                type="password"
+                name="confirm"
+                value={pwForm.confirm}
+                onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
+                required
+                autoComplete="new-password"
+              />
+              <Button type="submit" size="sm" isLoading={pwLoading}>Update Password</Button>
+            </form>
+          </div>
+        )}
+      </section>
+
+      {/* Delete Account */}
+      <section className="bg-surface border border-red-500/20 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setActiveSection(activeSection === 'delete' ? null : 'delete')}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-red-500/5 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Trash2 className="w-5 h-5 text-red-500" />
+            <span className="font-semibold text-red-500">Delete Account</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-red-500/40 transition-transform ${activeSection === 'delete' ? 'rotate-90' : ''}`} />
+        </button>
+
+        {activeSection === 'delete' && (
+          <div className="border-t border-red-500/20 px-6 py-4">
+            <p className="text-sm text-foreground/70 mb-4">
+              This action is permanent and cannot be undone. Enter your password to confirm.
+            </p>
+            <form onSubmit={handleDeleteAccount} className="space-y-3">
+              {deleteError && <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{deleteError}</p>}
+              <Input
+                label="Password"
+                type="password"
+                name="deletePassword"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                required
+                autoComplete="current-password"
+              />
+              <Button type="submit" variant="danger" size="sm" isLoading={deleteLoading}>
+                Permanently Delete My Account
+              </Button>
+            </form>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

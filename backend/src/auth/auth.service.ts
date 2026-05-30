@@ -522,6 +522,38 @@ export class AuthService {
     });
   }
 
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (!user.password_hash) throw new BadRequestException('Account uses OAuth login — password change not supported');
+    const valid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!valid) throw new BadRequestException('Current password is incorrect');
+
+    const newHash = await this.hashPassword(newPassword);
+    await this.prisma.user.update({ where: { id: userId }, data: { password_hash: newHash } });
+    await this.logoutAll(userId);
+
+    return { message: 'Password changed successfully. Please log in again.' };
+  }
+
+  async deleteAccount(userId: string, password: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.role === 'owner') throw new ForbiddenException('Owner account cannot be deleted');
+
+    if (!user.password_hash) throw new BadRequestException('Account uses OAuth login — deletion not supported via password');
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) throw new BadRequestException('Password is incorrect');
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { deleted_at: new Date() },
+    });
+
+    return { message: 'Account deleted successfully' };
+  }
+
   /**
    * Hash password using bcrypt
    */

@@ -60,8 +60,8 @@ backend/prisma/migrations/*.sql
 # WordPress migration (contains sensitive data)
 migration/
 
-# WordPress import source files — no longer needed; images committed directly
-# seed_data/ can be deleted once backend/uploads/wp-import/ is committed
+# WordPress import source files — no longer needed; images committed directly to backend/uploads/wp-import/
+seed_data/
 
 # Test artifacts
 test-results/
