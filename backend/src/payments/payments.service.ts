@@ -118,13 +118,14 @@ export class PaymentsService {
       let clientSecret: string;
       switch (dto.provider) {
         case 'stripe':
-          clientSecret = `test_secret_${mockPaymentId}`;
+          // Simulate Stripe Checkout session URL (redirects to order confirmation in test mode)
+          clientSecret = `/order-confirmation?order=${order.id}&test_mode=true`;
           break;
         case 'paypal':
           clientSecret = `https://sandbox.paypal.com/checkoutnow?token=${mockPaymentId}`;
           break;
         default:
-          clientSecret = `test_secret_${mockPaymentId}`;
+          clientSecret = `/order-confirmation?order=${order.id}&test_mode=true`;
       }
 
       return {
@@ -314,11 +315,11 @@ export class PaymentsService {
     this.logger.log(`Processing ${event.provider} webhook: ${event.type}`);
 
     switch (event.type) {
-      // Stripe events
-      case 'payment_intent.succeeded':
+      // Stripe Checkout events (checkout.session.completed = payment captured)
+      case 'checkout.session.completed':
         await this.handlePaymentSucceeded(event);
         break;
-      case 'payment_intent.payment_failed':
+      case 'checkout.session.expired':
         await this.handlePaymentFailed(event);
         break;
 

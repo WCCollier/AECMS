@@ -77,8 +77,9 @@ export class PayPalProvider implements PaymentProvider {
               brand_name: 'AECMS Store',
               locale: 'en-US',
               user_action: 'PAY_NOW',
-              return_url: `${this.configService.get('FRONTEND_URL')}/checkout/success`,
-              cancel_url: `${this.configService.get('FRONTEND_URL')}/checkout/cancel`,
+              // order param carries the AECMS order ID back to our success/cancel pages
+              return_url: `${this.configService.get('FRONTEND_URL')}/checkout/success?order=${params.orderId}`,
+              cancel_url: `${this.configService.get('FRONTEND_URL')}/checkout/cancel?order=${params.orderId}`,
             },
           },
         },

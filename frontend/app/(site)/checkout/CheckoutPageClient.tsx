@@ -104,14 +104,19 @@ export function CheckoutPageClient() {
       });
 
       if (provider === 'stripe') {
-        // NOTE: Amazon Pay is available automatically inside Stripe Checkout for
-        // eligible customers — no separate button or provider integration is needed.
-        alert(`Stripe payment created. Client secret: ${response.data.client_secret}\n\nIn production, this would open Stripe Elements/Checkout (which includes Apple Pay, Google Pay, and Amazon Pay where available).`);
-        await clearCart();
-        router.push(`/order-confirmation?order=${orderId}`);
+        // client_secret is the Stripe Checkout session URL.
+        // Clear cart before leaving — if payment is cancelled, user returns to /checkout/cancel.
+        // NOTE: Apple Pay, Google Pay, and Amazon Pay are available inside Stripe Checkout
+        // automatically for eligible customers — no separate integration needed.
+        if (response.data.client_secret) {
+          await clearCart();
+          window.location.href = response.data.client_secret;
+        }
       } else if (provider === 'paypal') {
-        if (response.data.approval_url) {
-          window.location.href = response.data.approval_url;
+        // client_secret holds the PayPal approval URL (payer-action link).
+        // Cart is cleared by /checkout/success after capture succeeds.
+        if (response.data.client_secret) {
+          window.location.href = response.data.client_secret;
         }
       }
     } catch (err) {

@@ -168,14 +168,27 @@ rm -rf backend/dist frontend/.next
 
 **Implemented**:
 - ✅ PaymentsModule with provider abstraction pattern
-- ✅ StripeProvider - Payment Intents API, webhooks
-- ✅ PayPalProvider - Orders API v2, OAuth2 tokens
-- ✅ Test mode for development without API keys
+- ✅ StripeProvider — Stripe Checkout Sessions, webhooks (`checkout.session.completed`)
+- ✅ PayPalProvider — Orders API v2, OAuth2 tokens, capture on return
+- ✅ Test mode (`PAYMENT_TEST_MODE=true`) for development without live API calls
 - ✅ OptionalJwtAuthGuard for guest checkout
+- ✅ `/checkout/success` — PayPal capture-on-return page
+- ✅ `/checkout/cancel` — cancellation page (Stripe + PayPal)
 
 **Configuration Status**:
 - ✅ Stripe sandbox keys configured (via Codespaces Secrets)
 - ✅ PayPal sandbox keys configured (via Codespaces Secrets)
+- ⚠️ `PAYMENT_TEST_MODE=true` in backend `.env` — must be set to `false` for live sandbox testing
+- ⚠️ `STRIPE_WEBHOOK_SECRET=PLACEHOLDER` — must be replaced with real value from `stripe listen`
+
+**To enable live sandbox testing** (one-time setup per Codespace restart):
+```bash
+# 1. Set PAYMENT_TEST_MODE=false in backend/.env
+# 2. Run the Stripe CLI listener in a separate terminal:
+stripe listen --forward-to localhost:4000/payments/webhooks/stripe
+# 3. Copy the whsec_... value it prints to STRIPE_WEBHOOK_SECRET in backend/.env
+# 4. Restart the backend: kill the process and npm run start:dev again
+```
 
 **Do NOT add a separate Amazon Pay provider.** Amazon Pay is exposed automatically by Stripe Checkout for eligible customers. A standalone `AmazonPayProvider` was built and then removed after this was discovered.
 

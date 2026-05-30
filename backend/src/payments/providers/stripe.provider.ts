@@ -39,46 +39,45 @@ export class StripeProvider implements PaymentProvider {
       throw new Error('Stripe is not configured');
     }
 
-    const paymentIntent = await this.stripe.paymentIntents.create({
-      amount: params.amount, // Amount in cents
-      currency: params.currency.toLowerCase(),
+    // Use Stripe Checkout (hosted page). Apple Pay, Google Pay, and Amazon Pay
+    // are automatically enabled by Stripe for eligible customers — no extra work needed.
+    const session = await this.stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer_email: params.customerEmail,
+      line_items: [
+        {
+          price_data: {
+            currency: params.currency.toLowerCase(),
+            product_data: {
+              name: `Order #${params.metadata?.order_number || params.orderId}`,
+            },
+            unit_amount: params.amount,
+          },
+          quantity: 1,
+        },
+      ],
       metadata: {
         order_id: params.orderId,
         ...params.metadata,
       },
-      receipt_email: params.customerEmail,
-      automatic_payment_methods: {
-        enabled: true,
-      },
+      success_url: `${this.configService.get('FRONTEND_URL')}/order-confirmation?order=${params.orderId}`,
+      cancel_url: `${this.configService.get('FRONTEND_URL')}/checkout/cancel?order=${params.orderId}`,
     });
 
     return {
-      id: paymentIntent.id,
-      clientSecret: paymentIntent.client_secret || undefined,
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      status: this.mapStripeStatus(paymentIntent.status),
-      metadata: paymentIntent.metadata as Record<string, string>,
+      id: session.id,
+      clientSecret: session.url ?? undefined, // The Checkout page URL — redirect the browser here
+      amount: params.amount,
+      currency: params.currency,
+      status: 'requires_action',
+      metadata: { order_id: params.orderId },
     };
   }
 
-  async capturePayment(paymentId: string): Promise<PaymentCapture> {
-    if (!this.stripe) {
-      throw new Error('Stripe is not configured');
-    }
-
-    // For Stripe, capture is usually automatic with PaymentIntents
-    // This is mainly for manual capture scenarios
-    const paymentIntent = await this.stripe.paymentIntents.capture(paymentId);
-
-    return {
-      id: paymentIntent.id,
-      orderId: paymentIntent.metadata?.order_id || '',
-      amount: paymentIntent.amount,
-      currency: paymentIntent.currency,
-      status: this.mapStripeStatus(paymentIntent.status),
-      paidAt: paymentIntent.status === 'succeeded' ? new Date() : undefined,
-    };
+  async capturePayment(_sessionId: string): Promise<PaymentCapture> {
+    // Stripe Checkout auto-captures on completion — no manual capture step needed.
+    // Payment confirmation arrives via the checkout.session.completed webhook.
+    throw new Error('Manual capture not used with Stripe Checkout');
   }
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
