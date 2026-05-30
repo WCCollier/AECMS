@@ -4,17 +4,34 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import useSWR from 'swr';
 import { useProduct } from '@/hooks/useProducts';
 import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/contexts/AuthContext';
 import { getErrorMessage } from '@/lib/api';
+import { fetcher } from '@/lib/swr';
 import { Button, Card, CardContent } from '@/components/ui';
 import { ShoppingCart, Minus, Plus, ArrowLeft, Check } from 'lucide-react';
+import { CommentList } from '@/components/comments/CommentList';
+import type { Order, PaginatedResponse } from '@/types';
 
 export function ProductPageClient() {
   const params = useParams();
   const slug = params?.slug as string | undefined;
   const { product, isLoading, isError } = useProduct(slug || '');
   const { addItem } = useCart();
+  const { user } = useAuth();
+
+  // Fetch orders only when authenticated; used to determine verified-purchase status
+  const { data: ordersData } = useSWR<PaginatedResponse<Order>>(
+    user ? '/orders/my?limit=100' : null,
+    fetcher,
+  );
+  const verifiedPurchase = !!(product && (ordersData?.data ?? []).some(
+    (o) =>
+      ['processing', 'completed'].includes(o.status) &&
+      o.items?.some((i: any) => i.product_id === product.id),
+  ));
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
@@ -232,6 +249,8 @@ export function ProductPageClient() {
           )}
         </div>
       </div>
+
+      <CommentList productId={product.id} verifiedPurchase={verifiedPurchase} />
     </div>
   );
 }

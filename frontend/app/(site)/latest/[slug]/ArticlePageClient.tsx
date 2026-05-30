@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useArticle } from '@/hooks/useArticles';
 import { ArrowLeft, Calendar, User, FileText } from 'lucide-react';
+import { CommentList } from '@/components/comments/CommentList';
 
 export function ArticlePageClient() {
   const params = useParams();
@@ -122,6 +123,8 @@ export function ArticlePageClient() {
           </div>
         </div>
       )}
+
+      <CommentList articleId={article.id} />
     </article>
   );
 }
