@@ -124,6 +124,8 @@ export function ShopPageClient() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
               <Input
+                id="shop-search"
+                name="search"
                 type="text"
                 placeholder="Search products..."
                 value={searchInput}
@@ -166,8 +168,8 @@ export function ShopPageClient() {
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+            {products.map((product, i) => (
+              <ProductCard key={product.id} product={product} priority={i < 8} />
             ))}
           </div>
 

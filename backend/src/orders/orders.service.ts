@@ -23,6 +23,7 @@ export class OrdersService {
     dto: CreateOrderDto,
     userId?: string,
     sessionId?: string,
+    userEmail?: string,
   ) {
     // Get cart
     const cart = await this.cartService.getCart(userId, sessionId);
@@ -52,6 +53,8 @@ export class OrdersService {
         throw new BadRequestException(`Product ${item.product.name} is no longer available`);
       }
 
+      // When 'digital' is added to product_type, change to: product_type === 'physical'
+      // See docs/Shape_Audit.md Item 5.
       if (
         product.product_type !== 'service' && (
           product.stock_status === 'out_of_stock' ||
@@ -76,18 +79,18 @@ export class OrdersService {
       data: {
         order_number: orderNumber,
         user_id: userId,
-        email: dto.email,
+        email: userEmail ?? dto.guest_email ?? '',
         status: 'pending',
         subtotal,
         tax,
         shipping,
         total,
-        payment_method: dto.payment_method,
+        payment_method: dto.payment_method ?? 'stripe',
         shipping_name: dto.shipping_address?.name,
-        shipping_address: dto.shipping_address?.address,
+        shipping_address: dto.shipping_address?.street,
         shipping_city: dto.shipping_address?.city,
         shipping_state: dto.shipping_address?.state,
-        shipping_zip: dto.shipping_address?.zip,
+        shipping_zip: dto.shipping_address?.postal_code,
         shipping_country: dto.shipping_address?.country,
         items: {
           create: cart.items.map((item: any) => ({
@@ -115,6 +118,7 @@ export class OrdersService {
       const updated = await this.prisma.product.findUnique({
         where: { id: item.product_id },
       });
+      // When 'digital' is added to product_type, change to: product_type === 'physical'. See docs/Shape_Audit.md Item 5.
       if (updated && updated.product_type !== 'service' && updated.stock_quantity != null && updated.stock_quantity <= 0) {
         await this.prisma.product.update({
           where: { id: item.product_id },
@@ -206,8 +210,11 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    // Check access
-    if (!isAdmin && order.user_id !== userId) {
+    // Guests (no userId) can view orders that have no user_id (guest orders)
+    if (!isAdmin && userId && order.user_id !== userId) {
+      throw new ForbiddenException('Access denied');
+    }
+    if (!isAdmin && !userId && order.user_id !== null) {
       throw new ForbiddenException('Access denied');
     }
 
@@ -395,11 +402,24 @@ export class OrdersService {
       tax: parseFloat(order.tax.toString()),
       shipping: parseFloat(order.shipping.toString()),
       total: parseFloat(order.total.toString()),
-      items: order.items.map((item: any) => ({
-        ...item,
-        price: parseFloat(item.price.toString()),
-        line_total: parseFloat(item.price.toString()) * item.quantity,
-      })),
+      // Remap flat DB shipping columns → nested object the frontend expects
+      shipping_address: order.shipping_address ? {
+        street: order.shipping_address,
+        city: order.shipping_city ?? '',
+        state: order.shipping_state ?? '',
+        postal_code: order.shipping_zip ?? '',
+        country: order.shipping_country ?? '',
+      } : null,
+      items: order.items.map((item: any) => {
+        const unitPrice = parseFloat(item.price.toString());
+        return {
+          ...item,
+          product_name: item.product?.name ?? '',
+          product_sku: item.product?.sku ?? '',
+          unit_price: unitPrice,
+          total_price: unitPrice * item.quantity,
+        };
+      }),
     };
   }
 }

@@ -3,11 +3,12 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
-import { CreateCommentDto, UpdateCommentDto, ModerateCommentDto, QueryCommentsDto } from './dto';
+import { CreateCommentDto, UpdateCommentDto, QueryCommentsDto } from './dto';
 import { CommentStatus, ModerationStatus, User } from '@prisma/client';
 
 @Injectable()
@@ -19,380 +20,158 @@ export class CommentsService {
     private moderationService: ModerationService,
   ) {}
 
+  // ── Shared Prisma includes ────────────────────────────────────────────────
+
+  private commentInclude(includeProduct = false) {
+    return {
+      user: { select: { id: true, email: true, first_name: true, last_name: true } },
+      ratings: { orderBy: { title: 'asc' as const } },
+      article: { select: { id: true, title: true, slug: true } },
+      ...(includeProduct && {
+        product: { select: { id: true, name: true, slug: true } },
+      }),
+    };
+  }
+
+  private replyInclude() {
+    return {
+      user: { select: { id: true, email: true, first_name: true, last_name: true } },
+      ratings: { orderBy: { title: 'asc' as const } },
+    };
+  }
+
+  // ── Public: create ────────────────────────────────────────────────────────
+
   /**
-   * Create a new comment on an article
+   * Create a comment or review. All comments require authentication.
+   * A comment becomes a review when ratings[] is provided; the first entry
+   * must have title "Overall". Product reviews additionally require a
+   * verified purchase (completed/processing order containing the product).
    */
   async create(dto: CreateCommentDto, user: User) {
     if (!dto.article_id && !dto.product_id) {
       throw new BadRequestException('Either article_id or product_id is required');
     }
 
+    const isReview = !!dto.ratings?.length;
+
+    if (isReview && dto.ratings![0].title !== 'Overall') {
+      throw new BadRequestException('First rating must have title "Overall"');
+    }
+
     // Verify target exists and is published
     if (dto.article_id) {
       const article = await this.prisma.article.findUnique({ where: { id: dto.article_id } });
       if (!article) throw new NotFoundException('Article not found');
-      if (article.status !== 'published') throw new BadRequestException('Cannot comment on unpublished articles');
+      if (article.status !== 'published') {
+        throw new BadRequestException('Cannot comment on unpublished articles');
+      }
     }
+
+    let verifiedPurchase = false;
 
     if (dto.product_id) {
       const product = await this.prisma.product.findUnique({ where: { id: dto.product_id } });
       if (!product || product.deleted_at) throw new NotFoundException('Product not found');
-      if (product.status !== 'published') throw new BadRequestException('Cannot comment on unpublished products');
+      if (product.status !== 'published') {
+        throw new BadRequestException('Cannot comment on unpublished products');
+      }
+
+      if (isReview) {
+        const order = await this.prisma.order.findFirst({
+          where: {
+            user_id: user.id,
+            status: { in: ['processing', 'completed'] },
+            items: { some: { product_id: dto.product_id } },
+          },
+        });
+        if (!order) {
+          throw new ForbiddenException(
+            'You must have purchased this product to leave a review',
+          );
+        }
+        verifiedPurchase = true;
+      }
     }
 
-    // If replying, verify parent comment exists and belongs to the same target
-    if (dto.parent_id) {
-      const parentComment = await this.prisma.comment.findUnique({
-        where: { id: dto.parent_id },
+    // One review per user per item
+    if (isReview) {
+      const existing = await this.prisma.comment.findFirst({
+        where: {
+          user_id: user.id,
+          ...(dto.article_id ? { article_id: dto.article_id } : { product_id: dto.product_id }),
+          ratings: { some: {} },
+          deleted_at: null,
+        },
       });
-
-      if (!parentComment) {
-        throw new NotFoundException('Parent comment not found');
+      if (existing) {
+        throw new ConflictException(
+          'You have already reviewed this item. Edit your existing review instead.',
+        );
       }
+    }
 
-      if (dto.article_id && parentComment.article_id !== dto.article_id) {
-        throw new BadRequestException('Parent comment belongs to different article');
+    // Validate reply constraints
+    if (dto.parent_id) {
+      if (isReview) throw new BadRequestException('Replies cannot include ratings');
+      const parent = await this.prisma.comment.findUnique({ where: { id: dto.parent_id } });
+      if (!parent) throw new NotFoundException('Parent comment not found');
+      if (dto.article_id && parent.article_id !== dto.article_id) {
+        throw new BadRequestException('Parent comment belongs to a different article');
       }
-
-      if (dto.product_id && parentComment.product_id !== dto.product_id) {
-        throw new BadRequestException('Parent comment belongs to different product');
+      if (dto.product_id && parent.product_id !== dto.product_id) {
+        throw new BadRequestException('Parent comment belongs to a different product');
       }
-
-      // Only allow single-level nesting
-      if (parentComment.parent_id) {
+      if (parent.parent_id) {
         throw new BadRequestException('Cannot reply to a reply (single-level nesting only)');
       }
     }
 
-    // Create comment with pending status (reactive moderation)
     const comment = await this.prisma.comment.create({
       data: {
         article_id: dto.article_id ?? null,
         product_id: dto.product_id ?? null,
         user_id: user.id,
         content: dto.content,
-        parent_id: dto.parent_id,
-        status: CommentStatus.approved, // Reactive: post immediately
-        moderation_status: ModerationStatus.pending, // Flag for review
+        title: dto.title ?? null,
+        verified_purchase: verifiedPurchase,
+        parent_id: dto.parent_id ?? null,
+        status: CommentStatus.approved,
+        moderation_status: ModerationStatus.pending,
+        ratings: isReview
+          ? { create: dto.ratings!.map(r => ({ title: r.title, value: r.value })) }
+          : undefined,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-        article: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-          },
-        },
-        product: {
-          select: {
-            id: true,
-            name: true,
-            slug: true,
-          },
-        },
-      },
+      include: this.commentInclude(true),
     });
 
-    // Run moderation asynchronously (don't block response)
     this.moderateCommentAsync(comment.id, dto.content);
-
     return comment;
   }
 
-  /**
-   * Run moderation on a comment asynchronously
-   */
-  private async moderateCommentAsync(commentId: string, content: string) {
-    try {
-      const result = await this.moderationService.moderate(content);
+  // ── Public: read ──────────────────────────────────────────────────────────
 
-      // Update comment with moderation results
-      await this.prisma.comment.update({
-        where: { id: commentId },
-        data: {
-          moderation_flags: result.flags,
-          profanity_detected: result.profanityDetected,
-          moderation_status: result.flagged
-            ? ModerationStatus.flagged
-            : ModerationStatus.approved,
-        },
-      });
-
-      if (result.flagged) {
-        this.logger.log(
-          `Comment ${commentId} flagged for moderation: ${result.flags.join(', ')}`,
-        );
-      }
-    } catch (error) {
-      this.logger.error(`Failed to moderate comment ${commentId}:`, error);
-      // Leave comment in pending state if moderation fails
-    }
-  }
-
-  /**
-   * Get comments for an article (public, approved only)
-   */
-  async findByArticle(articleId: string, page: number = 1, limit: number = 20) {
-    // Verify article exists
-    const article = await this.prisma.article.findUnique({
-      where: { id: articleId },
-    });
-
-    if (!article) {
-      throw new NotFoundException('Article not found');
-    }
+  async findByArticle(articleId: string, page = 1, limit = 20) {
+    const article = await this.prisma.article.findUnique({ where: { id: articleId } });
+    if (!article) throw new NotFoundException('Article not found');
 
     const skip = (page - 1) * limit;
-
-    // Get top-level comments (no parent)
-    const [comments, total] = await Promise.all([
-      this.prisma.comment.findMany({
-        where: {
-          article_id: articleId,
-          parent_id: null,
-          status: CommentStatus.approved,
-          deleted_at: null,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              first_name: true,
-              last_name: true,
-            },
-          },
-          replies: {
-            where: {
-              status: CommentStatus.approved,
-              deleted_at: null,
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  email: true,
-                  first_name: true,
-                  last_name: true,
-                },
-              },
-            },
-            orderBy: { created_at: 'asc' },
-          },
-        },
-        orderBy: { created_at: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.comment.count({
-        where: {
-          article_id: articleId,
-          parent_id: null,
-          status: CommentStatus.approved,
-          deleted_at: null,
-        },
-      }),
-    ]);
-
-    return {
-      data: comments,
-      total,
-      page,
-      limit,
-      total_pages: Math.ceil(total / limit),
-    };
-  }
-
-  /**
-   * Get comments for a product (public, approved only)
-   */
-  async findByProduct(productId: string, page: number = 1, limit: number = 20) {
-    const product = await this.prisma.product.findUnique({ where: { id: productId } });
-    if (!product || product.deleted_at) throw new NotFoundException('Product not found');
-
-    const skip = (page - 1) * limit;
-
-    const [comments, total] = await Promise.all([
-      this.prisma.comment.findMany({
-        where: { product_id: productId, parent_id: null, status: CommentStatus.approved, deleted_at: null },
-        include: {
-          user: { select: { id: true, email: true, first_name: true, last_name: true } },
-          replies: {
-            where: { status: CommentStatus.approved, deleted_at: null },
-            include: { user: { select: { id: true, email: true, first_name: true, last_name: true } } },
-            orderBy: { created_at: 'asc' },
-          },
-        },
-        orderBy: { created_at: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.comment.count({
-        where: { product_id: productId, parent_id: null, status: CommentStatus.approved, deleted_at: null },
-      }),
-    ]);
-
-    return { data: comments, total, page, limit, total_pages: Math.ceil(total / limit) };
-  }
-
-  /**
-   * Get a single comment by ID
-   */
-  async findById(id: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-        article: {
-          select: {
-            id: true,
-            title: true,
-            slug: true,
-          },
-        },
-        replies: {
-          where: {
-            status: CommentStatus.approved,
-            deleted_at: null,
-          },
-          include: {
-            user: {
-              select: {
-                id: true,
-                email: true,
-                first_name: true,
-                last_name: true,
-              },
-            },
-          },
-          orderBy: { created_at: 'asc' },
-        },
-      },
-    });
-
-    if (!comment || comment.deleted_at) {
-      throw new NotFoundException('Comment not found');
-    }
-
-    return comment;
-  }
-
-  /**
-   * Update own comment
-   */
-  async update(id: string, dto: UpdateCommentDto, userId: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-    });
-
-    if (!comment || comment.deleted_at) {
-      throw new NotFoundException('Comment not found');
-    }
-
-    if (comment.user_id !== userId) {
-      throw new ForbiddenException('You can only edit your own comments');
-    }
-
-    // Reset moderation status when content is edited
-    const updated = await this.prisma.comment.update({
-      where: { id },
-      data: {
-        content: dto.content,
-        moderation_status: ModerationStatus.pending, // Re-flag for review
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-      },
-    });
-
-    // Re-run moderation on updated content
-    if (dto.content) {
-      this.moderateCommentAsync(id, dto.content);
-    }
-
-    return updated;
-  }
-
-  /**
-   * Delete own comment (soft delete)
-   */
-  async remove(id: string, userId: string, isAdmin: boolean = false) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-    });
-
-    if (!comment || comment.deleted_at) {
-      throw new NotFoundException('Comment not found');
-    }
-
-    if (!isAdmin && comment.user_id !== userId) {
-      throw new ForbiddenException('You can only delete your own comments');
-    }
-
-    await this.prisma.comment.update({
-      where: { id },
-      data: { deleted_at: new Date() },
-    });
-
-    return { message: 'Comment deleted successfully' };
-  }
-
-  /**
-   * Admin: Get all comments with filters
-   */
-  async findAll(query: QueryCommentsDto) {
-    const { article_id, product_id, status, moderation_status, page = 1, limit = 20 } = query;
-    const skip = (page - 1) * limit;
-
-    const where: any = {
+    const where = {
+      article_id: articleId,
+      parent_id: null,
+      status: CommentStatus.approved,
       deleted_at: null,
     };
-
-    if (article_id) where.article_id = article_id;
-    if (product_id) where.product_id = product_id;
-    if (status) where.status = status;
-    if (moderation_status) where.moderation_status = moderation_status;
 
     const [comments, total] = await Promise.all([
       this.prisma.comment.findMany({
         where,
         include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              first_name: true,
-              last_name: true,
-            },
-          },
-          article: {
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-            },
+          ...this.replyInclude(),
+          replies: {
+            where: { status: CommentStatus.approved, deleted_at: null },
+            include: this.replyInclude(),
+            orderBy: { created_at: 'asc' },
           },
         },
         orderBy: { created_at: 'desc' },
@@ -402,21 +181,161 @@ export class CommentsService {
       this.prisma.comment.count({ where }),
     ]);
 
-    return {
-      data: comments,
-      total,
-      page,
-      limit,
-      total_pages: Math.ceil(total / limit),
-    };
+    return { data: comments, total, page, limit, total_pages: Math.ceil(total / limit) };
   }
 
   /**
-   * Admin: Get flagged comments for moderation
+   * Reviews (comments with ratings) are sorted first, then by Overall rating
+   * descending, then by recency. Plain comments follow.
    */
-  async findFlagged(page: number = 1, limit: number = 20) {
+  async findByProduct(productId: string, page = 1, limit = 20) {
+    const product = await this.prisma.product.findUnique({ where: { id: productId } });
+    if (!product || product.deleted_at) throw new NotFoundException('Product not found');
+
+    const skip = (page - 1) * limit;
+    const where = {
+      product_id: productId,
+      parent_id: null,
+      status: CommentStatus.approved,
+      deleted_at: null,
+    };
+
+    const [comments, total] = await Promise.all([
+      this.prisma.comment.findMany({
+        where,
+        include: {
+          ...this.replyInclude(),
+          replies: {
+            where: { status: CommentStatus.approved, deleted_at: null },
+            include: this.replyInclude(),
+            orderBy: { created_at: 'asc' },
+          },
+        },
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.comment.count({ where }),
+    ]);
+
+    const sorted = [...comments].sort((a: any, b: any) => {
+      const aRating = a.ratings.find((r: any) => r.title === 'Overall')?.value ?? null;
+      const bRating = b.ratings.find((r: any) => r.title === 'Overall')?.value ?? null;
+      if ((aRating !== null) !== (bRating !== null)) return aRating !== null ? -1 : 1;
+      if (aRating !== null && bRating !== null && aRating !== bRating) return bRating - aRating;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    return { data: sorted, total, page, limit, total_pages: Math.ceil(total / limit) };
+  }
+
+  async findById(id: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id },
+      include: {
+        ...this.commentInclude(true),
+        replies: {
+          where: { status: CommentStatus.approved, deleted_at: null },
+          include: this.replyInclude(),
+          orderBy: { created_at: 'asc' },
+        },
+      },
+    });
+    if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
+    return comment;
+  }
+
+  // ── Public: update ────────────────────────────────────────────────────────
+
+  /**
+   * Update own comment. If ratings[] is provided it replaces all existing
+   * ratings wholesale (delete + recreate in a transaction). An empty ratings[]
+   * removes all ratings, converting a review back to a plain comment.
+   */
+  async update(id: string, dto: UpdateCommentDto, userId: string) {
+    const comment = await this.prisma.comment.findUnique({
+      where: { id },
+      include: { ratings: true },
+    });
+    if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
+    if (comment.user_id !== userId) {
+      throw new ForbiddenException('You can only edit your own comments');
+    }
+
+    if (dto.ratings?.length) {
+      if (dto.ratings[0].title !== 'Overall') {
+        throw new BadRequestException('First rating must have title "Overall"');
+      }
+      if (comment.parent_id) {
+        throw new BadRequestException('Replies cannot include ratings');
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (dto.ratings !== undefined) {
+        await tx.commentRating.deleteMany({ where: { comment_id: id } });
+        if (dto.ratings.length > 0) {
+          await tx.commentRating.createMany({
+            data: dto.ratings.map(r => ({ comment_id: id, title: r.title, value: r.value })),
+          });
+        }
+      }
+
+      return tx.comment.update({
+        where: { id },
+        data: {
+          ...(dto.content !== undefined && { content: dto.content }),
+          ...(dto.title !== undefined && { title: dto.title }),
+          moderation_status: ModerationStatus.pending,
+        },
+        include: this.commentInclude(true),
+      });
+    });
+
+    if (dto.content) this.moderateCommentAsync(id, dto.content);
+    return updated;
+  }
+
+  // ── Public: delete ────────────────────────────────────────────────────────
+
+  async remove(id: string, userId: string, isAdmin = false) {
+    const comment = await this.prisma.comment.findUnique({ where: { id } });
+    if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
+    if (!isAdmin && comment.user_id !== userId) {
+      throw new ForbiddenException('You can only delete your own comments');
+    }
+    await this.prisma.comment.update({ where: { id }, data: { deleted_at: new Date() } });
+    return { message: 'Comment deleted successfully' };
+  }
+
+  // ── Admin ─────────────────────────────────────────────────────────────────
+
+  async findAll(query: QueryCommentsDto) {
+    const { article_id, product_id, status, moderation_status, page = 1, limit = 20 } = query;
     const skip = (page - 1) * limit;
 
+    const where: any = { deleted_at: null };
+    if (article_id) where.article_id = article_id;
+    if (product_id) where.product_id = product_id;
+    if (status) where.status = status;
+    if (moderation_status) where.moderation_status = moderation_status;
+
+    const [comments, total] = await Promise.all([
+      this.prisma.comment.findMany({
+        where,
+        include: this.commentInclude(true),
+        orderBy: { created_at: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.comment.count({ where }),
+    ]);
+
+    return { data: comments, total, page, limit, total_pages: Math.ceil(total / limit) };
+  }
+
+  async findFlagged(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
     const where = {
       deleted_at: null,
       OR: [
@@ -428,23 +347,7 @@ export class CommentsService {
     const [comments, total] = await Promise.all([
       this.prisma.comment.findMany({
         where,
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              first_name: true,
-              last_name: true,
-            },
-          },
-          article: {
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-            },
-          },
-        },
+        include: this.commentInclude(true),
         orderBy: { created_at: 'desc' },
         skip,
         take: limit,
@@ -452,116 +355,40 @@ export class CommentsService {
       this.prisma.comment.count({ where }),
     ]);
 
-    return {
-      data: comments,
-      total,
-      page,
-      limit,
-      total_pages: Math.ceil(total / limit),
-    };
+    return { data: comments, total, page, limit, total_pages: Math.ceil(total / limit) };
   }
 
-  /**
-   * Admin: Approve a comment
-   */
   async approve(id: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-    });
-
-    if (!comment || comment.deleted_at) {
-      throw new NotFoundException('Comment not found');
-    }
-
+    const comment = await this.prisma.comment.findUnique({ where: { id } });
+    if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
     return this.prisma.comment.update({
       where: { id },
-      data: {
-        status: CommentStatus.approved,
-        moderation_status: ModerationStatus.approved,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-      },
+      data: { status: CommentStatus.approved, moderation_status: ModerationStatus.approved },
+      include: this.commentInclude(),
     });
   }
 
-  /**
-   * Admin: Reject a comment
-   */
   async reject(id: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-    });
-
-    if (!comment || comment.deleted_at) {
-      throw new NotFoundException('Comment not found');
-    }
-
+    const comment = await this.prisma.comment.findUnique({ where: { id } });
+    if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
     return this.prisma.comment.update({
       where: { id },
-      data: {
-        status: CommentStatus.rejected,
-        moderation_status: ModerationStatus.rejected,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-      },
+      data: { status: CommentStatus.rejected, moderation_status: ModerationStatus.rejected },
+      include: this.commentInclude(),
     });
   }
 
-  /**
-   * Admin: Mark comment as spam
-   */
   async markAsSpam(id: string) {
-    const comment = await this.prisma.comment.findUnique({
-      where: { id },
-    });
-
-    if (!comment || comment.deleted_at) {
-      throw new NotFoundException('Comment not found');
-    }
-
+    const comment = await this.prisma.comment.findUnique({ where: { id } });
+    if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
     return this.prisma.comment.update({
       where: { id },
-      data: {
-        status: CommentStatus.spam,
-        moderation_status: ModerationStatus.rejected,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
-      },
+      data: { status: CommentStatus.spam, moderation_status: ModerationStatus.rejected },
+      include: this.commentInclude(),
     });
   }
 
-  /**
-   * Update moderation flags (called by moderation service)
-   */
-  async updateModerationFlags(
-    id: string,
-    flags: string[],
-    profanityDetected: boolean,
-  ) {
+  async updateModerationFlags(id: string, flags: string[], profanityDetected: boolean) {
     return this.prisma.comment.update({
       where: { id },
       data: {
@@ -572,5 +399,26 @@ export class CommentsService {
           : ModerationStatus.approved,
       },
     });
+  }
+
+  // ── Private ───────────────────────────────────────────────────────────────
+
+  private async moderateCommentAsync(commentId: string, content: string) {
+    try {
+      const result = await this.moderationService.moderate(content);
+      await this.prisma.comment.update({
+        where: { id: commentId },
+        data: {
+          moderation_flags: result.flags,
+          profanity_detected: result.profanityDetected,
+          moderation_status: result.flagged ? ModerationStatus.flagged : ModerationStatus.approved,
+        },
+      });
+      if (result.flagged) {
+        this.logger.log(`Comment ${commentId} flagged: ${result.flags.join(', ')}`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to moderate comment ${commentId}:`, error);
+    }
   }
 }

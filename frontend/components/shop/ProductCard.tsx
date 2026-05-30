@@ -1,18 +1,23 @@
 'use client';
 
+import { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Product } from '@/types';
 import { Button } from '@/components/ui';
 import { useCart } from '@/hooks/useCart';
+import { getErrorMessage } from '@/lib/api';
 import { ShoppingCart } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
+  priority?: boolean;
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, priority = false }: ProductCardProps) {
   const { addItem } = useCart();
+  const [addError, setAddError] = useState('');
+  const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -24,10 +29,13 @@ export function ProductCard({ product }: ProductCardProps) {
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (errorTimer.current) clearTimeout(errorTimer.current);
+    setAddError('');
     try {
       await addItem(product.id, 1);
     } catch (error) {
-      console.error('Failed to add to cart:', error);
+      setAddError(getErrorMessage(error));
+      errorTimer.current = setTimeout(() => setAddError(''), 5000);
     }
   };
 
@@ -45,6 +53,8 @@ export function ProductCard({ product }: ProductCardProps) {
               src={product.featured_image_url}
               alt={product.name}
               fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+              priority={priority}
               className="object-cover group-hover:scale-105 transition-transform duration-300"
             />
           ) : (
@@ -97,6 +107,9 @@ export function ProductCard({ product }: ProductCardProps) {
               {isService ? 'Reserve' : 'Add'}
             </Button>
           </div>
+          {addError && (
+            <p className="text-xs text-red-500 mt-2">{addError}</p>
+          )}
         </div>
       </div>
     </Link>

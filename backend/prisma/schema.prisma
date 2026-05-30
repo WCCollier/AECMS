@@ -50,7 +50,6 @@ model User {
   articles              Article[]
   products              Product[]       @relation("ProductAuthor")
   comments              Comment[]
-  product_reviews       ProductReview[]
   orders                Order[]
   cart_items            CartItem[]
   kindle_devices        KindleDevice[]
@@ -410,7 +409,6 @@ model Product {
   tags             ProductTag[]
   media            ProductMedia[]
   comments         Comment[]
-  reviews          ProductReview[]
   cart_items       CartItem[]
   order_items      OrderItem[]
   digital_files    DigitalProductFile[]
@@ -625,38 +623,67 @@ model OrderItem {
 // ============================================================================
 // COMMENTS & REVIEWS
 // ============================================================================
+//
+// A Comment becomes a Review when it has one or more CommentRating rows.
+// The first rating must always have title "Overall" (enforced in the service).
+// Future aspect-specific ratings ("Value", "Instruction Quality", etc.) are
+// additional rows on the same comment.
+//
+// Access rules (enforced in service, not schema):
+//   - All comments require a logged-in member (user_id is non-nullable)
+//   - Rating comments on products require verified_purchase = true
+//   - One rated comment per user per article/product (application-level check)
+//   - Plain comments (no ratings) are unrestricted beyond authentication
+//
+// See docs/Shape_Audit.md Item 9 for full design rationale.
 
 model Comment {
   id                String        @id @default(uuid())
   article_id        String?
   product_id        String?
-  user_id           String?       // Nullable for guest comments (future)
-  author_name       String?       // For guest comments
-  author_email      String?       // For guest comments
+  user_id           String        // Non-nullable: all comments require login
   content           String        @db.Text
+  title             String?       // Review headline (only meaningful when ratings present)
+  verified_purchase Boolean       @default(false) // System-set; true when user has completed order for this product
   status            CommentStatus @default(pending)
 
   // AI Moderation
   moderation_status ModerationStatus @default(pending)
-  moderation_flags  String[]      // Array of flags from OpenAI
+  moderation_flags  String[]
   profanity_detected Boolean      @default(false)
 
-  parent_id         String?       // For nested replies
+  parent_id         String?       // For nested replies (single-level only)
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
   deleted_at        DateTime?
 
-  article  Article?  @relation(fields: [article_id], references: [id], onDelete: Cascade)
-  product  Product?  @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  user     User?     @relation(fields: [user_id], references: [id])
-  parent   Comment?  @relation("CommentReplies", fields: [parent_id], references: [id])
-  replies  Comment[] @relation("CommentReplies")
+  article  Article?        @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  product  Product?        @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [user_id], references: [id])
+  parent   Comment?        @relation("CommentReplies", fields: [parent_id], references: [id])
+  replies  Comment[]       @relation("CommentReplies")
+  ratings  CommentRating[]
 
   @@index([article_id])
   @@index([product_id])
   @@index([user_id])
   @@index([status])
   @@map("comments")
+}
+
+// One row per rating dimension per comment.
+// title = "Overall" for the default review rating; future aspect ratings add more rows.
+// value = 1–5 integer on a five-point scale.
+model CommentRating {
+  id         String  @id @default(uuid())
+  comment_id String
+  title      String  // "Overall", future: "Value", "Instruction Quality", etc.
+  value      Int     // 1–5
+
+  comment    Comment @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+
+  @@index([comment_id])
+  @@map("comment_ratings")
 }
 
 enum CommentStatus {
@@ -671,33 +698,6 @@ enum ModerationStatus {
   approved
   flagged
   rejected
-}
-
-model ProductReview {
-  id                String           @id @default(uuid())
-  product_id        String
-  user_id           String
-  rating            Int              // 1-5
-  title             String?
-  content           String           @db.Text
-  status            CommentStatus    @default(pending)
-
-  // AI Moderation
-  moderation_status ModerationStatus @default(pending)
-  moderation_flags  String[]
-  profanity_detected Boolean         @default(false)
-
-  verified_purchase Boolean          @default(false)
-  created_at        DateTime         @default(now())
-  updated_at        DateTime         @updatedAt
-  deleted_at        DateTime?
-
-  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [user_id], references: [id])
-
-  @@index([product_id])
-  @@index([user_id])
-  @@map("product_reviews")
 }
 
 // ============================================================================

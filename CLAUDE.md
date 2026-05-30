@@ -28,8 +28,8 @@
 **Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
 **Phase 9**: 🔄 IN PROGRESS - User Testing (structured manual QA, bug fixes)
 
-**Test Status**: 90 frontend + 144 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 113 total
+**Test Status**: 90 frontend + 152 backend unit tests (all passing); 16 backend E2E tests (require Docker)
+**API Endpoints**: 114 total (added POST /cart/validate)
 
 ## API Endpoint Summary
 
@@ -163,7 +163,7 @@ rm -rf backend/dist frontend/.next
 ## Phase 5: Payments Integration (✅ CONFIGURED)
 
 **Architecture** (simplified):
-- **Stripe (Primary)**: Cards, Apple Pay, Google Pay, Amazon Pay - all via Stripe Checkout
+- **Stripe (Primary)**: Cards, Apple Pay, Google Pay via Stripe Checkout
 - **PayPal (Secondary)**: Alternative payment method for customers who prefer PayPal
 
 **Implemented**:
@@ -176,7 +176,7 @@ rm -rf backend/dist frontend/.next
 **Configuration Status**:
 - ✅ Stripe sandbox keys configured (via Codespaces Secrets)
 - ✅ PayPal sandbox keys configured (via Codespaces Secrets)
-- ⏸️ AmazonPayProvider deprecated (Amazon Pay handled via Stripe Checkout)
+- ⏸️ AmazonPayProvider backend complete (provider, test mode, capture, webhooks); frontend placeholder stub in checkout UI; credentials not yet configured — planned for MVP
 
 **Secrets Management**:
 - Development/Sandbox keys → Codespaces Secrets (current)
@@ -249,10 +249,10 @@ SMTP_PORT=587
 **Testing sequence** (see `docs/TESTING_GUIDE.md → Phase 9`):
 1. ✅ Anonymous article browsing (category/tag filtering fixed)
 2. ✅ Anonymous shop browsing (products recovered, service type added, images working)
-3. 🔄 Anonymous cart mechanics (session ID fix applied)
+3. ✅ Anonymous cart mechanics (NaN price fixed, stock validation added, session ID working)
 4. Member login + browsing
 5. Member cart mechanics
-6. Checkout as member (Stripe sandbox)
+6. ✅ Checkout as member (shipping DTO fixed, order confirmation page built, flow verified)
 7. Guest checkout
 8. Admin back door — 2FA enrollment
 9. Admin CRUD — articles
@@ -262,19 +262,23 @@ SMTP_PORT=587
 **Features added during Phase 9**:
 - Service product type (`ProductType.service`, `StockStatus.available/unavailable`, nullable stock)
 - 15 lesson products recovered from WordPress SQL dump + images
+- American Shooter Hat seeded (physical, $24.99, 5 in stock) for quantifiable item testing
 - Product feature parity with Articles: `author_id`, `compare_at_price`, comments support
 - Product description renders TipTap HTML; Compare-at Price field in admin form
 - Anonymous cart session ID (`x-session-id`) generated in `localStorage` and auto-injected
 - Infinite scroll / paginated toggle (`ViewModeContext`, `ViewModeToggle`, `useSWRInfinite`)
-  - Per-user preference stored in `localStorage`, global across catalogue pages
-  - `?page=N` in URL forces paginated mode for that visit without changing stored preference
-  - Paginated mode writes `?page=N` to URL; each page is bookmarkable/shareable
-  - Search/filter resets scroll position in infinite mode
+- Virtual stock reservation system (`POST /cart/validate`, inline stock errors at 3 touch points)
+- Order confirmation page (`/order-confirmation?order=:id`)
+- Amazon Pay reinstated as planned MVP provider (backend complete, frontend stub added)
+- API Shape Audit (`docs/Shape_Audit.md`) — 9 items identified and resolved
+- Unified Comment/Review system: `CommentRating` table, `ProductReview` dropped, verified purchase enforcement
+- CartProduct partial type, Cart audit fields (user_id, session_id, created_at, updated_at) retained
 
 **Deferred polish** (will fix as bugs surface during Phase 9):
 - Loading skeletons and toast notifications
-- CRUD forms in admin
-- Image upload in admin
+- Comment/review UI components (form, display, star input) — backend complete, no frontend yet
+- Stripe Elements card UI (currently stubs via alert)
+- Admin CRUD forms, image upload
 - Responsive design improvements
 - SEO and performance optimization
 - WordPress migration scripts

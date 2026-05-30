@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useProduct } from '@/hooks/useProducts';
 import { useCart } from '@/hooks/useCart';
+import { getErrorMessage } from '@/lib/api';
 import { Button, Card, CardContent } from '@/components/ui';
 import { ShoppingCart, Minus, Plus, ArrowLeft, Check } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export function ProductPageClient() {
   const [quantity, setQuantity] = useState(1);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
+  const [addError, setAddError] = useState('');
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -28,12 +30,13 @@ export function ProductPageClient() {
   const handleAddToCart = async () => {
     if (!product) return;
     setAdding(true);
+    setAddError('');
     try {
       await addItem(product.id, quantity);
       setAdded(true);
       setTimeout(() => setAdded(false), 2000);
     } catch (error) {
-      console.error('Failed to add to cart:', error);
+      setAddError(getErrorMessage(error));
     } finally {
       setAdding(false);
     }
@@ -96,6 +99,7 @@ export function ProductPageClient() {
               src={product.featured_image_url}
               alt={product.name}
               fill
+              sizes="(max-width: 768px) 100vw, 50vw"
               className="object-cover"
               priority
             />
@@ -194,6 +198,10 @@ export function ProductPageClient() {
               </div>
             </CardContent>
           </Card>
+
+          {addError && (
+            <p className="text-sm text-red-500 -mt-3 mb-4">{addError}</p>
+          )}
 
           {/* SKU */}
           <p className="text-sm text-foreground/50">

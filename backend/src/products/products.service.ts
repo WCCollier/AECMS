@@ -101,7 +101,7 @@ export class ProductsService {
       include: this.getProductIncludes(),
     });
 
-    return this.transformProduct(product);
+    return this.transformProduct(product);  // await handled by async transformProduct
   }
 
   /**
@@ -222,7 +222,7 @@ export class ProductsService {
     ]);
 
     return {
-      data: products.map((product) => this.transformProduct(product)),
+      data: await Promise.all(products.map((product) => this.transformProduct(product))),
       meta: {
         total,
         page,
@@ -476,7 +476,6 @@ export class ProductsService {
       },
       _count: {
         select: {
-          reviews: true,
           comments: true,
         },
       },
@@ -508,7 +507,7 @@ export class ProductsService {
   /**
    * Transform product response
    */
-  private transformProduct(product: any) {
+  private buildProductBase(product: any) {
     const media = product.media?.map((pm: any) => pm.media) || [];
     const primaryMedia = product.media?.find((pm: any) => pm.is_primary)?.media ?? media[0] ?? null;
     let featured_image_url: string | null = null;
@@ -526,8 +525,45 @@ export class ProductsService {
       media,
       featured_image_url,
       compare_at_price: product.compare_at_price ? parseFloat(product.compare_at_price.toString()) : null,
-      review_count: product._count?.reviews || 0,
       comment_count: product._count?.comments || 0,
     };
+  }
+
+  /**
+   * Fetch review_count and average_rating for a product from CommentRating.
+   * review_count = approved comments with at least one rating.
+   * average_rating = mean of all approved "Overall" ratings on this product.
+   */
+  private async getRatingStats(productId: string) {
+    const [reviewCount, ratingAgg] = await Promise.all([
+      this.prisma.comment.count({
+        where: {
+          product_id: productId,
+          status: 'approved',
+          deleted_at: null,
+          ratings: { some: {} },
+        },
+      }),
+      this.prisma.commentRating.aggregate({
+        where: {
+          title: 'Overall',
+          comment: { product_id: productId, status: 'approved', deleted_at: null },
+        },
+        _avg: { value: true },
+      }),
+    ]);
+
+    return {
+      review_count: reviewCount,
+      average_rating: ratingAgg._avg.value
+        ? Math.round(ratingAgg._avg.value * 10) / 10
+        : null,
+    };
+  }
+
+  private async transformProduct(product: any) {
+    const base = this.buildProductBase(product);
+    const stats = await this.getRatingStats(product.id);
+    return { ...base, ...stats };
   }
 }

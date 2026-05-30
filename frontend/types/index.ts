@@ -85,6 +85,10 @@ export interface Tag {
 }
 
 // Product types
+// Future additions (see docs/Shape_Audit.md Item 5):
+//   product_type gains 'digital' when Phase 7 delivery is wired to frontend
+//   can_backorder: boolean added when preorder/backorder is implemented
+//   media: Media[] added when product galleries are built
 export interface Product {
   id: string;
   name: string;
@@ -94,14 +98,16 @@ export interface Product {
   price: number;
   compare_at_price: number | null;
   sku: string;
-  stock_quantity: number;
-  track_inventory: boolean;
-  allow_backorder: boolean;
-  is_digital: boolean;
+  stock_quantity: number | null;
+  stock_status: 'in_stock' | 'out_of_stock' | 'backorder' | 'available' | 'unavailable';
+  product_type: 'physical' | 'service';
   featured_image_url: string | null;
-  gallery_urls: string[];
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   status: 'draft' | 'published' | 'archived';
+  guest_purchaseable: boolean;
+  comment_count: number;
+  review_count: number;
+  average_rating: number | null;
   categories: Category[];
   tags: Tag[];
   created_at: string;
@@ -109,13 +115,30 @@ export interface Product {
 }
 
 // Cart types
+
+// Minimal product snapshot embedded in each cart item by transformCart().
+// Intentionally narrower than Product — the cart UI needs only these fields and
+// can render in a single request without fetching full product records.
+// Adding fields here requires a matching change in cart.service.ts transformCart().
+// See docs/Shape_Audit.md Item 7 for the full rationale.
+export interface CartProduct {
+  id: string;
+  name: string;
+  slug: string;
+  price: number;
+  product_type: 'physical' | 'service';
+  stock_status: string;
+  stock_quantity: number | null;
+  featured_image_url: string | null;
+}
+
 export interface CartItem {
   id: string;
   product_id: string;
-  product: Product;
+  product: CartProduct;
   quantity: number;
   unit_price: number;
-  created_at: string;
+  line_total: number;
 }
 
 export interface Cart {
@@ -123,6 +146,8 @@ export interface Cart {
   user_id: string | null;
   session_id: string | null;
   items: CartItem[];
+  item_count: number;
+  subtotal: number;
   created_at: string;
   updated_at: string;
 }
@@ -142,17 +167,16 @@ export interface Order {
   id: string;
   order_number: string;
   user_id: string | null;
-  guest_email: string | null;
-  status: 'pending' | 'paid' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded';
-  payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
-  payment_provider: 'stripe' | 'paypal' | null;
-  payment_id: string | null;
+  email: string | null;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'refunded';
+  payment_method: 'stripe' | 'paypal' | 'amazon_pay' | null;
+  payment_intent_id: string | null;
+  paid_at: string | null;
   subtotal: number;
   tax: number;
   shipping: number;
   total: number;
-  shipping_address: ShippingAddress;
-  billing_address: ShippingAddress | null;
+  shipping_address: ShippingAddress | null;
   items: OrderItem[];
   created_at: string;
   updated_at: string;
@@ -164,6 +188,46 @@ export interface ShippingAddress {
   state: string;
   postal_code: string;
   country: string;
+}
+
+// Comment types
+
+export interface CommentAuthor {
+  id: string;
+  email: string;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+// A rating dimension within a review-type comment.
+// title: "Overall" (always first); future aspect ratings add more rows.
+// value: 1–5 integer.
+export interface CommentRating {
+  id: string;
+  title: string;
+  value: number;
+}
+
+// A Comment becomes a Review when ratings.length > 0.
+// The first rating always has title "Overall".
+// verified_purchase is system-set; true when the commenter has a
+// completed/processing order containing the reviewed product.
+export interface Comment {
+  id: string;
+  content: string;
+  title: string | null;          // Review headline
+  verified_purchase: boolean;
+  status: 'approved' | 'pending' | 'rejected' | 'spam';
+  moderation_status: 'pending' | 'flagged' | 'approved' | 'rejected';
+  user_id: string;
+  article_id: string | null;
+  product_id: string | null;
+  parent_id: string | null;
+  user: CommentAuthor | null;
+  ratings: CommentRating[];
+  replies: Comment[];
+  created_at: string;
+  updated_at: string;
 }
 
 // Pagination types

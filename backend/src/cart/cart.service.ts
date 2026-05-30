@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddToCartDto, UpdateCartItemDto } from './dto';
@@ -66,7 +67,6 @@ export class CartService {
    * Add item to cart
    */
   async addItem(dto: AddToCartDto, userId?: string, sessionId?: string) {
-    // Validate product exists and is purchaseable
     const product = await this.prisma.product.findUnique({
       where: { id: dto.product_id },
     });
@@ -74,67 +74,58 @@ export class CartService {
     if (!product || product.deleted_at) {
       throw new NotFoundException('Product not found');
     }
-
     if (product.status !== 'published') {
       throw new BadRequestException('Product is not available');
     }
-
-    if (product.stock_status === 'out_of_stock') {
-      throw new BadRequestException('Product is out of stock');
-    }
-
-    // Check guest purchase permissions
     if (!userId && !product.guest_purchaseable) {
       throw new ForbiddenException('Login required to purchase this product');
     }
 
-    // Get or create cart
     const cart = await this.getOrCreateCart(userId, sessionId);
 
-    // Check if item already in cart
     const existingItem = await this.prisma.cartItem.findFirst({
-      where: {
-        cart_id: cart.id,
-        product_id: dto.product_id,
-      },
+      where: { cart_id: cart.id, product_id: dto.product_id },
     });
 
     const quantity = dto.quantity || 1;
+    const newQuantity = existingItem ? existingItem.quantity + quantity : quantity;
 
-    if (existingItem) {
-      // Update quantity
-      const newQuantity = existingItem.quantity + quantity;
-
-      // Check stock (service products have no quantity limit)
-      if (
-        product.product_type !== 'service' &&
-        product.stock_quantity != null &&
-        newQuantity > product.stock_quantity &&
-        product.stock_status !== 'backorder'
-      ) {
-        throw new BadRequestException(
-          `Only ${product.stock_quantity} items available in stock`,
+    // Virtual stock check — skips service products (no inventory).
+    // When 'digital' is added to product_type, change to: product_type === 'physical'
+    // See docs/Shape_Audit.md Item 5 for the full rationale.
+    if (
+      product.product_type !== 'service' &&
+      product.stock_quantity != null &&
+      product.stock_status !== 'backorder'
+    ) {
+      const available = await this.getVirtualAvailableStock(
+        dto.product_id,
+        product.stock_quantity,
+        cart.id,
+      );
+      if (newQuantity > available) {
+        if (available <= 0) {
+          throw new ConflictException('This item is out of stock');
+        }
+        const alreadyInCart = existingItem?.quantity ?? 0;
+        const canAddMore = available - alreadyInCart;
+        if (canAddMore <= 0) {
+          throw new ConflictException(
+            `You already have all available stock in your cart (${available} unit${available !== 1 ? 's' : ''})`,
+          );
+        }
+        throw new ConflictException(
+          `Only ${available} available — you can add ${canAddMore} more`,
         );
       }
+    }
 
+    if (existingItem) {
       await this.prisma.cartItem.update({
         where: { id: existingItem.id },
         data: { quantity: newQuantity },
       });
     } else {
-      // Check stock (service products have no quantity limit)
-      if (
-        product.product_type !== 'service' &&
-        product.stock_quantity != null &&
-        quantity > product.stock_quantity &&
-        product.stock_status !== 'backorder'
-      ) {
-        throw new BadRequestException(
-          `Only ${product.stock_quantity} items available in stock`,
-        );
-      }
-
-      // Add new item
       await this.prisma.cartItem.create({
         data: {
           cart_id: cart.id,
@@ -145,7 +136,6 @@ export class CartService {
       });
     }
 
-    // Return updated cart
     return this.getCart(userId, sessionId);
   }
 
@@ -179,16 +169,25 @@ export class CartService {
       throw new ForbiddenException('Access denied');
     }
 
-    // Check stock (service products have no quantity limit)
+    // Virtual stock check (exclude current cart so user can freely adjust their own reservation).
+    // When 'digital' is added to product_type, change to: product_type === 'physical'
+    // See docs/Shape_Audit.md Item 5.
     if (
       item.product.product_type !== 'service' &&
       item.product.stock_quantity != null &&
-      dto.quantity > item.product.stock_quantity &&
       item.product.stock_status !== 'backorder'
     ) {
-      throw new BadRequestException(
-        `Only ${item.product.stock_quantity} items available in stock`,
+      const available = await this.getVirtualAvailableStock(
+        item.product_id,
+        item.product.stock_quantity,
+        item.cart_id,
       );
+      if (dto.quantity > available) {
+        if (available <= 0) {
+          throw new ConflictException('This item is out of stock');
+        }
+        throw new ConflictException(`Only ${available} available`);
+      }
     }
 
     // Update quantity
@@ -312,6 +311,91 @@ export class CartService {
   }
 
   /**
+   * Validate cart stock before checkout.
+   * Corrects any over-limit quantities in place and returns what changed.
+   */
+  async validateCart(userId?: string, sessionId?: string) {
+    const cart = await this.prisma.cart.findFirst({
+      where: userId ? { user_id: userId } : { session_id: sessionId },
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                product_type: true,
+                stock_quantity: true,
+                stock_status: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!cart || cart.items.length === 0) {
+      return { adjusted: false, changes: [] };
+    }
+
+    const changes: Array<{
+      product_name: string;
+      action: 'removed' | 'reduced';
+      from: number;
+      to: number;
+    }> = [];
+
+    for (const item of cart.items) {
+      const { product } = item;
+      if (
+        product.product_type === 'service' ||
+        product.stock_quantity == null ||
+        product.stock_status === 'backorder'
+      ) {
+        continue;
+      }
+
+      const available = await this.getVirtualAvailableStock(
+        product.id,
+        product.stock_quantity,
+        cart.id,
+      );
+
+      if (item.quantity > available) {
+        if (available <= 0) {
+          await this.prisma.cartItem.delete({ where: { id: item.id } });
+          changes.push({ product_name: product.name, action: 'removed', from: item.quantity, to: 0 });
+        } else {
+          await this.prisma.cartItem.update({
+            where: { id: item.id },
+            data: { quantity: available },
+          });
+          changes.push({ product_name: product.name, action: 'reduced', from: item.quantity, to: available });
+        }
+      }
+    }
+
+    return { adjusted: changes.length > 0, changes };
+  }
+
+  /**
+   * Compute stock available to a specific cart, excluding its own existing reservation.
+   * excludeCartId: the current cart — its reservations don't count against itself.
+   */
+  private async getVirtualAvailableStock(
+    productId: string,
+    stockQuantity: number,
+    excludeCartId: string,
+  ): Promise<number> {
+    const result = await this.prisma.cartItem.aggregate({
+      where: { product_id: productId, cart_id: { not: excludeCartId } },
+      _sum: { quantity: true },
+    });
+    const reserved = result._sum.quantity ?? 0;
+    return stockQuantity - reserved;
+  }
+
+  /**
    * Get cart includes
    */
   private getCartIncludes() {
@@ -333,24 +417,42 @@ export class CartService {
   }
 
   /**
-   * Transform cart response
+   * Transform cart response.
+   *
+   * user_id, session_id, created_at, updated_at are intentionally retained in the
+   * response even though no current UI component reads them. They are audit-trail
+   * fields required for future abandoned-cart detection and recovery (identifying
+   * stale carts by updated_at, joining to user records for recovery emails, tracking
+   * anonymous sessions). Stripping them would force a non-trivial backend change when
+   * that feature is built. See docs/Shape_Audit.md Item 6 for full rationale.
    */
   private transformCart(cart: any) {
-    const items = cart.items.map((item: any) => ({
-      id: item.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      product: {
-        id: item.product.id,
-        name: item.product.name,
-        slug: item.product.slug,
-        price: parseFloat(item.product.price.toString()),
-        stock_status: item.product.stock_status,
-        stock_quantity: item.product.stock_quantity,
-        image: item.product.media?.[0]?.media || null,
-      },
-      line_total: parseFloat(item.product.price.toString()) * item.quantity,
-    }));
+    const items = cart.items.map((item: any) => {
+      const unitPrice = parseFloat(item.product.price.toString());
+      const fp = item.product.media?.[0]?.media?.file_path ?? null;
+      const featured_image_url = fp
+        ? fp.startsWith('/uploads/') ? fp
+          : fp.includes('/uploads/') ? fp.replace(/.*\/uploads\//, '/uploads/')
+          : `/uploads/${fp}`
+        : null;
+      return {
+        id: item.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: unitPrice,
+        product: {
+          id: item.product.id,
+          name: item.product.name,
+          slug: item.product.slug,
+          price: unitPrice,
+          product_type: item.product.product_type,
+          stock_status: item.product.stock_status,
+          stock_quantity: item.product.stock_quantity,
+          featured_image_url,
+        },
+        line_total: unitPrice * item.quantity,
+      };
+    });
 
     const subtotal = items.reduce(
       (sum: number, item: any) => sum + item.line_total,
@@ -359,9 +461,13 @@ export class CartService {
 
     return {
       id: cart.id,
+      user_id: cart.user_id,
+      session_id: cart.session_id,
+      created_at: cart.created_at,
+      updated_at: cart.updated_at,
       items,
       item_count: items.reduce((sum: number, item: any) => sum + item.quantity, 0),
-      subtotal: Math.round(subtotal * 100) / 100, // Round to 2 decimal places
+      subtotal: Math.round(subtotal * 100) / 100,
     };
   }
 }

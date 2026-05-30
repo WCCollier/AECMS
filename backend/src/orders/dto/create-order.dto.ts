@@ -5,56 +5,55 @@ import {
   IsEnum,
   IsNotEmpty,
   ValidateNested,
-  IsArray,
-  IsNumber,
-  Min,
 } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export class ShippingAddressDto {
-  @ApiProperty({ description: 'Recipient name' })
+  @ApiPropertyOptional({ description: 'Recipient name' })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Street address' })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  street: string;
 
-  @ApiProperty({ description: 'Street address' })
-  @IsString()
-  @IsNotEmpty()
-  address: string;
-
-  @ApiProperty({ description: 'City' })
+  @ApiPropertyOptional({ description: 'City' })
   @IsString()
   @IsNotEmpty()
   city: string;
 
-  @ApiProperty({ description: 'State/Province' })
+  @ApiPropertyOptional({ description: 'State/Province' })
   @IsString()
   @IsNotEmpty()
   state: string;
 
-  @ApiProperty({ description: 'Postal/ZIP code' })
+  @ApiPropertyOptional({ description: 'Postal/ZIP code' })
   @IsString()
   @IsNotEmpty()
-  zip: string;
+  postal_code: string;
 
-  @ApiProperty({ description: 'Country code (e.g., US)' })
+  @ApiPropertyOptional({ description: 'Country code (e.g., US)' })
   @IsString()
   @IsNotEmpty()
   country: string;
 }
 
 export class CreateOrderDto {
-  @ApiProperty({ description: 'Customer email' })
+  @ApiPropertyOptional({ description: 'Guest email (omit if authenticated)' })
   @IsEmail()
-  email: string;
+  @IsOptional()
+  guest_email?: string;
 
-  @ApiProperty({
-    description: 'Payment method',
+  @ApiPropertyOptional({
+    description: 'Payment method (set when payment is initiated)',
     enum: ['stripe', 'paypal', 'amazon_pay'],
   })
   @IsEnum(['stripe', 'paypal', 'amazon_pay'])
-  payment_method: 'stripe' | 'paypal' | 'amazon_pay';
+  @IsOptional()
+  payment_method?: 'stripe' | 'paypal' | 'amazon_pay';
 
   @ApiPropertyOptional({ description: 'Shipping address (required for physical products)' })
   @ValidateNested()
@@ -64,7 +63,7 @@ export class CreateOrderDto {
 }
 
 export class UpdateOrderStatusDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'New order status',
     enum: ['pending', 'processing', 'completed', 'cancelled', 'refunded'],
   })

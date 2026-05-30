@@ -84,6 +84,17 @@ export class CartController {
     return this.cartService.clearCart(user?.id, sessionId);
   }
 
+  @Post('validate')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Validate cart stock before checkout; corrects quantities in place' })
+  @ApiHeader({ name: 'x-session-id', required: false })
+  validateCart(
+    @CurrentUser() user: any,
+    @Headers('x-session-id') sessionId?: string,
+  ) {
+    return this.cartService.validateCart(user?.id, sessionId);
+  }
+
   @Post('merge')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

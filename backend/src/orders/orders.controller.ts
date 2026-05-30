@@ -32,7 +32,7 @@ export class OrdersController {
     @CurrentUser() user: any,
     @Headers('x-session-id') sessionId?: string,
   ) {
-    return this.ordersService.createFromCart(dto, user?.id, sessionId);
+    return this.ordersService.createFromCart(dto, user?.id, sessionId, user?.email);
   }
 
   @Get()

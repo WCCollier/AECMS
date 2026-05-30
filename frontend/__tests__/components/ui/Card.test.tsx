@@ -18,7 +18,7 @@ describe('Card Components', () => {
     it('applies base styles', () => {
       render(<Card>Content</Card>);
       const card = screen.getByText('Content');
-      expect(card.className).toContain('bg-background');
+      expect(card.className).toContain('bg-surface');
       expect(card.className).toContain('rounded-lg');
       expect(card.className).toContain('shadow-sm');
     });

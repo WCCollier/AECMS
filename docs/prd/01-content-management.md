@@ -707,70 +707,69 @@ function morphBackground(element, images, scrollPosition) {
 
 #### Unified Comment System
 
-**Reviews are Comments**: In AECMS, reviews are a specialized type of comment with star ratings. The system uses a unified comment architecture:
+**Reviews are a subtype of Comment**: A Comment becomes a Review when it has one or more associated `CommentRating` rows. The system uses two database tables:
 
-- **Standard Comment**: Text-only feedback (no rating)
-- **Review**: Comment with 1-5 star rating (optional text)
+- **`comments`**: One row per comment, regardless of type. Plain comments have no ratings; reviews have one or more.
+- **`comment_ratings`**: One row per rating dimension, linked to a parent comment. The first and always-required dimension is `title: "Overall", value: 1–5`. Additional aspect-specific ratings (e.g. "Instruction Quality", "Value") can be added to the same comment in future.
 
-Both comment types use the same database table, moderation system, and display interface.
+This design allows the rating schema to extend without altering the Comment model.
+
+#### Comment vs Review Distinction
+
+| | Plain Comment | Review |
+|---|---|---|
+| `ratings` array | empty | one or more entries |
+| `title` (headline) | null | optional string |
+| `verified_purchase` | false | system-set true for product reviews |
+| Nesting (replies) | ✅ | ❌ (reviews cannot be replies) |
 
 #### Comments on Articles and Products
 
 **Both articles and products can receive comments and reviews**:
 
-- **Articles**: Can receive both standard comments AND reviews
-  - Users can review articles (e.g., "5 stars, great tutorial!")
+- **Articles**: Any logged-in member can leave a plain comment or a review (no purchase required).
   - Default sort: Most Recent (newest first)
 
-- **Products**: Can receive both standard comments AND reviews
-  - Reviews are primary (product quality feedback with ratings)
-  - Standard comments also allowed (e.g., "When will this be back in stock?")
-  - Default sort: Reviews First (highest rated reviews at top)
+- **Products**: Any logged-in member can leave a plain comment. Only **verified purchasers** (members with a completed or processing order containing the product) can leave a review.
+  - Default sort: Reviews First (by Overall rating descending), then plain comments by recency.
 
-**Rationale**: Unified system allows flexibility. Articles can be rated, and products can receive non-review comments (questions, feedback, etc.)
+**One review per user per item** is enforced at the application layer. Members may leave multiple plain comments on the same item but only one rated comment (review). That review is fully editable.
+
+#### Rating Scale
+
+- **Scale**: 1–5 integer stored in `comment_ratings.value`
+- **Default dimension**: `title: "Overall"` — always present as the first rating when a comment is a review
+- **Future dimensions**: Additional aspect-specific ratings (same 1–5 scale) may be added to a review as extra `CommentRating` rows. The title is a free string set by the UI (e.g. "Instruction Quality", "Value for Money").
+- **Average rating** (`average_rating` on Product): computed from approved "Overall" ratings on demand; rounded to one decimal place. `null` when no approved reviews exist.
 
 #### Comment Capabilities by Role
-- **Members**: Create, edit own, delete own comments/reviews
-- **Admin/Owner**: Moderate (approve/reject), edit any, delete any comments
-- **Guests**: Cannot comment, can view comments (if visibility allows)
+- **Members**: Create, edit own, delete own comments/reviews. Can leave a review on any article; can leave a review on a product only if they have a verified purchase.
+- **Admin/Owner**: Moderate (approve/reject/spam), edit any, delete any comments.
+- **Guests**: Cannot comment or review. Can view comments/reviews if visibility allows.
 
 #### Comment Visibility Controls
 
 Each article and product can have comment visibility set to:
 - **Disabled**: No comments allowed
-- **Logged-in only**: Members and above can comment, only logged-in users can view
-- **Public**: Members and above can comment, everyone (including Guests) can view
+- **Logged-in only**: Members and above can comment; only logged-in users can view
+- **Public**: Members and above can comment; everyone (including Guests) can view
 
-#### Comment Sorting Options
+#### Comment Sorting
 
-**Default Sort Order**:
-- **Products**: Reviews First (reviews sorted by rating, then standard comments by recency)
-- **Articles**: Most Recent (all comments sorted by newest first)
+**Product comments** (applied in service after DB query):
+1. Reviews (has ratings) before plain comments
+2. Within reviews: by Overall rating descending
+3. Within same rating tier: by recency descending
 
-**User-Selectable Sort Options**:
+**Article comments**: Most Recent (newest first)
+
+**User-Selectable Sort Options** (future UI):
 - Most Recent (default for articles)
 - Oldest First
 - Highest Rated (reviews only, 5 stars first)
 - Lowest Rated (reviews only, 1 star first)
 - Reviews First (default for products)
-- Most Helpful (based on upvotes - future feature)
-
-**Sort Implementation**:
-
-```typescript
-// Product default: Reviews first, then by rating
-SELECT * FROM comments
-WHERE product_id = 'uuid'
-ORDER BY
-  CASE WHEN rating IS NOT NULL THEN 0 ELSE 1 END, -- Reviews first
-  rating DESC NULLS LAST,                          -- Then by rating
-  created_at DESC                                   -- Then by recency
-
-// Article default: Most recent
-SELECT * FROM comments
-WHERE article_id = 'uuid'
-ORDER BY created_at DESC
-```
+- Most Helpful (based on upvotes — future feature)
 
 #### Comment Moderation
 

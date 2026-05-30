@@ -17,13 +17,13 @@ describe('Button', () => {
   it('applies default variant (primary) styles', () => {
     render(<Button>Primary</Button>);
     const button = screen.getByRole('button');
-    expect(button.className).toContain('bg-foreground');
+    expect(button.className).toContain('bg-accent');
   });
 
   it('applies secondary variant styles', () => {
     render(<Button variant="secondary">Secondary</Button>);
     const button = screen.getByRole('button');
-    expect(button.className).toContain('bg-foreground/10');
+    expect(button.className).toContain('bg-surface-raised');
   });
 
   it('applies outline variant styles', () => {
@@ -35,7 +35,7 @@ describe('Button', () => {
   it('applies ghost variant styles', () => {
     render(<Button variant="ghost">Ghost</Button>);
     const button = screen.getByRole('button');
-    expect(button.className).toContain('hover:bg-foreground/10');
+    expect(button.className).toContain('hover:bg-surface-raised');
   });
 
   it('applies danger variant styles', () => {

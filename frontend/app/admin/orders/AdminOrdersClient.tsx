@@ -98,7 +98,7 @@ export function AdminOrdersClient() {
                         <span className="font-medium">#{order.order_number}</span>
                       </td>
                       <td className="px-6 py-4 text-foreground/70">
-                        {order.guest_email || 'Registered User'}
+                        {order.email || 'Registered User'}
                       </td>
                       <td className="px-6 py-4 text-foreground/70">
                         {formatDate(order.created_at)}
@@ -110,11 +110,11 @@ export function AdminOrdersClient() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`text-xs px-2 py-1 rounded-full ${
-                          order.payment_status === 'paid' ? 'bg-green-500/10 text-green-500' :
-                          order.payment_status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
+                          order.paid_at ? 'bg-green-500/10 text-green-500' :
+                          order.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
                           'bg-red-500/10 text-red-500'
                         }`}>
-                          {order.payment_status}
+                          {order.paid_at ? 'paid' : order.status === 'pending' ? 'pending' : 'unpaid'}
                         </span>
                       </td>
                       <td className="px-6 py-4 font-medium">

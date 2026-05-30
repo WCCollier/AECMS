@@ -6,14 +6,16 @@ import Link from 'next/link';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
 import { createOrder } from '@/hooks/useOrders';
-import api from '@/lib/api';
+import api, { getErrorMessage } from '@/lib/api';
+
+const ADJUSTMENT_KEY = 'cart_stock_adjustments';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui';
 import { ArrowLeft, CreditCard, ShoppingCart } from 'lucide-react';
 import type { PaymentIntent, ShippingAddress } from '@/types';
 
 export function CheckoutPageClient() {
   const router = useRouter();
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, clearCart, mutate: mutateCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -50,6 +52,24 @@ export function CheckoutPageClient() {
     setError('');
 
     try {
+      // Pre-flight: validate cart stock and correct any over-limit quantities
+      const validation = await api.post<{
+        adjusted: boolean;
+        changes: Array<{ product_name: string; action: 'removed' | 'reduced'; from: number; to: number }>;
+      }>('/cart/validate');
+
+      if (validation.data.adjusted) {
+        const messages = validation.data.changes.map((c) =>
+          c.action === 'removed'
+            ? `"${c.product_name}" was removed (no longer in stock)`
+            : `"${c.product_name}" quantity reduced from ${c.from} to ${c.to} (only ${c.to} available)`,
+        );
+        sessionStorage.setItem(ADJUSTMENT_KEY, JSON.stringify(messages));
+        await mutateCart();
+        router.push('/cart');
+        return;
+      }
+
       const shippingAddress: ShippingAddress = {
         street: formData.street,
         city: formData.city,
@@ -66,13 +86,13 @@ export function CheckoutPageClient() {
       setOrderId(order.id);
       setStep('payment');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create order');
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePayment = async (provider: 'stripe' | 'paypal') => {
+  const handlePayment = async (provider: 'stripe' | 'paypal' | 'amazon_pay') => {
     if (!orderId) return;
     setIsLoading(true);
     setError('');
@@ -91,6 +111,13 @@ export function CheckoutPageClient() {
         if (response.data.approval_url) {
           window.location.href = response.data.approval_url;
         }
+      } else if (provider === 'amazon_pay') {
+        // In production: initialise the Amazon Pay JS widget with response.data.client_secret
+        // (the checkout session ID), which opens the Amazon-hosted authentication modal.
+        // Credentials are not yet configured — placeholder stub mirrors Stripe behaviour.
+        alert(`Amazon Pay session created. Session ID: ${response.data.client_secret}\n\nIn production, this would open the Amazon Pay widget.`);
+        await clearCart();
+        router.push(`/order-confirmation?order=${orderId}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed');
@@ -232,8 +259,8 @@ export function CheckoutPageClient() {
                 >
                   <CreditCard className="w-6 h-6 mr-4" />
                   <div className="text-left">
-                    <p className="font-semibold">Credit Card</p>
-                    <p className="text-sm text-foreground/60">Pay with Visa, Mastercard, or AMEX</p>
+                    <p className="font-semibold">Credit or Debit Card</p>
+                    <p className="text-sm text-foreground/60">Visa, Mastercard, AMEX — secured by Stripe</p>
                   </div>
                 </Button>
 
@@ -249,6 +276,21 @@ export function CheckoutPageClient() {
                   <div className="text-left">
                     <p className="font-semibold">PayPal</p>
                     <p className="text-sm text-foreground/60">Pay with your PayPal account</p>
+                  </div>
+                </Button>
+
+                <Button
+                  className="w-full justify-start h-auto py-4"
+                  variant="outline"
+                  onClick={() => handlePayment('amazon_pay')}
+                  disabled={isLoading}
+                >
+                  <div className="w-6 h-6 mr-4 flex items-center justify-center font-bold text-amber-500">
+                    a
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold">Amazon Pay</p>
+                    <p className="text-sm text-foreground/60">Pay with your Amazon account</p>
                   </div>
                 </Button>
 

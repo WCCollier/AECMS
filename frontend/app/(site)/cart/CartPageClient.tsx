@@ -1,15 +1,38 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
+import { getErrorMessage } from '@/lib/api';
 import { Button, Card, CardContent, CardFooter } from '@/components/ui';
-import { Minus, Plus, Trash2, ShoppingCart, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingCart, ArrowLeft, AlertTriangle } from 'lucide-react';
+
+const ADJUSTMENT_KEY = 'cart_stock_adjustments';
 
 export function CartPageClient() {
   const { items, subtotal, isLoading, updateItem, removeItem, clearCart } = useCart();
   const { isAuthenticated } = useAuth();
+  const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
+  const [adjustmentNotices, setAdjustmentNotices] = useState<string[]>([]);
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem(ADJUSTMENT_KEY);
+    if (stored) {
+      setAdjustmentNotices(JSON.parse(stored));
+      sessionStorage.removeItem(ADJUSTMENT_KEY);
+    }
+  }, []);
+
+  const handleUpdateItem = async (itemId: string, quantity: number) => {
+    setItemErrors((prev) => ({ ...prev, [itemId]: '' }));
+    try {
+      await updateItem(itemId, quantity);
+    } catch (error) {
+      setItemErrors((prev) => ({ ...prev, [itemId]: getErrorMessage(error) }));
+    }
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -65,6 +88,29 @@ export function CartPageClient() {
         </Button>
       </div>
 
+      {adjustmentNotices.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-medium text-amber-700 dark:text-amber-400 mb-1">
+              Your cart was updated before checkout:
+            </p>
+            <ul className="text-sm space-y-0.5 text-foreground/70">
+              {adjustmentNotices.map((msg, i) => (
+                <li key={i}>• {msg}</li>
+              ))}
+            </ul>
+            <p className="text-sm text-foreground/50 mt-2">Please review your cart before proceeding.</p>
+          </div>
+          <button
+            className="text-foreground/40 hover:text-foreground self-start"
+            onClick={() => setAdjustmentNotices([])}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
@@ -80,6 +126,7 @@ export function CartPageClient() {
                           src={item.product.featured_image_url}
                           alt={item.product.name}
                           fill
+                          sizes="96px"
                           className="object-cover"
                         />
                       ) : (
@@ -97,25 +144,29 @@ export function CartPageClient() {
                         {item.product.name}
                       </h3>
                     </Link>
-                    <p className="text-sm text-foreground/60">{formatPrice(item.unit_price)} each</p>
+                    {item.product.product_type !== 'service' && (
+                      <p className="text-sm text-foreground/60">{formatPrice(item.unit_price)} each</p>
+                    )}
 
                     {/* Quantity Controls */}
                     <div className="flex items-center gap-4 mt-3">
-                      <div className="flex items-center border border-foreground/20 rounded-lg">
-                        <button
-                          className="p-1.5 hover:bg-foreground/5"
-                          onClick={() => updateItem(item.id, Math.max(1, item.quantity - 1))}
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="px-3 text-sm">{item.quantity}</span>
-                        <button
-                          className="p-1.5 hover:bg-foreground/5"
-                          onClick={() => updateItem(item.id, item.quantity + 1)}
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
+                      {item.product.product_type !== 'service' && (
+                        <div className="flex items-center border border-foreground/20 rounded-lg">
+                          <button
+                            className="p-1.5 hover:bg-foreground/5"
+                            onClick={() => handleUpdateItem(item.id, Math.max(1, item.quantity - 1))}
+                          >
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="px-3 text-sm">{item.quantity}</span>
+                          <button
+                            className="p-1.5 hover:bg-foreground/5"
+                            onClick={() => handleUpdateItem(item.id, item.quantity + 1)}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
 
                       <button
                         className="p-1.5 text-foreground/50 hover:text-red-500 transition-colors"
@@ -124,6 +175,9 @@ export function CartPageClient() {
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
+                    {itemErrors[item.id] && (
+                      <p className="text-xs text-red-500 mt-1">{itemErrors[item.id]}</p>
+                    )}
                   </div>
 
                   {/* Item Total */}

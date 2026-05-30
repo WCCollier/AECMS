@@ -81,7 +81,7 @@ export function AdminProductsClient() {
                       <td className="px-6 py-4 text-foreground/70">{product.sku}</td>
                       <td className="px-6 py-4">{formatPrice(product.price)}</td>
                       <td className="px-6 py-4">
-                        {product.track_inventory ? product.stock_quantity : 'N/A'}
+                        {product.stock_quantity ?? 'N/A'}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`text-xs px-2 py-1 rounded-full ${
