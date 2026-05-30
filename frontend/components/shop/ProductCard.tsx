@@ -7,7 +7,7 @@ import { Product } from '@/types';
 import { Button } from '@/components/ui';
 import { useCart } from '@/hooks/useCart';
 import { getErrorMessage } from '@/lib/api';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Check } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -16,8 +16,11 @@ interface ProductCardProps {
 
 export function ProductCard({ product, priority = false }: ProductCardProps) {
   const { addItem } = useCart();
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState(false);
   const [addError, setAddError] = useState('');
   const errorTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -30,12 +33,18 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
     e.preventDefault();
     e.stopPropagation();
     if (errorTimer.current) clearTimeout(errorTimer.current);
+    if (addedTimer.current) clearTimeout(addedTimer.current);
     setAddError('');
+    setAdding(true);
     try {
       await addItem(product.id, 1);
+      setAdded(true);
+      addedTimer.current = setTimeout(() => setAdded(false), 2000);
     } catch (error) {
       setAddError(getErrorMessage(error));
       errorTimer.current = setTimeout(() => setAddError(''), 5000);
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -100,11 +109,19 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
             </div>
             <Button
               size="sm"
-              variant="secondary"
+              variant={added ? 'outline' : 'secondary'}
               onClick={handleAddToCart}
-              disabled={isOutOfStock || isUnavailable}
+              disabled={isOutOfStock || isUnavailable || adding}
+              isLoading={adding}
             >
-              {isService ? 'Reserve' : 'Add'}
+              {added ? (
+                <>
+                  <Check className="w-3.5 h-3.5 mr-1 text-green-500" />
+                  <span className="text-green-500">{isService ? 'Reserved' : 'Added'}</span>
+                </>
+              ) : (
+                isService ? 'Reserve' : 'Add'
+              )}
             </Button>
           </div>
           {addError && (

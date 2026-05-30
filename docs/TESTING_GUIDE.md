@@ -153,8 +153,8 @@ This section covers the structured manual testing sequence for Phase 9. Testing 
 - If you had anonymous cart items in Step 3: check whether they transferred after login (cart merge)
 
 **Checklist**
-- [ ] Cart works for logged-in user
-- [ ] Anonymous cart merges into member cart on login (or is explicitly cleared — either is acceptable, but the behavior should be consistent)
+- [x] Cart works for logged-in user
+- [x] Anonymous cart merges into member cart on login (or is explicitly cleared — either is acceptable, but the behavior should be consistent)
 
 ---
 
