@@ -61,3 +61,8 @@ migration/
 # WordPress import source files (large, not part of codebase)
 seed_data/
 backend/uploads/
+
+# Test artifacts
+test-results/
+frontend/test-results/
+**/playwright-report/
