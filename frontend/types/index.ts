@@ -169,7 +169,7 @@ export interface Order {
   user_id: string | null;
   email: string | null;
   status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'refunded';
-  payment_method: 'stripe' | 'paypal' | 'amazon_pay' | null;
+  payment_method: 'stripe' | 'paypal' | null;
   payment_intent_id: string | null;
   paid_at: string | null;
   subtotal: number;

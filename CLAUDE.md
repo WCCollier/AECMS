@@ -163,7 +163,7 @@ rm -rf backend/dist frontend/.next
 ## Phase 5: Payments Integration (✅ CONFIGURED)
 
 **Architecture** (simplified):
-- **Stripe (Primary)**: Cards, Apple Pay, Google Pay via Stripe Checkout
+- **Stripe (Primary)**: Cards, Apple Pay, Google Pay, **and Amazon Pay** — all via Stripe Checkout. Amazon Pay is a native Stripe payment method; no separate backend provider is needed.
 - **PayPal (Secondary)**: Alternative payment method for customers who prefer PayPal
 
 **Implemented**:
@@ -176,7 +176,8 @@ rm -rf backend/dist frontend/.next
 **Configuration Status**:
 - ✅ Stripe sandbox keys configured (via Codespaces Secrets)
 - ✅ PayPal sandbox keys configured (via Codespaces Secrets)
-- ⏸️ AmazonPayProvider backend complete (provider, test mode, capture, webhooks); frontend placeholder stub in checkout UI; credentials not yet configured — planned for MVP
+
+**Do NOT add a separate Amazon Pay provider.** Amazon Pay is exposed automatically by Stripe Checkout for eligible customers. A standalone `AmazonPayProvider` was built and then removed after this was discovered.
 
 **Secrets Management**:
 - Development/Sandbox keys → Codespaces Secrets (current)
@@ -269,7 +270,7 @@ SMTP_PORT=587
 - Infinite scroll / paginated toggle (`ViewModeContext`, `ViewModeToggle`, `useSWRInfinite`)
 - Virtual stock reservation system (`POST /cart/validate`, inline stock errors at 3 touch points)
 - Order confirmation page (`/order-confirmation?order=:id`)
-- Amazon Pay reinstated as planned MVP provider (backend complete, frontend stub added)
+- Amazon Pay: standalone provider built, then removed — it is natively available through Stripe Checkout
 - API Shape Audit (`docs/Shape_Audit.md`) — 9 items identified and resolved
 - Unified Comment/Review system: `CommentRating` table, `ProductReview` dropped, verified purchase enforcement
 - CartProduct partial type, Cart audit fields (user_id, session_id, created_at, updated_at) retained

@@ -47,13 +47,14 @@ export class CreateOrderDto {
   @IsOptional()
   guest_email?: string;
 
+  // NOTE: Amazon Pay is surfaced automatically by Stripe Checkout — no separate provider.
   @ApiPropertyOptional({
     description: 'Payment method (set when payment is initiated)',
-    enum: ['stripe', 'paypal', 'amazon_pay'],
+    enum: ['stripe', 'paypal'],
   })
-  @IsEnum(['stripe', 'paypal', 'amazon_pay'])
+  @IsEnum(['stripe', 'paypal'])
   @IsOptional()
-  payment_method?: 'stripe' | 'paypal' | 'amazon_pay';
+  payment_method?: 'stripe' | 'paypal';
 
   @ApiPropertyOptional({ description: 'Shipping address (required for physical products)' })
   @ValidateNested()

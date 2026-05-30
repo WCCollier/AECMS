@@ -92,7 +92,7 @@ export function CheckoutPageClient() {
     }
   };
 
-  const handlePayment = async (provider: 'stripe' | 'paypal' | 'amazon_pay') => {
+  const handlePayment = async (provider: 'stripe' | 'paypal') => {
     if (!orderId) return;
     setIsLoading(true);
     setError('');
@@ -104,20 +104,15 @@ export function CheckoutPageClient() {
       });
 
       if (provider === 'stripe') {
-        alert(`Stripe payment created. Client secret: ${response.data.client_secret}\n\nIn production, this would open Stripe Elements.`);
+        // NOTE: Amazon Pay is available automatically inside Stripe Checkout for
+        // eligible customers — no separate button or provider integration is needed.
+        alert(`Stripe payment created. Client secret: ${response.data.client_secret}\n\nIn production, this would open Stripe Elements/Checkout (which includes Apple Pay, Google Pay, and Amazon Pay where available).`);
         await clearCart();
         router.push(`/order-confirmation?order=${orderId}`);
       } else if (provider === 'paypal') {
         if (response.data.approval_url) {
           window.location.href = response.data.approval_url;
         }
-      } else if (provider === 'amazon_pay') {
-        // In production: initialise the Amazon Pay JS widget with response.data.client_secret
-        // (the checkout session ID), which opens the Amazon-hosted authentication modal.
-        // Credentials are not yet configured — placeholder stub mirrors Stripe behaviour.
-        alert(`Amazon Pay session created. Session ID: ${response.data.client_secret}\n\nIn production, this would open the Amazon Pay widget.`);
-        await clearCart();
-        router.push(`/order-confirmation?order=${orderId}`);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed');
@@ -276,21 +271,6 @@ export function CheckoutPageClient() {
                   <div className="text-left">
                     <p className="font-semibold">PayPal</p>
                     <p className="text-sm text-foreground/60">Pay with your PayPal account</p>
-                  </div>
-                </Button>
-
-                <Button
-                  className="w-full justify-start h-auto py-4"
-                  variant="outline"
-                  onClick={() => handlePayment('amazon_pay')}
-                  disabled={isLoading}
-                >
-                  <div className="w-6 h-6 mr-4 flex items-center justify-center font-bold text-amber-500">
-                    a
-                  </div>
-                  <div className="text-left">
-                    <p className="font-semibold">Amazon Pay</p>
-                    <p className="text-sm text-foreground/60">Pay with your Amazon account</p>
                   </div>
                 </Button>
 
