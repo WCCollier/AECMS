@@ -139,7 +139,9 @@ export class ArticlesService {
       status,
       visibility,
       category_id,
+      category,
       tag_id,
+      tag,
       author_id,
       search,
       page = 1,
@@ -177,22 +179,18 @@ export class ArticlesService {
       where.visibility = visibility;
     }
 
-    // Category filter
+    // Category filter — accepts UUID or slug
     if (category_id) {
-      where.categories = {
-        some: {
-          category_id,
-        },
-      };
+      where.categories = { some: { category_id } };
+    } else if (category) {
+      where.categories = { some: { category: { slug: category } } };
     }
 
-    // Tag filter
+    // Tag filter — accepts UUID or slug
     if (tag_id) {
-      where.tags = {
-        some: {
-          tag_id,
-        },
-      };
+      where.tags = { some: { tag_id } };
+    } else if (tag) {
+      where.tags = { some: { tag: { slug: tag } } };
     }
 
     // Author filter
