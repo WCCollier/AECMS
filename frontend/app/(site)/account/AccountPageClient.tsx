@@ -7,10 +7,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { Button, Input } from '@/components/ui';
 import api, { getErrorMessage } from '@/lib/api';
-import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star } from 'lucide-react';
+import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink } from 'lucide-react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import type { Comment, PaginatedResponse } from '@/types';
+import { CommentForm } from '@/components/comments/CommentForm';
 
 const formatPrice = (p: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p);
@@ -22,12 +23,13 @@ export function AccountPageClient() {
   const router = useRouter();
   const { user, logout, isLoading: authLoading } = useAuth();
   const { orders, isLoading: ordersLoading } = useOrders({ limit: 5 });
-  const { data: commentsData, isLoading: commentsLoading } = useSWR<PaginatedResponse<Comment>>(
+  const { data: commentsData, isLoading: commentsLoading, mutate: mutateComments } = useSWR<PaginatedResponse<Comment>>(
     user ? '/comments/mine?limit=5' : null,
     fetcher,
   );
 
   const [activeSection, setActiveSection] = useState<'orders' | 'comments' | 'password' | 'delete' | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   // Change password state
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -96,6 +98,18 @@ export function AccountPageClient() {
   return (
     <div className="container mx-auto px-4 py-10 max-w-2xl">
       <h1 className="text-2xl font-bold mb-8">My Account</h1>
+
+      {/* Admin panel shortcut — only for admin/owner logged in via front door */}
+      {(user.role === 'admin' || user.role === 'owner') && (
+        <div className="mb-6 p-4 bg-surface border border-border rounded-xl flex items-center justify-between text-sm">
+          <span className="text-foreground/60">
+            You have admin access. The admin panel requires a separate login with 2FA.
+          </span>
+          <Link href="/admin" className="text-accent hover:underline font-medium shrink-0 ml-4">
+            Go to Admin Panel →
+          </Link>
+        </div>
+      )}
 
       {/* Profile */}
       <section className="bg-surface border border-border rounded-xl p-6 mb-6">
@@ -185,12 +199,47 @@ export function AccountPageClient() {
             ) : comments.length === 0 ? (
               <p className="text-sm text-foreground/60">No comments or reviews yet.</p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {comments.map((c) => {
                   const overallRating = c.ratings?.find((r) => r.title === 'Overall');
+                  const target = c.article
+                    ? { href: `/latest/${c.article.slug}`, name: c.article.title }
+                    : c.product
+                    ? { href: `/shop/${c.product.slug}`, name: c.product.name }
+                    : null;
+                  const commentHref = target ? `${target.href}#comment-${c.id}` : null;
+
+                  if (editingCommentId === c.id) {
+                    return (
+                      <div key={c.id} className="py-3 border-b border-border last:border-0">
+                        <CommentForm
+                          commentId={c.id}
+                          articleId={c.article_id ?? undefined}
+                          productId={c.product_id ?? undefined}
+                          isProduct={!!c.product_id}
+                          initialContent={c.content}
+                          initialTitle={c.title ?? ''}
+                          initialRatings={c.ratings?.map(({ title, value }) => ({ title, value })) ?? []}
+                          onSuccess={() => { setEditingCommentId(null); mutateComments(); }}
+                          onCancel={() => setEditingCommentId(null)}
+                        />
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div key={c.id} className="py-2 border-b border-border last:border-0 text-sm">
-                      {c.title && <p className="font-medium">{c.title}</p>}
+                    <div key={c.id} className="py-3 border-b border-border last:border-0 text-sm">
+                      {/* Article / product attribution */}
+                      {target && (
+                        <Link
+                          href={target.href}
+                          className="inline-flex items-center gap-1 text-xs text-accent hover:underline mb-1"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          {target.name}
+                        </Link>
+                      )}
+                      {/* Rating */}
                       {overallRating && (
                         <div className="flex items-center gap-0.5 mb-1">
                           {Array.from({ length: 5 }).map((_, i) => (
@@ -201,8 +250,26 @@ export function AccountPageClient() {
                           ))}
                         </div>
                       )}
-                      <p className="text-foreground/70 line-clamp-2">{c.content}</p>
-                      <p className="text-foreground/40 text-xs mt-1">{formatDate(c.created_at)}</p>
+                      {c.title && <p className="font-medium mb-0.5">{c.title}</p>}
+                      {/* Comment body — links to comment anchor */}
+                      {commentHref ? (
+                        <Link href={commentHref} className="text-foreground/70 hover:text-foreground line-clamp-2 block">
+                          {c.content}
+                        </Link>
+                      ) : (
+                        <p className="text-foreground/70 line-clamp-2">{c.content}</p>
+                      )}
+                      {/* Footer: date + edit */}
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-foreground/40 text-xs">{formatDate(c.created_at)}</p>
+                        <button
+                          onClick={() => setEditingCommentId(c.id)}
+                          className="p-1 text-foreground/40 hover:text-accent transition-colors rounded"
+                          aria-label="Edit comment"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

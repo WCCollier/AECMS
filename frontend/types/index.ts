@@ -224,6 +224,9 @@ export interface Comment {
   product_id: string | null;
   parent_id: string | null;
   user: CommentAuthor | null;
+  // Hydrated by commentInclude — present on all public endpoints
+  article: { id: string; title: string; slug: string } | null;
+  product: { id: string; name: string; slug: string } | null;
   ratings: CommentRating[];
   replies: Comment[];
   created_at: string;

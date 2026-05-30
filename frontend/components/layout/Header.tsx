@@ -19,7 +19,6 @@ export function Header() {
   const flyoutRef = useRef<HTMLDivElement>(null);
   const loginBtnRef = useRef<HTMLButtonElement>(null);
 
-  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
   const navLink = 'text-foreground/60 hover:text-accent transition-colors text-sm font-medium';
 
   // Close flyout on outside click
@@ -67,9 +66,6 @@ export function Header() {
           <nav className="hidden md:flex items-center gap-7">
             <Link href="/shop" className={navLink}>Shop</Link>
             <Link href="/latest" className={navLink}>Latest</Link>
-            {isAdmin && (
-              <Link href="/admin" className={navLink}>Admin</Link>
-            )}
           </nav>
 
           {/* Desktop Actions */}
@@ -174,9 +170,6 @@ export function Header() {
               <Link href="/cart" className={`${navLink} flex items-center gap-2`} onClick={() => setMobileMenuOpen(false)}>
                 Cart {itemCount > 0 && <span className="bg-accent text-accent-foreground text-xs px-1.5 rounded-full font-bold">{itemCount}</span>}
               </Link>
-              {isAdmin && (
-                <Link href="/admin" className={navLink} onClick={() => setMobileMenuOpen(false)}>Admin</Link>
-              )}
               <hr className="border-border" />
               {isAuthenticated ? (
                 <>

@@ -85,7 +85,7 @@ export function CommentCard({ comment, onMutate, productId, verifiedPurchase }: 
   }
 
   return (
-    <div className="py-4 border-b border-border last:border-0">
+    <div id={`comment-${comment.id}`} className="py-4 border-b border-border last:border-0">
       {/* Header row */}
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2 min-w-0">

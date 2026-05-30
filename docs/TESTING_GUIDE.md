@@ -138,10 +138,10 @@ This section covers the structured manual testing sequence for Phase 9. Testing 
 - Browse shop
 
 **Checklist**
-- [ ] Login succeeds and redirects
-- [ ] Header reflects logged-in state
-- [ ] Auth context persists on page refresh
-- [ ] `logged_in_only` articles are visible to members
+- [x] Login succeeds and redirects
+- [x] Header reflects logged-in state
+- [x] Auth context persists on page refresh
+- [x] `logged_in_only` articles are visible to members
 
 **Likely issue**: Auth context `refreshUser` race condition on page load may flash the logged-out state briefly.
 
