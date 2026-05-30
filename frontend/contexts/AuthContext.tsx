@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import api, { setAccessToken, getAccessToken, getErrorMessage } from '@/lib/api';
+import { mutate } from 'swr';
+import api, { setAccessToken, getAccessToken, getErrorMessage, getSessionId, resetSessionId } from '@/lib/api';
 import type { User, AuthUser, LoginCredentials, RegisterData, AuthTokens } from '@/types';
 
 interface AuthContextType {
@@ -52,6 +53,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = async (credentials: LoginCredentials) => {
     try {
+      // Capture anonymous session ID before logging in — needed for cart merge
+      const sessionId = getSessionId();
+
       const response = await api.post<AuthTokens & { user: AuthUser }>('/auth/login', credentials);
       const { accessToken, refreshToken, user: userData } = response.data;
 
@@ -59,8 +63,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (typeof window !== 'undefined') {
         localStorage.setItem('refresh_token', refreshToken);
       }
-
       setUser(userData as unknown as User);
+
+      // Merge anonymous cart items into the user's account cart, then refresh
+      if (sessionId) {
+        try {
+          await api.post('/cart/merge', {}, {
+            headers: { 'x-session-id': sessionId },
+          });
+        } catch (mergeError) {
+          // Non-fatal — user cart still loads correctly even if merge fails
+          console.warn('Cart merge failed:', mergeError);
+        }
+      }
+      await mutate('/cart');
     } catch (error) {
       throw new Error(getErrorMessage(error));
     }
@@ -88,8 +104,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setAccessToken(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('refresh_token');
+        // Generate a fresh anonymous session so the cart starts empty after logout
+        resetSessionId();
       }
       setUser(null);
+      // Clear the SWR cart cache immediately — anonymous cart for the new session is empty
+      await mutate('/cart', null, { revalidate: false });
     }
   };
 

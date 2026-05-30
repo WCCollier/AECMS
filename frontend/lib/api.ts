@@ -32,6 +32,15 @@ export const getSessionId = (): string | null => {
   return id;
 };
 
+// Generate a brand-new session ID, used on logout to start a clean anonymous session.
+export const resetSessionId = (): string => {
+  const id = crypto.randomUUID();
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(SESSION_ID_KEY, id);
+  }
+  return id;
+};
+
 export const setAccessToken = (token: string | null) => {
   accessToken = token;
   if (typeof window !== 'undefined' && token) {
