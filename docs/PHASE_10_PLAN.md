@@ -200,10 +200,17 @@ Replaces the current `ImageField` (single-image) in `ArticleForm` and `ProductFo
 - [ ] Create `frontend/components/editor/extensions/video-embed.ts` (TipTap node)
 - [ ] Supports YouTube, Vimeo by URL
 
-### B5 — Tests & verification
+### B5 — `XEmbed` inline widget
+
+- [ ] Create `frontend/components/widgets/XEmbed/XEmbed.tsx` (display)
+- [ ] Create `frontend/components/editor/extensions/x-embed.ts` (TipTap node)
+- [ ] Accepts a tweet/post URL; renders via Twitter embed script (`widgets.js`)
+- [ ] Graceful fallback if embed script fails to load (linked blockquote)
+
+### B6 — Tests & verification
 
 - [ ] All existing content displays correctly after JSON migration
-- [ ] Inline widgets render in editor and on detail pages
+- [ ] Inline widgets render in editor and on detail pages (MediaCarousel, Callout, VideoEmbed, XEmbed)
 - [ ] No data loss from HTML → JSON conversion
 
 ---
