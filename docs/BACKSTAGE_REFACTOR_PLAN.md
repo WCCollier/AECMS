@@ -104,110 +104,89 @@ when added, they would carry `scope: 'customer'`.
 
 ### Phase A — Database Schema
 
-- [ ] **A1** Add `scope String @default("backstage")` to `Capability` model in `schema.prisma`
-- [ ] **A2** Add `session_type String @default("customer")` to `RefreshToken` model in `schema.prisma`
-- [ ] **A3** Run `npx prisma migrate dev --name add_capability_scope_and_session_type`
-- [ ] **A4** Run `npx prisma generate`
+- [x] **A1** Add `scope String @default("backstage")` to `Capability` model in `schema.prisma`
+- [x] **A2** Add `session_type String @default("customer")` to `RefreshToken` model in `schema.prisma`
+- [x] **A3** Run `npx prisma migrate dev --name add_capability_scope_and_session_type`
+- [x] **A4** Run `npx prisma generate`
 
 ---
 
 ### Phase B — Backend: Interfaces & Token Layer
 
-- [ ] **B1** `auth-response.interface.ts` — add `session_type: 'customer' | 'backstage'` to `TokenPayload`
-- [ ] **B2** `auth.service.ts` — `generateTokens()`: add `sessionType: 'customer' | 'backstage'` param; embed in both access and refresh JWT payloads
-- [ ] **B3** `auth.service.ts` — `storeRefreshToken()`: add `sessionType` param; write to `session_type` column
-- [ ] **B4** `auth.service.ts` — `refreshTokens()`: read `session_type` from the stored `RefreshToken` DB row; pass it through to `generateTokens()` and `storeRefreshToken()` so type survives rotation
-- [ ] **B5** `jwt.strategy.ts` — expose `session_type` from JWT payload in the `validate()` return value so it lands on `req.user`
+- [x] **B1** `auth-response.interface.ts` — add `session_type: 'customer' | 'backstage'` to `TokenPayload`
+- [x] **B2** `auth.service.ts` — `generateTokens()`: add `sessionType: 'customer' | 'backstage'` param; embed in both access and refresh JWT payloads
+- [x] **B3** `auth.service.ts` — `storeRefreshToken()`: add `sessionType` param; write to `session_type` column; returns `{ id }` so callers can reference the stored row
+- [x] **B4** `auth.service.ts` — `refreshTokens()`: read `session_type` from the stored `RefreshToken` DB row; pass it through to `generateTokens()` and `storeRefreshToken()` so type survives rotation
+- [x] **B5** `jwt.strategy.ts` — expose `session_type` from JWT payload in the `validate()` return value so it lands on `req.user`
 
 ---
 
 ### Phase C — Backend: Admin Login & Backstage Session Logic
 
-- [ ] **C1** `auth.service.ts` — `adminLogin()`: replace `user.role !== 'admin' && user.role !== 'owner'` check with:
+- [x] **C1** `auth.service.ts` — `adminLogin()`: replace `user.role !== 'admin' && user.role !== 'owner'` check with:
   - Owner → always eligible (bypass capability query)
   - Others → query `UserCapability` + `RoleCapability` for any capability with `scope = 'backstage'`; if none → `403 ForbiddenException`
-- [ ] **C2** `auth.service.ts` — `adminLogin()` (2FA-not-set-up path): pass `sessionType: 'backstage'` to `generateTokens()` and `storeRefreshToken()`
-- [ ] **C3** `auth.service.ts` — `verifyTwoFactor()`: pass `sessionType: 'backstage'` to `generateTokens()` and `storeRefreshToken()`; after issuing new tokens, call `revokeOtherBackstageSessions(userId, newRefreshTokenId)` to kill other backstage sessions on other machines
-- [ ] **C4** `auth.service.ts` — add private `revokeOtherBackstageSessions(userId, excludeId)`: sets `revoked_at` on all `RefreshToken` rows where `user_id = userId AND session_type = 'backstage' AND id != excludeId AND revoked_at IS NULL`
-- [ ] **C5** `auth.service.ts` — `login()` (customer front door): pass `sessionType: 'customer'` to `generateTokens()` and `storeRefreshToken()`
+- [x] **C2** `auth.service.ts` — `adminLogin()` (2FA-not-set-up path): pass `sessionType: 'backstage'` to `generateTokens()` and `storeRefreshToken()`
+- [x] **C3** `auth.service.ts` — `verifyTwoFactor()`: pass `sessionType: 'backstage'` to `generateTokens()` and `storeRefreshToken()`; after issuing new tokens, call `revokeOtherBackstageSessions(userId, newRefreshTokenId)` to kill other backstage sessions on other machines
+- [x] **C4** `auth.service.ts` — add private `revokeOtherBackstageSessions(userId, excludeId)`: sets `revoked_at` on all `RefreshToken` rows where `user_id = userId AND session_type = 'backstage' AND id != excludeId AND revoked_at IS NULL`
+- [x] **C5** `auth.service.ts` — `login()` (customer front door): pass `sessionType: 'customer'` to `generateTokens()` and `storeRefreshToken()`
 
 ---
 
 ### Phase D — Backend: `BackstageGuard` & Controller Cleanup
 
-- [ ] **D1** Create `backend/src/auth/guards/backstage.guard.ts`:
+- [x] **D1** Create `backend/src/auth/guards/backstage.guard.ts`:
   - Requires `JwtAuthGuard` to have already run (i.e., `req.user` is populated)
   - Passes if `req.user.session_type === 'backstage'`
   - Throw `ForbiddenException('Backstage session required')` otherwise
-- [ ] **D2** `domain-aliases.controller.ts` — add new `domain.manage` capability to seed (see Phase E); replace `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(...)` with `@UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)` + `@RequiresCapability('domain.manage')` on all endpoints
-- [ ] **D3** `digital-products.controller.ts` — replace all `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles('admin', 'owner')` with `@UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)` + appropriate `@RequiresCapability`:
-  - Upload/manage digital files → `product.edit`
-  - Delete digital product → `product.delete`
-  - View digital products (admin) → `product.edit`
-- [ ] **D4** `capabilities.controller.ts` — replace `@UseGuards(RolesGuard)` + `@Roles(UserRole.owner)` with `@UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)` + `@RequiresCapability('system.configure')`
-- [ ] **D5** Export `BackstageGuard` from `auth.module.ts`
+- [x] **D2** `domain-aliases.controller.ts` — replace `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles(...)` with `@UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)` + `@RequiresCapability('domain.manage')` on all endpoints
+- [x] **D3** `digital-products.controller.ts` — replace all `@UseGuards(JwtAuthGuard, RolesGuard)` + `@Roles('admin', 'owner')` with `@UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)` + appropriate `@RequiresCapability`
+- [x] **D4** `capabilities.controller.ts` — replace `@UseGuards(RolesGuard)` + `@Roles(UserRole.owner)` with `@UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)` + `@RequiresCapability('system.configure')`
+- [x] **D5** Add `BackstageGuard` to `AuthModule` providers and exports
+- [x] **D6** *(post-plan fix)* Add `AuthModule` + `CapabilitiesModule` imports to `DomainAliasesModule`, `DigitalProductsModule`, and `CapabilitiesModule` — required for NestJS dependency injection of `BackstageGuard` and `CapabilityGuard`
 
 ---
 
 ### Phase E — Database: Seed Updates
 
-- [ ] **E1** `prisma/seed.ts` — add `scope: 'backstage'` to all 29 existing capability upsert calls
-- [ ] **E2** `prisma/seed.ts` — add new `domain.manage` capability entry (`scope: 'backstage'`, category: `'system'`)
-- [ ] **E3** `prisma/seed.ts` — assign `domain.manage` to Owner role in `role_capabilities` (Owner already gets all capabilities by default via the "all capabilities" logic, but seed it explicitly for clarity)
-- [ ] **E4** Run `npx prisma db seed` and verify capability count is now 30
+- [x] **E1** `prisma/seed.ts` — add `scope: 'backstage'` to all 29 existing capability upsert calls; update `update:{}` to also set scope on re-seed
+- [x] **E2** `prisma/seed.ts` — add new `domain.manage` capability entry (`scope: 'backstage'`, category: `'system'`)
+- [x] **E3** Owner receives `domain.manage` automatically via the "Owner gets all capabilities" default logic
+- [x] **E4** Seed verified: 30 capabilities, all with `scope = 'backstage'`
 
 ---
 
 ### Phase F — Frontend: Token Storage & API Clients
 
-- [ ] **F1** `frontend/lib/api.ts` — add helper functions:
-  - `getAdminAccessToken(): string | null`
-  - `setAdminAccessToken(token: string | null): void`
-  - `getAdminRefreshToken(): string | null`
-  - `setAdminRefreshToken(token: string | null): void`
-  - `clearAdminSession(): void` (clears both admin token keys + any sessionStorage)
-- [ ] **F2** Create `frontend/lib/adminApi.ts` — new Axios instance:
-  - Request interceptor: attach `admin_access_token` as `Authorization: Bearer`
-  - Response interceptor: on 401, attempt refresh using `admin_refresh_token` via `/auth/refresh`; on refresh success store new `admin_*` tokens; on refresh failure call `clearAdminSession()` and `window.location.href = '/admin/login'`
+- [x] **F1** `frontend/lib/api.ts` — add helper functions: `getAdminAccessToken`, `setAdminAccessToken`, `getAdminRefreshToken`, `setAdminRefreshToken`, `clearAdminSession`
+- [x] **F2** Create `frontend/lib/adminApi.ts` — new Axios instance using admin tokens; auto-refreshes via `admin_refresh_token`; on refresh failure clears admin session and redirects to `/admin/login`
 
 ---
 
 ### Phase G — Frontend: Admin Login Flow
 
-- [ ] **G1** `app/admin/login/AdminLoginClient.tsx` — on successful credential response (2FA-not-set-up path):
-  - Replace `setAccessToken(result.accessToken)` with `setAdminAccessToken(result.accessToken)`
-  - Replace `localStorage.setItem('refresh_token', ...)` with `setAdminRefreshToken(result.refreshToken)`
-  - Store user info in `sessionStorage.setItem('admin_user', JSON.stringify(result.user))` for the layout
-  - Remove `await refreshUser()` call (must not touch customer session)
-- [ ] **G2** `app/admin/login/2fa/TwoFactorClient.tsx` (or equivalent) — same token storage pattern: admin tokens → `admin_*` keys; store `admin_user` in sessionStorage
-- [ ] **G3** `app/admin/login/setup/SetupTwoFactorClient.tsx` — currently reads `user` from AuthContext (customer session); switch to reading from `sessionStorage.admin_user` or `adminApi` call to `/auth/me`
+- [x] **G1** `app/admin/login/AdminLoginClient.tsx` — stores to `admin_*` keys; stores `admin_user` in sessionStorage; removed `refreshUser()` call; customer session untouched
+- [x] **G2** `app/admin/login/2fa/TwoFactorClient.tsx` — stores to `admin_*` keys; stores `admin_user` in sessionStorage; removed `refreshUser()` call
+- [ ] **G3** `app/admin/login/setup/SetupTwoFactorClient.tsx` — still reads `user` from `useAuth()` (customer session) and uses `api` for the setup/enable calls; needs to read from `sessionStorage.admin_user` and switch calls to `adminApi`
 
 ---
 
 ### Phase H — Frontend: Admin Layout & Activity Guard
 
-- [ ] **H1** `app/admin/layout.tsx` — replace customer-session auth check with backstage token check:
-  - Import `getAdminAccessToken` from `@/lib/api`
-  - Replace `const isAdmin = user?.role === ...` with `const hasBackstageSession = !!getAdminAccessToken()`
-  - Read `adminUser` from `sessionStorage.getItem('admin_user')` for the sidebar display
-  - If `!isLoginRoute && !hasBackstageSession` → `router.push('/admin/login')`
-  - Remove dependency on `useAuth()` for access control (can keep for "View Site" link if needed)
-- [ ] **H2** `app/admin/layout.tsx` — update logout button: call `clearAdminSession()` and `router.push('/admin/login')` instead of the customer-session `logout()`
-- [ ] **H3** Create `frontend/hooks/useBackstageActivity.ts`:
-  - Attach `mousemove`, `keydown`, `click`, `scroll` listeners
-  - Reset a 30-minute timer on each event
-  - On timeout: call `clearAdminSession()` and `router.push('/admin/login')`
-- [ ] **H4** `app/admin/layout.tsx` — invoke `useBackstageActivity()` inside the layout
+- [x] **H1** `app/admin/layout.tsx` — checks `getAdminAccessToken()` instead of `user.role`; reads `admin_user` from sessionStorage for sidebar display; redirects to `/admin/login` if no backstage token
+- [x] **H2** `app/admin/layout.tsx` — logout calls `clearAdminSession()` + `router.push('/admin/login')`; does not touch customer session
+- [x] **H3** Create `frontend/hooks/useBackstageActivity.ts` — 30-min inactivity timer; resets on mouse/keyboard/scroll/touch; on timeout calls `clearAdminSession()` and redirects to `/admin/login`
+- [x] **H4** `app/admin/layout.tsx` — invokes `useBackstageActivity()`
 
 ---
 
 ### Phase I — Frontend: Admin Pages Switch to `adminApi`
 
-- [ ] **I1** `app/admin/AdminDashboardClient.tsx` — replace `api` import with `adminApi`
-- [ ] **I2** `app/admin/products/` — replace `api` with `adminApi` in all files
-- [ ] **I3** `app/admin/articles/` — replace `api` with `adminApi` in all files
-- [ ] **I4** `app/admin/orders/` — replace `api` with `adminApi` in all files
-- [ ] **I5** `app/admin/domains/` — replace `api` with `adminApi` in all files
+- [x] **I1** `app/admin/AdminDashboardClient.tsx` — switched to `adminFetcher` (added to `swr.ts`)
+- [x] **I2** `app/admin/products/` — `EditProductClient.tsx` switched to `adminApi`; list page uses `useProducts` hook (reads public GET endpoint, no direct `api` import)
+- [x] **I3** `app/admin/articles/` — `EditArticleClient.tsx` switched to `adminApi`; list page uses `useArticles` hook (reads public GET endpoint, no direct `api` import)
+- [x] **I4** `app/admin/orders/` — `AdminOrdersClient.tsx` switched to `adminFetcher`
+- [ ] **I5** `app/admin/domains/` — `AdminDomainsClient.tsx` uses `useDomainAliases` hook which calls customer `api` for all mutations (POST/PATCH/DELETE); these endpoints are now backstage-gated so the hook must switch to `adminApi` for write operations
 
 ---
 
@@ -237,7 +216,7 @@ when added, they would carry `scope: 'customer'`.
 
 - [ ] **K1** Update `CLAUDE.md` — document the customer/backstage session model and the `session_type` convention
 - [ ] **K2** Create `docs/PHASE_9_BACKSTAGE_COMPLETION.md` — record what changed and why
-- [ ] **K3** Commit in logical groups: (1) schema + migration, (2) backend auth + guards, (3) frontend token layer + adminApi, (4) admin UI pages, (5) cleanup
+- [x] **K3** Committed in logical groups: (1) main implementation, (2) fix BackstageGuard providers, (3) fix module dependency imports
 
 ---
 
