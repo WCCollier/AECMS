@@ -1,0 +1,1 @@
+export { XEmbed } from './XEmbed';

@@ -1,16 +1,17 @@
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
-import Image from '@tiptap/extension-image';
 import { useCallback, useRef, useState } from 'react';
 import {
   Bold, Italic, Strikethrough, Code, List, ListOrdered, Quote,
   Undo, Redo, Link as LinkIcon, Unlink, Heading1, Heading2, Heading3,
-  Minus, ImagePlus, X, Upload,
+  Minus, ImagePlus, X, Upload, Info, Video, Twitter, GalleryHorizontal,
 } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
+import { getEditorExtensions } from './extensions';
+import { MediaGalleryField } from '@/components/widgets/MediaGallery/MediaGalleryField';
+import type { GalleryEntry } from '@/components/widgets/MediaGallery/MediaGalleryField';
+import type { MediaItem } from '@/types';
 
 interface TipTapEditorProps {
   content: string;
@@ -26,6 +27,8 @@ interface MenuButtonProps {
   children: React.ReactNode;
   title?: string;
 }
+
+type ActivePanel = 'image' | 'carousel' | null;
 
 function MenuButton({ onClick, isActive, disabled, children, title }: MenuButtonProps) {
   return (
@@ -53,42 +56,36 @@ export function TipTapEditor({
   placeholder = 'Start writing...',
   className = '',
 }: TipTapEditorProps) {
-  const [showImagePanel, setShowImagePanel] = useState(false);
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+
+  // Image insert state
   const [imageUrl, setImageUrl] = useState('');
   const [imageAlt, setImageAlt] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Carousel insert state
+  const [carouselEntries, setCarouselEntries] = useState<GalleryEntry[]>([]);
+
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: { levels: [1, 2, 3] },
-        link: false,
-      }),
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: { class: 'text-accent underline hover:text-accent-hover' },
-      }),
-      Image.configure({
-        inline: false,
-        allowBase64: false,
-        HTMLAttributes: {
-          class: 'rounded-lg max-w-full my-4',
-        },
-      }),
-    ],
+    extensions: getEditorExtensions(),
     content,
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[200px] px-4 py-3',
       },
     },
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+    onUpdate: ({ editor: e }) => {
+      onChange(JSON.stringify(e.getJSON()));
     },
   });
+
+  const togglePanel = (panel: ActivePanel) => {
+    setActivePanel((prev) => (prev === panel ? null : panel));
+    setUploadError(null);
+  };
 
   const setLink = useCallback(() => {
     if (!editor) return;
@@ -107,7 +104,7 @@ export function TipTapEditor({
     editor.chain().focus().setImage({ src: imageUrl.trim(), alt: imageAlt.trim() }).run();
     setImageUrl('');
     setImageAlt('');
-    setShowImagePanel(false);
+    setActivePanel(null);
   }, [editor, imageUrl, imageAlt]);
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -125,12 +122,11 @@ export function TipTapEditor({
         { headers: { 'Content-Type': 'multipart/form-data' } },
       );
 
-      // Construct the proxied URL from the filename
       const url = `/uploads/${response.data.file_path.split('/uploads/')[1]}`;
       editor.chain().focus().setImage({ src: url, alt: imageAlt.trim() || file.name }).run();
       setImageUrl('');
       setImageAlt('');
-      setShowImagePanel(false);
+      setActivePanel(null);
     } catch (err) {
       setUploadError(getErrorMessage(err));
     } finally {
@@ -143,6 +139,48 @@ export function TipTapEditor({
     if (file) handleFileUpload(file);
     e.target.value = '';
   }, [handleFileUpload]);
+
+  const insertCarousel = useCallback(() => {
+    if (!editor || carouselEntries.length === 0) return;
+    const mediaItems: MediaItem[] = carouselEntries.map((e, i) => ({
+      id: e.mediaId,
+      url: e.url,
+      order: i,
+      is_primary: e.isPrimary,
+      alt_text: null,
+    }));
+    editor.chain().focus().insertContent({
+      type: 'mediaCarousel',
+      attrs: { media: JSON.stringify(mediaItems) },
+    }).run();
+    setCarouselEntries([]);
+    setActivePanel(null);
+  }, [editor, carouselEntries]);
+
+  const insertCallout = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'callout',
+      attrs: { type: 'info' },
+      content: [{ type: 'paragraph' }],
+    }).run();
+  }, [editor]);
+
+  const insertVideo = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'videoEmbed',
+      attrs: { url: '' },
+    }).run();
+  }, [editor]);
+
+  const insertXEmbed = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'xEmbed',
+      attrs: { url: '' },
+    }).run();
+  }, [editor]);
 
   if (!editor) {
     return (
@@ -210,13 +248,29 @@ export function TipTapEditor({
 
         <MenuDivider />
 
-        {/* Image insert */}
-        <MenuButton
-          onClick={() => { setShowImagePanel(!showImagePanel); setUploadError(null); }}
-          isActive={showImagePanel}
-          title="Insert image"
-        >
+        {/* Inline image */}
+        <MenuButton onClick={() => togglePanel('image')} isActive={activePanel === 'image'} title="Insert inline image">
           <ImagePlus className="w-4 h-4" />
+        </MenuButton>
+
+        {/* Media carousel */}
+        <MenuButton onClick={() => { setCarouselEntries([]); togglePanel('carousel'); }} isActive={activePanel === 'carousel'} title="Insert media carousel">
+          <GalleryHorizontal className="w-4 h-4" />
+        </MenuButton>
+
+        {/* Callout */}
+        <MenuButton onClick={insertCallout} title="Insert callout block">
+          <Info className="w-4 h-4" />
+        </MenuButton>
+
+        {/* Video embed */}
+        <MenuButton onClick={insertVideo} title="Insert video embed">
+          <Video className="w-4 h-4" />
+        </MenuButton>
+
+        {/* X / Twitter embed */}
+        <MenuButton onClick={insertXEmbed} title="Insert X / Twitter post">
+          <Twitter className="w-4 h-4" />
         </MenuButton>
 
         <MenuDivider />
@@ -229,12 +283,12 @@ export function TipTapEditor({
         </MenuButton>
       </div>
 
-      {/* Image insert panel */}
-      {showImagePanel && (
+      {/* ── Inline image insert panel ── */}
+      {activePanel === 'image' && (
         <div className="border-b border-border bg-surface p-3 space-y-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">Insert Image</span>
-            <button type="button" onClick={() => setShowImagePanel(false)} className="text-foreground/40 hover:text-foreground">
+            <button type="button" onClick={() => setActivePanel(null)} className="text-foreground/40 hover:text-foreground">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -243,7 +297,7 @@ export function TipTapEditor({
             type="text"
             placeholder="Alt text (optional)"
             value={imageAlt}
-            onChange={e => setImageAlt(e.target.value)}
+            onChange={(e) => setImageAlt(e.target.value)}
             className="w-full px-3 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-accent/40"
           />
 
@@ -252,8 +306,8 @@ export function TipTapEditor({
               type="text"
               placeholder="Paste image URL…"
               value={imageUrl}
-              onChange={e => setImageUrl(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && insertImageFromUrl()}
+              onChange={(e) => setImageUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && insertImageFromUrl()}
               className="flex-1 px-3 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-accent/40"
             />
             <button
@@ -283,9 +337,30 @@ export function TipTapEditor({
             {uploading ? 'Uploading…' : 'Upload from device'}
           </button>
 
-          {uploadError && (
-            <p className="text-xs text-red-400">{uploadError}</p>
-          )}
+          {uploadError && <p className="text-xs text-red-400">{uploadError}</p>}
+        </div>
+      )}
+
+      {/* ── Media carousel insert panel ── */}
+      {activePanel === 'carousel' && (
+        <div className="border-b border-border bg-surface p-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">Insert Media Carousel</span>
+            <button type="button" onClick={() => setActivePanel(null)} className="text-foreground/40 hover:text-foreground">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <MediaGalleryField value={carouselEntries} onChange={setCarouselEntries} />
+
+          <button
+            type="button"
+            onClick={insertCarousel}
+            disabled={carouselEntries.length === 0}
+            className="w-full px-3 py-2 text-sm bg-accent text-white rounded-lg hover:opacity-90 disabled:opacity-40 transition-opacity"
+          >
+            Insert Carousel ({carouselEntries.length} image{carouselEntries.length !== 1 ? 's' : ''})
+          </button>
         </div>
       )}
 

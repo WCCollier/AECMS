@@ -6,6 +6,7 @@ import { useArticle } from '@/hooks/useArticles';
 import { ArrowLeft, Calendar, User, FileText } from 'lucide-react';
 import { CommentList } from '@/components/comments/CommentList';
 import { MediaGallery } from '@/components/widgets';
+import { RichTextContent } from '@/components/editor';
 
 export function ArticlePageClient() {
   const params = useParams();
@@ -96,10 +97,7 @@ export function ArticlePageClient() {
       </div>
 
       {/* Content */}
-      <div
-        className="prose-article"
-        dangerouslySetInnerHTML={{ __html: article.content }}
-      />
+      <RichTextContent content={article.content} className="prose-article" />
 
       {/* Tags */}
       {article.tags.length > 0 && (

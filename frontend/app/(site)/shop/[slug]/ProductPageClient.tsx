@@ -13,6 +13,7 @@ import { fetcher } from '@/lib/swr';
 import { Button, Card, CardContent } from '@/components/ui';
 import { ShoppingCart, Minus, Plus, ArrowLeft, Check } from 'lucide-react';
 import { CommentList } from '@/components/comments/CommentList';
+import { RichTextContent } from '@/components/editor';
 import type { Order, PaginatedResponse } from '@/types';
 
 export function ProductPageClient() {
@@ -143,9 +144,9 @@ export function ProductPageClient() {
 
           {/* Description */}
           {product.description && (
-            <div
+            <RichTextContent
+              content={product.description}
               className="prose prose-sm max-w-none mb-6 text-foreground/70"
-              dangerouslySetInnerHTML={{ __html: product.description }}
             />
           )}
 
