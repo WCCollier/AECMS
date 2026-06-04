@@ -24,7 +24,7 @@
     "fix:content": "ts-node -r tsconfig-paths/register prisma/fix-content-and-images.ts"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "bash prisma/seed-all.sh"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.4",

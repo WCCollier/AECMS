@@ -89,23 +89,33 @@
 ## Common Commands
 
 ```bash
-# Backend development
-cd backend && npm run start:dev
+# ── Starting the app (preferred — handles cold AND warm restarts) ──
+bash start-dev.sh
+# Cold start (new Codespace): starts Docker containers, runs migrations, seeds DB, starts both servers
+# Warm start (same session):  skips seed if users already exist, restarts NestJS + Next.js only
 
-# Run tests
+# Logs (after start-dev.sh)
+tail -f /tmp/backend.log /tmp/frontend.log
+
+# ── Manual startup (if needed individually) ──
+cd backend && npm run start:dev   # backend only (DB must already be running)
+cd frontend && npm run dev        # frontend only
+
+# ── Tests ──
 npm run test          # Unit tests
-npm run test:e2e      # E2E tests
+npm run test:e2e      # E2E tests (require Docker)
 
-# Database
+# ── Database ──
 npx prisma migrate dev --name migration_name
-npx prisma db seed
+npx prisma db seed    # runs all 5 seed scripts (users + content)
 npx prisma generate
 
-# Docker
-docker-compose up -d
-docker-compose logs -f
+# ── Docker (postgres + redis only — docker-compose full build is broken in Codespaces) ──
+docker start aecms-postgres aecms-redis        # restart existing containers
+docker run -d --name aecms-postgres ...        # see start-dev.sh for full command
+docker logs aecms-postgres
 
-# Docker cache maintenance (run regularly to preserve storage)
+# ── Docker cache maintenance (run regularly to preserve storage) ──
 docker system prune -af --volumes  # Remove all unused data
 docker builder prune -af           # Clear build cache
 ```
