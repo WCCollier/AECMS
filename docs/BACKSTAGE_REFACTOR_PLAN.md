@@ -167,7 +167,7 @@ when added, they would carry `scope: 'customer'`.
 
 - [x] **G1** `app/admin/login/AdminLoginClient.tsx` — stores to `admin_*` keys; stores `admin_user` in sessionStorage; removed `refreshUser()` call; customer session untouched
 - [x] **G2** `app/admin/login/2fa/TwoFactorClient.tsx` — stores to `admin_*` keys; stores `admin_user` in sessionStorage; removed `refreshUser()` call
-- [ ] **G3** `app/admin/login/setup/SetupTwoFactorClient.tsx` — still reads `user` from `useAuth()` (customer session) and uses `api` for the setup/enable calls; needs to read from `sessionStorage.admin_user` and switch calls to `adminApi`
+- [x] **G3** `app/admin/login/setup/SetupTwoFactorClient.tsx` — removed `useAuth()` dependency; guards on `admin_access_token` in localStorage; calls `/auth/2fa/setup` and `/auth/2fa/enable` via `adminApi`
 
 ---
 
@@ -186,7 +186,7 @@ when added, they would carry `scope: 'customer'`.
 - [x] **I2** `app/admin/products/` — `EditProductClient.tsx` switched to `adminApi`; list page uses `useProducts` hook (reads public GET endpoint, no direct `api` import)
 - [x] **I3** `app/admin/articles/` — `EditArticleClient.tsx` switched to `adminApi`; list page uses `useArticles` hook (reads public GET endpoint, no direct `api` import)
 - [x] **I4** `app/admin/orders/` — `AdminOrdersClient.tsx` switched to `adminFetcher`
-- [ ] **I5** `app/admin/domains/` — `AdminDomainsClient.tsx` uses `useDomainAliases` hook which calls customer `api` for all mutations (POST/PATCH/DELETE); these endpoints are now backstage-gated so the hook must switch to `adminApi` for write operations
+- [x] **I5** `app/admin/domains/` — `useDomainAliases` hook switched to `adminFetcher` for reads and `adminApi` for all mutations (create/update/delete/verify)
 
 ---
 
