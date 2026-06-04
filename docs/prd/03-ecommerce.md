@@ -23,9 +23,9 @@ This document defines the ecommerce functionality for AECMS, including product m
 - Faster time to market
 
 **Payment Priority:**
-1. **Stripe** (Primary): Most flexible, best API, comprehensive features
+1. **Stripe** (Primary): Most flexible, best API, comprehensive features — also natively facilitates **Amazon Pay** via Stripe Checkout (no separate Amazon Pay integration needed)
 2. **PayPal** (Secondary): Popular alternative, buyer protection
-3. **Amazon Pay** (Tertiary): Amazon ecosystem users, trusted brand
+3. ~~**Amazon Pay** (Tertiary)~~: Covered automatically through Stripe Checkout for eligible customers
 
 ## User Stories
 
@@ -55,7 +55,7 @@ This document defines the ecommerce functionality for AECMS, including product m
   - Slug (auto-generated, editable)
   - Description (rich text)
   - Short description (for listings)
-  - SKU (stock keeping unit)
+  - SKU (stock keeping unit) — **TODO**: implement auto-SKU generation for new products with a configurable SKU schema (e.g. prefix + sequential number, or category-based pattern)
   - Barcode (UPC/EAN/ISBN)
 
 - **Pricing**:
@@ -232,6 +232,7 @@ Guests (unauthenticated users) can purchase products marked as `guest_purchaseab
 - 3D Secure (SCA compliance for Europe)
 - Multiple currency support
 - Multiple payment methods (cards, digital wallets)
+- **Amazon Pay** — natively available to eligible customers through Stripe Checkout; no separate provider or integration required
 - Automatic tax calculation (Stripe Tax)
 - Saved payment methods
 - Refund processing via API
@@ -352,6 +353,7 @@ POST /api/checkout/amazon-pay
 - Payment method
 - Payment status (pending, paid, failed, refunded)
 - Order status (pending, processing, shipped, delivered, cancelled)
+- **Order status history**: every status transition recorded — see [Audit Trail & Transaction Logging](#audit-trail--transaction-logging)
 - Order notes (private, customer-facing)
 - Created date
 - Updated date
@@ -400,6 +402,78 @@ POST /api/checkout/amazon-pay
 - Allow purchase without account
 - Email for order confirmation
 - Option to create account post-purchase
+
+### Audit Trail & Transaction Logging
+
+Every significant action by a customer or shop admin must be recorded so that disputes can be resolved, anomalies can be investigated, and the integrity of the order lifecycle can be verified. The database schema already includes an `AuditLog` table with the necessary structure; Phase 12 wires it up.
+
+#### What Must Be Logged
+
+**Order lifecycle**
+- Every order status transition: `from_status`, `to_status`, `actor_id` (admin or system), timestamp, optional reason/note
+- Refund initiated or reversed: amount, actor, payment gateway reference
+- Order note added: content, actor, visibility (private vs. customer-facing)
+
+**Payment events**
+- Every inbound Stripe or PayPal webhook payload stored verbatim in a `WebhookEvent` table: `event_id` (gateway-assigned, deduplicated), `event_type`, `payload` (JSONB), `processed_at`, `error` (if processing failed)
+- Payment intent created, succeeded, or failed
+- Dispute / chargeback opened or resolved
+
+**Admin CRUD actions**
+- Product created, updated, or deleted: `actor_id`, `resource_id`, `changes` (before/after JSON diff)
+- Article/Page published, unpublished, or deleted: same fields
+- Order status manually changed by admin: recorded on the order status history and in the AuditLog
+
+**Authentication & session events**
+- Successful login: `user_id`, `ip_address`, `user_agent`, `session_type` (customer / backstage)
+- Failed login attempt: `email_attempted`, `ip_address`, `user_agent`, reason
+- 2FA success and failure
+- Session revoked (logout, forced expiry, or new backstage login invalidating other sessions)
+- Password reset requested and completed
+
+**Comment / review moderation**
+- Status change on a comment (approved, rejected, flagged): `moderator_id`, `from_status`, `to_status`, `reason`
+
+#### AuditLog Schema (already in DB)
+
+The `AuditLog` table already covers these needs:
+
+| Field | Purpose |
+|-------|---------|
+| `event_type` | Dot-namespaced string: `order.status_changed`, `product.deleted`, `auth.login_failed`, etc. |
+| `user_id` | Actor (null for guest or system events) |
+| `ip_address`, `user_agent` | Request context |
+| `resource_type`, `resource_id` | What was acted upon |
+| `changes` | JSONB before/after diff |
+| `metadata` | Arbitrary extra context (reason, note, gateway ref, etc.) |
+| `previous_hash`, `entry_hash` | Integrity chain — each entry hashes its content + predecessor |
+
+#### WebhookEvent Table (new — Phase 12)
+
+```sql
+webhook_events {
+  id: uuid PK
+  gateway: enum (stripe, paypal)
+  event_id: varchar(255) unique   -- gateway-assigned ID, used for deduplication
+  event_type: varchar(100)        -- e.g. checkout.session.completed
+  payload: jsonb                  -- raw webhook body
+  received_at: timestamp
+  processed_at: timestamp null
+  processing_error: text null
+}
+```
+
+#### Access to Audit Logs
+
+- **Owner only**: full AuditLog query UI in backstage
+- **Admin**: can view audit entries scoped to their own actions and to orders/content they manage
+- **Customer**: can view their own order status history on the order detail page (not raw AuditLog entries)
+- Logs are append-only; no UI or API permits editing or deleting entries
+
+#### What Is Not Logged
+
+- Read-only views (page views, product views, search queries) — out of scope; use an analytics layer if needed
+- Cart item additions/removals — lower priority; covered by order line items once checkout completes
 
 ### Product Discovery
 

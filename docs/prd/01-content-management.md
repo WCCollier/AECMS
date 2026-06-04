@@ -328,325 +328,155 @@ enum ArticleStatus {
 // Future: Writer role will use Review workflow
 ```
 
+### Version History & Content Audit Trail
+
+#### Scope
+
+Version history applies to **Articles** and **Products** (description field). Pages are excluded until the page-builder phase. Phase 12 wires up both.
+
+#### Article Version History
+
+The `ArticleVersion` model is already in the database schema. It records a snapshot of the article content at each save:
+
+| Field | Purpose |
+|-------|---------|
+| `version_number` | Auto-incrementing integer per article |
+| `title`, `content`, `excerpt` | Full content snapshot |
+| `change_summary` | Optional human-readable note (e.g. "Fixed typo in intro") |
+| `created_by` | User who saved this version |
+| `created_at` | Timestamp |
+
+**Behavior**:
+- A new version is created on every **publish** action. Drafts do not automatically version (avoids noise from in-progress editing).
+- Admins and Owners can view the version list and diff any two versions in the backstage article editor.
+- Restoring a prior version creates a new version entry (the restore itself is recorded); it does not overwrite history.
+- Version history for articles is **on by default** for Phase 12.
+
+#### Product Version History
+
+The `ProductVersion` model does not yet exist in the schema (articles have it; products do not). Phase 12 adds a parallel model covering:
+
+- `name`, `description`, `price`, `compare_at_price`, `stock_quantity`, `stock_status`, `sku`
+- `change_summary`, `created_by`, `created_at`, `version_number`
+
+A new product version is created when an admin saves a product in the backstage editor.
+
+#### Content Audit Events (via AuditLog)
+
+The following content management actions are written to `AuditLog` (see ecommerce PRD for schema):
+
+| Event | `event_type` | Actor |
+|-------|-------------|-------|
+| Article published | `article.published` | Admin/Owner |
+| Article unpublished / archived | `article.unpublished` | Admin/Owner |
+| Article deleted (soft) | `article.deleted` | Admin/Owner |
+| Product created | `product.created` | Admin/Owner |
+| Product updated | `product.updated` | Admin/Owner |
+| Product deleted (soft) | `product.deleted` | Admin/Owner |
+| Comment approved / rejected | `comment.moderated` | Moderator |
+| Media uploaded | `media.uploaded` | Admin/Owner |
+| Media deleted | `media.deleted` | Admin/Owner |
+
+These are complementary to version snapshots: the AuditLog records **who did what and when**; the version table records **what the content looked like**.
+
 ### Pages
+
+*Phase 11. The `Page` DB model, backend service, and 7 API endpoints exist from Phase 3. Phase 11 wires up the frontend and page builder.*
 
 #### Core Fields
 - **Title** (required): Page name
-- **Slug** (required): URL path
-- **Content** (required): Rich text content
-- **Template**: Layout template selection
-- **Parent Page**: For hierarchical organization
-- **Order**: Sort order within parent
+- **Slug** (required): URL path off root domain — e.g. slug `about` → `/about`. Reserved slugs (`shop`, `latest`, `cart`, `checkout`, `account`, `admin`) are rejected.
+- **Content**: Structured `PageContent` JSON envelope (see Zone Architecture below) — not a flat rich-text string
+- **Layout**: Encoded inside the content envelope, not a separate DB column
+- **Parent Page**: For hierarchical organization (schema exists; admin tree UI deferred)
 - **Status**: Draft, Published
 - **SEO Fields**: Meta title, meta description
+- **Visibility**: Public, logged-in only, admin only (server-side gated)
 
-#### Page Templates
+#### Zone Architecture
 
-- **Default**: Standard content page with header, footer, and content area
-- **Home**: Homepage with customizable widget sections and featured content
-- **Landing Page**: Full-screen marketing-focused layout with parallax scrolling and animated backgrounds (see detailed spec below)
-- **Split Comparison**: Full-screen width 50/50 split, edge-to-edge, no gutter (for side-by-side comparisons)
-- **Article List**: Display filtered articles in grid or list view
-- **Custom**: User-defined templates (advanced)
+Pages are composed of **layout zones**. Each zone is an independent TipTap JSON document — the same format used for article and product body content. Widgets (MediaCarousel, Callout, VideoEmbed, XEmbed, ArticleEmbed, ProductEmbed, RichTextBox) are embedded in zones as TipTap nodes, using the exact same mechanism as embedding widgets in articles.
 
-#### Landing Page Template (Detailed Specification)
+The page editor in backstage is **N TipTap editor instances rendered side-by-side**, one per zone, laid out to match the published page structure. There is no separate block manager — each zone is one document, and the author edits it exactly as they edit an article body.
 
-**Purpose**: Full-screen marketing landing page with modern parallax effects and animated backgrounds for high-impact first impressions.
-
-**Key Features**:
-- Full-screen sections (100vh height)
-- Parallax scrolling with fixed backgrounds
-- Optional background morphing/animation on scroll
-- Overlay text with smooth scroll reveal
-- Call-to-action buttons
-- No header/footer by default (optional)
-
-**Visual Layout**:
-
-```
-┌─────────────────────────────────────────┐
-│                                         │ ← Section 1 (100vh)
-│         Hero Text (scrolls)             │
-│     ┌─────────────────────┐            │
-│     │  [Call to Action]   │            │
-│     └─────────────────────────┘         │
-│                                         │
-│  Background: Fixed (parallax effect)    │
-└─────────────────────────────────────────┘
-┌─────────────────────────────────────────┐
-│                                         │ ← Section 2 (100vh)
-│      More Content (scrolls)             │
-│                                         │
-│  Background: Fixed (different image)    │
-│  Optional: Morphs/animates with scroll  │
-└─────────────────────────────────────────┘
-┌─────────────────────────────────────────┐
-│                                         │ ← Section 3 (100vh)
-│      Final CTA Section                  │
-│                                         │
-│  Background: Solid color or gradient    │
-└─────────────────────────────────────────┘
-```
-
-**Parallax Effect**:
-- **Fixed Background**: Background image/video remains stationary while content scrolls over it
-- **Scroll Rate Control**: Adjust background scroll speed (0 = fixed, 1 = normal, 0.5 = half speed)
-- **Multiple Layers**: Foreground, midground, background layers with different scroll rates
-
-**Animated Background Options**:
-
-1. **Static**: Fixed image, no animation
-2. **Morphing**: Background smoothly transitions between images/colors as user scrolls
-3. **Gradient Shift**: Gradient colors shift based on scroll position
-4. **Particle Effects**: Animated particles (stars, dots, geometric shapes) overlay background
-5. **Video Background**: Full-screen video loop with optional parallax
-
-**Content Editor Interface**:
-
-```
-┌──────────────────────────────────────────────┐
-│ Page: Landing Page (Landing Page Template)  │
-├──────────────────────────────────────────────┤
-│                                              │
-│ ┌─ Section 1 Settings ──────────────────┐   │
-│ │ Height: [100vh ▼] (Full-screen)       │   │
-│ │                                        │   │
-│ │ Background Type:                       │   │
-│ │ ● Image  ○ Video  ○ Gradient          │   │
-│ │                                        │   │
-│ │ Background Image: [Upload/Select]     │   │
-│ │ Parallax Effect: ☑ Enabled            │   │
-│ │ Scroll Speed: [0.5] (0=fixed, 1=normal)│   │
-│ │                                        │   │
-│ │ Background Animation:                  │   │
-│ │ [None ▼] Static, Morph, Gradient Shift│   │
-│ │                                        │   │
-│ │ Text Overlay Color: [#ffffff] [Picker]│   │
-│ │ Overlay Opacity: [0.3] (darkens bg)   │   │
-│ └────────────────────────────────────────┘   │
-│                                              │
-│ ┌─ Section 1 Content ───────────────────┐   │
-│ │ [Rich text editor for hero text]      │   │
-│ │                                        │   │
-│ │ Vertical Alignment: [Center ▼]        │   │
-│ │ Horizontal Alignment: [Center ▼]      │   │
-│ │                                        │   │
-│ │ Call-to-Action Button:                │   │
-│ │ Text: [Get Started]                   │   │
-│ │ Link: [/signup]                        │   │
-│ │ Style: [Primary ▼]                    │   │
-│ └────────────────────────────────────────┘   │
-│                                              │
-│ [+ Add Section]                              │
-│                                              │
-│ [Preview] [Save] [Publish]                   │
-└──────────────────────────────────────────────┘
-```
-
-**Technical Implementation**:
-
-```css
-/* Parallax section */
-.landing-section {
-  height: 100vh;
-  position: relative;
-  overflow: hidden;
-}
-
-/* Fixed background with parallax */
-.landing-section-bg {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  background-size: cover;
-  background-position: center;
-  z-index: -1;
-  transform: translateY(calc(var(--scroll-position) * -0.5)); /* Parallax effect */
-}
-
-/* Scrolling content over fixed bg */
-.landing-section-content {
-  position: relative;
-  z-index: 1;
-  height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  text-align: center;
+**Content storage:**
+```typescript
+interface PageContent {
+  layout: 'no_sidebar' | 'sidebar_left' | 'sidebar_right' | 'split_comparison';
+  zones: {
+    main?:    TipTapDoc;  // no_sidebar, sidebar_left, sidebar_right
+    sidebar?: TipTapDoc;  // sidebar_left, sidebar_right
+    left?:    TipTapDoc;  // split_comparison
+    right?:   TipTapDoc;  // split_comparison
+  };
 }
 ```
 
-```javascript
-// Parallax scroll effect
-window.addEventListener('scroll', () => {
-  const scrollPosition = window.pageYOffset
-  document.querySelectorAll('.landing-section-bg').forEach((bg, index) => {
-    const scrollRate = bg.dataset.scrollRate || 0.5
-    bg.style.transform = `translateY(${scrollPosition * scrollRate}px)`
-  })
-})
+#### Page Layouts
 
-// Morphing background animation
-function morphBackground(element, images, scrollPosition) {
-  const progress = (scrollPosition % 1000) / 1000 // 0 to 1
-  const imageIndex = Math.floor(progress * images.length)
-  element.style.backgroundImage = `url(${images[imageIndex]})`
-}
-```
+| Layout | Zones | Desktop appearance |
+|--------|-------|--------------------|
+| `no_sidebar` | `main` only | Full-width single column |
+| `sidebar_left` | `sidebar` + `main` | ~30% sidebar left, ~70% main right |
+| `sidebar_right` | `main` + `sidebar` | ~70% main left, ~30% sidebar right |
+| `split_comparison` | `left` + `right` | 50vw each, edge-to-edge, no gutter |
 
-**Mobile Responsive**:
-- Parallax disabled on mobile (performance)
-- Sections stack vertically
-- Backgrounds become static
-- Full-width content maintained
+All layouts stack to a single column on mobile. `split_comparison` stacks left-then-right below 768px.
 
-#### Page Layout System
-- **Pane/Widget Support**: Ability to add content blocks
-- **Pane Types**:
-  - Article List (filtered by category/tag)
-  - Featured Articles
-  - Media Gallery
-  - Custom HTML
-  - Product Showcase (for ecommerce)
-  - Newsletter Signup
-  - Social Media Feed
-- **Drag-and-Drop**: Visual arrangement of panes
-- **Responsive Controls**: Desktop/mobile visibility options
+**Zone sizing and widgets:** The zone a widget lives in determines whether it renders in its large or small variant (see Widget System § Dual-Size Rendering). Sidebar zones always render small. Main zones always render large. Split-comparison zones render large on desktop (≥1024px) and small on mobile.
 
-#### Split Comparison Template (Full-Screen)
+#### Split Comparison Layout
 
-**Use Case**: Landing pages with side-by-side content comparison, before/after displays, feature comparisons, or dual-content presentations.
-
-**Layout Specification**:
-- **Full-screen width**: Edge-to-edge, no container margins
-- **50/50 split**: Exactly half the viewport width for each side
-- **No gutter**: Zero spacing between left and right panels
-- **No margins**: Content extends to screen edges (left at 0, right at 100vw)
-- **Vertical scroll**: Each side scrolls independently (optional) or together (default)
-- **Responsive behavior**: Stacks vertically on mobile (< 768px)
-
-**Visual Layout**:
+**Use cases**: before/after, feature comparison, dual-content presentations, free vs. premium plan, product A vs. product B.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ Left Content Box          │ Right Content Box           │
-│                           │                             │
-│ - Rich text editor        │ - Rich text editor          │
-│ - Images/media            │ - Images/media              │
-│ - Product embeds          │ - Product embeds            │
-│ - Custom HTML             │ - Custom HTML               │
-│ - Background color/image  │ - Background color/image    │
-│ - Text alignment          │ - Text alignment            │
-│ - Padding control         │ - Padding control           │
-│                           │                             │
-│                           │                             │
-│                           │                             │
-│                           │                             │
-└─────────────────────────────────────────────────────────┘
-←─────────── 50vw ─────────→←─────────── 50vw ─────────→
+Desktop (≥768px):
+┌──────────────────────────┬──────────────────────────┐
+│  Left Zone               │  Right Zone              │
+│  (one TipTap editor)     │  (one TipTap editor)     │
+│  Widgets: large @ lg:    │  Widgets: large @ lg:    │
+│           small @ <lg    │           small @ <lg    │
+└──────────────────────────┴──────────────────────────┘
+←────────── 50vw ──────────→←────────── 50vw ──────────→
+
+Mobile (<768px):
+┌──────────────────────────┐
+│  Left Zone  (full width) │
+└──────────────────────────┘
+┌──────────────────────────┐
+│  Right Zone (full width) │
+└──────────────────────────┘
 ```
 
-**Mobile Responsive Layout** (< 768px):
+**Cross-zone drag**: Moving a widget between zones (e.g. dragging from main into sidebar) requires extracting TipTap node JSON from one editor and inserting it into another — not a native drag operation. Phase 11 supports cut/paste between zones. Cross-zone drag is a future enhancement.
 
-```
-┌───────────────────────────┐
-│                           │
-│   Left Content Box        │
-│   (Full width)            │
-│                           │
-└───────────────────────────┘
-┌───────────────────────────┐
-│                           │
-│   Right Content Box       │
-│   (Full width)            │
-│                           │
-└───────────────────────────┘
-```
+#### Conditional Widget Display
 
-**Content Editor Interface**:
+Any widget in any zone can carry a `show_when` condition set by the author:
 
-```
-┌──────────────────────────────────────────────┐
-│ Page: Landing Page (Split Comparison)       │
-├──────────────────────────────────────────────┤
-│ Template: Split Comparison ▼                 │
-│                                              │
-│ ┌─ Left Panel Settings ──────────────────┐  │
-│ │ Background Color: [#ffffff] [Picker]   │  │
-│ │ Background Image: [Upload] [Select]    │  │
-│ │ Text Color: [#000000] [Picker]         │  │
-│ │ Padding: Top [40] Right [40] ...       │  │
-│ │ Vertical Alignment: [Top/Middle/Bottom]│  │
-│ └────────────────────────────────────────┘  │
-│                                              │
-│ ┌─ Left Content ─────────────────────────┐  │
-│ │ [Rich text editor with full content]   │  │
-│ │                                         │  │
-│ └─────────────────────────────────────────┘  │
-│                                              │
-│ ┌─ Right Panel Settings ─────────────────┐  │
-│ │ Background Color: [#f3f4f6] [Picker]   │  │
-│ │ Background Image: [Upload] [Select]    │  │
-│ │ Text Color: [#000000] [Picker]         │  │
-│ │ Padding: Top [40] Right [40] ...       │  │
-│ │ Vertical Alignment: [Top/Middle/Bottom]│  │
-│ └────────────────────────────────────────┘  │
-│                                              │
-│ ┌─ Right Content ────────────────────────┐  │
-│ │ [Rich text editor with full content]   │  │
-│ │                                         │  │
-│ └─────────────────────────────────────────┘  │
-│                                              │
-│ ☐ Enable independent scrolling (advanced)   │
-│                                              │
-│ [Preview] [Save Draft] [Publish]            │
-└──────────────────────────────────────────────┘
-```
+| Value | Behavior |
+|-------|----------|
+| `always` (default) | Renders for all viewers |
+| `logged_in` | Renders only when a user session exists |
+| `logged_out` | Renders only when no session exists |
 
-**Technical Implementation**:
+This enables dynamic page composition. Example: a "Sign in to order" Callout set to `logged_out` and an adjacent ProductEmbed set to `logged_in` — only the relevant widget renders for each viewer. The condition is set via a toggle in each widget's edit panel in the backstage editor. In the editor, all widgets render regardless of condition, but a **"Members only"** or **"Guests only"** badge is shown on the widget chrome.
 
-```css
-/* Desktop layout */
-.split-comparison-template {
-  display: flex;
-  width: 100vw;
-  min-height: 100vh;
-  margin: 0;
-  padding: 0;
-}
+**Note**: `show_when` is a client-side display convenience, not a server-side access control. The full page JSON (including hidden widgets) is delivered to the browser. Use `visibility: logged_in_only` on the Page itself for server-gated content.
 
-.split-panel-left,
-.split-panel-right {
-  width: 50vw;
-  min-height: 100vh;
-  padding: 40px; /* Configurable */
-  box-sizing: border-box;
-}
+#### Deferred: Landing Page Template
 
-/* Mobile responsive */
-@media (max-width: 767px) {
-  .split-comparison-template {
-    flex-direction: column;
-  }
+The Landing Page format — stacked full-viewport sections, per-section backgrounds, parallax scrolling, scroll-triggered animations — is a distinct editing paradigm from the zone/document model and is deferred to a future phase. Its full specification is preserved below for reference.
 
-  .split-panel-left,
-  .split-panel-right {
-    width: 100vw;
-    min-height: 50vh;
-  }
-}
-```
+**Purpose**: Full-screen marketing landing page with parallax effects and animated backgrounds.
 
-**Example Use Cases**:
+**Key Features**: Full-screen sections (100vh), parallax scrolling with fixed backgrounds, optional background morphing/animation on scroll, overlay text with scroll reveal, call-to-action buttons, optional no-header/footer mode.
 
-1. **Landing Page**: Product features on left, sign-up form on right
-2. **Before/After**: Before image/description left, after right
-3. **Comparison**: Free plan features left, premium plan right
-4. **Dual Content**: Text content left, video/media right
-5. **Split Hero**: Headline/CTA left, hero image right
+**Animated Background Options**: Static image, morphing (transitions between images on scroll), gradient shift, particle effects, video background loop.
+
+**Mobile**: Parallax disabled on mobile (performance), sections stack vertically, backgrounds become static.
+
+**Deferred reason**: Requires a section-stack editor paradigm separate from the zone/TipTap model. Will be designed as a self-contained extension after the core zone infrastructure is stable, to avoid rework.
 
 ### Categories
 
@@ -1180,24 +1010,65 @@ PUT    /api/comments/:id/moderate     # Approve/reject (Admin+)
 
 ## Widget System (Phase 10+)
 
-*Added 2026-06-04. Supersedes single-image `featured_image` handling described elsewhere in this document.*
+*Added 2026-06-04. Supersedes single-image `featured_image` handling described elsewhere in this document. Updated 2026-06-04 with dual-size system, conditional display, and nested embed protection (Phase 11).*
 
 ### Design Intent
 
-All three content types — Articles, Products, and (eventually) Pages — share a common widget library. A widget is a self-contained display module with a corresponding admin form component. The same widget code renders in the hero zone (above content) and, after Phase 10B, inline inside TipTap body content.
+All three content types — Articles, Products, and Pages — share a common widget library. A widget is a self-contained display module with a corresponding TipTap node extension. The same widget code renders in the hero zone (above content), inline inside TipTap body content in Articles and Products, and inside layout zones in Pages.
 
-### Two-Zone Model
+### Content Zones
 
-| Zone | Description | Mechanism |
-|------|-------------|-----------|
-| **Hero** | Prominent media display above the content body | `media[]` array on the content type; rendered by `MediaGallery` widget |
-| **Body** | Content inline — paragraphs, headings, embedded widgets | TipTap editor; inline widget nodes (Phase 10B) |
+| Zone type | Where | Widget size |
+|-----------|-------|-------------|
+| **Hero** | Above content body on Articles and Products | `media[]` array; rendered by `MediaGallery` |
+| **Body** | Inside TipTap document on Articles and Products | Always **large** |
+| **Page main** | Main zone of a sidebar or no-sidebar Page | Always **large** |
+| **Page sidebar** | Sidebar zone of a sidebar Page | Always **small** |
+| **Page split** | Left/right zone of a split-comparison Page | **large** on desktop (≥1024px), **small** on mobile |
+
+### Dual-Size Rendering
+
+Every widget renders in two sizes. The size is determined by context, not by a prop — a React `WidgetSizeContext` wraps each zone and all widget display components read from it via `useWidgetSize()`.
+
+```
+WidgetSize = 'large' | 'small'
+```
+
+| Widget | Large | Small |
+|--------|-------|-------|
+| `MediaGallery` | Full carousel, controls, dots, counter | Auto-rotating single image, no controls |
+| `Callout` | Bordered card with background fill and full body text | Single-line pill: icon + first ~80 chars of text |
+| `VideoEmbed` | `aspect-video` iframe, full container width | Static thumbnail with play overlay, opens URL in new tab |
+| `XEmbed` | Full Twitter embed via `widgets.js` | Compact card: @handle, post text (via oEmbed), "View on X ↗" |
+| `ArticleEmbed` | Featured image + category + title + first paragraph + "Read more" | 80×80 thumbnail + title + excerpt line |
+| `ProductEmbed` | Image + name + price + rating + Add to Cart | 64×64 thumbnail + name + price + cart icon |
+| `RichTextBox` | Prose content, full render | Same render; character-count warning if >300 chars |
+
+**In the backstage editor**: widgets always render in large mode regardless of zone context, so the author can see full content while editing. A "Preview small widgets" toggle in the page builder switches all editors to render small mode.
+
+### Conditional Display
+
+Every widget node carries a `show_when` attribute controlling visibility for the current viewer:
+
+| Value | Renders when |
+|-------|-------------|
+| `always` (default) | Always |
+| `logged_in` | User has an active session |
+| `logged_out` | No active session |
+
+The check runs client-side via `useAuth()`. This is an experience design tool — not a security boundary. For access-controlled content, use `visibility: logged_in_only` on the Article or Page itself (server-side gated).
+
+**Future values**: `verified_purchaser`, `role_admin`, capability-scoped conditions. The attribute and wrapper already support extension.
+
+### Nested Embed Protection
+
+When an `ArticleEmbed` or `ProductEmbed` widget renders a preview of an article or product, the embedded content's TipTap JSON is passed through `stripWidgetNodes()` before any text is extracted. This function recursively removes all widget-type nodes (`mediaCarousel`, `callout`, `videoEmbed`, `xEmbed`, `articleEmbed`, `productEmbed`, `image`) from the document tree, leaving only text blocks.
+
+The display components then extract the first paragraph's plain text for the preview. Widget content inside an embedded article or product is **never rendered** — only text is shown. This prevents a MediaCarousel or XEmbed that appears early in an article from appearing inside the embed card.
 
 ### Media Normalization
 
-**Rationale**: Article previously used a direct FK (`featured_image_id`) for a single featured image. Product used a junction table (`ProductMedia` with `is_primary`) designed for a gallery. These are now unified.
-
-**After Phase 10A**, both Article and Product use the same data contract:
+**After Phase 10A**, Articles and Products share identical media data contract:
 
 ```typescript
 interface MediaItem {
@@ -1211,41 +1082,21 @@ interface MediaItem {
 
 Every content type API returns `media: MediaItem[]`. The `featured_image_url` convenience field (used by catalogue cards) is computed from `media[is_primary]`.
 
-**Schema change (Phase 10A)**:
-- `ArticleMedia` gains `is_primary Boolean @default(false)`
-- `Article.featured_image_id` is dropped (migration backfills junction rows)
-- Both models become topologically identical for media
+### Widget Inventory
 
-### MediaGallery Widget
-
-The first shipped widget. Display behavior:
-
-| `media.length` | Renders |
-|----------------|---------|
-| 0 | Empty state / "Add images" prompt |
-| 1 | Static image — identical to current design, no carousel chrome |
-| N > 1 | Carousel with dot indicators, prev/next arrows, keyboard navigation |
-
-Used in:
-- Article detail page hero slot (`aspect-video` ratio)
-- Product detail page hero slot (`aspect-square` ratio)
-- Inline in TipTap body content (Phase 10B)
-
-**Admin form counterpart**: `MediaGalleryField` — replaces the current single-image `ImageField` in both `ArticleForm` and `ProductForm`. Supports pick from library, upload, drag-to-reorder, set-primary, remove.
-
-### Planned Future Widgets
-
-| Widget | Phase | Description |
-|--------|-------|-------------|
-| `MediaGallery` | 10A | Hero carousel + inline carousel |
-| `Callout` | 10B | Info / warning / success / danger callout box |
-| `VideoEmbed` | 10B | YouTube or Vimeo embed by URL |
-| Product Card | Future | Inline shop item embed within an article |
-| Table of Contents | Future | Auto-generated from headings |
-
-### Pages (Deferred)
-
-Pages are architecturally distinct from Articles and Products. They are intended to be composed entirely from widgets, with no conventional content body. Their media handling and widget integration will be designed as part of the Page Builder phase. Pages are excluded from Phase 10.
+| Widget | Phase | Status | Notes |
+|--------|-------|--------|-------|
+| `MediaGallery` | 10A | ✅ Live | Hero carousel + inline carousel node |
+| `Callout` | 10B | ✅ Live | Info / warning / success / danger; non-atom node with `NodeViewContent` |
+| `VideoEmbed` | 10B | ✅ Live | YouTube or Vimeo by URL; atom node |
+| `XEmbed` | 10B | ✅ Live | Twitter `widgets.js` embed; atom node; small via oEmbed Route Handler |
+| `MediaCarousel` | 10B | ✅ Live | Inline carousel separate from hero `MediaGallery` |
+| `ArticleEmbed` | 11 | 📋 Planned | Article preview card; large + small; atom node with article picker |
+| `ProductEmbed` | 11 | 📋 Planned | Product card with Add to Cart; large + small; atom node with product picker |
+| `RichTextBox` | 11 | 📋 Planned | Styled text block; non-atom node with `NodeViewContent` |
+| Article List | Future | ⏸ Deferred | Dynamic filtered feed; deferred until page infrastructure stable |
+| Product Showcase | Future | ⏸ Deferred | Dynamic product grid; same reason |
+| Table of Contents | Future | ⏸ Deferred | Auto-generated from headings |
 
 ## Success Metrics
 

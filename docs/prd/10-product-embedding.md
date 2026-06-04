@@ -1,10 +1,35 @@
 # PRD 10: Product Embedding Architecture
 
-**Version:** 1.0
-**Date:** 2026-01-28
-**Status:** Draft
+**Version:** 1.1
+**Date:** 2026-01-28 (updated 2026-06-04)
+**Status:** Draft — Phase 11 supersedes insertion method
 **Parent:** [Master PRD](./00-master-prd.md)
 **Related**: [PRD 01: Content Management](./01-content-management.md), [PRD 03: Ecommerce](./03-ecommerce.md)
+
+## Phase 11 Update — TipTap Node Supersedes Shortcode/Markdown
+
+*Added 2026-06-04.*
+
+The shortcode (`[product id="..."]`) and Markdown extension (`!product[...]`) insertion methods described in this document are **superseded for body-content embeds** by the `ProductEmbed` TipTap node introduced in Phase 11.
+
+**What changes:**
+- Products are embedded in article, product, and page body content via the `productEmbed` TipTap node — inserted from the editor toolbar, stored as a node in the TipTap JSON document
+- The node stores a `productId` attribute; the display component fetches product data client-side via SWR
+- The shortcode parser and Markdown extension are **not implemented**; the visual TipTap approach covers the same use cases more cleanly without a separate parsing layer
+
+**What stays the same:**
+- The two display variants (Card/large and Inline/small) described in this PRD map directly to the Phase 11 large and small widget sizes — Variant A (Card Embed) is the large render; Variant B (Inline Embed) is the small render
+- Add-to-cart works from both variants
+- The full product page is unchanged
+
+**Dual-size behavior (Phase 11):**
+- Widget in an article body, page main zone, or split-comparison zone on desktop → **large** (Variant A / Card Embed)
+- Widget in a page sidebar zone, or split-comparison zone on mobile → **small** (Variant B / Inline Embed)
+- The size is determined automatically by `WidgetSizeContext`; the author does not choose it manually
+
+See `docs/PHASE_11_PLAN.md § Section E` and `docs/prd/01-content-management.md § Widget System` for full implementation details.
+
+---
 
 ## Overview
 
@@ -778,14 +803,15 @@ WHERE id IN (uuid1, uuid2, uuid3)
 
 ## Success Metrics
 
-- ✅ Products can be embedded in articles/pages via 3 methods (visual, shortcode, markdown)
-- ✅ Embedded products display correctly in all 3 modes (card, inline, grid)
-- ✅ Add to cart works from embedded widgets without page reload
+- ✅ Products can be embedded in articles, products, and page zones via the TipTap `productEmbed` node
+- ✅ Large (card) and small (inline) variants render correctly based on zone context
+- ✅ Add to cart works from both variants without page reload
 - ✅ Embedded products respect visibility and permission rules
 - ✅ Product embeds load in < 500ms
 - ✅ Click-through rate from embedded products > 5%
 - ✅ Conversion rate from embedded add-to-cart > 2%
 - ✅ Zero layout shift when products load
+- ⏸ Shortcode and Markdown insertion methods — not implemented (superseded by TipTap node)
 
 ---
 
