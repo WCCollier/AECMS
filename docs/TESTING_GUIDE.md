@@ -1,39 +1,30 @@
 # AECMS Comprehensive Testing Guide
 
-**Version**: 1.2
-**Last Updated**: 2026-05-30
-**Status**: Phase 9 - User Testing (Steps 1–3, 6 complete)
+**Version**: 1.3
+**Last Updated**: 2026-06-04
+**Status**: Phase 9 - User Testing (Steps 1–8 complete; Steps 9–11 pending)
 
 ---
 
 ## Quick Start
 
-### Option 1: Docker Compose (Recommended)
 ```bash
-# Start all services
-docker-compose up -d
+# Start everything (handles Docker, migrations, seeding, both servers)
+bash start-dev.sh
 
-# Wait for services to be healthy
-docker-compose ps
+# Logs
+tail -f /tmp/backend.log /tmp/frontend.log
 
 # Backend: http://localhost:4000
 # Frontend: http://localhost:3000
 ```
 
-### Option 2: Manual Development
+> **Note**: `docker-compose up` is broken in Codespaces (BuildKit issue). Always use `bash start-dev.sh` — it starts the postgres and redis containers directly via `docker run`/`docker start` and runs all seed scripts if the database is empty.
+
+**Run tests**
 ```bash
-# 1. Start services
-docker-compose up -d postgres redis
-
-# 2. Start backend (Terminal 1)
-cd backend && npm run start:dev
-
-# 3. Start frontend (Terminal 2)
-cd frontend && npm run dev
-
-# 4. Run automated tests (Terminal 3)
-cd backend && npm run test && npm run test:e2e
-cd frontend && npm run test
+cd backend && npm run test       # 154 unit tests
+cd frontend && npm test          # 90 unit tests
 ```
 
 ---
