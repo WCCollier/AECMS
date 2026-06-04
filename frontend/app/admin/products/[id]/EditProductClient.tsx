@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { ProductForm } from '@/components/admin/ProductForm';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
+import type { MediaItem } from '@/types';
 
 interface Product {
   id: string;
@@ -14,16 +15,17 @@ interface Product {
   slug: string;
   description: string;
   short_description: string;
-  featured_image_url: string | null;
   price: number;
+  compare_at_price?: number | null;
   sku: string;
-  stock_quantity: number;
-  track_inventory: boolean;
-  is_digital: boolean;
+  stock_quantity: number | null;
+  stock_status: 'in_stock' | 'out_of_stock' | 'back_ordered' | 'available' | 'unavailable';
+  product_type: 'physical' | 'digital' | 'service';
   status: 'draft' | 'published' | 'archived';
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   meta_title: string;
   meta_description: string;
+  media: MediaItem[];
 }
 
 export function EditProductClient() {
@@ -92,7 +94,17 @@ export function EditProductClient() {
         <h1 className="text-3xl font-bold">Edit Product</h1>
       </div>
 
-      <ProductForm productId={productId} initialData={product} />
+      <ProductForm
+        productId={productId}
+        initialData={{
+          ...product,
+          compare_at_price: product.compare_at_price ?? undefined,
+          stock_quantity: product.stock_quantity ?? 0,
+          stock_status: (product.stock_status === 'available' || product.stock_status === 'unavailable')
+            ? 'in_stock'
+            : (product.stock_status as 'in_stock' | 'out_of_stock' | 'back_ordered') ?? 'in_stock',
+        }}
+      />
     </div>
   );
 }

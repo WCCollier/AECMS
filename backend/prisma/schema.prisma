@@ -162,7 +162,6 @@ model Article {
   slug                String      @unique
   content             String      @db.Text
   excerpt             String?
-  featured_image_id   String?
   author_id           String
   status              ContentStatus @default(draft)
   visibility          ContentVisibility @default(public)
@@ -185,7 +184,6 @@ model Article {
   deleted_at          DateTime?
 
   author          User            @relation(fields: [author_id], references: [id])
-  featured_image  Media?      @relation("ArticleFeaturedImage", fields: [featured_image_id], references: [id])
   categories      ArticleCategory[]
   tags            ArticleTag[]
   media           ArticleMedia[]
@@ -346,7 +344,6 @@ model Media {
   updated_at     DateTime @updatedAt
 
   uploader         User          @relation("MediaUploader", fields: [uploaded_by], references: [id], onDelete: Cascade)
-  article_featured Article[]     @relation("ArticleFeaturedImage")
   article_media    ArticleMedia[]
   product_media    ProductMedia[]
 
@@ -358,10 +355,11 @@ model Media {
 model ArticleMedia {
   article_id String
   media_id   String
-  order      Int @default(0)
+  order      Int     @default(0)
+  is_primary Boolean @default(false)
 
-  article Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
-  media   Media @relation(fields: [media_id], references: [id], onDelete: Cascade)
+  article Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  media   Media   @relation(fields: [media_id], references: [id], onDelete: Cascade)
 
   @@id([article_id, media_id])
   @@map("article_media")

@@ -2956,7 +2956,45 @@ npm run migrate -- --sql-file=wordpress-export.sql --wp-url=https://oldsite.com
 
 ---
 
-## Phase 10: Production Deployment (Weeks 19-20)
+## Phase 10: Widget System & Media Normalization
+
+> **Note**: The original "Phase 10: Production Deployment" from this plan has been deferred.
+> Phase 10 now covers the widget system. See `docs/PHASE_10_PLAN.md` for the full checklist.
+> Production deployment tasks remain valid and will be addressed in a later phase.
+
+### Phase 10A: Hero Carousel & Media Schema Normalization
+
+**Goal**: Normalize Article and Product media to a shared `media: MediaItem[]` contract.
+Build the `MediaGallery` widget and `MediaGalleryField` admin component. Replace single-image
+display on both detail pages with the carousel widget.
+
+**Key deliverables**:
+- 🤖 Schema migration: `ArticleMedia.is_primary`, drop `Article.featured_image_id`, update relations
+- 🤖 Article API: return `media[]` array; write junction rows on create/update
+- 🤖 Product API: `featured_media_id` in DTO writes `ProductMedia(is_primary: true)`
+- 🤖 `MediaGallery` display component (static if 1 image, carousel if N)
+- 🤖 `MediaGalleryField` admin form component (pick, reorder, set-primary, remove)
+- 🤖 Wire `MediaGalleryField` into `ArticleForm` and `ProductForm`
+- 🤖 Wire `MediaGallery` into article detail page and product detail page
+- 👁️ Manual verification: carousel renders, primary image used on catalogue cards
+
+### Phase 10B: TipTap JSON Migration + Inline Widgets
+
+**Goal**: Switch TipTap content storage from HTML strings to ProseMirror JSON, enabling
+first-class inline widget nodes. Build initial inline widgets.
+
+**Key deliverables**:
+- 🤖 Switch `editor.getHTML()` → `editor.getJSON()` in TipTap
+- 🤖 One-time content migration: convert existing HTML content to TipTap JSON
+- 🤖 Update display rendering to use `generateHTML(json, extensions)`
+- 🤖 `MediaCarouselNode` TipTap extension (inline carousel in body content)
+- 🤖 `CalloutNode` TipTap extension + `Callout` widget component
+- 🤖 `VideoEmbedNode` TipTap extension + `VideoEmbed` widget component
+- 👁️ Manual verification: existing content renders correctly post-migration
+
+---
+
+## Phase 11: Production Deployment (formerly Phase 10)
 
 ### 🤖 [AUTONOMOUS] 10.1 CI/CD Pipeline
 

@@ -756,6 +756,42 @@ On click: Modal with media details, edit options, and use/insert button
 
 5. ~~Do we want widget/block library extensibility for developers?~~ → **NO - No extensibility for other developers.** This is a closed project. No plugin system, no third-party extensions, no developer API for custom blocks.
 
+## Media Display Components (Phase 10+)
+
+*Added 2026-06-04.*
+
+### MediaGallery
+
+A shared display component used in the hero zone of Article and Product detail pages.
+
+**Behavior**:
+- **0 images**: empty state (admin-facing); no output on public page
+- **1 image**: renders a single static `<Image>` with no carousel chrome; the public page looks identical to the current single featured-image design
+- **N images**: renders a carousel with dot indicators, left/right arrow buttons, and keyboard navigation (left/right arrow keys); the primary image is shown first
+
+**Aspect ratios**:
+- Article detail page: `aspect-video` (16:9) — consistent with long-form reading layout
+- Product detail page: `aspect-square` (1:1) — consistent with ecommerce convention
+
+**Catalogue cards** (`ArticleCard`, `ProductCard`) continue to display only `featured_image_url` (the primary image). Catalogue cards are never carousels.
+
+### MediaGalleryField (Admin)
+
+Admin form component for setting the hero media of an Article or Product.
+
+- Lists current images with thumbnails in display order
+- Drag-to-reorder (or up/down buttons as fallback)
+- "Set as primary" action — marks one image as the catalogue card image
+- "Remove" action per image
+- "Add images" opens the existing `MediaPicker` (pick from library or upload new)
+- Used in `ArticleForm` and `ProductForm`; replaces the current single-image `ImageField`
+
+### Inline Body Widgets (Phase 10B)
+
+After the TipTap JSON migration (Phase 10B), widgets become embeddable inside article and product body content via the editor toolbar. The `MediaGallery` widget can be inserted inline — not just in the hero slot — using the same underlying React component.
+
+Additional widgets planned for Phase 10B: `Callout`, `VideoEmbed`.
+
 ## Success Metrics
 
 - Task completion rate > 95% for common workflows

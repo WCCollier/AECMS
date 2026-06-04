@@ -1,11 +1,11 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useArticle } from '@/hooks/useArticles';
 import { ArrowLeft, Calendar, User, FileText } from 'lucide-react';
 import { CommentList } from '@/components/comments/CommentList';
+import { MediaGallery } from '@/components/widgets';
 
 export function ArticlePageClient() {
   const params = useParams();
@@ -60,16 +60,10 @@ export function ArticlePageClient() {
         Back to Latest
       </Link>
 
-      {/* Featured Image — only when one actually exists */}
-      {article.featured_image_url && (
-        <div className="aspect-video relative bg-surface rounded-xl overflow-hidden mb-8">
-          <Image
-            src={article.featured_image_url}
-            alt={article.title}
-            fill
-            className="object-cover"
-            priority
-          />
+      {/* Hero media — single image or carousel depending on how many images the article has */}
+      {(article.media?.length ?? 0) > 0 && (
+        <div className="mb-8">
+          <MediaGallery media={article.media ?? []} aspectRatio="video" />
         </div>
       )}
 

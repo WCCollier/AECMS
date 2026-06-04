@@ -2,14 +2,39 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useProducts } from '@/hooks/useProducts';
+import useSWR from 'swr';
+import { adminFetcher } from '@/lib/swr';
+import adminApi from '@/lib/adminApi';
 import { Button, Card, CardContent, Input } from '@/components/ui';
 import { Plus, Search, Edit, Trash2, Package } from 'lucide-react';
+import type { Product, PaginatedResponse } from '@/types';
 
 export function AdminProductsClient() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const { products, totalPages, isLoading } = useProducts({ page, limit: 10, search: search || undefined });
+
+  const params = new URLSearchParams();
+  params.set('page', page.toString());
+  params.set('limit', '10');
+  if (search) params.set('search', search);
+
+  const { data, isLoading, mutate } = useSWR<PaginatedResponse<Product>>(
+    `/products?${params.toString()}`,
+    adminFetcher,
+  );
+
+  const products = data?.data ?? [];
+  const totalPages = data?.meta?.total_pages ?? data?.total_pages ?? 0;
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    try {
+      await adminApi.delete(`/products/${id}`);
+      mutate();
+    } catch {
+      alert('Delete failed. Please try again.');
+    }
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -75,13 +100,18 @@ export function AdminProductsClient() {
                           <div className="w-10 h-10 bg-foreground/10 rounded flex items-center justify-center">
                             <Package className="w-5 h-5 text-foreground/50" />
                           </div>
-                          <span className="font-medium">{product.name}</span>
+                          <div>
+                            <span className="font-medium block">{product.name}</span>
+                            <span className="text-xs text-foreground/50 capitalize">{product.product_type}</span>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-foreground/70">{product.sku}</td>
+                      <td className="px-6 py-4 text-foreground/70">{product.sku || '—'}</td>
                       <td className="px-6 py-4">{formatPrice(product.price)}</td>
-                      <td className="px-6 py-4">
-                        {product.stock_quantity ?? 'N/A'}
+                      <td className="px-6 py-4 text-foreground/70">
+                        {product.product_type === 'physical'
+                          ? (product.stock_quantity ?? 0)
+                          : '—'}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`text-xs px-2 py-1 rounded-full ${
@@ -99,7 +129,11 @@ export function AdminProductsClient() {
                               <Edit className="w-4 h-4" />
                             </Button>
                           </Link>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(product.id, product.name)}
+                          >
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
                         </div>

@@ -37,6 +37,15 @@ export interface RegisterData {
   display_name?: string;
 }
 
+// Media widget type — shared across Articles, Products (and future Pages)
+export interface MediaItem {
+  id: string;
+  url: string;
+  order: number;
+  is_primary: boolean;
+  alt_text?: string | null;
+}
+
 // Content types
 export interface Article {
   id: string;
@@ -45,6 +54,7 @@ export interface Article {
   content: string;
   excerpt: string | null;
   featured_image_url: string | null;
+  media: MediaItem[];
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   status: 'draft' | 'published' | 'archived';
   published_at: string | null;
@@ -85,10 +95,6 @@ export interface Tag {
 }
 
 // Product types
-// Future additions (see docs/Shape_Audit.md Item 5):
-//   product_type gains 'digital' when Phase 7 delivery is wired to frontend
-//   can_backorder: boolean added when preorder/backorder is implemented
-//   media: Media[] added when product galleries are built
 export interface Product {
   id: string;
   name: string;
@@ -99,9 +105,10 @@ export interface Product {
   compare_at_price: number | null;
   sku: string;
   stock_quantity: number | null;
-  stock_status: 'in_stock' | 'out_of_stock' | 'backorder' | 'available' | 'unavailable';
-  product_type: 'physical' | 'service';
+  stock_status: 'in_stock' | 'out_of_stock' | 'back_ordered' | 'backorder' | 'available' | 'unavailable';
+  product_type: 'physical' | 'digital' | 'service';
   featured_image_url: string | null;
+  media: MediaItem[];
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   status: 'draft' | 'published' | 'archived';
   guest_purchaseable: boolean;
@@ -126,7 +133,7 @@ export interface CartProduct {
   name: string;
   slug: string;
   price: number;
-  product_type: 'physical' | 'service';
+  product_type: 'physical' | 'digital' | 'service';
   stock_status: string;
   stock_quantity: number | null;
   featured_image_url: string | null;

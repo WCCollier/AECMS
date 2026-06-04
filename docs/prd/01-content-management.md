@@ -1178,6 +1178,75 @@ PUT    /api/comments/:id/moderate     # Approve/reject (Admin+)
 6. ~~Should media library support external media sources (Unsplash, Pexels integration)?~~ → **Answered**: YES - Post-MVP feature, will be implemented eventually
 7. ~~Should we implement automatic content suggestions or AI writing assistance?~~ → **Answered**: NO - Not planned for MVP or post-MVP
 
+## Widget System (Phase 10+)
+
+*Added 2026-06-04. Supersedes single-image `featured_image` handling described elsewhere in this document.*
+
+### Design Intent
+
+All three content types — Articles, Products, and (eventually) Pages — share a common widget library. A widget is a self-contained display module with a corresponding admin form component. The same widget code renders in the hero zone (above content) and, after Phase 10B, inline inside TipTap body content.
+
+### Two-Zone Model
+
+| Zone | Description | Mechanism |
+|------|-------------|-----------|
+| **Hero** | Prominent media display above the content body | `media[]` array on the content type; rendered by `MediaGallery` widget |
+| **Body** | Content inline — paragraphs, headings, embedded widgets | TipTap editor; inline widget nodes (Phase 10B) |
+
+### Media Normalization
+
+**Rationale**: Article previously used a direct FK (`featured_image_id`) for a single featured image. Product used a junction table (`ProductMedia` with `is_primary`) designed for a gallery. These are now unified.
+
+**After Phase 10A**, both Article and Product use the same data contract:
+
+```typescript
+interface MediaItem {
+  id: string;
+  url: string;
+  order: number;
+  is_primary: boolean;
+  alt_text?: string | null;
+}
+```
+
+Every content type API returns `media: MediaItem[]`. The `featured_image_url` convenience field (used by catalogue cards) is computed from `media[is_primary]`.
+
+**Schema change (Phase 10A)**:
+- `ArticleMedia` gains `is_primary Boolean @default(false)`
+- `Article.featured_image_id` is dropped (migration backfills junction rows)
+- Both models become topologically identical for media
+
+### MediaGallery Widget
+
+The first shipped widget. Display behavior:
+
+| `media.length` | Renders |
+|----------------|---------|
+| 0 | Empty state / "Add images" prompt |
+| 1 | Static image — identical to current design, no carousel chrome |
+| N > 1 | Carousel with dot indicators, prev/next arrows, keyboard navigation |
+
+Used in:
+- Article detail page hero slot (`aspect-video` ratio)
+- Product detail page hero slot (`aspect-square` ratio)
+- Inline in TipTap body content (Phase 10B)
+
+**Admin form counterpart**: `MediaGalleryField` — replaces the current single-image `ImageField` in both `ArticleForm` and `ProductForm`. Supports pick from library, upload, drag-to-reorder, set-primary, remove.
+
+### Planned Future Widgets
+
+| Widget | Phase | Description |
+|--------|-------|-------------|
+| `MediaGallery` | 10A | Hero carousel + inline carousel |
+| `Callout` | 10B | Info / warning / success / danger callout box |
+| `VideoEmbed` | 10B | YouTube or Vimeo embed by URL |
+| Product Card | Future | Inline shop item embed within an article |
+| Table of Contents | Future | Auto-generated from headings |
+
+### Pages (Deferred)
+
+Pages are architecturally distinct from Articles and Products. They are intended to be composed entirely from widgets, with no conventional content body. Their media handling and widget integration will be designed as part of the Page Builder phase. Pages are excluded from Phase 10.
+
 ## Success Metrics
 
 - Article creation time < 5 minutes (for 500-word article)

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
+import { MediaGallery } from '@/components/widgets';
 import { useParams } from 'next/navigation';
 import useSWR from 'swr';
 import { useProduct } from '@/hooks/useProducts';
@@ -109,24 +109,19 @@ export function ProductPageClient() {
       </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Image */}
-        <div className="aspect-square relative bg-foreground/5 rounded-lg overflow-hidden">
-          {product.featured_image_url ? (
-            <Image
-              src={product.featured_image_url}
-              alt={product.name}
-              fill
-              sizes="(max-width: 768px) 100vw, 50vw"
-              className="object-cover"
-              priority
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-foreground/30">
-              <ShoppingCart className="w-24 h-24" />
-            </div>
-          )}
+        {/* Hero media — carousel when multiple product images exist */}
+        <div className="relative">
+          <MediaGallery
+            media={product.media ?? []}
+            aspectRatio="square"
+            fallback={
+              <div className="w-full h-full flex items-center justify-center text-foreground/30">
+                <ShoppingCart className="w-24 h-24" />
+              </div>
+            }
+          />
           {discount && (
-            <span className="absolute top-4 left-4 bg-red-500 text-white text-sm px-2 py-1 rounded">
+            <span className="absolute top-4 left-4 z-20 bg-red-500 text-white text-sm px-2 py-1 rounded">
               -{discount}%
             </span>
           )}

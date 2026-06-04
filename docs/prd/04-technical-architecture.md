@@ -1086,3 +1086,95 @@ Dashboard shows:
 - Support 10,000 concurrent users
 - Handle 1,000 requests/second
 - Database query time < 100ms (p95)
+
+---
+
+## Widget Architecture (Phase 10+)
+
+*Added 2026-06-04. See `docs/PHASE_10_PLAN.md` for full implementation checklist.*
+
+### Design Principle
+
+Widgets are self-contained display modules. Each widget has three co-located files:
+
+```
+components/widgets/
+  <WidgetName>/
+    <WidgetName>.tsx        ← public display component
+    <WidgetName>Field.tsx   ← admin form field component (if editable)
+    index.ts
+  index.ts                  ← barrel export for all widgets
+```
+
+The same display component is used in both the **hero zone** (above content, outside TipTap) and as a **TipTap NodeView** (inside body content, Phase 10B). There is one implementation, used in both contexts.
+
+### Two-Zone Model
+
+```
+┌─────────────────────────────────────────────────┐
+│  HERO ZONE (outside TipTap)                     │
+│  <MediaGallery media={item.media} />            │
+│  Managed via MediaGalleryField in admin form    │
+├─────────────────────────────────────────────────┤
+│  BODY ZONE (inside TipTap)                      │
+│  Rich text + inline widget nodes                │
+│  Phase 10B: stored as TipTap JSON               │
+└─────────────────────────────────────────────────┘
+```
+
+### Content Format: HTML → JSON (Phase 10B)
+
+**Current (Phase 10A and earlier)**: TipTap calls `editor.getHTML()` on change. Content is stored as an HTML string in `content Text` columns. Rendered with `dangerouslySetInnerHTML` on the display side.
+
+**Phase 10B**: Switch to TipTap JSON.
+
+- Editor calls `editor.getJSON()` — returns a ProseMirror document object
+- Stored in the same `content Text` column as a JSON string
+- Rendered via TipTap's `generateHTML(json, extensions)` utility, or a read-only `<EditorContent>` instance
+- Custom widget nodes serialize naturally: `{ type: "mediaGallery", attrs: { mediaIds: [...] } }`
+- One-time migration: `generateJSON(existingHtml, extensions)` converts all existing content rows
+
+**Why JSON is required for inline widgets**: HTML-embedded widgets require fragile custom elements or `data-*` attributes (`<div data-widget="callout" data-type="warning">`). These break on sanitization passes and are difficult to render. ProseMirror JSON handles custom nodes as first-class schema members.
+
+### TipTap Extension Structure (Phase 10B)
+
+```
+components/editor/
+  TipTapEditor.tsx               ← gains new extensions
+  extensions/
+    media-gallery.ts             ← MediaCarousel inline node
+    callout.ts                   ← Callout inline node
+    video-embed.ts               ← VideoEmbed inline node
+```
+
+Each extension file exports a TipTap `Node` extension. The NodeView property points to the shared display component from `components/widgets/`.
+
+### Media Data Contract
+
+All content type APIs return a normalized `media` array. The `featured_image_url` field is a computed convenience field retained for backwards compatibility with catalogue card components:
+
+```typescript
+// Returned by Article API and Product API
+interface MediaItem {
+  id: string;
+  url: string;
+  order: number;
+  is_primary: boolean;
+  alt_text?: string | null;
+}
+
+// featured_image_url = media.find(m => m.is_primary)?.url ?? media[0]?.url ?? null
+```
+
+### Database: Media Junction Tables
+
+After Phase 10A migration:
+
+| Table | Fields | Content Type |
+|-------|--------|-------------|
+| `article_media` | `article_id`, `media_id`, `order`, `is_primary` | Article |
+| `product_media` | `product_id`, `media_id`, `order`, `is_primary` | Product |
+
+Both are topologically identical. `Article.featured_image_id` (direct FK) is removed — the junction table is the sole source of truth for both content types.
+
+Pages will get a `page_media` junction table when the Page Builder phase is designed.

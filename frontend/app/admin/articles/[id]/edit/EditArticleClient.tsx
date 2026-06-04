@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { ArticleForm } from '@/components/admin/ArticleForm';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
+import type { MediaItem } from '@/types';
 
 interface Article {
   id: string;
@@ -14,11 +15,11 @@ interface Article {
   slug: string;
   content: string;
   excerpt: string;
-  featured_image_url: string | null;
   status: 'draft' | 'published' | 'archived';
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   meta_title: string;
   meta_description: string;
+  media: MediaItem[];
 }
 
 export function EditArticleClient() {

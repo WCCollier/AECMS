@@ -5,21 +5,23 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { TipTapEditor } from '@/components/editor';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
-import { ImageField } from '@/components/admin/ImageField';
-import api, { getErrorMessage } from '@/lib/api';
+import { MediaGalleryField } from '@/components/widgets';
+import type { GalleryEntry } from '@/components/widgets';
+import adminApi from '@/lib/adminApi';
+import { getErrorMessage } from '@/lib/api';
+import type { MediaItem } from '@/types';
 
 interface ProductFormData {
   name: string;
   slug: string;
   description: string;
   short_description: string;
-  featured_image_url: string | null;
   price: number;
   compare_at_price?: number;
   sku: string;
   stock_quantity: number;
-  track_inventory: boolean;
-  is_digital: boolean;
+  stock_status: 'in_stock' | 'out_of_stock' | 'back_ordered';
+  product_type: 'physical' | 'digital' | 'service';
   status: 'draft' | 'published' | 'archived';
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   meta_title: string;
@@ -28,7 +30,14 @@ interface ProductFormData {
 
 interface ProductFormProps {
   productId?: string;
-  initialData?: Partial<ProductFormData>;
+  initialData?: Partial<ProductFormData & { media?: MediaItem[] }>;
+}
+
+function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
+  if (!media?.length) return [];
+  return [...media]
+    .sort((a, b) => (a.is_primary === b.is_primary ? a.order - b.order : a.is_primary ? -1 : 1))
+    .map((m) => ({ mediaId: m.id, url: m.url, isPrimary: m.is_primary }));
 }
 
 export function ProductForm({ productId, initialData }: ProductFormProps) {
@@ -36,7 +45,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState(initialData?.description || '');
-  const [featuredImage, setFeaturedImage] = useState<string | null>(initialData?.featured_image_url || null);
+  const [gallery, setGallery] = useState<GalleryEntry[]>(() => toGalleryEntries(initialData?.media));
 
   const {
     register,
@@ -54,8 +63,8 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
       compare_at_price: initialData?.compare_at_price ? Number(initialData.compare_at_price) : undefined,
       sku: initialData?.sku || '',
       stock_quantity: initialData?.stock_quantity || 0,
-      track_inventory: initialData?.track_inventory ?? true,
-      is_digital: initialData?.is_digital ?? false,
+      stock_status: initialData?.stock_status || 'in_stock',
+      product_type: initialData?.product_type || 'physical',
       status: initialData?.status || 'draft',
       visibility: initialData?.visibility || 'public',
       meta_title: initialData?.meta_title || '',
@@ -64,10 +73,8 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
   });
 
   const name = watch('name');
-  const trackInventory = watch('track_inventory');
-  const isDigital = watch('is_digital');
+  const productType = watch('product_type');
 
-  // Auto-generate slug from name
   useEffect(() => {
     if (!productId && name) {
       const slug = name
@@ -78,29 +85,36 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
     }
   }, [name, productId, setValue]);
 
-  // Digital products don't track inventory
-  useEffect(() => {
-    if (isDigital) {
-      setValue('track_inventory', false);
-    }
-  }, [isDigital, setValue]);
-
   const onSubmit = async (data: ProductFormData) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const payload = {
-        ...data,
+      const payload: Record<string, unknown> = {
+        name: data.name,
+        slug: data.slug,
         description,
-        featured_image_url: featuredImage,
+        short_description: data.short_description,
         price: data.price,
+        compare_at_price: data.compare_at_price || undefined,
+        sku: data.sku || undefined,
+        product_type: data.product_type,
+        status: data.status,
+        visibility: data.visibility,
+        meta_title: data.meta_title || undefined,
+        meta_description: data.meta_description || undefined,
+        media_ids: gallery.map((e) => e.mediaId),
       };
 
+      if (data.product_type === 'physical') {
+        payload.stock_quantity = data.stock_quantity;
+        payload.stock_status = data.stock_status;
+      }
+
       if (productId) {
-        await api.patch(`/products/${productId}`, payload);
+        await adminApi.patch(`/products/${productId}`, payload);
       } else {
-        await api.post('/products', payload);
+        await adminApi.post('/products', payload);
       }
 
       router.push('/admin/products');
@@ -178,14 +192,13 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Product Image</CardTitle>
+              <CardTitle>Images</CardTitle>
             </CardHeader>
             <CardContent>
-              <ImageField
-                label=""
-                value={featuredImage}
-                onChange={setFeaturedImage}
-              />
+              <p className="text-xs text-foreground/50 mb-3">
+                First image is the primary listing image. Add more for a gallery on the product page.
+              </p>
+              <MediaGalleryField value={gallery} onChange={setGallery} />
             </CardContent>
           </Card>
 
@@ -194,6 +207,18 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
               <CardTitle>Publish</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Product Type</label>
+                <select
+                  {...register('product_type')}
+                  className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                >
+                  <option value="physical">Physical</option>
+                  <option value="digital">Digital</option>
+                  <option value="service">Service</option>
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-2">Status</label>
                 <select
@@ -249,7 +274,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
                     min="0"
                     {...register('price', {
                       required: 'Price is required',
-                      min: { value: 0, message: 'Price must be positive' }
+                      min: { value: 0, message: 'Price must be positive' },
                     })}
                     placeholder="0.00"
                     className="w-full pl-7"
@@ -269,7 +294,7 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
                     step="0.01"
                     min="0"
                     {...register('compare_at_price', {
-                      min: { value: 0, message: 'Must be positive' }
+                      min: { value: 0, message: 'Must be positive' },
                     })}
                     placeholder="Original price (shown as strikethrough)"
                     className="w-full pl-7"
@@ -288,56 +313,40 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Inventory</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="is_digital"
-                  {...register('is_digital')}
-                  className="w-4 h-4 rounded border-foreground/20"
-                />
-                <label htmlFor="is_digital" className="text-sm">
-                  Digital product
-                </label>
-              </div>
+          {productType === 'physical' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Inventory</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Stock Quantity</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    {...register('stock_quantity', {
+                      valueAsNumber: true,
+                      min: { value: 0, message: 'Stock must be positive' },
+                    })}
+                    placeholder="0"
+                    className="w-full"
+                  />
+                </div>
 
-              {!isDigital && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="track_inventory"
-                      {...register('track_inventory')}
-                      className="w-4 h-4 rounded border-foreground/20"
-                    />
-                    <label htmlFor="track_inventory" className="text-sm">
-                      Track inventory
-                    </label>
-                  </div>
-
-                  {trackInventory && (
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Stock Quantity</label>
-                      <Input
-                        type="number"
-                        min="0"
-                        {...register('stock_quantity', {
-                          valueAsNumber: true,
-                          min: { value: 0, message: 'Stock must be positive' }
-                        })}
-                        placeholder="0"
-                        className="w-full"
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Stock Status</label>
+                  <select
+                    {...register('stock_status')}
+                    className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  >
+                    <option value="in_stock">In Stock</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                    <option value="back_ordered">Back Ordered</option>
+                  </select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

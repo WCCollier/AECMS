@@ -151,4 +151,10 @@ export class CreateProductDto {
   @IsUUID()
   @IsOptional()
   author_id?: string;
+
+  @ApiPropertyOptional({ description: 'Media IDs in display order (first is primary)', type: [String] })
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @IsOptional()
+  media_ids?: string[];
 }

@@ -22,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { ArticlesService } from './articles.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
@@ -34,7 +35,7 @@ export class ArticlesController {
   constructor(private readonly articlesService: ArticlesService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
   @RequiresCapability('article.create')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new article' })
@@ -96,7 +97,7 @@ export class ArticlesController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update an article' })
   @ApiParam({ name: 'id', description: 'Article ID' })
@@ -116,7 +117,7 @@ export class ArticlesController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete an article' })

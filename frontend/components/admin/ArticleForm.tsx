@@ -5,15 +5,17 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { TipTapEditor } from '@/components/editor';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
-import { ImageField } from '@/components/admin/ImageField';
-import api, { getErrorMessage } from '@/lib/api';
+import { MediaGalleryField } from '@/components/widgets';
+import type { GalleryEntry } from '@/components/widgets';
+import adminApi from '@/lib/adminApi';
+import { getErrorMessage } from '@/lib/api';
+import type { MediaItem } from '@/types';
 
 interface ArticleFormData {
   title: string;
   slug: string;
   content: string;
   excerpt: string;
-  featured_image_url: string | null;
   status: 'draft' | 'published' | 'archived';
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   meta_title: string;
@@ -22,7 +24,14 @@ interface ArticleFormData {
 
 interface ArticleFormProps {
   articleId?: string;
-  initialData?: Partial<ArticleFormData>;
+  initialData?: Partial<ArticleFormData & { media?: MediaItem[] }>;
+}
+
+function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
+  if (!media?.length) return [];
+  return [...media]
+    .sort((a, b) => (a.is_primary === b.is_primary ? a.order - b.order : a.is_primary ? -1 : 1))
+    .map((m) => ({ mediaId: m.id, url: m.url, isPrimary: m.is_primary }));
 }
 
 export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
@@ -30,7 +39,7 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState(initialData?.content || '');
-  const [featuredImage, setFeaturedImage] = useState<string | null>(initialData?.featured_image_url || null);
+  const [gallery, setGallery] = useState<GalleryEntry[]>(() => toGalleryEntries(initialData?.media));
 
   const {
     register,
@@ -53,7 +62,6 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
 
   const title = watch('title');
 
-  // Auto-generate slug from title
   useEffect(() => {
     if (!articleId && title) {
       const slug = title
@@ -72,13 +80,13 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
       const payload = {
         ...data,
         content,
-        featured_image_url: featuredImage,
+        media_ids: gallery.map((e) => e.mediaId),
       };
 
       if (articleId) {
-        await api.patch(`/articles/${articleId}`, payload);
+        await adminApi.patch(`/articles/${articleId}`, payload);
       } else {
-        await api.post('/articles', payload);
+        await adminApi.post('/articles', payload);
       }
 
       router.push('/admin/articles');
@@ -156,14 +164,13 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Featured Image</CardTitle>
+              <CardTitle>Images</CardTitle>
             </CardHeader>
             <CardContent>
-              <ImageField
-                label=""
-                value={featuredImage}
-                onChange={setFeaturedImage}
-              />
+              <p className="text-xs text-foreground/50 mb-3">
+                First image is used as the featured image on listing cards. Add more for a gallery on the article page.
+              </p>
+              <MediaGalleryField value={gallery} onChange={setGallery} />
             </CardContent>
           </Card>
 

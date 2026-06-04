@@ -102,7 +102,7 @@ export function SetupTwoFactorClient() {
 
               <div>
                 <p className="text-xs text-foreground/50 text-center mb-2">
-                  Can't scan? Enter this key manually:
+                  Can&apos;t scan? Enter this key manually:
                 </p>
                 <div className="bg-foreground/5 rounded-lg px-4 py-2 font-mono text-sm text-center break-all select-all">
                   {setupData.secret}

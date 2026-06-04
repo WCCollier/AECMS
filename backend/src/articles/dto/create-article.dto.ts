@@ -33,10 +33,11 @@ export class CreateArticleDto {
   @IsOptional()
   excerpt?: string;
 
-  @ApiPropertyOptional({ description: 'Featured image ID', type: String })
-  @IsUUID()
+  @ApiPropertyOptional({ description: 'Media IDs in display order (first is primary)', type: [String] })
+  @IsArray()
+  @IsUUID('4', { each: true })
   @IsOptional()
-  featured_image_id?: string;
+  media_ids?: string[];
 
   @ApiPropertyOptional({
     description: 'Article status',

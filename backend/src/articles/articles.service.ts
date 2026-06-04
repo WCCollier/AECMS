@@ -14,64 +14,68 @@ import { Prisma, ContentStatus, ContentVisibility } from '@prisma/client';
 export class ArticlesService {
   constructor(private prisma: PrismaService) {}
 
+  private getMediaInclude() {
+    return {
+      media: {
+        include: { media: true },
+        orderBy: { order: 'asc' as const },
+      },
+    };
+  }
+
+  private getArticleInclude(withCounts = false) {
+    return {
+      author: { select: { id: true, email: true, first_name: true, last_name: true } },
+      ...this.getMediaInclude(),
+      categories: { include: { category: true } },
+      tags: { include: { tag: true } },
+      ...(withCounts ? { _count: { select: { comments: true, versions: true } } } : {}),
+    };
+  }
+
+  /**
+   * Write article_media junction rows for an article, replacing any existing set.
+   * First item in array is primary.
+   */
+  private async setArticleMedia(articleId: string, mediaIds: string[]) {
+    await this.prisma.articleMedia.deleteMany({ where: { article_id: articleId } });
+    if (mediaIds.length === 0) return;
+
+    await this.prisma.articleMedia.createMany({
+      data: mediaIds.map((mediaId, index) => ({
+        article_id: articleId,
+        media_id: mediaId,
+        order: index,
+        is_primary: index === 0,
+      })),
+    });
+  }
+
   /**
    * Create a new article
    */
   async create(dto: CreateArticleDto, authorId: string) {
-    // Generate slug if not provided
     const slug = dto.slug || this.generateSlug(dto.title);
 
-    // Check if slug already exists
-    const existing = await this.prisma.article.findUnique({
-      where: { slug },
-    });
+    const existing = await this.prisma.article.findUnique({ where: { slug } });
+    if (existing) throw new ConflictException(`Article with slug "${slug}" already exists`);
 
-    if (existing) {
-      throw new ConflictException(
-        `Article with slug "${slug}" already exists`,
-      );
+    if (dto.category_ids?.length) {
+      const cats = await this.prisma.category.findMany({ where: { id: { in: dto.category_ids } } });
+      if (cats.length !== dto.category_ids.length) throw new BadRequestException('One or more categories not found');
     }
 
-    // Validate featured image exists
-    if (dto.featured_image_id) {
-      const image = await this.prisma.media.findUnique({
-        where: { id: dto.featured_image_id },
-      });
-      if (!image) {
-        throw new BadRequestException('Featured image not found');
-      }
+    if (dto.tag_ids?.length) {
+      const tags = await this.prisma.tag.findMany({ where: { id: { in: dto.tag_ids } } });
+      if (tags.length !== dto.tag_ids.length) throw new BadRequestException('One or more tags not found');
     }
 
-    // Validate categories exist
-    if (dto.category_ids && dto.category_ids.length > 0) {
-      const categories = await this.prisma.category.findMany({
-        where: { id: { in: dto.category_ids } },
-      });
-      if (categories.length !== dto.category_ids.length) {
-        throw new BadRequestException('One or more categories not found');
-      }
-    }
-
-    // Validate tags exist
-    if (dto.tag_ids && dto.tag_ids.length > 0) {
-      const tags = await this.prisma.tag.findMany({
-        where: { id: { in: dto.tag_ids } },
-      });
-      if (tags.length !== dto.tag_ids.length) {
-        throw new BadRequestException('One or more tags not found');
-      }
-    }
-
-    // Create article with relationships
     const article = await this.prisma.article.create({
       data: {
         title: dto.title,
         slug,
         content: dto.content,
         excerpt: dto.excerpt,
-        featured_image: dto.featured_image_id
-          ? { connect: { id: dto.featured_image_id } }
-          : undefined,
         status: dto.status || 'draft',
         visibility: dto.visibility || 'public',
         meta_title: dto.meta_title,
@@ -82,53 +86,30 @@ export class ArticlesService {
         admin_can_edit: dto.admin_can_edit ?? true,
         admin_can_delete: dto.admin_can_delete ?? true,
         author: { connect: { id: authorId } },
-        published_at:
-          dto.status === 'published' ? new Date() : null,
+        published_at: dto.status === 'published' ? new Date() : null,
         categories: dto.category_ids
-          ? {
-              create: dto.category_ids.map((categoryId) => ({
-                category: { connect: { id: categoryId } },
-              })),
-            }
+          ? { create: dto.category_ids.map((id) => ({ category: { connect: { id } } })) }
           : undefined,
         tags: dto.tag_ids
-          ? {
-              create: dto.tag_ids.map((tagId) => ({
-                tag: { connect: { id: tagId } },
-              })),
-            }
+          ? { create: dto.tag_ids.map((id) => ({ tag: { connect: { id } } })) }
           : undefined,
       },
-      include: {
-        author: {
-          select: { id: true, email: true, first_name: true, last_name: true },
-        },
-        featured_image: true,
-        categories: {
-          include: {
-            category: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-      },
+      include: this.getArticleInclude(),
     });
 
-    // Create initial version if versioning is enabled
-    if (dto.version_control_enabled) {
-      await this.createVersion(
-        article.id,
-        dto.title,
-        dto.content,
-        authorId,
-        'Initial version',
-      );
+    if (dto.media_ids?.length) {
+      await this.setArticleMedia(article.id, dto.media_ids);
     }
 
-    return this.transformArticle(article);
+    if (dto.version_control_enabled) {
+      await this.createVersion(article.id, dto.title, dto.content, authorId, 'Initial version');
+    }
+
+    const fresh = await this.prisma.article.findUnique({
+      where: { id: article.id },
+      include: this.getArticleInclude(true),
+    });
+    return this.transformArticle(fresh!);
   }
 
   /**
@@ -136,69 +117,31 @@ export class ArticlesService {
    */
   async findAll(query: QueryArticlesDto, userId?: string, isAdmin = false) {
     const {
-      status,
-      visibility,
-      category_id,
-      category,
-      tag_id,
-      tag,
-      author_id,
-      search,
-      page = 1,
-      limit = 20,
-      sort_by = 'created_at',
-      sort_order = 'desc',
+      status, visibility, category_id, category, tag_id, tag,
+      author_id, search, page = 1, limit = 20,
+      sort_by = 'created_at', sort_order = 'desc',
     } = query;
 
     const skip = (page - 1) * limit;
-
-    // Build where clause
     const where: Prisma.ArticleWhereInput = {};
 
-    // Status filter
-    if (status) {
-      where.status = status;
-    }
+    if (status) where.status = status;
 
-    // Visibility filter based on user permissions
     if (!isAdmin) {
-      if (userId) {
-        // Logged-in users can see public and logged_in_only
-        where.visibility = {
-          in: [ContentVisibility.public, ContentVisibility.logged_in_only],
-        };
-      } else {
-        // Guests can only see public
-        where.visibility = ContentVisibility.public;
-      }
+      where.visibility = userId
+        ? { in: [ContentVisibility.public, ContentVisibility.logged_in_only] }
+        : ContentVisibility.public;
     }
-    // Admins can see all visibility levels
+    if (visibility && isAdmin) where.visibility = visibility;
 
-    // Additional visibility filter if specified
-    if (visibility && isAdmin) {
-      where.visibility = visibility;
-    }
+    if (category_id) where.categories = { some: { category_id } };
+    else if (category) where.categories = { some: { category: { slug: category } } };
 
-    // Category filter — accepts UUID or slug
-    if (category_id) {
-      where.categories = { some: { category_id } };
-    } else if (category) {
-      where.categories = { some: { category: { slug: category } } };
-    }
+    if (tag_id) where.tags = { some: { tag_id } };
+    else if (tag) where.tags = { some: { tag: { slug: tag } } };
 
-    // Tag filter — accepts UUID or slug
-    if (tag_id) {
-      where.tags = { some: { tag_id } };
-    } else if (tag) {
-      where.tags = { some: { tag: { slug: tag } } };
-    }
+    if (author_id) where.author_id = author_id;
 
-    // Author filter
-    if (author_id) {
-      where.author_id = author_id;
-    }
-
-    // Search filter
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
@@ -207,44 +150,21 @@ export class ArticlesService {
       ];
     }
 
-    // Execute queries
     const [articles, total] = await Promise.all([
       this.prisma.article.findMany({
-        where,
-        skip,
-        take: limit,
+        where, skip, take: limit,
         orderBy: { [sort_by]: sort_order },
         include: {
-          author: {
-            select: { id: true, email: true, first_name: true, last_name: true },
-          },
-          featured_image: true,
-          categories: {
-            include: {
-              category: true,
-            },
-          },
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-          _count: {
-            select: { comments: true },
-          },
+          ...this.getArticleInclude(),
+          _count: { select: { comments: true } },
         },
       }),
       this.prisma.article.count({ where }),
     ]);
 
     return {
-      data: articles.map((article) => this.transformArticle(article)),
-      meta: {
-        total,
-        page,
-        limit,
-        total_pages: Math.ceil(total / limit),
-      },
+      data: articles.map((a) => this.transformArticle(a)),
+      meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
     };
   }
 
@@ -254,34 +174,10 @@ export class ArticlesService {
   async findById(id: string, userId?: string, isAdmin = false) {
     const article = await this.prisma.article.findUnique({
       where: { id },
-      include: {
-        author: {
-          select: { id: true, email: true, first_name: true, last_name: true },
-        },
-        featured_image: true,
-        categories: {
-          include: {
-            category: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-        _count: {
-          select: { comments: true, versions: true },
-        },
-      },
+      include: this.getArticleInclude(true),
     });
-
-    if (!article) {
-      throw new NotFoundException('Article not found');
-    }
-
-    // Check visibility permissions
+    if (!article) throw new NotFoundException('Article not found');
     this.checkVisibilityAccess(article, userId, isAdmin);
-
     return this.transformArticle(article);
   }
 
@@ -291,89 +187,31 @@ export class ArticlesService {
   async findBySlug(slug: string, userId?: string, isAdmin = false) {
     const article = await this.prisma.article.findUnique({
       where: { slug },
-      include: {
-        author: {
-          select: { id: true, email: true, first_name: true, last_name: true },
-        },
-        featured_image: true,
-        categories: {
-          include: {
-            category: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-        _count: {
-          select: { comments: true, versions: true },
-        },
-      },
+      include: this.getArticleInclude(true),
     });
-
-    if (!article) {
-      throw new NotFoundException('Article not found');
-    }
-
-    // Check visibility permissions
+    if (!article) throw new NotFoundException('Article not found');
     this.checkVisibilityAccess(article, userId, isAdmin);
-
     return this.transformArticle(article);
   }
 
   /**
    * Update article
    */
-  async update(
-    id: string,
-    dto: UpdateArticleDto,
-    userId: string,
-    isAdmin = false,
-  ) {
-    const article = await this.prisma.article.findUnique({
-      where: { id },
-    });
-
-    if (!article) {
-      throw new NotFoundException('Article not found');
-    }
-
-    // Check edit permissions
+  async update(id: string, dto: UpdateArticleDto, userId: string, isAdmin = false) {
+    const article = await this.prisma.article.findUnique({ where: { id } });
+    if (!article) throw new NotFoundException('Article not found');
     this.checkEditAccess(article, userId, isAdmin);
 
-    // Check slug uniqueness if changing
     if (dto.slug && dto.slug !== article.slug) {
-      const existing = await this.prisma.article.findUnique({
-        where: { slug: dto.slug },
-      });
-      if (existing) {
-        throw new ConflictException(
-          `Article with slug "${dto.slug}" already exists`,
-        );
-      }
+      const existing = await this.prisma.article.findUnique({ where: { slug: dto.slug } });
+      if (existing) throw new ConflictException(`Article with slug "${dto.slug}" already exists`);
     }
 
-    // Validate featured image if changing
-    if (dto.featured_image_id) {
-      const image = await this.prisma.media.findUnique({
-        where: { id: dto.featured_image_id },
-      });
-      if (!image) {
-        throw new BadRequestException('Featured image not found');
-      }
-    }
-
-    // Handle status change to published
     let published_at = article.published_at;
-    if (
-      dto.status === ContentStatus.published &&
-      article.status !== ContentStatus.published
-    ) {
+    if (dto.status === ContentStatus.published && article.status !== ContentStatus.published) {
       published_at = new Date();
     }
 
-    // Prepare update data
     const updateData: Prisma.ArticleUpdateInput = {
       title: dto.title,
       slug: dto.slug,
@@ -391,233 +229,112 @@ export class ArticlesService {
       published_at,
     };
 
-    // Handle featured image update
-    if (dto.featured_image_id !== undefined) {
-      if (dto.featured_image_id) {
-        updateData.featured_image = { connect: { id: dto.featured_image_id } };
-      } else {
-        updateData.featured_image = { disconnect: true };
-      }
-    }
-
-    // Handle category updates
     if (dto.category_ids !== undefined) {
-      // Delete existing categories
-      await this.prisma.articleCategory.deleteMany({
-        where: { article_id: id },
-      });
-      // Create new categories
+      await this.prisma.articleCategory.deleteMany({ where: { article_id: id } });
       if (dto.category_ids.length > 0) {
         updateData.categories = {
-          create: dto.category_ids.map((categoryId) => ({
-            category: { connect: { id: categoryId } },
-          })),
+          create: dto.category_ids.map((catId) => ({ category: { connect: { id: catId } } })),
         };
       }
     }
 
-    // Handle tag updates
     if (dto.tag_ids !== undefined) {
-      // Delete existing tags
-      await this.prisma.articleTag.deleteMany({
-        where: { article_id: id },
-      });
-      // Create new tags
+      await this.prisma.articleTag.deleteMany({ where: { article_id: id } });
       if (dto.tag_ids.length > 0) {
         updateData.tags = {
-          create: dto.tag_ids.map((tagId) => ({
-            tag: { connect: { id: tagId } },
-          })),
+          create: dto.tag_ids.map((tagId) => ({ tag: { connect: { id: tagId } } })),
         };
       }
     }
 
-    // Update article
-    const updated = await this.prisma.article.update({
-      where: { id },
-      data: updateData,
-      include: {
-        author: {
-          select: { id: true, email: true, first_name: true, last_name: true },
-        },
-        featured_image: true,
-        categories: {
-          include: {
-            category: true,
-          },
-        },
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-      },
-    });
+    await this.prisma.article.update({ where: { id }, data: updateData });
 
-    // Create version if enabled and content changed
-    if (
-      article.version_control_enabled &&
-      dto.content &&
-      dto.content !== article.content
-    ) {
-      await this.createVersion(
-        id,
-        dto.title || article.title,
-        dto.content,
-        userId,
-        'Content updated',
-      );
+    if (dto.media_ids !== undefined) {
+      await this.setArticleMedia(id, dto.media_ids);
     }
 
-    return this.transformArticle(updated);
+    if (article.version_control_enabled && dto.content && dto.content !== article.content) {
+      await this.createVersion(id, dto.title || article.title, dto.content, userId, 'Content updated');
+    }
+
+    const updated = await this.prisma.article.findUnique({
+      where: { id },
+      include: this.getArticleInclude(true),
+    });
+    return this.transformArticle(updated!);
   }
 
   /**
    * Delete article
    */
   async remove(id: string, userId: string, isAdmin = false) {
-    const article = await this.prisma.article.findUnique({
-      where: { id },
-    });
-
-    if (!article) {
-      throw new NotFoundException('Article not found');
-    }
-
-    // Check delete permissions
+    const article = await this.prisma.article.findUnique({ where: { id } });
+    if (!article) throw new NotFoundException('Article not found');
     this.checkDeleteAccess(article, userId, isAdmin);
-
-    // Delete article (cascades to relationships)
-    await this.prisma.article.delete({
-      where: { id },
-    });
+    await this.prisma.article.delete({ where: { id } });
   }
 
-  /**
-   * Generate slug from title
-   */
   private generateSlug(title: string): string {
     return title
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '') // Remove special characters
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-      .substring(0, 200); // Limit length
+      .toLowerCase().trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .substring(0, 200);
   }
 
-  /**
-   * Create version record
-   */
-  private async createVersion(
-    articleId: string,
-    title: string,
-    content: string,
-    createdBy: string,
-    summary: string,
-  ) {
-    // Get version number
-    const lastVersion = await this.prisma.articleVersion.findFirst({
+  private async createVersion(articleId: string, title: string, content: string, createdBy: string, summary: string) {
+    const last = await this.prisma.articleVersion.findFirst({
       where: { article_id: articleId },
       orderBy: { version_number: 'desc' },
     });
-
-    const versionNumber = lastVersion ? lastVersion.version_number + 1 : 1;
-
+    const versionNumber = last ? last.version_number + 1 : 1;
     await this.prisma.articleVersion.create({
-      data: {
-        article: { connect: { id: articleId } },
-        version_number: versionNumber,
-        title,
-        content,
-        created_by: createdBy,
-        change_summary: summary,
-      },
+      data: { article: { connect: { id: articleId } }, version_number: versionNumber, title, content, created_by: createdBy, change_summary: summary },
     });
-
-    // Update article current_version
-    await this.prisma.article.update({
-      where: { id: articleId },
-      data: { current_version: versionNumber },
-    });
+    await this.prisma.article.update({ where: { id: articleId }, data: { current_version: versionNumber } });
   }
 
-  /**
-   * Check visibility access
-   */
-  private checkVisibilityAccess(
-    article: any,
-    userId?: string,
-    isAdmin = false,
-  ) {
-    if (isAdmin) {
-      return; // Admins can see everything
-    }
-
-    if (article.visibility === ContentVisibility.admin_only) {
-      throw new ForbiddenException('Access denied');
-    }
-
-    if (
-      article.visibility === ContentVisibility.logged_in_only &&
-      !userId
-    ) {
-      throw new ForbiddenException('Login required');
-    }
+  private checkVisibilityAccess(article: any, userId?: string, isAdmin = false) {
+    if (isAdmin) return;
+    if (article.visibility === ContentVisibility.admin_only) throw new ForbiddenException('Access denied');
+    if (article.visibility === ContentVisibility.logged_in_only && !userId) throw new ForbiddenException('Login required');
   }
 
-  /**
-   * Check edit access
-   */
   private checkEditAccess(article: any, userId: string, isAdmin: boolean) {
-    // Owner always has access
-    if (article.author_id === userId && article.author_can_edit) {
-      return;
-    }
-
-    // Admin access
-    if (isAdmin && article.admin_can_edit) {
-      return;
-    }
-
+    if (article.author_id === userId && article.author_can_edit) return;
+    if (isAdmin && article.admin_can_edit) return;
     throw new ForbiddenException('You do not have permission to edit this article');
   }
 
-  /**
-   * Check delete access
-   */
   private checkDeleteAccess(article: any, userId: string, isAdmin: boolean) {
-    // Owner always has access
-    if (article.author_id === userId && article.author_can_delete) {
-      return;
-    }
-
-    // Admin access
-    if (isAdmin && article.admin_can_delete) {
-      return;
-    }
-
+    if (article.author_id === userId && article.author_can_delete) return;
+    if (isAdmin && article.admin_can_delete) return;
     throw new ForbiddenException('You do not have permission to delete this article');
   }
 
-  /**
-   * Derive a browser-accessible URL from a media record's file_path.
-   * Files live under <cwd>/uploads/... and are served by ServeStatic at /uploads/...
-   */
-  private mediaUrl(media: any): string | null {
-    if (!media?.file_path) return null;
+  private mediaUrl(filePath: string | null | undefined): string | null {
+    if (!filePath) return null;
     const uploadsBase = path.join(process.cwd(), 'uploads');
-    const rel = path.relative(uploadsBase, media.file_path);
+    const rel = path.relative(uploadsBase, filePath);
     return `/uploads/${rel}`;
   }
 
-  /**
-   * Transform article response
-   */
   private transformArticle(article: any) {
+    const mediaItems = (article.media || []).map((am: any) => ({
+      id: am.media.id,
+      url: this.mediaUrl(am.media.file_path),
+      order: am.order,
+      is_primary: am.is_primary,
+      alt_text: am.media.alt_text ?? null,
+    }));
+
+    const primaryMedia = mediaItems.find((m: any) => m.is_primary) ?? mediaItems[0] ?? null;
+
     return {
       ...article,
-      featured_image_url: this.mediaUrl(article.featured_image),
+      media: mediaItems,
+      featured_image_url: primaryMedia?.url ?? null,
       categories: article.categories?.map((ac: any) => ac.category) || [],
       tags: article.tags?.map((at: any) => at.tag) || [],
       comment_count: article._count?.comments || 0,

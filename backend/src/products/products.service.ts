@@ -101,7 +101,16 @@ export class ProductsService {
       include: this.getProductIncludes(),
     });
 
-    return this.transformProduct(product);  // await handled by async transformProduct
+    if (dto.media_ids?.length) {
+      await this.setProductMedia(product.id, dto.media_ids);
+      const fresh = await this.prisma.product.findUnique({
+        where: { id: product.id },
+        include: this.getProductIncludes(),
+      });
+      return this.transformProduct(fresh!);
+    }
+
+    return this.transformProduct(product);
   }
 
   /**
@@ -375,6 +384,15 @@ export class ProductsService {
       include: this.getProductIncludes(),
     });
 
+    if (dto.media_ids !== undefined) {
+      await this.setProductMedia(id, dto.media_ids);
+      const fresh = await this.prisma.product.findUnique({
+        where: { id },
+        include: this.getProductIncludes(),
+      });
+      return this.transformProduct(fresh!);
+    }
+
     return this.transformProduct(updated);
   }
 
@@ -446,6 +464,19 @@ export class ProductsService {
   /**
    * Get product includes for queries
    */
+  private async setProductMedia(productId: string, mediaIds: string[]) {
+    await this.prisma.productMedia.deleteMany({ where: { product_id: productId } });
+    if (mediaIds.length === 0) return;
+    await this.prisma.productMedia.createMany({
+      data: mediaIds.map((mediaId, index) => ({
+        product_id: productId,
+        media_id: mediaId,
+        order: index,
+        is_primary: index === 0,
+      })),
+    });
+  }
+
   private getProductIncludes() {
     return {
       author: {
@@ -507,23 +538,32 @@ export class ProductsService {
   /**
    * Transform product response
    */
+  private mediaUrl(filePath: string | null | undefined): string | null {
+    if (!filePath) return null;
+    const fp = filePath;
+    return fp.startsWith('/uploads/') ? fp
+      : fp.includes('/uploads/') ? fp.replace(/.*\/uploads\//, '/uploads/')
+      : `/uploads/${fp}`;
+  }
+
   private buildProductBase(product: any) {
-    const media = product.media?.map((pm: any) => pm.media) || [];
-    const primaryMedia = product.media?.find((pm: any) => pm.is_primary)?.media ?? media[0] ?? null;
-    let featured_image_url: string | null = null;
-    if (primaryMedia?.file_path) {
-      const fp = primaryMedia.file_path;
-      featured_image_url = fp.startsWith('/uploads/') ? fp
-        : fp.includes('/uploads/') ? fp.replace(/.*\/uploads\//, '/uploads/')
-        : `/uploads/${fp}`;
-    }
+    const mediaItems = (product.media || []).map((pm: any) => ({
+      id: pm.media.id,
+      url: this.mediaUrl(pm.media.file_path),
+      order: pm.order,
+      is_primary: pm.is_primary,
+      alt_text: pm.media.alt_text ?? null,
+    }));
+
+    const primaryMedia = mediaItems.find((m: any) => m.is_primary) ?? mediaItems[0] ?? null;
+
     return {
       ...product,
       price: parseFloat(product.price.toString()),
       categories: product.categories?.map((pc: any) => pc.category) || [],
       tags: product.tags?.map((pt: any) => pt.tag) || [],
-      media,
-      featured_image_url,
+      media: mediaItems,
+      featured_image_url: primaryMedia?.url ?? null,
       compare_at_price: product.compare_at_price ? parseFloat(product.compare_at_price.toString()) : null,
       comment_count: product._count?.comments || 0,
     };

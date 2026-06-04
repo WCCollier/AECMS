@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto, QueryProductsDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
@@ -26,7 +27,7 @@ export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
   @RequiresCapability('product.create')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new product' })
@@ -59,7 +60,7 @@ export class ProductsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
   @RequiresCapability('product.edit')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a product' })
@@ -73,7 +74,7 @@ export class ProductsController {
   }
 
   @Patch(':id/stock')
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
   @RequiresCapability('product.edit')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update product stock' })
@@ -87,7 +88,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
   @RequiresCapability('product.delete')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)

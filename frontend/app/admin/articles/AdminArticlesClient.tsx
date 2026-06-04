@@ -2,14 +2,39 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useArticles } from '@/hooks/useArticles';
+import useSWR from 'swr';
+import { adminFetcher } from '@/lib/swr';
+import adminApi from '@/lib/adminApi';
 import { Button, Card, CardContent, Input } from '@/components/ui';
 import { Plus, Search, Edit, Trash2, FileText } from 'lucide-react';
+import type { Article, PaginatedResponse } from '@/types';
 
 export function AdminArticlesClient() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const { articles, totalPages, isLoading } = useArticles({ page, limit: 10, search: search || undefined });
+
+  const params = new URLSearchParams();
+  params.set('page', page.toString());
+  params.set('limit', '10');
+  if (search) params.set('search', search);
+
+  const { data, isLoading, mutate } = useSWR<PaginatedResponse<Article>>(
+    `/articles?${params.toString()}`,
+    adminFetcher,
+  );
+
+  const articles = data?.data ?? [];
+  const totalPages = data?.meta?.total_pages ?? data?.total_pages ?? 0;
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    try {
+      await adminApi.delete(`/articles/${id}`);
+      mutate();
+    } catch {
+      alert('Delete failed. Please try again.');
+    }
+  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Draft';
@@ -101,7 +126,11 @@ export function AdminArticlesClient() {
                               <Edit className="w-4 h-4" />
                             </Button>
                           </Link>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(article.id, article.title)}
+                          >
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
                         </div>
