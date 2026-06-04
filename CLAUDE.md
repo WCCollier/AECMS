@@ -26,7 +26,8 @@
 **Phase 6B**: ✅ COMPLETE - Comments & AI Moderation (OpenAI + profanity filter)
 **Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
 **Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
-**Phase 9**: 🔄 IN PROGRESS - User Testing (structured manual QA, bug fixes)
+**Phase 9**: ✅ COMPLETE - User Testing (Steps 1–8 verified; Steps 9–11 superseded by Phase 13)
+**Phase 13**: 📋 PLANNED - Full-system QA: admin CRUD, Stripe/PayPal live sandbox, widgets, pages, audit log, version history
 **Phase 10A**: ✅ COMPLETE - Widget System: MediaGallery hero carousel, media schema normalization
 **Phase 10B**: ✅ COMPLETE - TipTap JSON migration + inline widget nodes (MediaCarousel, Callout, VideoEmbed, XEmbed)
 **Phase 11**: ✅ COMPLETE - Pages: widget-composed page builder, dual-size widget system, ArticleEmbed/ProductEmbed/RichTextBox
@@ -202,7 +203,7 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_9_COMPLETION_REPORT.md` - User testing progress and bugs found
 - `docs/PHASE_9_BACKSTAGE_COMPLETION.md` - Customer/backstage session bifurcation details
 - `docs/BACKSTAGE_REFACTOR_PLAN.md` - Full implementation plan with completion checklist
-- `docs/TESTING_GUIDE.md` - Full testing guide including Phase 9 manual sequence
+- `docs/TESTING_GUIDE.md` - Full testing guide including Phase 13 manual sequence, Stripe/PayPal setup
 - `docs/PHASE_10A_COMPLETION_REPORT.md` - MediaGallery widget, media schema normalization
 - `docs/PHASE_10B_COMPLETION_REPORT.md` - TipTap JSON migration, inline widget nodes
 - `docs/PHASE_11_PLAN.md` - Pages: widget-composed page builder, dual-size widget system
