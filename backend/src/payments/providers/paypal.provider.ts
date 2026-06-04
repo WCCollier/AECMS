@@ -145,6 +145,18 @@ export class PayPalProvider implements PaymentProvider {
     };
   }
 
+  async getOrderRawStatus(paypalOrderId: string): Promise<{ rawStatus: string; captureId?: string }> {
+    if (!this.isAvailable()) throw new Error('PayPal is not configured');
+    const accessToken = await this.getAccessToken();
+    const response = await fetch(`${this.baseUrl}/v2/checkout/orders/${paypalOrderId}`, {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!response.ok) throw new Error(`PayPal order fetch failed: ${response.status}`);
+    const order = await response.json();
+    const captureId = order.purchase_units?.[0]?.payments?.captures?.[0]?.id as string | undefined;
+    return { rawStatus: order.status as string, captureId };
+  }
+
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
     if (!this.isAvailable()) {
       throw new Error('PayPal is not configured');

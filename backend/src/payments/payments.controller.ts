@@ -18,6 +18,7 @@ import {
   RefundPaymentDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
@@ -89,6 +90,17 @@ export class PaymentsController {
       throw new Error('Missing raw body');
     }
     return this.paymentsService.handlePayPalWebhook(payload, signature || '');
+  }
+
+  @Post('paypal/reconcile')
+  @UseGuards(JwtAuthGuard, BackstageGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Manually trigger PayPal zombie-order reconciliation (owner/admin)' })
+  reconcilePayPal(@CurrentUser() user: any) {
+    if (user.role !== 'owner' && user.role !== 'admin') {
+      throw new Error('Owner or admin required');
+    }
+    return this.paymentsService.reconcilePayPalOrders();
   }
 
   @Post('test/simulate/:orderId')

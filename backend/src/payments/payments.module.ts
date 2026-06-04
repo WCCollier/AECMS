@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -13,7 +14,7 @@ import { PayPalProvider } from './providers/paypal.provider';
 // browser/country supports it.
 
 @Module({
-  imports: [PrismaModule, OrdersModule, CapabilitiesModule],
+  imports: [PrismaModule, OrdersModule, CapabilitiesModule, ScheduleModule.forRoot()],
   controllers: [PaymentsController],
   providers: [PaymentsService, StripeProvider, PayPalProvider],
   exports: [PaymentsService],

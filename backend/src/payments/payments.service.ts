@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Logger,
 } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
@@ -440,6 +441,101 @@ export class PaymentsService {
 
     this.logger.warn(`Payment failed for order ${orderId}`);
     // Order remains in pending status - user can retry
+  }
+
+  /**
+   * Reconcile stale pending PayPal orders.
+   *
+   * Runs automatically every night at 02:00 and can be triggered manually
+   * via POST /payments/paypal/reconcile.
+   *
+   * Finds pending PayPal orders whose redirect window has long passed (>1h old),
+   * queries PayPal for the current status of each, and:
+   *   APPROVED   → attempts capture; marks paid on success (zombie recovery)
+   *   COMPLETED  → marks paid without another capture (already captured elsewhere)
+   *   VOIDED/CREATED → leaves pending; logs for manual review
+   */
+  @Cron('0 2 * * *', { name: 'paypal-reconcile', timeZone: 'America/Chicago' })
+  async reconcilePayPalOrders(): Promise<{ checked: number; recovered: number; errors: number }> {
+    this.logger.log('[paypal-reconcile] Starting reconciliation run');
+
+    if (this.testMode) {
+      this.logger.log('[paypal-reconcile] Test mode active — skipping live PayPal queries');
+      return { checked: 0, recovered: 0, errors: 0 };
+    }
+
+    const provider = this.providers.get('paypal') as PayPalProvider;
+    if (!provider?.isAvailable()) {
+      this.logger.warn('[paypal-reconcile] PayPal not configured — skipping');
+      return { checked: 0, recovered: 0, errors: 0 };
+    }
+
+    // Orders that are pending, paid via PayPal, have a payment_intent_id,
+    // and were created more than 1 hour ago (well past any redirect window).
+    const staleOrders = await this.prisma.order.findMany({
+      where: {
+        status: 'pending',
+        payment_method: 'paypal',
+        payment_intent_id: { not: null },
+        created_at: { lt: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+      select: { id: true, payment_intent_id: true, order_number: true },
+    });
+
+    this.logger.log(`[paypal-reconcile] Found ${staleOrders.length} stale pending PayPal order(s)`);
+
+    let recovered = 0;
+    let errors = 0;
+
+    for (const order of staleOrders) {
+      const paypalId = order.payment_intent_id!;
+      try {
+        const { rawStatus } = await provider.getOrderRawStatus(paypalId);
+        this.logger.log(`[paypal-reconcile] ${order.order_number}: PayPal status = ${rawStatus}`);
+
+        if (rawStatus === 'APPROVED') {
+          // User approved on PayPal but never completed the redirect — attempt capture now.
+          const capture = await provider.capturePayment(paypalId);
+          if (capture.status === 'succeeded') {
+            await this.ordersService.markAsPaid(order.id, capture.id);
+            await this.auditLog.log({
+              event_type: 'order.status_changed',
+              resource_type: 'order',
+              resource_id: order.id,
+              changes: { before: { status: 'pending' }, after: { status: 'processing' } },
+              metadata: { reconciled: true, paypal_order_id: paypalId },
+            });
+            this.logger.log(`[paypal-reconcile] ${order.order_number}: recovered (captured ${capture.id})`);
+            recovered++;
+          }
+        } else if (rawStatus === 'COMPLETED') {
+          // Already captured (maybe by a late webhook) — sync our side.
+          await this.ordersService.markAsPaid(order.id, paypalId);
+          await this.auditLog.log({
+            event_type: 'order.status_changed',
+            resource_type: 'order',
+            resource_id: order.id,
+            changes: { before: { status: 'pending' }, after: { status: 'processing' } },
+            metadata: { reconciled: true, reason: 'already_completed_at_paypal' },
+          });
+          recovered++;
+        } else {
+          // VOIDED, CREATED, PAYER_ACTION_REQUIRED — log for manual review; leave in pending.
+          await this.auditLog.log({
+            event_type: 'order.status_changed',
+            resource_type: 'order',
+            resource_id: order.id,
+            metadata: { reconcile_skipped: true, paypal_status: rawStatus },
+          });
+        }
+      } catch (err: any) {
+        this.logger.error(`[paypal-reconcile] ${order.order_number}: error — ${err?.message}`);
+        errors++;
+      }
+    }
+
+    this.logger.log(`[paypal-reconcile] Done — checked ${staleOrders.length}, recovered ${recovered}, errors ${errors}`);
+    return { checked: staleOrders.length, recovered, errors };
   }
 
   /**
