@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { CreateCommentDto, UpdateCommentDto, QueryCommentsDto } from './dto';
 import { CommentStatus, ModerationStatus, User } from '@prisma/client';
 
@@ -18,6 +19,7 @@ export class CommentsService {
   constructor(
     private prisma: PrismaService,
     private moderationService: ModerationService,
+    private capabilitiesService: CapabilitiesService,
   ) {}
 
   // ── Shared Prisma includes ────────────────────────────────────────────────
@@ -54,6 +56,18 @@ export class CommentsService {
     }
 
     const isReview = !!dto.ratings?.length;
+
+    // Capability check — Owner bypasses; all others must hold the matching capability.
+    // The required capability depends on target type and whether ratings are included.
+    if (user.role !== 'owner') {
+      const requiredCap = dto.product_id
+        ? (isReview ? 'review.product' : 'comment.product')
+        : (isReview ? 'review.article' : 'comment.article');
+      const allowed = await this.capabilitiesService.userHasCapability(user.id, requiredCap);
+      if (!allowed) {
+        throw new ForbiddenException(`Requires the '${requiredCap}' capability`);
+      }
+    }
 
     if (isReview && dto.ratings![0].title !== 'Overall') {
       throw new BadRequestException('First rating must have title "Overall"');

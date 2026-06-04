@@ -69,6 +69,12 @@ async function main() {
 
     // Domain Management (Owner-only by default)
     { name: 'domain.manage',       category: 'system',    scope: 'backstage', description: 'Manage domain aliases' },
+
+    // Customer-facing: comment & review actions (scope:'customer' — no backstage required)
+    { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
+    { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
+    { name: 'comment.product',     category: 'ecommerce', scope: 'customer',  description: 'Post a comment on a product' },
+    { name: 'review.product',      category: 'ecommerce', scope: 'customer',  description: 'Post a rated review on a product (verified purchase required)' },
   ];
 
   for (const cap of capabilities) {
@@ -156,8 +162,16 @@ async function main() {
   // ============================================
   console.log('\n[3/3] Seeding role capabilities...');
 
-  // Admin default capabilities
-  const adminCapabilities = [
+  // Customer-facing capabilities shared by Member and Admin
+  const customerCapabilities = [
+    'comment.article',
+    'review.article',
+    'comment.product',
+    'review.product',
+  ];
+
+  // Admin backstage capabilities (in addition to the customer ones above)
+  const adminBackstageCapabilities = [
     'article.create',
     'article.edit.any',
     'article.publish',
@@ -175,36 +189,31 @@ async function main() {
     'review.moderate',
   ];
 
-  let assignedCount = 0;
-  for (const capName of adminCapabilities) {
-    const capability = await prisma.capability.findUnique({
-      where: { name: capName },
-    });
-
-    if (capability) {
-      // Check if already exists
+  async function assignCapsToRole(role: UserRole, capNames: string[]) {
+    let count = 0;
+    for (const capName of capNames) {
+      const capability = await prisma.capability.findUnique({ where: { name: capName } });
+      if (!capability) continue;
       const existing = await prisma.roleCapability.findFirst({
-        where: {
-          role: UserRole.admin,
-          capability_id: capability.id,
-        },
+        where: { role, capability_id: capability.id },
       });
-
       if (!existing) {
-        await prisma.roleCapability.create({
-          data: {
-            role: UserRole.admin,
-            capability_id: capability.id,
-          },
-        });
-        assignedCount++;
+        await prisma.roleCapability.create({ data: { role, capability_id: capability.id } });
+        count++;
       }
     }
+    return count;
   }
 
-  console.log(`✓ Assigned ${assignedCount} capabilities to Admin role`);
+  const adminCount = await assignCapsToRole(UserRole.admin, [
+    ...adminBackstageCapabilities,
+    ...customerCapabilities,
+  ]);
+  const memberCount = await assignCapsToRole(UserRole.member, customerCapabilities);
+
+  console.log(`✓ Assigned ${adminCount} capabilities to Admin role`);
+  console.log(`✓ Assigned ${memberCount} capabilities to Member role`);
   console.log('✓ Owner role has all capabilities by default');
-  console.log('✓ Member role has no default capabilities');
 
   console.log('\n=== Database seeding completed ===');
   console.log('\nTest credentials:');
