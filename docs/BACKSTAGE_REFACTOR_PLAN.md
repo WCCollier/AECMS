@@ -192,8 +192,9 @@ when added, they would carry `scope: 'customer'`.
 
 ### Phase J — Tests & Verification
 
-- [ ] **J1** Run `npm run test` in backend — fix any unit tests broken by `session_type` param changes
-- [ ] **J2** Run `npm run test` in frontend — fix any unit tests broken by token storage changes
+- [x] **J1** Backend tests — 154/154 pass; auth.service unaffected (defaulted param); comments.service
+  fixed: added CapabilitiesService mock + 2 new tests (capability gate blocks, Owner bypasses)
+- [x] **J2** Frontend tests — 90/90 pass; no changes needed (admin login/token changes are not covered by existing tests)
 - [ ] **J3** Manual verification — customer front-door:
   - Log in as owner via `/` (front door)
   - Confirm customer experience works (cart, logged-in content)
