@@ -247,20 +247,14 @@ request shape is unchanged.
 
 #### Checklist
 
-- [ ] **L1** `prisma/seed.ts` — add 4 new capabilities with `scope: 'customer'`; add all 4 to Member
-  and Admin default role capabilities lists; update upsert to set scope on re-seed
-- [ ] **L2** `backend/src/comments/comments.module.ts` — import `CapabilitiesModule` so
-  `CapabilitiesService` is available for injection into `CommentsService`
-- [ ] **L3** `backend/src/comments/comments.service.ts` — inject `CapabilitiesService`; add
-  runtime capability check in `create()` immediately after `isReview` / target-ID derivation:
-  - Owner role → bypass
-  - Others → call `capabilitiesService.userHasCapability(userId, requiredCap)`
-  - Throw `ForbiddenException` if check fails
-- [ ] **L4** `backend/src/comments/comments.controller.ts` — add `CapabilityGuard` to the
-  `POST /comments` `@UseGuards(...)` chain (guard handles the Owner bypass and delegates to
-  the service for the dynamic per-request check)
-- [ ] **L5** Run `npx prisma db seed` and verify capability count is now 34; confirm Member role
-  has the 4 new capabilities assigned
+- [x] **L1** `prisma/seed.ts` — 4 new capabilities with `scope: 'customer'` added; assigned to Member
+  and Admin via refactored `assignCapsToRole()` helper; 34 total (30 backstage + 4 customer)
+- [x] **L2** `CommentsModule` already imported `CapabilitiesModule` — no change needed
+- [x] **L3** `CommentsService` — injected `CapabilitiesService`; runtime capability check in
+  `create()` after `isReview` derivation; Owner bypasses; others checked via
+  `userHasCapability(userId, requiredCap)`; throws `ForbiddenException` if absent
+- [x] **L4** Skipped — Option A chosen: enforcement lives in the service, not a controller guard
+- [x] **L5** Seed verified: 34 capabilities (30 backstage, 4 customer); Member has all 4 customer caps
 - [ ] **L6** Manual verification — log in as Member via customer front door; post a comment on
   an article, a review on an article, a comment on a product, and a review on a purchased
   product; confirm all 4 succeed; confirm review on un-purchased product is rejected (403)
