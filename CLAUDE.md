@@ -29,8 +29,10 @@
 **Phase 9**: 🔄 IN PROGRESS - User Testing (structured manual QA, bug fixes)
 **Phase 10A**: ✅ COMPLETE - Widget System: MediaGallery hero carousel, media schema normalization
 **Phase 10B**: ✅ COMPLETE - TipTap JSON migration + inline widget nodes (MediaCarousel, Callout, VideoEmbed, XEmbed)
+**Phase 11**: ✅ COMPLETE - Pages: widget-composed page builder, dual-size widget system, ArticleEmbed/ProductEmbed/RichTextBox
+**Phase 12**: 📋 PLANNED - Audit trail, transaction logging, content version history
 
-**Test Status**: 90 frontend + 154 backend unit tests (all passing); 16 backend E2E tests (require Docker)
+**Test Status**: 116 frontend + 169 backend unit tests (all passing); 16 backend E2E tests (require Docker)
 **API Endpoints**: 114 total (added POST /cart/validate)
 
 ## API Endpoint Summary
@@ -204,6 +206,7 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_10A_COMPLETION_REPORT.md` - MediaGallery widget, media schema normalization
 - `docs/PHASE_10B_COMPLETION_REPORT.md` - TipTap JSON migration, inline widget nodes
 - `docs/PHASE_11_PLAN.md` - Pages: widget-composed page builder, dual-size widget system
+- `docs/PHASE_11_COMPLETION_REPORT.md` - Phase 11 implementation details
 - `docs/PHASE_12_PLAN.md` - Audit trail, transaction logging, content version history
 - `docs/prd/` - 12 PRD documents with full specifications
 
