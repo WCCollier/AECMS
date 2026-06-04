@@ -88,7 +88,7 @@ export class MediaService {
         },
       });
 
-      return media;
+      return this.transformMedia(media);
     } catch (error) {
       throw new InternalServerErrorException(
         `Failed to upload file: ${error.message}`,
@@ -134,12 +134,12 @@ export class MediaService {
     ]);
 
     return {
-      data: media,
+      data: media.map((m) => this.transformMedia(m)),
       meta: {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        total_pages: Math.ceil(total / limit),
       },
     };
   }
@@ -166,7 +166,19 @@ export class MediaService {
       throw new NotFoundException('Media not found');
     }
 
-    return media;
+    return this.transformMedia(media);
+  }
+
+  private mediaUrl(filePath: string): string {
+    const rel = path.relative(process.cwd(), filePath);
+    return `/${rel}`;
+  }
+
+  private transformMedia(media: any) {
+    return {
+      ...media,
+      url: this.mediaUrl(media.file_path),
+    };
   }
 
   /**

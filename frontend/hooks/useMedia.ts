@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { adminFetcher } from '@/lib/swr';
 import type { Media, PaginatedResponse } from '@/types';
 
 interface UseMediaOptions {
@@ -18,13 +18,13 @@ export function useMedia(options: UseMediaOptions = {}) {
 
   const { data, error, isLoading, mutate } = useSWR<PaginatedResponse<Media>>(
     `/media?${params.toString()}`,
-    fetcher
+    adminFetcher,
   );
 
   return {
     media: data?.data ?? [],
-    total: data?.total ?? 0,
-    totalPages: data?.total_pages ?? 0,
+    total: data?.meta?.total ?? 0,
+    totalPages: data?.meta?.total_pages ?? 0,
     isLoading,
     isError: !!error,
     error,

@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { useMedia } from '@/hooks/useMedia';
 import { Button, Input, Card } from '@/components/ui';
-import api, { getErrorMessage } from '@/lib/api';
+import adminApi from '@/lib/adminApi';
+import { getErrorMessage } from '@/lib/api';
 import { Upload, X, Image as ImageIcon, Search, Check, Loader2 } from 'lucide-react';
 import type { Media } from '@/types';
 
@@ -30,7 +31,7 @@ export function MediaPicker({ value, onChange, onClose }: MediaPickerProps) {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await api.post('/media/upload', formData, {
+      const response = await adminApi.post('/media/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
