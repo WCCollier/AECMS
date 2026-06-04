@@ -55,7 +55,32 @@ This document defines the ecommerce functionality for AECMS, including product m
   - Slug (auto-generated, editable)
   - Description (rich text)
   - Short description (for listings)
-  - SKU (stock keeping unit) — **TODO**: implement auto-SKU generation for new products with a configurable SKU schema (e.g. prefix + sequential number, or category-based pattern)
+  - SKU (stock keeping unit) — auto-generated from the product slug and type when creating a new product; always overrideable by the shop manager
+
+#### SKU Auto-Generation
+
+**Scheme**: `TYPE-WORD-WORD-WORD`
+
+- `TYPE` is a single letter derived from `product_type`: `P` (physical), `D` (digital), `S` (service)
+- Up to three significant words are taken from the slug, each truncated to 4 characters, uppercased, joined by hyphens
+- Stop words (`a`, `an`, `the`, `and`, `or`, `of`, `for`, `in`, `to`) are stripped before selecting words
+- If the resulting SKU is already taken, a numeric suffix is appended (`-2`, `-3`, …) until a unique value is found
+
+**Examples**:
+
+| Product name | Type | Generated SKU |
+|---|---|---|
+| American Shooter Hat | physical | `P-AMER-SHOO-HAT` |
+| Lesson 1: Marksmanship | service | `S-LESS-1-MA` |
+| How Writing Works | digital | `D-HOW-WRIT-WORK` |
+| American Shooter: Safe Gun Ownership | service | `S-AMER-SHOO-SAFE` |
+
+**Behaviour**:
+- On the *Create Product* form, the SKU field is auto-populated as the user types the product name (derived from the slug, which is itself auto-derived from the name)
+- The field displays an "auto-generated" label while the value has not been manually edited
+- The moment the shop manager edits the SKU field directly, auto-generation stops for the remainder of that session; the label disappears
+- On subsequent *Edit Product* visits the stored SKU is shown as-is with no auto-generation
+- The backend independently applies the same generation logic as a fallback when no SKU is provided in the API payload (e.g. bulk import or seed scripts); it will increment the suffix until uniqueness is achieved
   - Barcode (UPC/EAN/ISBN)
 
 - **Pricing**:

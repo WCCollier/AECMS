@@ -14,6 +14,7 @@ import { MediaGalleryField } from '@/components/widgets';
 import type { GalleryEntry } from '@/components/widgets';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
+import { slugToSku } from '@/lib/sku';
 import type { MediaItem } from '@/types';
 
 interface ProductFormData {
@@ -51,6 +52,8 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState(initialData?.description || '');
   const [gallery, setGallery] = useState<GalleryEntry[]>(() => toGalleryEntries(initialData?.media));
+  // Tracks whether the SKU is still auto-managed (false once user manually edits)
+  const [skuIsAuto, setSkuIsAuto] = useState(!productId && !initialData?.sku);
 
   const {
     register,
@@ -78,17 +81,29 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
   });
 
   const name = watch('name');
+  const slug = watch('slug');
   const productType = watch('product_type');
 
+  // Auto-derive slug from name on new products
   useEffect(() => {
     if (!productId && name) {
-      const slug = name
+      const derived = name
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-      setValue('slug', slug);
+      setValue('slug', derived);
     }
   }, [name, productId, setValue]);
+
+  // Auto-derive SKU from slug + type on new products while not manually touched
+  useEffect(() => {
+    if (!productId && skuIsAuto && slug) {
+      setValue('sku', slugToSku(slug, productType));
+    }
+  }, [slug, productType, productId, skuIsAuto, setValue]);
+
+  // Split register for SKU so we can intercept onChange
+  const { ref: skuRef, onChange: skuOnChange, ...skuRegisterRest } = register('sku');
 
   const onSubmit = async (data: ProductFormData) => {
     setIsLoading(true);
@@ -308,12 +323,27 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">SKU</label>
+                <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                  SKU
+                  {skuIsAuto && (
+                    <span className="text-xs font-normal text-foreground/40">auto-generated</span>
+                  )}
+                </label>
                 <Input
-                  {...register('sku')}
-                  placeholder="Stock Keeping Unit"
+                  ref={skuRef}
+                  {...skuRegisterRest}
+                  onChange={(e) => {
+                    skuOnChange(e);
+                    setSkuIsAuto(false);
+                  }}
+                  placeholder="e.g. P-AMER-SHOO-HAT"
                   className="w-full"
                 />
+                {skuIsAuto && (
+                  <p className="text-xs text-foreground/40 mt-1">
+                    Edit this field to override. Format: TYPE-WORD-WORD-WORD
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>

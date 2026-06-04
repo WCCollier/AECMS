@@ -33,13 +33,14 @@ export class ProductsService {
       throw new ConflictException(`Product with slug "${slug}" already exists`);
     }
 
-    // Check if SKU already exists
+    // Resolve SKU: use provided value, or auto-generate from slug
+    const sku = dto.sku ? dto.sku : await this.generateUniqueSku(slug, dto.product_type || 'physical');
+
+    // Check if SKU already exists (only relevant when explicitly provided)
     if (dto.sku) {
-      const existingSku = await this.prisma.product.findUnique({
-        where: { sku: dto.sku },
-      });
+      const existingSku = await this.prisma.product.findUnique({ where: { sku } });
       if (existingSku) {
-        throw new ConflictException(`Product with SKU "${dto.sku}" already exists`);
+        throw new ConflictException(`Product with SKU "${sku}" already exists`);
       }
     }
 
@@ -72,7 +73,7 @@ export class ProductsService {
         short_description: dto.short_description,
         price: dto.price,
         compare_at_price: dto.compare_at_price ?? null,
-        sku: dto.sku,
+        sku,
         stock_quantity: dto.product_type === 'service' ? null : (dto.stock_quantity ?? 0),
         stock_status: dto.stock_status || (dto.product_type === 'service' ? 'available' : 'in_stock'),
         status: dto.status || 'draft',
@@ -558,6 +559,37 @@ export class ProductsService {
   /**
    * Generate slug from name
    */
+  private static readonly SKU_STOP_WORDS = new Set([
+    'a', 'an', 'the', 'and', 'or', 'of', 'for', 'in', 'to', 'with', 'by', 'at',
+  ]);
+
+  private static readonly SKU_TYPE_PREFIX: Record<string, string> = {
+    physical: 'P', digital: 'D', service: 'S',
+  };
+
+  private generateSkuFromSlug(slug: string, type: string): string {
+    const prefix = ProductsService.SKU_TYPE_PREFIX[type] ?? 'X';
+    const parts = slug
+      .toLowerCase()
+      .split('-')
+      .filter((p) => p.length > 0 && !ProductsService.SKU_STOP_WORDS.has(p))
+      .slice(0, 3)
+      .map((p) => p.slice(0, 4).toUpperCase());
+    return parts.length ? `${prefix}-${parts.join('-')}` : prefix;
+  }
+
+  private async generateUniqueSku(slug: string, type: string): Promise<string> {
+    const base = this.generateSkuFromSlug(slug, type);
+    const taken = await this.prisma.product.findUnique({ where: { sku: base } });
+    if (!taken) return base;
+    for (let i = 2; i <= 99; i++) {
+      const candidate = `${base}-${i}`;
+      const conflict = await this.prisma.product.findUnique({ where: { sku: candidate } });
+      if (!conflict) return candidate;
+    }
+    return `${base}-${Date.now()}`;
+  }
+
   private generateSlug(name: string): string {
     return name
       .toLowerCase()

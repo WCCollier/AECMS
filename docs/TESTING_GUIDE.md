@@ -24,7 +24,7 @@ tail -f /tmp/backend.log /tmp/frontend.log
 **Run unit tests**
 ```bash
 cd /workspaces/AECMS/backend && npm run test     # 176 backend unit tests
-cd /workspaces/AECMS/frontend && npm run test    # 116 frontend unit tests
+cd /workspaces/AECMS/frontend && npm run test    # 125 frontend unit tests
 ```
 
 ---
@@ -287,13 +287,13 @@ cd /workspaces/AECMS/backend && npm run test:e2e
 # Requires Docker containers running (start-dev.sh handles this)
 ```
 
-### Frontend Unit Tests (116 tests)
+### Frontend Unit Tests (125 tests)
 
 ```bash
 cd /workspaces/AECMS/frontend && npm run test
 ```
 
-Suites include: Button, Input, Card, Header, Footer, useAuth, useCart, useArticles, useProducts, Login, Register, Shop, Cart, Admin, PageContent, StripWidgetNodes, WidgetSizeContext.
+Suites include: Button, Input, Card, Header, Footer, useAuth, useCart, useArticles, useProducts, Login, Register, Shop, Cart, Admin, PageContent, StripWidgetNodes, WidgetSizeContext, SKU generation.
 
 ---
 
@@ -524,6 +524,44 @@ curl -s -X POST http://localhost:3000/admin/maintenance/migrate-content
 ---
 
 ## Ecommerce Testing
+
+### SKU Auto-Generation
+
+When creating a new product in the admin UI, the SKU field is auto-populated as you type the product name. The scheme is derived from the product slug and type:
+
+```
+TYPE-WORD-WORD-WORD
+```
+
+| Type | Prefix | Example name | Generated SKU |
+|------|--------|-------------|---------------|
+| physical | `P` | American Shooter Hat | `P-AMER-SHOO-HAT` |
+| digital | `D` | How Writing Works | `D-HOW-WRIT-WORK` |
+| service | `S` | Lesson 1: Marksmanship | `S-LESS-1-MA` |
+
+**Behaviour to verify:**
+- The SKU field shows an "(auto-generated)" label while untouched
+- Changing the product type (physical/digital/service) updates the prefix live
+- Editing the SKU field directly removes the label and stops further auto-generation
+- On the Edit Product form, the stored SKU is shown as-is with no auto-generation
+
+**Backend fallback:** if a product is created via the API with no `sku` field (e.g. seed scripts, bulk import), the backend generates the same slug-derived SKU and appends `-2`, `-3`, … until unique.
+
+**Manual override via API:**
+```bash
+# Provide explicit SKU — overrides auto-generation
+curl -s -X POST http://localhost:4000/products \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My Product","sku":"CUSTOM-SKU-001","price":9.99,...}' | jq '{id,name,sku}'
+
+# Omit SKU — backend auto-generates
+curl -s -X POST http://localhost:4000/products \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My Product","price":9.99,...}' | jq '{id,name,sku}'
+# sku will be "P-MY-PROD" or similar
+```
 
 ### Products
 

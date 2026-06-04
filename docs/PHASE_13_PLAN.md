@@ -124,25 +124,35 @@ Work through each area in order. Each step's prerequisites are stated. An `[ ]` 
 ### Area 4 — Admin CRUD: Products *(Phase 9 Step 10)*
 
 1. Navigate to `/admin/products` → click **New Product**
-2. Set type to **Physical**, enter name "Test Hat", price $9.99, stock 3
-3. Leave SKU blank — verify it's either auto-populated (if implemented) or gracefully empty
-4. Upload a product image
-5. Set status to **Published**, save
-6. Open `/shop` — verify product appears
-7. Add the product to cart, proceed to checkout (stop at payment page)
-8. Back in admin, edit the product: change price to $12.99, save
-9. Verify price updated on `/shop` product detail
-10. Check Version History panel — verify a version was created
-11. Delete the product — verify it disappears from shop
+2. Set type to **Physical**, begin typing name "Test Rifle Case"
+3. Verify the SKU field auto-populates as you type: should become `P-TEST-RIFL-CASE` and show "(auto-generated)" label
+4. Change product type to **Service** — verify SKU prefix updates to `S-`
+5. Manually edit the SKU to "MY-CUSTOM-SKU" — verify the "(auto-generated)" label disappears and the field stays fixed even if you change the name
+6. Enter price $9.99, stock 3
+7. Upload a product image
+8. Set status to **Published**, save
+9. Open `/shop` — verify product appears with the custom SKU stored correctly
+10. Add the product to cart, proceed to checkout (stop at payment page)
+11. Back in admin, edit the product: change price to $12.99, save
+12. Verify price updated on `/shop` product detail
+13. Check Version History panel — verify a version was created
+14. Open a **second new product** form, leave SKU untouched — verify auto-generated value differs from the first product's auto SKU
+15. Delete the test product — verify it disappears from shop
 
 **Checklist**
+- [ ] SKU auto-populates from slug as name is typed
+- [ ] SKU prefix changes with product type (P/D/S)
+- [ ] "(auto-generated)" label visible while auto; disappears on manual edit
+- [ ] Manual SKU override persists; auto-generation does not resume
+- [ ] Existing product edit shows stored SKU with no auto-generation
+- [ ] Auto-SKU format matches PRD scheme: `TYPE-WORD-WORD-WORD`
 - [ ] Product create with all required fields
 - [ ] Image upload and display in shop
 - [ ] Stock quantity shown and tracked
 - [ ] Compare-at price displays strikethrough on shop page
 - [ ] Edit saves correctly; price update reflected on storefront
 - [ ] Version history panel shows version after save
-- [ ] Delete soft-deletes (product disappears from shop, check DB if curious)
+- [ ] Delete soft-deletes (product disappears from shop)
 
 ---
 
