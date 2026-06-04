@@ -32,7 +32,7 @@ export function EditArticleClient() {
   useEffect(() => {
     async function fetchArticle() {
       try {
-        const response = await api.get(`/articles/${articleId}`);
+        const response = await adminApi.get(`/articles/${articleId}`);
         setArticle(response.data);
       } catch (err) {
         setError(getErrorMessage(err));

@@ -14,7 +14,7 @@ export function AdminOrdersClient() {
 
   const { data, isLoading } = useSWR<PaginatedResponse<Order>>(
     `/orders?page=${page}&limit=10${search ? `&search=${search}` : ''}`,
-    fetcher
+    adminFetcher
   );
 
   const orders = data?.data || [];

@@ -28,6 +28,7 @@ export function AdminLoginClient() {
         preAuthToken?: string;
         accessToken?: string;
         refreshToken?: string;
+        user?: { id: string; email: string; firstName?: string; lastName?: string; role: string };
       }>('/auth/admin/login', data);
 
       const result = response.data;

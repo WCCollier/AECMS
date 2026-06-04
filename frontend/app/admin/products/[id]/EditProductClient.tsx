@@ -37,7 +37,7 @@ export function EditProductClient() {
   useEffect(() => {
     async function fetchProduct() {
       try {
-        const response = await api.get(`/products/${productId}`);
+        const response = await adminApi.get(`/products/${productId}`);
         setProduct(response.data);
       } catch (err) {
         setError(getErrorMessage(err));

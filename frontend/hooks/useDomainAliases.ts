@@ -1,12 +1,13 @@
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
-import api, { getErrorMessage } from '@/lib/api';
+import { adminFetcher } from '@/lib/swr';
+import adminApi from '@/lib/adminApi';
+import { getErrorMessage } from '@/lib/api';
 import type { DomainAlias, DomainAliasCreateData, DomainVerificationInstructions } from '@/types';
 
 export function useDomainAliases() {
   const { data, error, isLoading, mutate } = useSWR<DomainAlias[]>(
     '/domain-aliases',
-    fetcher
+    adminFetcher
   );
 
   return {
@@ -21,7 +22,7 @@ export function useDomainAliases() {
 export function useDomainAlias(id: string | undefined) {
   const { data, error, isLoading, mutate } = useSWR<DomainAlias>(
     id ? `/domain-aliases/${id}` : null,
-    fetcher
+    adminFetcher
   );
 
   return {
@@ -36,7 +37,7 @@ export function useDomainAlias(id: string | undefined) {
 export function useDomainVerificationInstructions(id: string | undefined) {
   const { data, error, isLoading } = useSWR<DomainVerificationInstructions>(
     id ? `/domain-aliases/${id}/instructions` : null,
-    fetcher
+    adminFetcher
   );
 
   return {
@@ -49,7 +50,7 @@ export function useDomainVerificationInstructions(id: string | undefined) {
 
 export async function createDomainAlias(data: DomainAliasCreateData): Promise<DomainAlias> {
   try {
-    const response = await api.post<DomainAlias>('/domain-aliases', data);
+    const response = await adminApi.post<DomainAlias>('/domain-aliases', data);
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error));
@@ -58,7 +59,7 @@ export async function createDomainAlias(data: DomainAliasCreateData): Promise<Do
 
 export async function updateDomainAlias(id: string, data: Partial<DomainAlias>): Promise<DomainAlias> {
   try {
-    const response = await api.patch<DomainAlias>(`/domain-aliases/${id}`, data);
+    const response = await adminApi.patch<DomainAlias>(`/domain-aliases/${id}`, data);
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error));
@@ -67,7 +68,7 @@ export async function updateDomainAlias(id: string, data: Partial<DomainAlias>):
 
 export async function deleteDomainAlias(id: string): Promise<void> {
   try {
-    await api.delete(`/domain-aliases/${id}`);
+    await adminApi.delete(`/domain-aliases/${id}`);
   } catch (error) {
     throw new Error(getErrorMessage(error));
   }
@@ -75,7 +76,7 @@ export async function deleteDomainAlias(id: string): Promise<void> {
 
 export async function verifyDomainAlias(id: string): Promise<DomainAlias> {
   try {
-    const response = await api.post<DomainAlias>(`/domain-aliases/${id}/verify`);
+    const response = await adminApi.post<DomainAlias>(`/domain-aliases/${id}/verify`);
     return response.data;
   } catch (error) {
     throw new Error(getErrorMessage(error));

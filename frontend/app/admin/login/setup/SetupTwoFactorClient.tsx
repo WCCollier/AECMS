@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import api, { getErrorMessage } from '@/lib/api';
+import adminApi from '@/lib/adminApi';
+import { getErrorMessage } from '@/lib/api';
 import QRCode from 'react-qr-code';
 
 export function SetupTwoFactorClient() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
   const [setupData, setSetupData] = useState<{ secret: string; otpauthUrl: string } | null>(null);
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState<string | null>(null);
@@ -17,16 +16,17 @@ export function SetupTwoFactorClient() {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
-    if (isLoading) return;
-    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+    const adminToken = typeof window !== 'undefined'
+      ? localStorage.getItem('admin_access_token')
+      : null;
+    if (!adminToken) {
       router.replace('/admin/login');
       return;
     }
-    // Generate 2FA secret
-    api.post<{ secret: string; otpauthUrl: string }>('/auth/2fa/setup')
+    adminApi.post<{ secret: string; otpauthUrl: string }>('/auth/2fa/setup')
       .then(r => { setSetupData(r.data); setIsFetching(false); })
       .catch(err => { setError(getErrorMessage(err)); setIsFetching(false); });
-  }, [user, isLoading, router]);
+  }, [router]);
 
   const handleChange = (index: number, value: string) => {
     if (!/^\d?$/.test(value)) return;
@@ -57,7 +57,7 @@ export function SetupTwoFactorClient() {
     setError(null);
 
     try {
-      await api.post('/auth/2fa/enable', { code });
+      await adminApi.post('/auth/2fa/enable', { code });
       router.push('/admin');
     } catch (err) {
       setError(getErrorMessage(err));
