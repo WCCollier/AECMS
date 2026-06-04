@@ -209,6 +209,8 @@ All require backstage session + `articles.manage` capability.
 
 ## Section G — Product Version History
 
+> **Note**: Page version history (Section G3 below) was added as an addendum after Phase 11. Pages store content as a `PageContent` JSON envelope (layout + zones), so their versioning snapshots that full structure rather than a single HTML/TipTap string.
+
 ### G1 — Schema migration
 
 Add `ProductVersion` model (parallel to `ArticleVersion`):
@@ -272,6 +274,79 @@ POST /products/:id/versions/:vnum/restore
 
 ---
 
+## Section G3 — Page Version History (addendum from Phase 11)
+
+Pages were added in Phase 11 after the original Phase 12 plan was written. They warrant the same version history treatment as Articles and Products.
+
+### G3.1 — Schema migration
+
+Add `PageVersion` model (parallel to `ArticleVersion`):
+
+```prisma
+model PageVersion {
+  id             String   @id @default(uuid())
+  page_id        String
+  version_number Int
+  title          String
+  content        String   @db.Text   // full PageContent JSON envelope
+  change_summary String?
+  created_by     String
+  created_at     DateTime @default(now())
+
+  page Page @relation(fields: [page_id], references: [id], onDelete: Cascade)
+
+  @@unique([page_id, version_number])
+  @@map("page_versions")
+}
+```
+
+Add `versions PageVersion[]` relation to the `Page` model.
+
+### G3.2 — Service wiring
+
+In `PagesService.update()`, create a `PageVersion` snapshot on every save where `status` transitions to `published`, or whenever an already-published page is edited (same trigger logic as articles):
+
+```typescript
+await prisma.pageVersion.create({
+  data: {
+    page_id:        page.id,
+    version_number: (latestVersion?.version_number ?? 0) + 1,
+    title:          dto.title ?? page.title,
+    content:        dto.content ?? page.content,   // full PageContent JSON string
+    change_summary: dto.change_summary ?? null,
+    created_by:     actorId,
+  },
+});
+```
+
+Also write an `AuditLog` entry for `page.updated` / `page.published` (parallel to Section C).
+
+### G3.3 — API endpoints
+
+Add to `PagesController`:
+
+```
+GET  /pages/:id/versions          → paginated list (version_number, created_by, created_at, change_summary)
+GET  /pages/:id/versions/:vnum    → full version snapshot (includes content JSON)
+POST /pages/:id/versions/:vnum/restore  → creates a new draft from this version snapshot
+```
+
+All require backstage session + `page.edit` capability.
+
+### G3.4 — AuditLog events for Pages
+
+Wire `AuditLogService` into `PagesService` for all mutating operations (parallel to Section C):
+
+| Trigger | `event_type` |
+|---------|-------------|
+| Page created | `page.created` |
+| Page updated | `page.updated` |
+| Page published | `page.published` |
+| Page unpublished | `page.unpublished` |
+| Page deleted | `page.deleted` |
+
+---
+
 ## Section H — Backstage UI
 
 ### H1 — Audit Log viewer (`/admin/audit-log`)
@@ -292,7 +367,14 @@ POST /products/:id/versions/:vnum/restore
 - Same as H2 but for the product editor
 - Shows name, price, SKU, description diffs
 
-### H4 — Order status history on order detail page
+### H4 — Page version history panel
+
+- In the page editor (`/admin/pages/[id]/edit`), a "Version History" sidebar panel listing past versions
+- Click a version → shows a diff of title + `content` (rendered as layout label + zone summary) vs. current
+- "Restore this version" button → calls `POST /pages/:id/versions/:vnum/restore`, which creates a new draft
+- Full `PageContent` JSON is stored per version — restoring brings back the exact layout and all zone content
+
+### H5 — Order status history on order detail page
 
 - In the backstage order detail view, a timeline of status transitions
 - Each entry: status, timestamp, actor (admin name or "system")
@@ -308,6 +390,7 @@ POST /products/:id/versions/:vnum/restore
 - `AuthService`: login success/failure writes correct entries
 - `ArticlesService`: version created on publish; `changes` diff correct
 - `ProductsService`: version created on update; `changes` diff correct
+- `PagesService`: version created on publish/save; audit event written
 - `WebhookEvent`: duplicate `event_id` is silently skipped (idempotency)
 
 ### Integration / manual verification
@@ -316,9 +399,11 @@ POST /products/:id/versions/:vnum/restore
 - [ ] Stripe webhook received → row in `webhook_events`; second delivery of same `event_id` → no duplicate
 - [ ] Article published → `ArticleVersion` row created; restored version → new version row
 - [ ] Product saved → `ProductVersion` row created
+- [ ] Page published/saved → `PageVersion` row created; restored version → new version row
 - [ ] `/admin/audit-log` renders, filters work
 - [ ] Article editor version panel shows list and diff
 - [ ] Product editor version panel shows list and diff
+- [ ] Page editor version panel shows list and restore
 
 ---
 
@@ -346,18 +431,31 @@ POST /products/:id/versions/:vnum/restore
 | `prisma/schema.prisma` | `WebhookEvent` model; `ProductVersion` model; `Product.versions` relation |
 | `app.module.ts` | Import `AuditModule` |
 
+### Backend — new (additions from G3 addendum)
+| File | Purpose |
+|------|---------|
+| `prisma/migrations/...` | `page_versions` table |
+
+### Backend — modified (additions from G3 addendum)
+| File | Change |
+|------|--------|
+| `src/pages/pages.service.ts` | Write page audit events + create `PageVersion` on publish/save |
+| `src/pages/pages.controller.ts` | New version endpoints |
+| `prisma/schema.prisma` | `PageVersion` model; `Page.versions` relation |
+
 ### Frontend — new
 | File | Purpose |
 |------|---------|
 | `app/admin/audit-log/page.tsx` | Audit log viewer (Owner) |
 | `app/admin/audit-log/AuditLogClient.tsx` | Table + filters |
-| `components/admin/VersionHistoryPanel.tsx` | Shared version list + diff panel |
+| `components/admin/VersionHistoryPanel.tsx` | Shared version list + diff panel (used by articles, products, pages) |
 
 ### Frontend — modified
 | File | Change |
 |------|--------|
 | `app/admin/articles/[id]/edit/EditArticleClient.tsx` | Add `VersionHistoryPanel` |
 | `app/admin/products/[id]/edit/EditProductClient.tsx` | Add `VersionHistoryPanel` |
+| `app/admin/pages/[id]/edit/EditPageClient.tsx` | Add `VersionHistoryPanel` |
 | `app/admin/orders/[id]/page.tsx` | Add status history timeline |
 
 ---
@@ -369,6 +467,7 @@ POST /products/:id/versions/:vnum/restore
 3. Failed login attempts are recorded without exposing them to the public API
 4. Every article publish creates an `ArticleVersion`; restoring a version creates a new version
 5. Every product save creates a `ProductVersion`
-6. `/admin/audit-log` renders with working filters; Owner can see all events
-7. Article and product editors show version history with working diff and restore
-8. All new backend unit tests pass; full test suite still passes
+6. Every page publish/save creates a `PageVersion`; restoring a version creates a new draft
+7. `/admin/audit-log` renders with working filters; Owner can see all events
+8. Article, product, and page editors show version history with working diff and restore
+9. All new backend unit tests pass; full test suite still passes
