@@ -27,7 +27,7 @@
 **Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
 **Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
 **Phase 9**: 🔄 IN PROGRESS - User Testing (structured manual QA, bug fixes)
-**Phase 10A**: 🔄 IN PROGRESS - Widget System: MediaGallery hero carousel, media schema normalization
+**Phase 10A**: ✅ COMPLETE - Widget System: MediaGallery hero carousel, media schema normalization
 **Phase 10B**: 📋 PLANNED - TipTap JSON migration + inline widget nodes (Callout, VideoEmbed)
 
 **Test Status**: 90 frontend + 154 backend unit tests (all passing); 16 backend E2E tests (require Docker)

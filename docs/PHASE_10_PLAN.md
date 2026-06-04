@@ -2,7 +2,7 @@
 
 **Project**: AECMS - Advanced Ecommerce Content Management System
 **Phase**: Phase 10 — Widget System & Media Normalization
-**Status**: 🔄 IN PROGRESS (Phase 10A)
+**Status**: ✅ Phase 10A COMPLETE — 🔄 Phase 10B PLANNED
 **Started**: 2026-06-04
 
 ---
@@ -164,9 +164,9 @@ Replaces the current `ImageField` (single-image) in `ArticleForm` and `ProductFo
 - [x] API: PATCH article reorder → new primary correctly reflects in `featured_image_url`
 - [x] API: product with 2 images → normalized `MediaItem[]` shape with `is_primary`/`order`
 - [x] API: existing seeded product media → `is_primary=true` on single image, `featured_image_url` intact
-- [ ] Manual UI: create article with images via admin form → gallery renders on detail page
-- [ ] Manual UI: create product with images via admin form → carousel renders on product page
-- [ ] Manual UI: reorder in admin form → persisted correctly
+- [x] Manual UI: create article with images via admin form → gallery renders on detail page
+- [x] Manual UI: create product with images via admin form → carousel renders on product page
+- [x] Manual UI: reorder in admin form → persisted correctly
 
 ---
 

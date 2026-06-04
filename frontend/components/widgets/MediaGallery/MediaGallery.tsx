@@ -80,14 +80,14 @@ export function MediaGallery({ media, aspectRatio = 'video', className = '', fal
       <button
         onClick={prev}
         aria-label="Previous image"
-        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/80 text-white rounded-full p-1.5 opacity-60 hover:opacity-100 transition-opacity"
       >
         <ChevronLeft className="w-5 h-5" />
       </button>
       <button
         onClick={next}
         aria-label="Next image"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-black/50 hover:bg-black/80 text-white rounded-full p-1.5 opacity-60 hover:opacity-100 transition-opacity"
       >
         <ChevronRight className="w-5 h-5" />
       </button>
@@ -99,8 +99,8 @@ export function MediaGallery({ media, aspectRatio = 'video', className = '', fal
             key={i}
             onClick={() => setIndex(i)}
             aria-label={`Go to image ${i + 1}`}
-            className={`w-2 h-2 rounded-full transition-all ${
-              i === index ? 'bg-white scale-125' : 'bg-white/50 hover:bg-white/75'
+            className={`w-2.5 h-2.5 rounded-full transition-all drop-shadow ${
+              i === index ? 'bg-white scale-110' : 'bg-white/60 hover:bg-white/90'
             }`}
           />
         ))}

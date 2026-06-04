@@ -34,6 +34,27 @@ const nextConfig = {
     // Force all pages to be dynamically rendered
     // This avoids static generation issues with providers
   },
+
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      const existing = config.optimization.splitChunks ?? {};
+      config.optimization.splitChunks = {
+        ...existing,
+        maxSize: 512 * 1024,
+        cacheGroups: {
+          ...(existing.cacheGroups ?? {}),
+          tiptap: {
+            test: /[\\/]node_modules[\\/](@tiptap|@prosemirror|prosemirror-[-\w]+)[\\/]/,
+            name: false,
+            chunks: 'all',
+            priority: 30,
+            reuseExistingChunk: true,
+          },
+        },
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

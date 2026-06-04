@@ -3,8 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { TipTapEditor } from '@/components/editor';
+import dynamic from 'next/dynamic';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
+
+const TipTapEditor = dynamic(
+  () => import('@/components/editor').then((m) => m.TipTapEditor),
+  { ssr: false, loading: () => <div className="h-48 bg-foreground/5 rounded-lg animate-pulse" /> },
+);
 import { MediaGalleryField } from '@/components/widgets';
 import type { GalleryEntry } from '@/components/widgets';
 import adminApi from '@/lib/adminApi';

@@ -74,6 +74,7 @@ fi
 
 # ── 6. Kill stale processes and start backend ─────────────────────────────────
 echo "→ Starting backend (port 4000)..."
+pkill -f "nest start" 2>/dev/null || true
 kill "$(lsof -ti:4000)" 2>/dev/null || true
 sleep 1
 cd "$BACKEND_DIR"
