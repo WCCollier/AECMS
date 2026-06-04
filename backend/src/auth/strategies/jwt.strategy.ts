@@ -30,13 +30,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException();
     }
 
-    // Return user object that will be attached to request.user
     return {
       id: user.id,
       email: user.email,
       role: user.role,
       firstName: user.first_name || undefined,
       lastName: user.last_name || undefined,
+      session_type: payload.session_type ?? 'customer',
     };
   }
 }

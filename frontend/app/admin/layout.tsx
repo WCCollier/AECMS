@@ -1,10 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   Package,
@@ -16,7 +14,16 @@ import {
   X,
   Globe,
 } from 'lucide-react';
-import { useState } from 'react';
+import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
+import { useBackstageActivity } from '@/hooks/useBackstageActivity';
+
+interface AdminUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  role: string;
+}
 
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -27,35 +34,44 @@ const navItems = [
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [checked, setChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isAdmin = user?.role === 'owner' || user?.role === 'admin';
-  const isOwner = user?.role === 'owner';
   const isLoginRoute = pathname?.startsWith('/admin/login') ?? false;
 
+  // Inactivity auto-logout (30 min) — runs on all admin pages including login
+  useBackstageActivity();
+
   useEffect(() => {
-    if (isLoginRoute) return;
-    if (!isLoading && !isAuthenticated) {
+    if (isLoginRoute) { setChecked(true); return; }
+
+    const token = getAdminAccessToken();
+    if (!token) {
       router.push('/admin/login');
-    } else if (!isLoading && isAuthenticated && !isAdmin) {
-      router.push('/');
+      return;
     }
-  }, [isLoading, isAuthenticated, isAdmin, isLoginRoute, router]);
 
-  // Login pages render without the admin shell
-  if (isLoginRoute) {
-    return <>{children}</>;
-  }
+    const stored = typeof window !== 'undefined'
+      ? sessionStorage.getItem('admin_user')
+      : null;
+    if (stored) {
+      try { setAdminUser(JSON.parse(stored)); } catch { /* ignore */ }
+    }
+    setChecked(true);
+  }, [isLoginRoute, router]);
 
-  if (isLoading) {
+  const handleLogout = () => {
+    clearAdminSession();
+    router.push('/admin/login');
+  };
+
+  if (isLoginRoute) return <>{children}</>;
+
+  if (!checked) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-foreground" />
@@ -63,9 +79,10 @@ export default function AdminLayout({
     );
   }
 
-  if (!isAuthenticated || !isAdmin) {
-    return null;
-  }
+  const isOwner = adminUser?.role === 'owner';
+  const displayName = adminUser?.firstName
+    ? `${adminUser.firstName} ${adminUser.lastName ?? ''}`.trim()
+    : adminUser?.email ?? '';
 
   return (
     <div className="min-h-screen bg-background">
@@ -90,18 +107,16 @@ export default function AdminLayout({
           `}
         >
           <div className="h-full flex flex-col">
-            {/* Logo */}
             <div className="p-6 border-b border-border hidden lg:block">
               <Link href="/admin" className="text-xl font-bold text-accent">
                 AECMS Admin
               </Link>
             </div>
 
-            {/* Navigation */}
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
               {navItems
-                .filter((item) => !item.ownerOnly || isOwner)
-                .map((item) => {
+                .filter(item => !item.ownerOnly || isOwner)
+                .map(item => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
                   return (
@@ -124,17 +139,14 @@ export default function AdminLayout({
                 })}
             </nav>
 
-            {/* User Section */}
             <div className="p-4 border-t border-border">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-accent/10 text-accent rounded-full flex items-center justify-center font-bold">
-                  {user?.display_name?.[0] || user?.username?.[0] || 'U'}
+                  {displayName[0]?.toUpperCase() ?? 'A'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">
-                    {user?.display_name || user?.username}
-                  </p>
-                  <p className="text-sm text-foreground/60 truncate">{user?.email}</p>
+                  <p className="font-medium truncate">{displayName}</p>
+                  <p className="text-sm text-foreground/60 truncate">{adminUser?.email}</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -145,7 +157,7 @@ export default function AdminLayout({
                   View Site
                 </Link>
                 <button
-                  onClick={() => logout()}
+                  onClick={handleLogout}
                   className="px-3 py-2 text-sm border border-border rounded-lg hover:bg-surface-raised hover:text-accent transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
@@ -155,7 +167,6 @@ export default function AdminLayout({
           </div>
         </aside>
 
-        {/* Mobile Overlay */}
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/50 z-30 lg:hidden"
@@ -163,7 +174,6 @@ export default function AdminLayout({
           />
         )}
 
-        {/* Main Content */}
         <main className="flex-1 min-h-screen lg:min-h-0">
           {children}
         </main>

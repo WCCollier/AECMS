@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { adminFetcher } from '@/lib/swr';
 import { Button, Card, CardContent, Input } from '@/components/ui';
 import { Search, Eye, ShoppingCart } from 'lucide-react';
 import type { Order, PaginatedResponse } from '@/types';

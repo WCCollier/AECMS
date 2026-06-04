@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { adminFetcher } from '@/lib/swr';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { Package, FileText, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react';
 
@@ -21,9 +21,9 @@ interface Order {
 }
 
 export function AdminDashboardClient() {
-  const { data: productsData } = useSWR<PaginatedResponse<unknown>>('/products?limit=1', fetcher);
-  const { data: articlesData } = useSWR<PaginatedResponse<unknown>>('/articles?limit=1', fetcher);
-  const { data: ordersData } = useSWR<PaginatedResponse<Order>>('/orders?limit=5', fetcher);
+  const { data: productsData } = useSWR<PaginatedResponse<unknown>>('/products?limit=1', adminFetcher);
+  const { data: articlesData } = useSWR<PaginatedResponse<unknown>>('/articles?limit=1', adminFetcher);
+  const { data: ordersData } = useSWR<PaginatedResponse<Order>>('/orders?limit=5', adminFetcher);
 
   const stats = [
     {

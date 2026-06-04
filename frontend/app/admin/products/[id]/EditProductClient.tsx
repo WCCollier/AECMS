@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { ProductForm } from '@/components/admin/ProductForm';
-import api, { getErrorMessage } from '@/lib/api';
+import adminApi from '@/lib/adminApi';
+import { getErrorMessage } from '@/lib/api';
 
 interface Product {
   id: string;

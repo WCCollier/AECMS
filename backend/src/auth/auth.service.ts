@@ -114,10 +114,10 @@ export class AuthService {
     });
 
     // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.role);
+    const tokens = await this.generateTokens(user.id, user.email, user.role, undefined, 'customer');
 
     // Store refresh token
-    await this.storeRefreshToken(user.id, tokens.refreshToken);
+    await this.storeRefreshToken(user.id, tokens.refreshToken, undefined, 'customer');
 
     return {
       ...tokens,
@@ -153,8 +153,20 @@ export class AuthService {
       throw new UnauthorizedException('Email not verified');
     }
 
-    if (user.role !== 'admin' && user.role !== 'owner') {
-      throw new ForbiddenException('Admin access required');
+    // Owner always has backstage access; others must hold at least one backstage-scoped capability
+    if (user.role !== 'owner') {
+      const backstageCap = await this.prisma.capability.findFirst({
+        where: {
+          scope: 'backstage',
+          OR: [
+            { user_capabilities: { some: { user_id: user.id } } },
+            { role_capabilities: { some: { role: user.role, enabled: true } } },
+          ],
+        },
+      });
+      if (!backstageCap) {
+        throw new ForbiddenException('Backstage access requires at least one backstage-scoped capability');
+      }
     }
 
     await this.prisma.user.update({
@@ -167,9 +179,9 @@ export class AuthService {
       return { requiresTwoFactor: true, preAuthToken };
     }
 
-    // 2FA not yet set up — grant access with 7-day tokens and flag setup required
-    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d');
-    await this.storeRefreshToken(user.id, tokens.refreshToken, '7d');
+    // 2FA not yet set up — grant backstage access with 7-day tokens and flag setup required
+    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
+    await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
 
     return {
       requiresTwoFactor: false,
@@ -214,8 +226,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid authenticator code');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d');
-    await this.storeRefreshToken(user.id, tokens.refreshToken, '7d');
+    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
+    const storedToken = await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
+    await this.revokeOtherBackstageSessions(user.id, storedToken.id);
 
     return {
       ...tokens,
@@ -324,15 +337,21 @@ export class AuthService {
         data: { revoked_at: new Date() },
       });
 
+      // Propagate session_type so the session type survives rotation
+      const sessionType = (storedToken.session_type as 'customer' | 'backstage') ?? 'customer';
+      const refreshExpiry = sessionType === 'backstage' ? '7d' : undefined;
+
       // Generate new tokens
       const tokens = await this.generateTokens(
         storedToken.user.id,
         storedToken.user.email,
         storedToken.user.role,
+        refreshExpiry,
+        sessionType,
       );
 
       // Store new refresh token
-      await this.storeRefreshToken(storedToken.user.id, tokens.refreshToken);
+      await this.storeRefreshToken(storedToken.user.id, tokens.refreshToken, refreshExpiry, sessionType);
 
       return {
         ...tokens,
@@ -577,6 +596,7 @@ export class AuthService {
     email: string,
     role: UserRole,
     refreshExpiryOverride?: string,
+    sessionType: 'customer' | 'backstage' = 'customer',
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const jwtSecret = this.configService.get<string>('jwt.secret');
     const jwtExpiration = this.configService.get<string>('jwt.expiresIn');
@@ -586,20 +606,20 @@ export class AuthService {
       throw new Error('JWT configuration is missing');
     }
 
-    // Create unique access token payload
     const accessPayload: TokenPayload = {
       sub: userId,
       email,
       role,
-      jti: crypto.randomUUID(), // Unique identifier for access token
+      jti: crypto.randomUUID(),
+      session_type: sessionType,
     };
 
-    // Create unique refresh token payload
     const refreshPayload: TokenPayload = {
       sub: userId,
       email,
       role,
-      jti: crypto.randomUUID(), // Unique identifier for refresh token
+      jti: crypto.randomUUID(),
+      session_type: sessionType,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -623,7 +643,8 @@ export class AuthService {
     userId: string,
     token: string,
     expiryOverride?: string,
-  ): Promise<void> {
+    sessionType: 'customer' | 'backstage' = 'customer',
+  ): Promise<{ id: string }> {
     const refreshExpiration = expiryOverride ?? this.configService.get<string>('jwt.refreshExpiresIn');
     if (!refreshExpiration) {
       throw new Error('Refresh token expiration not configured');
@@ -632,12 +653,26 @@ export class AuthService {
     const expiresAt = this.calculateExpiration(refreshExpiration);
     const tokenHash = this.hashToken(token);
 
-    await this.prisma.refreshToken.create({
+    return this.prisma.refreshToken.create({
       data: {
         user_id: userId,
         token_hash: tokenHash,
+        session_type: sessionType,
         expires_at: expiresAt,
       },
+      select: { id: true },
+    });
+  }
+
+  private async revokeOtherBackstageSessions(userId: string, excludeTokenId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: {
+        user_id: userId,
+        session_type: 'backstage',
+        id: { not: excludeTokenId },
+        revoked_at: null,
+      },
+      data: { revoked_at: new Date() },
     });
   }
 

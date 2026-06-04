@@ -125,7 +125,45 @@ api.interceptors.response.use(
   }
 );
 
-// API response types
+// ── Backstage (admin) session token storage ──────────────────────────────────
+// Stored separately from customer tokens so the two sessions are fully independent.
+
+export const getAdminAccessToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('admin_access_token');
+};
+
+export const setAdminAccessToken = (token: string | null) => {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    localStorage.setItem('admin_access_token', token);
+  } else {
+    localStorage.removeItem('admin_access_token');
+  }
+};
+
+export const getAdminRefreshToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('admin_refresh_token');
+};
+
+export const setAdminRefreshToken = (token: string | null) => {
+  if (typeof window === 'undefined') return;
+  if (token) {
+    localStorage.setItem('admin_refresh_token', token);
+  } else {
+    localStorage.removeItem('admin_refresh_token');
+  }
+};
+
+export const clearAdminSession = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('admin_access_token');
+  localStorage.removeItem('admin_refresh_token');
+  sessionStorage.removeItem('admin_user');
+};
+
+// ── API response types ────────────────────────────────────────────────────────
 export interface ApiError {
   message: string;
   error?: string;

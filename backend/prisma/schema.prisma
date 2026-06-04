@@ -91,16 +91,18 @@ model RefreshToken {
   id              String    @id @default(uuid())
   user_id         String
   token_hash      String    @unique
-  device_info     String?   // User agent
+  session_type    String    @default("customer") // 'customer' | 'backstage'
+  device_info     String?
   ip_address      String?
   expires_at      DateTime
   created_at      DateTime  @default(now())
-  revoked_at      DateTime? // For "logout all devices"
+  revoked_at      DateTime?
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id])
   @@index([token_hash])
+  @@index([user_id, session_type])
   @@map("refresh_tokens")
 }
 
@@ -112,6 +114,7 @@ model Capability {
   id          String   @id @default(uuid())
   name        String   @unique // e.g., 'article.create', 'product.edit'
   category    String   // 'content', 'ecommerce', 'users', 'system'
+  scope       String   @default("backstage") // 'customer' | 'backstage'
   description String
   created_at  DateTime @default(now())
 

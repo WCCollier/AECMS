@@ -27,5 +27,6 @@ export interface TokenPayload {
   email: string;
   role: UserRole;
   jti?: string;
-  scope?: string; // 'pre_2fa' for pre-auth tokens
+  scope?: string;         // 'pre_2fa' for pre-auth tokens
+  session_type?: 'customer' | 'backstage';
 }

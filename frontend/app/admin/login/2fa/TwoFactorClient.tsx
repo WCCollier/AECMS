@@ -2,12 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import api, { getErrorMessage, setAccessToken } from '@/lib/api';
+import api, { getErrorMessage, setAdminAccessToken, setAdminRefreshToken } from '@/lib/api';
 
 export function TwoFactorClient() {
   const router = useRouter();
-  const { refreshUser } = useAuth();
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,11 +67,12 @@ export function TwoFactorClient() {
       );
 
       sessionStorage.removeItem('admin_pre_auth_token');
-      setAccessToken(response.data.accessToken);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('refresh_token', response.data.refreshToken);
+      setAdminAccessToken(response.data.accessToken);
+      setAdminRefreshToken(response.data.refreshToken);
+      const userData = (response.data as any).user;
+      if (userData && typeof window !== 'undefined') {
+        sessionStorage.setItem('admin_user', JSON.stringify(userData));
       }
-      await refreshUser();
       router.push('/admin');
     } catch (err) {
       setError(getErrorMessage(err));

@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { useAuth } from '@/contexts/AuthContext';
-import api, { getErrorMessage, setAccessToken } from '@/lib/api';
+import api, { getErrorMessage, setAdminAccessToken, setAdminRefreshToken } from '@/lib/api';
 
 interface LoginForm {
   email: string;
@@ -13,7 +12,6 @@ interface LoginForm {
 
 export function AdminLoginClient() {
   const router = useRouter();
-  const { refreshUser } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -41,13 +39,13 @@ export function AdminLoginClient() {
         return;
       }
 
-      // 2FA not yet set up — store tokens and redirect to setup
+      // 2FA not yet set up — store to admin session (never touches customer tokens)
       if (result.accessToken && result.refreshToken) {
-        setAccessToken(result.accessToken);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('refresh_token', result.refreshToken);
+        setAdminAccessToken(result.accessToken);
+        setAdminRefreshToken(result.refreshToken);
+        if (result.user && typeof window !== 'undefined') {
+          sessionStorage.setItem('admin_user', JSON.stringify(result.user));
         }
-        await refreshUser();
 
         if (result.twoFactorSetupRequired) {
           router.push('/admin/login/setup');

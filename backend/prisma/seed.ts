@@ -25,143 +25,56 @@ async function main() {
   // ============================================
   console.log('\n[1/3] Seeding capabilities...');
 
+  // All current capabilities are backstage-scoped — they require the admin dashboard to exercise.
+  // Customer-scoped capabilities (e.g. comment.create) would carry scope:'customer' when added.
   const capabilities = [
     // Content Management
-    {
-      name: 'article.create',
-      category: 'content',
-      description: 'Create articles',
-    },
-    {
-      name: 'article.edit.own',
-      category: 'content',
-      description: 'Edit own articles',
-    },
-    {
-      name: 'article.edit.any',
-      category: 'content',
-      description: 'Edit any article',
-    },
-    {
-      name: 'article.delete.own',
-      category: 'content',
-      description: 'Delete own articles',
-    },
-    {
-      name: 'article.delete.any',
-      category: 'content',
-      description: 'Delete any article',
-    },
-    {
-      name: 'article.publish',
-      category: 'content',
-      description: 'Publish articles',
-    },
-    {
-      name: 'page.create',
-      category: 'content',
-      description: 'Create pages',
-    },
-    { name: 'page.edit', category: 'content', description: 'Edit pages' },
-    { name: 'page.delete', category: 'content', description: 'Delete pages' },
-    {
-      name: 'media.upload',
-      category: 'content',
-      description: 'Upload media files',
-    },
-    {
-      name: 'media.delete',
-      category: 'content',
-      description: 'Delete media files',
-    },
+    { name: 'article.create',      category: 'content',   scope: 'backstage', description: 'Create articles' },
+    { name: 'article.edit.own',    category: 'content',   scope: 'backstage', description: 'Edit own articles' },
+    { name: 'article.edit.any',    category: 'content',   scope: 'backstage', description: 'Edit any article' },
+    { name: 'article.delete.own',  category: 'content',   scope: 'backstage', description: 'Delete own articles' },
+    { name: 'article.delete.any',  category: 'content',   scope: 'backstage', description: 'Delete any article' },
+    { name: 'article.publish',     category: 'content',   scope: 'backstage', description: 'Publish articles' },
+    { name: 'page.create',         category: 'content',   scope: 'backstage', description: 'Create pages' },
+    { name: 'page.edit',           category: 'content',   scope: 'backstage', description: 'Edit pages' },
+    { name: 'page.delete',         category: 'content',   scope: 'backstage', description: 'Delete pages' },
+    { name: 'media.upload',        category: 'content',   scope: 'backstage', description: 'Upload media files' },
+    { name: 'media.delete',        category: 'content',   scope: 'backstage', description: 'Delete media files' },
 
     // Ecommerce
-    {
-      name: 'product.create',
-      category: 'ecommerce',
-      description: 'Create products',
-    },
-    {
-      name: 'product.edit',
-      category: 'ecommerce',
-      description: 'Edit products',
-    },
-    {
-      name: 'product.delete',
-      category: 'ecommerce',
-      description: 'Delete products',
-    },
-    {
-      name: 'order.view.all',
-      category: 'ecommerce',
-      description: 'View all orders',
-    },
-    { name: 'order.edit', category: 'ecommerce', description: 'Edit orders' },
-    {
-      name: 'order.refund',
-      category: 'ecommerce',
-      description: 'Process refunds',
-    },
+    { name: 'product.create',      category: 'ecommerce', scope: 'backstage', description: 'Create products' },
+    { name: 'product.edit',        category: 'ecommerce', scope: 'backstage', description: 'Edit products' },
+    { name: 'product.delete',      category: 'ecommerce', scope: 'backstage', description: 'Delete products' },
+    { name: 'order.view.all',      category: 'ecommerce', scope: 'backstage', description: 'View all orders' },
+    { name: 'order.edit',          category: 'ecommerce', scope: 'backstage', description: 'Edit orders' },
+    { name: 'order.refund',        category: 'ecommerce', scope: 'backstage', description: 'Process refunds' },
 
     // Users
-    { name: 'user.create', category: 'users', description: 'Create users' },
-    { name: 'user.edit', category: 'users', description: 'Edit users' },
-    { name: 'user.delete', category: 'users', description: 'Delete users' },
-    {
-      name: 'user.assign_role',
-      category: 'users',
-      description: 'Assign user roles',
-    },
-    {
-      name: 'user.assign_capability',
-      category: 'users',
-      description: 'Assign capabilities',
-    },
+    { name: 'user.create',         category: 'users',     scope: 'backstage', description: 'Create users' },
+    { name: 'user.edit',           category: 'users',     scope: 'backstage', description: 'Edit users' },
+    { name: 'user.delete',         category: 'users',     scope: 'backstage', description: 'Delete users' },
+    { name: 'user.assign_role',    category: 'users',     scope: 'backstage', description: 'Assign user roles' },
+    { name: 'user.assign_capability', category: 'users',  scope: 'backstage', description: 'Assign capabilities' },
 
     // Comments & Reviews
-    {
-      name: 'comment.view.all',
-      category: 'content',
-      description: 'View all comments',
-    },
-    {
-      name: 'comment.moderate',
-      category: 'content',
-      description: 'Moderate comments',
-    },
-    {
-      name: 'comment.delete',
-      category: 'content',
-      description: 'Delete any comment',
-    },
-    {
-      name: 'review.moderate',
-      category: 'ecommerce',
-      description: 'Moderate reviews',
-    },
+    { name: 'comment.view.all',    category: 'content',   scope: 'backstage', description: 'View all comments' },
+    { name: 'comment.moderate',    category: 'content',   scope: 'backstage', description: 'Moderate comments' },
+    { name: 'comment.delete',      category: 'content',   scope: 'backstage', description: 'Delete any comment' },
+    { name: 'review.moderate',     category: 'ecommerce', scope: 'backstage', description: 'Moderate reviews' },
 
     // System
-    {
-      name: 'system.configure',
-      category: 'system',
-      description: 'Configure system settings',
-    },
-    {
-      name: 'system.view_audit',
-      category: 'system',
-      description: 'View audit logs',
-    },
-    {
-      name: 'system.export_data',
-      category: 'system',
-      description: 'Export data (CSV)',
-    },
+    { name: 'system.configure',    category: 'system',    scope: 'backstage', description: 'Configure system settings' },
+    { name: 'system.view_audit',   category: 'system',    scope: 'backstage', description: 'View audit logs' },
+    { name: 'system.export_data',  category: 'system',    scope: 'backstage', description: 'Export data (CSV)' },
+
+    // Domain Management (Owner-only by default)
+    { name: 'domain.manage',       category: 'system',    scope: 'backstage', description: 'Manage domain aliases' },
   ];
 
   for (const cap of capabilities) {
     await prisma.capability.upsert({
       where: { name: cap.name },
-      update: {},
+      update: { scope: cap.scope, description: cap.description },
       create: cap,
     });
   }

@@ -16,8 +16,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { BackstageGuard } from '../auth/guards/backstage.guard';
+import { CapabilityGuard } from '../capabilities/guards/capability.guard';
+import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
 import { DigitalProductsService } from './digital-products.service';
 import {
   CreateDigitalFileDto,
@@ -34,8 +35,8 @@ export class DigitalProductsController {
    * Upload a digital file for a product (Admin only)
    */
   @Post('files')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'owner')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
   @UseInterceptors(FileInterceptor('file'))
   async uploadFile(
     @Body() dto: CreateDigitalFileDto,
@@ -56,8 +57,8 @@ export class DigitalProductsController {
    * Get all digital files for a product
    */
   @Get('products/:productId/files')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'owner')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
   async getProductFiles(@Param('productId', ParseUUIDPipe) productId: string) {
     return this.digitalProductsService.getProductFiles(productId);
   }
@@ -66,8 +67,8 @@ export class DigitalProductsController {
    * Get a specific digital file
    */
   @Get('files/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'owner')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
   async getDigitalFile(@Param('id', ParseUUIDPipe) id: string) {
     return this.digitalProductsService.getDigitalFile(id);
   }
@@ -76,8 +77,8 @@ export class DigitalProductsController {
    * Update digital file settings
    */
   @Put('files/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'owner')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
   async updateDigitalFile(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDigitalFileDto,
@@ -89,8 +90,8 @@ export class DigitalProductsController {
    * Delete a digital file
    */
   @Delete('files/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'owner')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.delete')
   async deleteDigitalFile(@Param('id', ParseUUIDPipe) id: string) {
     await this.digitalProductsService.deleteDigitalFile(id);
     return { message: 'Digital file deleted successfully' };
@@ -100,8 +101,8 @@ export class DigitalProductsController {
    * Create download tokens for an order (Admin or system use)
    */
   @Post('orders/:orderId/downloads')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'owner')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
   async createOrderDownloads(
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Query('expiryDays') expiryDays?: string,
@@ -170,8 +171,8 @@ export class DigitalProductsController {
    * Regenerate a download token (Admin only)
    */
   @Post('downloads/:id/regenerate')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'owner')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
   async regenerateToken(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('expiryDays') expiryDays?: string,
