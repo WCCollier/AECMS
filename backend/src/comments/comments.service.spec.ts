@@ -11,6 +11,7 @@ jest.mock('openai', () => {
 import { CommentsService } from './comments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 
 describe('CommentsService', () => {
   let service: CommentsService;
@@ -97,12 +98,18 @@ describe('CommentsService', () => {
     }),
   };
 
+  // Default: user has the capability. Individual tests override for negative cases.
+  const mockCapabilitiesService = {
+    userHasCapability: jest.fn().mockResolvedValue(true),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommentsService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ModerationService, useValue: mockModerationService },
+        { provide: CapabilitiesService, useValue: mockCapabilitiesService },
       ],
     }).compile();
 
@@ -133,6 +140,30 @@ describe('CommentsService', () => {
 
       expect(result).toBeDefined();
       expect(result.content).toBe('This is a test comment');
+    });
+
+    it('should throw ForbiddenException when user lacks the required capability', async () => {
+      mockCapabilitiesService.userHasCapability.mockResolvedValueOnce(false);
+      await expect(
+        service.create({ article_id: 'article-123', content: 'Test' }, mockUser as any),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should bypass capability check for owner role', async () => {
+      mockPrismaService.article.findUnique.mockResolvedValue(mockArticle);
+      mockPrismaService.comment.create.mockResolvedValue({
+        ...mockComment,
+        user: mockUser,
+        ratings: [],
+        article: mockArticle,
+      });
+      const ownerUser = { ...mockUser, role: 'owner' };
+      const result = await service.create(
+        { article_id: 'article-123', content: 'Owner comment' },
+        ownerUser as any,
+      );
+      expect(result).toBeDefined();
+      expect(mockCapabilitiesService.userHasCapability).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException if article does not exist', async () => {
