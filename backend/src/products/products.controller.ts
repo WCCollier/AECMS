@@ -11,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto, QueryProductsDto } from './dto';
@@ -70,7 +71,7 @@ export class ProductsController {
     @CurrentUser() user: any,
   ) {
     const isAdmin = user.role === 'owner' || user.role === 'admin';
-    return this.productsService.update(id, dto, isAdmin);
+    return this.productsService.update(id, dto, user.id, isAdmin);
   }
 
   @Patch(':id/stock')
@@ -96,5 +97,40 @@ export class ProductsController {
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     const isAdmin = user.role === 'owner' || user.role === 'admin';
     return this.productsService.remove(id, isAdmin);
+  }
+
+  @Get(':id/versions')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List product versions' })
+  getVersions(
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.productsService.getVersions(id, page, limit);
+  }
+
+  @Get(':id/versions/:vnum')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a specific product version' })
+  getVersion(@Param('id') id: string, @Param('vnum') vnum: string) {
+    return this.productsService.getVersion(id, parseInt(vnum, 10));
+  }
+
+  @Post(':id/versions/:vnum/restore')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore product to a previous version' })
+  restoreVersion(
+    @Param('id') id: string,
+    @Param('vnum') vnum: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.productsService.restoreVersion(id, parseInt(vnum, 10), user.id);
   }
 }

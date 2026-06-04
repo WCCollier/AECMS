@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { ArticleForm } from '@/components/admin/ArticleForm';
+import { VersionHistoryPanel } from '@/components/admin/VersionHistoryPanel';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 import type { MediaItem } from '@/types';
@@ -89,6 +90,10 @@ export function EditArticleClient() {
       </div>
 
       <ArticleForm articleId={articleId} initialData={article} />
+
+      <div className="mt-6">
+        <VersionHistoryPanel resourceType="articles" resourceId={articleId} />
+      </div>
     </div>
   );
 }

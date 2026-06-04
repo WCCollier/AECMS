@@ -175,8 +175,8 @@ export class CommentsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Missing required capability' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
-  async approve(@Param('id', ParseUUIDPipe) id: string) {
-    return this.commentsService.approve(id);
+  async approve(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    return this.commentsService.approve(id, req.user?.id);
   }
 
   /**
@@ -191,8 +191,8 @@ export class CommentsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Missing required capability' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
-  async reject(@Param('id', ParseUUIDPipe) id: string) {
-    return this.commentsService.reject(id);
+  async reject(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    return this.commentsService.reject(id, req.user?.id);
   }
 
   /**
@@ -207,8 +207,8 @@ export class CommentsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Missing required capability' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
-  async markAsSpam(@Param('id', ParseUUIDPipe) id: string) {
-    return this.commentsService.markAsSpam(id);
+  async markAsSpam(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
+    return this.commentsService.markAsSpam(id, req.user?.id);
   }
 
   /**

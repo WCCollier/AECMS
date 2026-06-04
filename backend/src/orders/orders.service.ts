@@ -8,12 +8,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { CreateOrderDto, UpdateOrderStatusDto, QueryOrdersDto } from './dto';
 import { Prisma } from '@prisma/client';
+import { AuditLogService } from '../audit/audit.service';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private cartService: CartService,
+    private auditLog: AuditLogService,
   ) {}
 
   /**
@@ -245,7 +247,7 @@ export class OrdersService {
   /**
    * Update order status (admin)
    */
-  async updateStatus(id: string, dto: UpdateOrderStatusDto) {
+  async updateStatus(id: string, dto: UpdateOrderStatusDto, actorId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
     });
@@ -261,6 +263,15 @@ export class OrdersService {
       where: { id },
       data: { status: dto.status },
       include: this.getOrderIncludes(),
+    });
+
+    await this.auditLog.log({
+      event_type: 'order.status_changed',
+      user_id: actorId ?? undefined,
+      resource_type: 'order',
+      resource_id: id,
+      changes: { before: { status: order.status }, after: { status: dto.status } },
+      metadata: undefined,
     });
 
     return this.transformOrder(updated);
@@ -286,6 +297,14 @@ export class OrdersService {
         paid_at: new Date(),
       },
       include: this.getOrderIncludes(),
+    });
+
+    await this.auditLog.log({
+      event_type: 'order.status_changed',
+      resource_type: 'order',
+      resource_id: id,
+      changes: { before: { status: order.status }, after: { status: 'processing' } },
+      metadata: { payment_intent_id: paymentIntentId },
     });
 
     return this.transformOrder(updated);

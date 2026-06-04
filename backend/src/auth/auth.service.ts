@@ -19,6 +19,7 @@ import { UserRole } from '@prisma/client';
 import * as crypto from 'crypto';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
+import { AuditLogService } from '../audit/audit.service';
 
 @Injectable()
 export class AuthService {
@@ -30,6 +31,7 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     @Inject(EMAIL_PROVIDER) private emailProvider: EmailProvider,
+    private auditLog: AuditLogService,
   ) {}
 
   /**
@@ -85,6 +87,7 @@ export class AuthService {
     });
 
     if (!user || !user.password_hash) {
+      await this.auditLog.log({ event_type: 'auth.login_failed', metadata: { email_attempted: loginDto.email, reason: 'user_not_found' } });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -95,6 +98,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
+      await this.auditLog.log({ event_type: 'auth.login_failed', metadata: { email_attempted: loginDto.email, reason: 'invalid_password' } });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -118,6 +122,8 @@ export class AuthService {
 
     // Store refresh token
     await this.storeRefreshToken(user.id, tokens.refreshToken, undefined, 'customer');
+
+    await this.auditLog.log({ event_type: 'auth.login', user_id: user.id, metadata: { session_type: 'customer' } });
 
     return {
       ...tokens,
@@ -146,6 +152,7 @@ export class AuthService {
 
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password_hash);
     if (!isPasswordValid) {
+      await this.auditLog.log({ event_type: 'auth.login_failed', metadata: { email_attempted: loginDto.email, reason: 'invalid_password' } });
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -182,6 +189,8 @@ export class AuthService {
     // 2FA not yet set up — grant backstage access with 7-day tokens and flag setup required
     const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
     await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
+
+    await this.auditLog.log({ event_type: 'auth.login', user_id: user.id, metadata: { session_type: 'backstage', two_factor_setup_required: true } });
 
     return {
       requiresTwoFactor: false,
@@ -228,7 +237,12 @@ export class AuthService {
 
     const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
     const storedToken = await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
-    await this.revokeOtherBackstageSessions(user.id, storedToken.id);
+    const revoked = await this.revokeOtherBackstageSessions(user.id, storedToken.id);
+
+    await this.auditLog.log({ event_type: 'auth.2fa_success', user_id: user.id, metadata: { session_type: 'backstage' } });
+    if (revoked > 0) {
+      await this.auditLog.log({ event_type: 'auth.sessions_revoked', user_id: user.id, metadata: { count: revoked, session_type: 'backstage' } });
+    }
 
     return {
       ...tokens,
@@ -371,7 +385,7 @@ export class AuthService {
   /**
    * Logout user (revoke refresh token)
    */
-  async logout(userId: string, refreshToken: string): Promise<void> {
+  async logout(userId: string, refreshToken: string, sessionType?: string): Promise<void> {
     const tokenHash = this.hashToken(refreshToken);
     await this.prisma.refreshToken.updateMany({
       where: {
@@ -382,6 +396,7 @@ export class AuthService {
         revoked_at: new Date(),
       },
     });
+    await this.auditLog.log({ event_type: 'auth.logout', user_id: userId, metadata: { session_type: sessionType ?? 'customer' } });
   }
 
   /**
@@ -664,8 +679,8 @@ export class AuthService {
     });
   }
 
-  private async revokeOtherBackstageSessions(userId: string, excludeTokenId: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
+  private async revokeOtherBackstageSessions(userId: string, excludeTokenId: string): Promise<number> {
+    const result = await this.prisma.refreshToken.updateMany({
       where: {
         user_id: userId,
         session_type: 'backstage',
@@ -674,6 +689,7 @@ export class AuthService {
       },
       data: { revoked_at: new Date() },
     });
+    return result.count;
   }
 
   /**

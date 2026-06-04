@@ -46,6 +46,7 @@ export interface CreatePaymentParams {
 }
 
 export interface WebhookEvent {
+  id?: string;  // gateway-assigned event ID for deduplication
   type: string;
   data: any;
   provider: 'stripe' | 'paypal';

@@ -23,6 +23,7 @@ import { StorageModule } from './storage/storage.module';
 import { EmailModule } from './email/email.module';
 import { DigitalProductsModule } from './digital-products/digital-products.module';
 import { DomainAliasesModule } from './domain-aliases/domain-aliases.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { DomainAliasesModule } from './domain-aliases/domain-aliases.module';
     EmailModule,
     DigitalProductsModule,
     DomainAliasesModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -9,10 +9,14 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateArticleDto, UpdateArticleDto, QueryArticlesDto } from './dto';
 import { Prisma, ContentStatus, ContentVisibility } from '@prisma/client';
+import { AuditLogService, diffChanges } from '../audit/audit.service';
 
 @Injectable()
 export class ArticlesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   private getMediaInclude() {
     return {
@@ -101,9 +105,19 @@ export class ArticlesService {
       await this.setArticleMedia(article.id, dto.media_ids);
     }
 
-    if (dto.version_control_enabled) {
+    if (dto.status === 'published') {
+      await this.createVersion(article.id, dto.title, dto.content, authorId, 'Published');
+    } else if (dto.version_control_enabled) {
       await this.createVersion(article.id, dto.title, dto.content, authorId, 'Initial version');
     }
+
+    await this.auditLog.log({
+      event_type: 'article.created',
+      user_id: authorId,
+      resource_type: 'article',
+      resource_id: article.id,
+      metadata: { title: dto.title, slug, status: dto.status || 'draft' },
+    });
 
     const fresh = await this.prisma.article.findUnique({
       where: { id: article.id },
@@ -253,9 +267,24 @@ export class ArticlesService {
       await this.setArticleMedia(id, dto.media_ids);
     }
 
-    if (article.version_control_enabled && dto.content && dto.content !== article.content) {
-      await this.createVersion(id, dto.title || article.title, dto.content, userId, 'Content updated');
+    const isPublishing = dto.status === ContentStatus.published && article.status !== ContentStatus.published;
+    const isUpdatingPublished = article.status === ContentStatus.published;
+    if (isPublishing || isUpdatingPublished) {
+      const summary = (dto as any).change_summary ?? (isPublishing ? 'Published' : 'Updated');
+      await this.createVersion(id, dto.title ?? article.title, dto.content ?? article.content, userId, summary);
     }
+
+    const eventType = isPublishing ? 'article.published'
+      : dto.status === 'archived' && article.status === ContentStatus.published ? 'article.unpublished'
+      : 'article.updated';
+    const diff = diffChanges(article as any, dto as any);
+    await this.auditLog.log({
+      event_type: eventType,
+      user_id: userId,
+      resource_type: 'article',
+      resource_id: id,
+      changes: Object.keys(diff.before).length ? diff : undefined,
+    });
 
     const updated = await this.prisma.article.findUnique({
       where: { id },
@@ -272,6 +301,61 @@ export class ArticlesService {
     if (!article) throw new NotFoundException('Article not found');
     this.checkDeleteAccess(article, userId, isAdmin);
     await this.prisma.article.delete({ where: { id } });
+    await this.auditLog.log({
+      event_type: 'article.deleted',
+      user_id: userId,
+      resource_type: 'article',
+      resource_id: id,
+      metadata: { title: article.title, slug: article.slug },
+    });
+  }
+
+  async getVersions(articleId: string, page = 1, limit = 20) {
+    const article = await this.prisma.article.findUnique({ where: { id: articleId } });
+    if (!article) throw new NotFoundException('Article not found');
+    const skip = (page - 1) * limit;
+    const [versions, total] = await Promise.all([
+      this.prisma.articleVersion.findMany({
+        where: { article_id: articleId },
+        orderBy: { version_number: 'desc' },
+        skip,
+        take: limit,
+        select: { id: true, version_number: true, title: true, change_summary: true, created_by: true, created_at: true },
+      }),
+      this.prisma.articleVersion.count({ where: { article_id: articleId } }),
+    ]);
+    return { data: versions, meta: { total, page, limit, total_pages: Math.ceil(total / limit) } };
+  }
+
+  async getVersion(articleId: string, versionNumber: number) {
+    const version = await this.prisma.articleVersion.findUnique({
+      where: { article_id_version_number: { article_id: articleId, version_number: versionNumber } },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+    return version;
+  }
+
+  async restoreVersion(articleId: string, versionNumber: number, userId: string) {
+    const version = await this.getVersion(articleId, versionNumber);
+    const article = await this.prisma.article.findUnique({ where: { id: articleId } });
+    if (!article) throw new NotFoundException('Article not found');
+
+    await this.prisma.article.update({
+      where: { id: articleId },
+      data: { title: version.title, content: version.content, status: 'draft' },
+    });
+
+    await this.createVersion(articleId, version.title, version.content, userId, `Restored from version ${versionNumber}`);
+    await this.auditLog.log({
+      event_type: 'article.updated',
+      user_id: userId,
+      resource_type: 'article',
+      resource_id: articleId,
+      metadata: { restored_from_version: versionNumber },
+    });
+
+    const updated = await this.prisma.article.findUnique({ where: { id: articleId }, include: this.getArticleInclude(true) });
+    return this.transformArticle(updated!);
   }
 
   private generateSlug(title: string): string {

@@ -131,4 +131,37 @@ export class ArticlesController {
     const isAdmin = user.capabilities?.includes('article.delete.any') || false;
     await this.articlesService.remove(id, userId, isAdmin);
   }
+
+  @Get(':id/versions')
+  @UseGuards(JwtAuthGuard, BackstageGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List article versions' })
+  getVersions(
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.articlesService.getVersions(id, page, limit);
+  }
+
+  @Get(':id/versions/:vnum')
+  @UseGuards(JwtAuthGuard, BackstageGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a specific article version' })
+  getVersion(@Param('id') id: string, @Param('vnum') vnum: string) {
+    return this.articlesService.getVersion(id, parseInt(vnum, 10));
+  }
+
+  @Post(':id/versions/:vnum/restore')
+  @UseGuards(JwtAuthGuard, BackstageGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore article to a previous version (creates new draft)' })
+  restoreVersion(
+    @Param('id') id: string,
+    @Param('vnum') vnum: string,
+    @Req() req: Request,
+  ) {
+    const userId = (req.user as any).id;
+    return this.articlesService.restoreVersion(id, parseInt(vnum, 10), userId);
+  }
 }

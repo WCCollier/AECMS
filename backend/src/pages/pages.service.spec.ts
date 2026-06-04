@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PagesService } from './pages.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../audit/audit.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('PagesService', () => {
@@ -17,11 +18,14 @@ describe('PagesService', () => {
     },
   };
 
+  const mockAuditLog = { log: jest.fn() };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PagesService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: AuditLogService, useValue: mockAuditLog },
       ],
     }).compile();
 

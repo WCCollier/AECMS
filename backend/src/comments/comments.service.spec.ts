@@ -12,6 +12,7 @@ import { CommentsService } from './comments.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { CapabilitiesService } from '../capabilities/capabilities.service';
+import { AuditLogService } from '../audit/audit.service';
 
 describe('CommentsService', () => {
   let service: CommentsService;
@@ -110,6 +111,7 @@ describe('CommentsService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: ModerationService, useValue: mockModerationService },
         { provide: CapabilitiesService, useValue: mockCapabilitiesService },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 

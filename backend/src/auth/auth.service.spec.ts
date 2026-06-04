@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../audit/audit.service';
 import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { EMAIL_PROVIDER } from '../email/email.interface';
@@ -78,6 +79,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: EMAIL_PROVIDER, useValue: mockEmailProvider },
+        { provide: AuditLogService, useValue: { log: jest.fn() } },
       ],
     }).compile();
 

@@ -241,6 +241,7 @@ export class PayPalProvider implements PaymentProvider {
     this.logger.warn('PayPal webhook verification not fully implemented - trusting event');
 
     return {
+      id: event.id,
       type: event.event_type,
       data: event.resource,
       provider: 'paypal',

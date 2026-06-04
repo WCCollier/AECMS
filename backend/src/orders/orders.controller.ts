@@ -79,8 +79,9 @@ export class OrdersController {
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
+    @CurrentUser() user: any,
   ) {
-    return this.ordersService.updateStatus(id, dto);
+    return this.ordersService.updateStatus(id, dto, user?.id);
   }
 
   @Post(':id/cancel')

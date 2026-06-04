@@ -266,6 +266,7 @@ model Page {
 
   parent   Page?  @relation("PageHierarchy", fields: [parent_id], references: [id])
   children Page[] @relation("PageHierarchy")
+  versions PageVersion[]
 
   @@index([slug])
   @@index([parent_id])
@@ -413,6 +414,7 @@ model Product {
   cart_items       CartItem[]
   order_items      OrderItem[]
   digital_files    DigitalProductFile[]
+  versions         ProductVersion[]
 
   @@index([slug])
   @@index([sku])
@@ -763,4 +765,64 @@ model DomainAlias {
   @@index([domain])
   @@index([owner_id])
   @@map("domain_aliases")
+}
+
+// ============================================================================
+// WEBHOOK EVENTS
+// ============================================================================
+
+model WebhookEvent {
+  id               String    @id @default(uuid())
+  gateway          String    // 'stripe' | 'paypal'
+  event_id         String    @unique // gateway-assigned ID (deduplication key)
+  event_type       String    // e.g. 'checkout.session.completed'
+  payload          Json      // raw webhook body
+  received_at      DateTime  @default(now())
+  processed_at     DateTime?
+  processing_error String?   @db.Text
+
+  @@index([gateway, event_type])
+  @@index([received_at])
+  @@map("webhook_events")
+}
+
+// ============================================================================
+// VERSION HISTORY
+// ============================================================================
+
+model ProductVersion {
+  id               String   @id @default(uuid())
+  product_id       String
+  version_number   Int
+  name             String
+  description      String?  @db.Text
+  price            Decimal  @db.Decimal(10, 2)
+  compare_at_price Decimal? @db.Decimal(10, 2)
+  sku              String?
+  stock_quantity   Int?
+  stock_status     String
+  change_summary   String?
+  created_by       String
+  created_at       DateTime @default(now())
+
+  product Product @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@unique([product_id, version_number])
+  @@map("product_versions")
+}
+
+model PageVersion {
+  id             String   @id @default(uuid())
+  page_id        String
+  version_number Int
+  title          String
+  content        String   @db.Text // full PageContent JSON envelope
+  change_summary String?
+  created_by     String
+  created_at     DateTime @default(now())
+
+  page Page @relation(fields: [page_id], references: [id], onDelete: Cascade)
+
+  @@unique([page_id, version_number])
+  @@map("page_versions")
 }

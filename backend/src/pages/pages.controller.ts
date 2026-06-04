@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PagesService } from './pages.service';
 import { CreatePageDto, UpdatePageDto, QueryPagesDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
@@ -89,5 +90,40 @@ export class PagesController {
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     const isAdmin = user.role === 'owner' || user.role === 'admin';
     return this.pagesService.remove(id, user.id, isAdmin);
+  }
+
+  @Get(':id/versions')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('page.edit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'List page versions' })
+  getVersions(
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.pagesService.getVersions(id, page, limit);
+  }
+
+  @Get(':id/versions/:vnum')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('page.edit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a specific page version' })
+  getPageVersion(@Param('id') id: string, @Param('vnum') vnum: string) {
+    return this.pagesService.getPageVersion(id, parseInt(vnum, 10));
+  }
+
+  @Post(':id/versions/:vnum/restore')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('page.edit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Restore page to a previous version (creates new draft)' })
+  restorePageVersion(
+    @Param('id') id: string,
+    @Param('vnum') vnum: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.pagesService.restorePageVersion(id, parseInt(vnum, 10), user.id);
   }
 }

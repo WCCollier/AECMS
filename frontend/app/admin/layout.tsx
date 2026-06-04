@@ -14,6 +14,7 @@ import {
   X,
   Globe,
   LayoutTemplate,
+  ClipboardList,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import { useBackstageActivity } from '@/hooks/useBackstageActivity';
@@ -32,6 +33,7 @@ const navItems = [
   { href: '/admin/articles', label: 'Articles', icon: FileText },
   { href: '/admin/pages', label: 'Pages', icon: LayoutTemplate },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, ownerOnly: true },
   { href: '/admin/domains', label: 'Domains', icon: Globe, ownerOnly: true },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];

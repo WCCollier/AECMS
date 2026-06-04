@@ -15,6 +15,7 @@ import {
   RefundPaymentDto,
 } from './dto';
 import { PaymentProvider, WebhookEvent } from './providers/payment-provider.interface';
+import { AuditLogService } from '../audit/audit.service';
 
 @Injectable()
 export class PaymentsService {
@@ -28,6 +29,7 @@ export class PaymentsService {
     private configService: ConfigService,
     private stripeProvider: StripeProvider,
     private paypalProvider: PayPalProvider,
+    private auditLog: AuditLogService,
   ) {
     this.testMode = this.configService.get<string>('PAYMENT_TEST_MODE') === 'true';
 
@@ -252,10 +254,19 @@ export class PaymentsService {
         data: { status: 'refunded' },
       });
 
+      const testRefundId = `test_refund_${Date.now()}`;
+      const testAmount = dto.amount || Math.round(parseFloat(order.total.toString()) * 100);
+      await this.auditLog.log({
+        event_type: 'order.refund_initiated',
+        resource_type: 'order',
+        resource_id: orderId,
+        metadata: { amount: testAmount, gateway_refund_id: testRefundId, test_mode: true },
+      });
+
       return {
         success: true,
-        refund_id: `test_refund_${Date.now()}`,
-        amount: dto.amount || Math.round(parseFloat(order.total.toString()) * 100),
+        refund_id: testRefundId,
+        amount: testAmount,
         test_mode: true,
       };
     }
@@ -273,6 +284,13 @@ export class PaymentsService {
         data: { status: 'refunded' },
       });
     }
+
+    await this.auditLog.log({
+      event_type: 'order.refund_initiated',
+      resource_type: 'order',
+      resource_id: orderId,
+      metadata: { amount: refund.amount, gateway_refund_id: refund.id, status: refund.status },
+    });
 
     return {
       success: refund.status === 'succeeded',
@@ -314,25 +332,60 @@ export class PaymentsService {
   private async processWebhookEvent(event: WebhookEvent) {
     this.logger.log(`Processing ${event.provider} webhook: ${event.type}`);
 
-    switch (event.type) {
-      // Stripe Checkout events (checkout.session.completed = payment captured)
-      case 'checkout.session.completed':
-        await this.handlePaymentSucceeded(event);
-        break;
-      case 'checkout.session.expired':
-        await this.handlePaymentFailed(event);
-        break;
+    // Persist webhook event for audit trail (idempotent on duplicate event_id)
+    const eventId = event.id ?? `${event.provider}:${event.type}:${Date.now()}`;
+    let webhookRow: { id: string } | null = null;
+    try {
+      const existing = await this.prisma.webhookEvent.findUnique({ where: { event_id: eventId } });
+      if (existing) {
+        this.logger.log(`Duplicate webhook event ${eventId} — skipping`);
+        return { received: true };
+      }
+      webhookRow = await this.prisma.webhookEvent.create({
+        data: { gateway: event.provider, event_id: eventId, event_type: event.type, payload: event.data },
+        select: { id: true },
+      });
+    } catch (err) {
+      this.logger.warn('Failed to persist webhook event', err);
+    }
 
-      // PayPal events
-      case 'PAYMENT.CAPTURE.COMPLETED':
-        await this.handlePaymentSucceeded(event);
-        break;
-      case 'PAYMENT.CAPTURE.DENIED':
-        await this.handlePaymentFailed(event);
-        break;
+    let processingError: string | undefined;
+    try {
+      switch (event.type) {
+        // Stripe Checkout events (checkout.session.completed = payment captured)
+        case 'checkout.session.completed':
+          await this.handlePaymentSucceeded(event);
+          break;
+        case 'checkout.session.expired':
+          await this.handlePaymentFailed(event);
+          break;
 
-      default:
-        this.logger.log(`Unhandled webhook event: ${event.type}`);
+        // PayPal events
+        case 'PAYMENT.CAPTURE.COMPLETED':
+          await this.handlePaymentSucceeded(event);
+          break;
+        case 'PAYMENT.CAPTURE.DENIED':
+          await this.handlePaymentFailed(event);
+          break;
+
+        default:
+          this.logger.log(`Unhandled webhook event: ${event.type}`);
+      }
+    } catch (err: any) {
+      processingError = err?.message ?? 'Unknown error';
+      this.logger.error(`Failed processing webhook ${eventId}`, err);
+    }
+
+    // Update processed_at on the webhook row
+    if (webhookRow) {
+      try {
+        await this.prisma.webhookEvent.update({
+          where: { id: webhookRow.id },
+          data: { processed_at: new Date(), processing_error: processingError ?? null },
+        });
+      } catch (err) {
+        this.logger.warn('Failed to update webhook processed_at', err);
+      }
     }
 
     return { received: true };

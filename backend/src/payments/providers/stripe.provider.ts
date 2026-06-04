@@ -129,6 +129,7 @@ export class StripeProvider implements PaymentProvider {
     );
 
     return {
+      id: event.id,
       type: event.type,
       data: event.data.object,
       provider: 'stripe',

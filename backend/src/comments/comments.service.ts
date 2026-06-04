@@ -11,6 +11,7 @@ import { ModerationService } from '../moderation/moderation.service';
 import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { CreateCommentDto, UpdateCommentDto, QueryCommentsDto } from './dto';
 import { CommentStatus, ModerationStatus, User } from '@prisma/client';
+import { AuditLogService } from '../audit/audit.service';
 
 @Injectable()
 export class CommentsService {
@@ -20,6 +21,7 @@ export class CommentsService {
     private prisma: PrismaService,
     private moderationService: ModerationService,
     private capabilitiesService: CapabilitiesService,
+    private auditLog: AuditLogService,
   ) {}
 
   // ── Shared Prisma includes ────────────────────────────────────────────────
@@ -388,34 +390,61 @@ export class CommentsService {
     return { data: comments, total, page, limit, total_pages: Math.ceil(total / limit) };
   }
 
-  async approve(id: string) {
+  async approve(id: string, actorId?: string) {
     const comment = await this.prisma.comment.findUnique({ where: { id } });
     if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
-    return this.prisma.comment.update({
+    const updated = await this.prisma.comment.update({
       where: { id },
       data: { status: CommentStatus.approved, moderation_status: ModerationStatus.approved },
       include: this.commentInclude(),
     });
+    await this.auditLog.log({
+      event_type: 'comment.moderated',
+      user_id: actorId,
+      resource_type: 'comment',
+      resource_id: id,
+      changes: { before: { status: comment.status }, after: { status: 'approved' } },
+      metadata: { moderation_type: 'manual' },
+    });
+    return updated;
   }
 
-  async reject(id: string) {
+  async reject(id: string, actorId?: string) {
     const comment = await this.prisma.comment.findUnique({ where: { id } });
     if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
-    return this.prisma.comment.update({
+    const updated = await this.prisma.comment.update({
       where: { id },
       data: { status: CommentStatus.rejected, moderation_status: ModerationStatus.rejected },
       include: this.commentInclude(),
     });
+    await this.auditLog.log({
+      event_type: 'comment.moderated',
+      user_id: actorId,
+      resource_type: 'comment',
+      resource_id: id,
+      changes: { before: { status: comment.status }, after: { status: 'rejected' } },
+      metadata: { moderation_type: 'manual' },
+    });
+    return updated;
   }
 
-  async markAsSpam(id: string) {
+  async markAsSpam(id: string, actorId?: string) {
     const comment = await this.prisma.comment.findUnique({ where: { id } });
     if (!comment || comment.deleted_at) throw new NotFoundException('Comment not found');
-    return this.prisma.comment.update({
+    const updated = await this.prisma.comment.update({
       where: { id },
       data: { status: CommentStatus.spam, moderation_status: ModerationStatus.rejected },
       include: this.commentInclude(),
     });
+    await this.auditLog.log({
+      event_type: 'comment.moderated',
+      user_id: actorId,
+      resource_type: 'comment',
+      resource_id: id,
+      changes: { before: { status: comment.status }, after: { status: 'spam' } },
+      metadata: { moderation_type: 'manual' },
+    });
+    return updated;
   }
 
   async updateModerationFlags(id: string, flags: string[], profanityDetected: boolean) {

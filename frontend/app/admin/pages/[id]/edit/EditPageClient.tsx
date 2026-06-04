@@ -7,6 +7,7 @@ import { ArrowLeft, Eye, LayoutTemplate } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import adminApi from '@/lib/adminApi';
 import { PageZoneEditor } from '@/components/admin/PageZoneEditor';
+import { VersionHistoryPanel } from '@/components/admin/VersionHistoryPanel';
 import { getZonesForLayout, parsePageContent, LAYOUT_LABELS } from '@/lib/pageContent';
 import type { Page, PageLayout, PageContent } from '@/types';
 
@@ -192,6 +193,10 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         onChange={setZones}
         previewSmall={previewSmall}
       />
+
+      <div className="mt-6">
+        <VersionHistoryPanel resourceType="pages" resourceId={pageId} />
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { AuditLogService } from '../audit/audit.service';
 import { Media } from '@prisma/client';
 import sharp from 'sharp';
 import * as fs from 'fs/promises';
@@ -21,6 +22,7 @@ export class MediaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly auditLog: AuditLogService,
   ) {
     this.uploadsDir = path.join(process.cwd(), 'uploads');
     this.maxFileSize = 10 * 1024 * 1024; // 10MB
@@ -86,6 +88,14 @@ export class MediaService {
           width: metadata?.width,
           height: metadata?.height,
         },
+      });
+
+      await this.auditLog.log({
+        event_type: 'media.uploaded',
+        user_id: userId,
+        resource_type: 'media',
+        resource_id: media.id,
+        metadata: { filename: file.originalname, mime_type: file.mimetype, size: file.size },
       });
 
       return this.transformMedia(media);
@@ -213,6 +223,13 @@ export class MediaService {
 
       // Delete database record
       await this.prisma.media.delete({ where: { id } });
+
+      await this.auditLog.log({
+        event_type: 'media.deleted',
+        resource_type: 'media',
+        resource_id: id,
+        metadata: { filename: media.original_name, mime_type: media.mime_type },
+      });
     } catch (error) {
       throw new InternalServerErrorException(
         `Failed to delete media: ${error.message}`,

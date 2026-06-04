@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { ProductForm } from '@/components/admin/ProductForm';
+import { VersionHistoryPanel } from '@/components/admin/VersionHistoryPanel';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 import type { MediaItem } from '@/types';
@@ -105,6 +106,10 @@ export function EditProductClient() {
             : (product.stock_status as 'in_stock' | 'out_of_stock' | 'back_ordered') ?? 'in_stock',
         }}
       />
+
+      <div className="mt-6">
+        <VersionHistoryPanel resourceType="products" resourceId={productId} />
+      </div>
     </div>
   );
 }

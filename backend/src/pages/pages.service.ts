@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto, UpdatePageDto, QueryPagesDto } from './dto';
 import { Prisma, ContentVisibility } from '@prisma/client';
+import { AuditLogService, diffChanges } from '../audit/audit.service';
 
 const RESERVED_SLUGS = [
   'shop', 'latest', 'cart', 'checkout', 'account',
@@ -16,7 +17,10 @@ const RESERVED_SLUGS = [
 
 @Injectable()
 export class PagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   /**
    * Create a new page
@@ -75,6 +79,14 @@ export class PagesService {
           select: { id: true, title: true, slug: true },
         },
       },
+    });
+
+    await this.auditLog.log({
+      event_type: 'page.created',
+      user_id: authorId,
+      resource_type: 'page',
+      resource_id: page.id,
+      metadata: { title: dto.title, slug, status: dto.status || 'draft' },
     });
 
     return this.transformPage(page);
@@ -349,6 +361,25 @@ export class PagesService {
       },
     });
 
+    const isPublishing = dto.status === 'published' && page.status !== 'published';
+    const isUpdatingPublished = page.status === 'published';
+    if (isPublishing || isUpdatingPublished) {
+      const summary = (dto as any).change_summary ?? (isPublishing ? 'Published' : 'Updated');
+      await this.createPageVersion(id, dto.title ?? page.title, dto.content ?? page.content, userId, summary);
+    }
+
+    const eventType = isPublishing ? 'page.published'
+      : dto.status === 'archived' && page.status === 'published' ? 'page.unpublished'
+      : 'page.updated';
+    const diff = diffChanges(page as any, dto as any);
+    await this.auditLog.log({
+      event_type: eventType,
+      user_id: userId,
+      resource_type: 'page',
+      resource_id: id,
+      changes: Object.keys(diff.before).length ? diff : undefined,
+    });
+
     return this.transformPage(updated);
   }
 
@@ -381,11 +412,87 @@ export class PagesService {
     await this.prisma.page.delete({
       where: { id },
     });
+
+    await this.auditLog.log({
+      event_type: 'page.deleted',
+      user_id: userId,
+      resource_type: 'page',
+      resource_id: id,
+      metadata: { title: page.title, slug: page.slug },
+    });
   }
 
   /**
    * Generate slug from title
    */
+  private async createPageVersion(pageId: string, title: string, content: string, createdBy: string, summary?: string) {
+    const last = await this.prisma.pageVersion.findFirst({
+      where: { page_id: pageId },
+      orderBy: { version_number: 'desc' },
+    });
+    await this.prisma.pageVersion.create({
+      data: {
+        page_id: pageId,
+        version_number: (last?.version_number ?? 0) + 1,
+        title,
+        content,
+        change_summary: summary ?? null,
+        created_by: createdBy,
+      },
+    });
+  }
+
+  async getVersions(pageId: string, page = 1, limit = 20) {
+    const pg = await this.prisma.page.findUnique({ where: { id: pageId } });
+    if (!pg) throw new NotFoundException('Page not found');
+    const skip = (page - 1) * limit;
+    const [versions, total] = await Promise.all([
+      this.prisma.pageVersion.findMany({
+        where: { page_id: pageId },
+        orderBy: { version_number: 'desc' },
+        skip,
+        take: limit,
+        select: { id: true, version_number: true, title: true, change_summary: true, created_by: true, created_at: true },
+      }),
+      this.prisma.pageVersion.count({ where: { page_id: pageId } }),
+    ]);
+    return { data: versions, meta: { total, page, limit, total_pages: Math.ceil(total / limit) } };
+  }
+
+  async getPageVersion(pageId: string, versionNumber: number) {
+    const version = await this.prisma.pageVersion.findUnique({
+      where: { page_id_version_number: { page_id: pageId, version_number: versionNumber } },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+    return version;
+  }
+
+  async restorePageVersion(pageId: string, versionNumber: number, userId: string) {
+    const version = await this.getPageVersion(pageId, versionNumber);
+    const page = await this.prisma.page.findUnique({ where: { id: pageId } });
+    if (!page) throw new NotFoundException('Page not found');
+
+    await this.prisma.page.update({
+      where: { id: pageId },
+      data: { title: version.title, content: version.content, status: 'draft' },
+    });
+
+    await this.createPageVersion(pageId, version.title, version.content, userId, `Restored from version ${versionNumber}`);
+    await this.auditLog.log({
+      event_type: 'page.updated',
+      user_id: userId,
+      resource_type: 'page',
+      resource_id: pageId,
+      metadata: { restored_from_version: versionNumber },
+    });
+
+    const updated = await this.prisma.page.findUnique({
+      where: { id: pageId },
+      include: { parent: { select: { id: true, title: true, slug: true } }, children: { select: { id: true, title: true, slug: true } } },
+    });
+    return this.transformPage(updated!);
+  }
+
   private generateSlug(title: string): string {
     return title
       .toLowerCase()

@@ -8,10 +8,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, UpdateProductDto, QueryProductsDto } from './dto';
 import { Prisma, ContentVisibility } from '@prisma/client';
+import { AuditLogService, diffChanges } from '../audit/audit.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLog: AuditLogService,
+  ) {}
 
   /**
    * Create a new product
@@ -111,6 +115,28 @@ export class ProductsService {
     }
 
     return this.transformProduct(product);
+  }
+
+  private async createProductVersion(product: any, userId: string, summary?: string) {
+    const last = await this.prisma.productVersion.findFirst({
+      where: { product_id: product.id },
+      orderBy: { version_number: 'desc' },
+    });
+    await this.prisma.productVersion.create({
+      data: {
+        product_id: product.id,
+        version_number: (last?.version_number ?? 0) + 1,
+        name: product.name,
+        description: product.description ?? null,
+        price: product.price,
+        compare_at_price: product.compare_at_price ?? null,
+        sku: product.sku ?? null,
+        stock_quantity: product.stock_quantity ?? null,
+        stock_status: product.stock_status,
+        change_summary: summary ?? null,
+        created_by: userId,
+      },
+    });
   }
 
   /**
@@ -282,7 +308,7 @@ export class ProductsService {
   /**
    * Update product
    */
-  async update(id: string, dto: UpdateProductDto, isAdmin = false) {
+  async update(id: string, dto: UpdateProductDto, userId: string, isAdmin = false) {
     const product = await this.prisma.product.findUnique({
       where: { id },
     });
@@ -390,8 +416,26 @@ export class ProductsService {
         where: { id },
         include: this.getProductIncludes(),
       });
+      await this.createProductVersion(fresh!, userId, (dto as any).change_summary);
+      await this.auditLog.log({
+        event_type: 'product.updated',
+        user_id: userId,
+        resource_type: 'product',
+        resource_id: id,
+        changes: diffChanges(product as any, dto as any),
+      });
       return this.transformProduct(fresh!);
     }
+
+    await this.createProductVersion(updated, userId, (dto as any).change_summary);
+    const diff = diffChanges(product as any, dto as any);
+    await this.auditLog.log({
+      event_type: 'product.updated',
+      user_id: userId,
+      resource_type: 'product',
+      resource_id: id,
+      changes: Object.keys(diff.before).length ? diff : undefined,
+    });
 
     return this.transformProduct(updated);
   }
@@ -418,11 +462,74 @@ export class ProductsService {
       where: { id },
       data: { deleted_at: new Date() },
     });
+
+    await this.auditLog.log({
+      event_type: 'product.deleted',
+      resource_type: 'product',
+      resource_id: id,
+      metadata: { name: product.name, slug: product.slug },
+    });
   }
 
   /**
    * Update stock
    */
+  async getVersions(productId: string, page = 1, limit = 20) {
+    const product = await this.prisma.product.findFirst({ where: { id: productId, deleted_at: null } });
+    if (!product) throw new NotFoundException('Product not found');
+    const skip = (page - 1) * limit;
+    const [versions, total] = await Promise.all([
+      this.prisma.productVersion.findMany({
+        where: { product_id: productId },
+        orderBy: { version_number: 'desc' },
+        skip,
+        take: limit,
+        select: { id: true, version_number: true, name: true, price: true, stock_status: true, change_summary: true, created_by: true, created_at: true },
+      }),
+      this.prisma.productVersion.count({ where: { product_id: productId } }),
+    ]);
+    return { data: versions, meta: { total, page, limit, total_pages: Math.ceil(total / limit) } };
+  }
+
+  async getVersion(productId: string, versionNumber: number) {
+    const version = await this.prisma.productVersion.findUnique({
+      where: { product_id_version_number: { product_id: productId, version_number: versionNumber } },
+    });
+    if (!version) throw new NotFoundException('Version not found');
+    return version;
+  }
+
+  async restoreVersion(productId: string, versionNumber: number, userId: string) {
+    const version = await this.getVersion(productId, versionNumber);
+    const product = await this.prisma.product.findFirst({ where: { id: productId, deleted_at: null } });
+    if (!product) throw new NotFoundException('Product not found');
+
+    const restored = await this.prisma.product.update({
+      where: { id: productId },
+      data: {
+        name: version.name,
+        description: version.description ?? undefined,
+        price: version.price,
+        compare_at_price: version.compare_at_price ?? null,
+        sku: version.sku ?? undefined,
+        stock_quantity: version.stock_quantity ?? null,
+        stock_status: version.stock_status as any,
+      },
+      include: this.getProductIncludes(),
+    });
+
+    await this.createProductVersion(restored, userId, `Restored from version ${versionNumber}`);
+    await this.auditLog.log({
+      event_type: 'product.updated',
+      user_id: userId,
+      resource_type: 'product',
+      resource_id: productId,
+      metadata: { restored_from_version: versionNumber },
+    });
+
+    return this.transformProduct(restored);
+  }
+
   async updateStock(id: string, quantity: number, isAdmin = false) {
     const product = await this.prisma.product.findUnique({
       where: { id },
