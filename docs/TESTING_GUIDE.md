@@ -198,22 +198,28 @@ This section covers the structured manual testing sequence for Phase 9. Testing 
 
 ---
 
-### Step 8 — Admin Back Door: 2FA Enrollment
+### Step 8 — Admin Back Door: Session Isolation & 2FA ✅
 
-**Do this before any admin CRUD testing** — without a registered TOTP device, the owner account cannot reach the admin dashboard.
+The backstage experience is fully bifurcated from the customer-facing experience. Customer and
+backstage sessions are independent: separate tokens (`admin_access_token` / `admin_refresh_token`
+vs `access_token` / `refresh_token`), separate API client (`adminApi`), and a dedicated
+`BackstageGuard` enforcing `session_type === 'backstage'` on all admin endpoints.
 
-- Navigate to `/admin/login`
+- Navigate to `/admin/login` (the only entry point to the backstage)
 - Sign in as `owner@aecms.local / Admin123!@#`
-- When QR code appears, scan with authenticator app (Google Authenticator, Authy, etc.)
-- Enter the 6-digit code to complete enrollment
+- If 2FA not yet enrolled: QR code displayed → scan with authenticator app → enter 6-digit code
+- If 2FA enrolled: enter 6-digit TOTP code directly
 - Verify you land on the admin dashboard
 
 **Checklist**
-- [ ] Admin login page loads at `/admin/login`
-- [ ] Credentials accepted, TOTP challenge shown
-- [ ] QR code scans correctly
-- [ ] 6-digit code accepted, dashboard loads
-- [ ] Subsequent logins prompt for TOTP code
+- [x] Admin login page loads at `/admin/login`
+- [x] Navigating directly to `/admin` while logged in via customer front door redirects to `/admin/login` (not admitted)
+- [x] Credentials accepted, TOTP challenge shown
+- [x] QR code scans correctly; 6-digit code accepted; dashboard loads
+- [x] Subsequent logins prompt for TOTP code only (no QR code after enrollment)
+- [x] Backstage logout clears only the backstage session; customer session remains active
+- [x] Customer logout does not affect an active backstage session
+- [x] Both sessions can be active simultaneously without interference
 
 ---
 
@@ -275,13 +281,13 @@ This section covers the structured manual testing sequence for Phase 9. Testing 
 | Checkout | Stripe Payment Intent creation blocked in Codespaces network, or webhook not reachable |
 | Admin article edit | Form doesn't pre-populate existing categories/tags |
 | Admin 2FA | Blocks all admin testing until enrollment is complete |
-| Cart merge | Anonymous → logged-in cart merge probably not implemented |
+| Cart merge | ✅ Fixed in Phase 9 — anonymous cart merges on login |
 
 ---
 
 ## Automated Testing
 
-### Backend Unit Tests (152 tests)
+### Backend Unit Tests (154 tests)
 ```bash
 cd backend && npm run test
 ```

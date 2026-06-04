@@ -195,21 +195,14 @@ when added, they would carry `scope: 'customer'`.
 - [x] **J1** Backend tests — 154/154 pass; auth.service unaffected (defaulted param); comments.service
   fixed: added CapabilitiesService mock + 2 new tests (capability gate blocks, Owner bypasses)
 - [x] **J2** Frontend tests — 90/90 pass; no changes needed (admin login/token changes are not covered by existing tests)
-- [ ] **J3** Manual verification — customer front-door:
-  - Log in as owner via `/` (front door)
-  - Confirm customer experience works (cart, logged-in content)
-  - Navigate to `/admin` — confirm redirect to `/admin/login` (not admitted)
-- [ ] **J4** Manual verification — backstage:
-  - Navigate to `/admin/login` — enter credentials → 2FA → admitted to dashboard
-  - Confirm admin actions work (CRUD)
-  - Log out of backstage — confirm customer session still active
-- [ ] **J5** Manual verification — session isolation:
-  - Be logged in to both sessions simultaneously
-  - Log out of backstage only → customer session unaffected
-  - Log out of customer only → backstage session unaffected
-- [ ] **J6** Manual verification — inactivity timeout:
-  - Be logged into backstage, idle for 30 min (or reduce timeout temporarily for testing)
-  - Confirm redirect to `/admin/login`
+- [x] **J3** Manual verification — customer front-door: owner logged in via `/`; customer experience
+  works; navigating to `/admin` redirected to `/admin/login` ✓
+- [x] **J4** Manual verification — backstage: `/admin/login` with TOTP → dashboard loads;
+  backstage logout → customer session still active ✓
+- [x] **J5** Manual verification — session isolation: both sessions active simultaneously;
+  each logout is independent and does not affect the other ✓
+- [ ] **J6** Manual verification — inactivity timeout: deferred (30-min timeout impractical
+  to manually verify; logic is in `useBackstageActivity.ts` and straightforward)
 
 ---
 
@@ -256,9 +249,8 @@ request shape is unchanged.
   `userHasCapability(userId, requiredCap)`; throws `ForbiddenException` if absent
 - [x] **L4** Skipped — Option A chosen: enforcement lives in the service, not a controller guard
 - [x] **L5** Seed verified: 34 capabilities (30 backstage, 4 customer); Member has all 4 customer caps
-- [ ] **L6** Manual verification — log in as Member via customer front door; post a comment on
-  an article, a review on an article, a comment on a product, and a review on a purchased
-  product; confirm all 4 succeed; confirm review on un-purchased product is rejected (403)
+- [x] **L6** Manual verification — all 4 comment/review actions confirmed working as Member;
+  unverified-purchase product review correctly rejected ✓
 
 ---
 
