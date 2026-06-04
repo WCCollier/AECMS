@@ -212,6 +212,61 @@ when added, they would carry `scope: 'customer'`.
 
 ---
 
+### Phase L — Customer-Scoped Capabilities: Comment & Review
+
+Add four capabilities with `scope: 'customer'` that gate the comment/review actions in the
+customer-facing experience. These use `JwtAuthGuard + CapabilityGuard` — no `BackstageGuard`.
+A standard customer-session token is sufficient; no backstage login required.
+
+**New capabilities**
+
+| Name | Scope | Description |
+|------|-------|-------------|
+| `comment.article` | customer | Post a comment (no rating) on an article |
+| `review.article` | customer | Post a review (with rating) on an article |
+| `comment.product` | customer | Post a comment (no rating) on a product |
+| `review.product` | customer | Post a review (with rating) on a product; verified purchase enforced |
+
+Default role assignments: Member gets all 4. Admin gets all 4. Owner gets all capabilities automatically.
+
+**Runtime capability selection** (inside `CommentsService.create()`):
+
+```
+isReview=false + article_id  →  requires  comment.article
+isReview=true  + article_id  →  requires  review.article
+isReview=false + product_id  →  requires  comment.product
+isReview=true  + product_id  →  requires  review.product
+```
+
+`isReview` and the target ID are already derived by the service before any DB writes; the
+capability check slots in immediately after that derivation. Owner role bypasses the check.
+Verified purchase enforcement for `review.product` is already implemented in the service.
+
+No frontend changes are required — `POST /comments` is the existing unified endpoint and the
+request shape is unchanged.
+
+#### Checklist
+
+- [ ] **L1** `prisma/seed.ts` — add 4 new capabilities with `scope: 'customer'`; add all 4 to Member
+  and Admin default role capabilities lists; update upsert to set scope on re-seed
+- [ ] **L2** `backend/src/comments/comments.module.ts` — import `CapabilitiesModule` so
+  `CapabilitiesService` is available for injection into `CommentsService`
+- [ ] **L3** `backend/src/comments/comments.service.ts` — inject `CapabilitiesService`; add
+  runtime capability check in `create()` immediately after `isReview` / target-ID derivation:
+  - Owner role → bypass
+  - Others → call `capabilitiesService.userHasCapability(userId, requiredCap)`
+  - Throw `ForbiddenException` if check fails
+- [ ] **L4** `backend/src/comments/comments.controller.ts` — add `CapabilityGuard` to the
+  `POST /comments` `@UseGuards(...)` chain (guard handles the Owner bypass and delegates to
+  the service for the dynamic per-request check)
+- [ ] **L5** Run `npx prisma db seed` and verify capability count is now 34; confirm Member role
+  has the 4 new capabilities assigned
+- [ ] **L6** Manual verification — log in as Member via customer front door; post a comment on
+  an article, a review on an article, a comment on a product, and a review on a purchased
+  product; confirm all 4 succeed; confirm review on un-purchased product is rejected (403)
+
+---
+
 ### Phase K — Cleanup & Documentation
 
 - [ ] **K1** Update `CLAUDE.md` — document the customer/backstage session model and the `session_type` convention
@@ -242,3 +297,7 @@ when added, they would carry `scope: 'customer'`.
 | `frontend/app/admin/login/2fa/TwoFactorClient.tsx` | admin token storage |
 | `frontend/app/admin/login/setup/SetupTwoFactorClient.tsx` | read from admin session |
 | `frontend/app/admin/**/*.tsx` (5 page files) | api → adminApi |
+| `backend/prisma/seed.ts` *(Phase L)* | 4 new customer-scoped capabilities; Member + Admin role assignments |
+| `backend/src/comments/comments.module.ts` *(Phase L)* | import CapabilitiesModule |
+| `backend/src/comments/comments.service.ts` *(Phase L)* | inject CapabilitiesService; runtime capability check in create() |
+| `backend/src/comments/comments.controller.ts` *(Phase L)* | add CapabilityGuard to POST /comments |
