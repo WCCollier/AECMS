@@ -6,6 +6,7 @@ import {
   Bold, Italic, Strikethrough, Code, List, ListOrdered, Quote,
   Undo, Redo, Link as LinkIcon, Unlink, Heading1, Heading2, Heading3,
   Minus, ImagePlus, X, Upload, Info, Video, Twitter, GalleryHorizontal,
+  FileText, ShoppingBag, Square,
 } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
 import { getEditorExtensions } from './extensions';
@@ -182,6 +183,30 @@ export function TipTapEditor({
     }).run();
   }, [editor]);
 
+  const insertRichTextBox = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'richTextBox',
+      content: [{ type: 'paragraph' }],
+    }).run();
+  }, [editor]);
+
+  const insertArticleEmbed = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'articleEmbed',
+      attrs: { articleId: '' },
+    }).run();
+  }, [editor]);
+
+  const insertProductEmbed = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'productEmbed',
+      attrs: { productId: '' },
+    }).run();
+  }, [editor]);
+
   if (!editor) {
     return (
       <div className={`border border-border rounded-lg ${className}`}>
@@ -271,6 +296,21 @@ export function TipTapEditor({
         {/* X / Twitter embed */}
         <MenuButton onClick={insertXEmbed} title="Insert X / Twitter post">
           <Twitter className="w-4 h-4" />
+        </MenuButton>
+
+        {/* Rich Text Box */}
+        <MenuButton onClick={insertRichTextBox} title="Insert rich text box">
+          <Square className="w-4 h-4" />
+        </MenuButton>
+
+        {/* Article embed */}
+        <MenuButton onClick={insertArticleEmbed} title="Embed article">
+          <FileText className="w-4 h-4" />
+        </MenuButton>
+
+        {/* Product embed */}
+        <MenuButton onClick={insertProductEmbed} title="Embed product">
+          <ShoppingBag className="w-4 h-4" />
         </MenuButton>
 
         <MenuDivider />

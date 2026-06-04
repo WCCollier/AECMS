@@ -1,0 +1,197 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, Eye, LayoutTemplate } from 'lucide-react';
+import { Button, Input } from '@/components/ui';
+import adminApi from '@/lib/adminApi';
+import { PageZoneEditor } from '@/components/admin/PageZoneEditor';
+import { getZonesForLayout, parsePageContent, LAYOUT_LABELS } from '@/lib/pageContent';
+import type { Page, PageLayout, PageContent } from '@/types';
+
+const LAYOUT_OPTIONS: PageLayout[] = ['no_sidebar', 'sidebar_left', 'sidebar_right', 'split_comparison'];
+
+interface EditPageClientProps {
+  pageId: string;
+}
+
+export function EditPageClient({ pageId }: EditPageClientProps) {
+  const router = useRouter();
+  const [page, setPage] = useState<Page | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
+  const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+  const [layout, setLayout] = useState<PageLayout>('no_sidebar');
+  const [zones, setZones] = useState<PageContent['zones']>({});
+  const [previewSmall, setPreviewSmall] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [layoutChangeWarning, setLayoutChangeWarning] = useState(false);
+  const [pendingLayout, setPendingLayout] = useState<PageLayout | null>(null);
+
+  useEffect(() => {
+    adminApi.get<Page>(`/pages/${pageId}`)
+      .then((res) => {
+        const p = res.data;
+        setPage(p);
+        setTitle(p.title);
+        setSlug(p.slug);
+        setStatus(p.status);
+        const content = parsePageContent(p.content);
+        setLayout(content.layout);
+        setZones(content.zones);
+      })
+      .catch(() => setError('Failed to load page.'))
+      .finally(() => setLoading(false));
+  }, [pageId]);
+
+  const handleLayoutChange = (newLayout: PageLayout) => {
+    if (newLayout === layout) return;
+    setPendingLayout(newLayout);
+    setLayoutChangeWarning(true);
+  };
+
+  const confirmLayoutChange = () => {
+    if (!pendingLayout) return;
+    const mainContent = zones.main ?? zones.left ?? null;
+    setZones({ main: mainContent ?? undefined });
+    setLayout(pendingLayout);
+    setPendingLayout(null);
+    setLayoutChangeWarning(false);
+  };
+
+  const handleSave = async () => {
+    if (!title.trim()) { setError('Title is required.'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      const pageContent: PageContent = { layout, zones };
+      await adminApi.patch(`/pages/${pageId}`, {
+        title: title.trim(),
+        slug,
+        content: JSON.stringify(pageContent),
+        layout,
+        status,
+      });
+      router.push('/admin/pages');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Save failed.';
+      setError(Array.isArray(msg) ? msg.join(', ') : msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-6 text-center text-foreground/50">Loading page…</div>;
+  }
+
+  if (!page && !loading) {
+    return <div className="p-6 text-center text-red-500">{error ?? 'Page not found.'}</div>;
+  }
+
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <Link href="/admin/pages" className="inline-flex items-center text-foreground/60 hover:text-foreground mb-2">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Pages
+          </Link>
+          <h1 className="text-2xl font-bold">Edit Page</h1>
+        </div>
+        <div className="flex items-center gap-3">
+          {getZonesForLayout(layout).length > 1 && (
+            <button
+              type="button"
+              onClick={() => setPreviewSmall((v) => !v)}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
+                previewSmall ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
+              }`}
+            >
+              <Eye className="w-4 h-4" />
+              {previewSmall ? 'Small preview ON' : 'Preview small widgets'}
+            </button>
+          )}
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as typeof status)}
+            className="text-sm px-3 py-1.5 border border-border rounded-lg bg-background"
+          >
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save Changes'}
+          </Button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-500">
+          {error}
+        </div>
+      )}
+
+      {/* Metadata row */}
+      <div className="grid sm:grid-cols-2 gap-4 mb-6 p-4 bg-surface rounded-lg border border-border">
+        <div>
+          <label className="block text-sm font-medium mb-1">Title</label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Slug</label>
+          <div className="flex items-center gap-2">
+            <span className="text-foreground/40 text-sm">/</span>
+            <Input value={slug} onChange={(e) => setSlug(e.target.value)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Layout selector */}
+      <div className="mb-6">
+        <p className="text-sm font-medium mb-2">Layout</p>
+        <div className="flex flex-wrap gap-2">
+          {LAYOUT_OPTIONS.map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => handleLayoutChange(opt)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+                opt === layout
+                  ? 'border-accent bg-accent/10 text-accent'
+                  : 'border-border hover:border-accent/50'
+              }`}
+            >
+              <LayoutTemplate className="w-3.5 h-3.5" />
+              {LAYOUT_LABELS[opt]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Layout change confirmation */}
+      {layoutChangeWarning && pendingLayout && (
+        <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+          <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Change layout to {LAYOUT_LABELS[pendingLayout]}?</p>
+          <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+            Main/Left zone content will be preserved. Sidebar and Right zone content will be discarded.
+          </p>
+          <div className="flex gap-2 mt-3">
+            <Button variant="outline" onClick={confirmLayoutChange} className="text-sm">Confirm Change</Button>
+            <Button variant="ghost" onClick={() => { setLayoutChangeWarning(false); setPendingLayout(null); }} className="text-sm">Cancel</Button>
+          </div>
+        </div>
+      )}
+
+      <PageZoneEditor
+        layout={layout}
+        zones={zones}
+        onChange={setZones}
+        previewSmall={previewSmall}
+      />
+    </div>
+  );
+}

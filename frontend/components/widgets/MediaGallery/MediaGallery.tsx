@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { MediaItem } from '@/types';
+import { useWidgetSize } from '@/contexts/WidgetSizeContext';
 
 interface MediaGalleryProps {
   media: MediaItem[];
@@ -18,15 +19,46 @@ const ASPECT: Record<string, string> = {
   auto: '',
 };
 
-export function MediaGallery({ media, aspectRatio = 'video', className = '', fallback }: MediaGalleryProps) {
-  const sorted = [...media].sort((a, b) => {
+function sortMedia(media: MediaItem[]): MediaItem[] {
+  return [...media].sort((a, b) => {
     if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
     return a.order - b.order;
   });
+}
+
+function MediaCarouselSmall({ media, aspectRatio }: { media: MediaItem[]; aspectRatio: string }) {
+  const [index, setIndex] = useState(0);
+  const sorted = sortMedia(media);
+
+  useEffect(() => { setIndex(0); }, [media]);
+
+  useEffect(() => {
+    if (sorted.length <= 1) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % sorted.length), 3000);
+    return () => clearInterval(id);
+  }, [sorted.length]);
+
+  if (sorted.length === 0) return null;
+
+  return (
+    <div className={`${ASPECT[aspectRatio] || 'aspect-video'} relative overflow-hidden rounded-lg`}>
+      <Image
+        src={sorted[index].url}
+        alt={sorted[index].alt_text || ''}
+        fill
+        className="object-cover transition-opacity duration-500"
+        sizes="(max-width: 768px) 100vw, 280px"
+      />
+    </div>
+  );
+}
+
+export function MediaGallery({ media, aspectRatio = 'video', className = '', fallback }: MediaGalleryProps) {
+  const size = useWidgetSize();
+  const sorted = sortMedia(media);
 
   const [index, setIndex] = useState(0);
 
-  // Reset index when media changes (e.g. navigating between articles)
   useEffect(() => { setIndex(0); }, [media]);
 
   const prev = useCallback(() => setIndex((i) => (i - 1 + sorted.length) % sorted.length), [sorted.length]);
@@ -46,6 +78,10 @@ export function MediaGallery({ media, aspectRatio = 'video', className = '', fal
     return fallback ? (
       <div className={`${ASPECT[aspectRatio]} relative ${className}`}>{fallback}</div>
     ) : null;
+  }
+
+  if (size === 'small') {
+    return <MediaCarouselSmall media={sorted} aspectRatio={aspectRatio} />;
   }
 
   const current = sorted[index];
@@ -76,7 +112,6 @@ export function MediaGallery({ media, aspectRatio = 'video', className = '', fal
         priority={index === 0}
       />
 
-      {/* Prev / Next arrows */}
       <button
         onClick={prev}
         aria-label="Previous image"
@@ -92,7 +127,6 @@ export function MediaGallery({ media, aspectRatio = 'video', className = '', fal
         <ChevronRight className="w-5 h-5" />
       </button>
 
-      {/* Dot indicators */}
       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
         {sorted.map((_, i) => (
           <button
@@ -106,7 +140,6 @@ export function MediaGallery({ media, aspectRatio = 'video', className = '', fal
         ))}
       </div>
 
-      {/* Image counter */}
       <div className="absolute top-3 right-3 bg-black/50 text-white text-xs px-2 py-0.5 rounded-full z-10">
         {index + 1} / {sorted.length}
       </div>

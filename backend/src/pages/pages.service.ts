@@ -9,6 +9,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto, UpdatePageDto, QueryPagesDto } from './dto';
 import { Prisma, ContentVisibility } from '@prisma/client';
 
+const RESERVED_SLUGS = [
+  'shop', 'latest', 'cart', 'checkout', 'account',
+  'order-confirmation', 'admin', 'auth', 'api',
+];
+
 @Injectable()
 export class PagesService {
   constructor(private prisma: PrismaService) {}
@@ -19,6 +24,11 @@ export class PagesService {
   async create(dto: CreatePageDto, authorId: string) {
     // Generate slug if not provided
     const slug = dto.slug || this.generateSlug(dto.title);
+
+    // Check reserved slugs
+    if (RESERVED_SLUGS.includes(slug)) {
+      throw new ConflictException(`"${slug}" is reserved and cannot be used as a page slug`);
+    }
 
     // Check if slug already exists
     const existing = await this.prisma.page.findUnique({
@@ -260,6 +270,9 @@ export class PagesService {
 
     // Check slug uniqueness if changing
     if (dto.slug && dto.slug !== page.slug) {
+      if (RESERVED_SLUGS.includes(dto.slug)) {
+        throw new ConflictException(`"${dto.slug}" is reserved and cannot be used as a page slug`);
+      }
       const existing = await this.prisma.page.findUnique({
         where: { slug: dto.slug },
       });

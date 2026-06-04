@@ -7,3 +7,8 @@ export type { CalloutType } from './Callout';
 export { VideoEmbed } from './VideoEmbed';
 
 export { XEmbed } from './XEmbed';
+
+export { ArticleEmbed } from './ArticleEmbed/ArticleEmbed';
+export { ProductEmbed } from './ProductEmbed/ProductEmbed';
+export { RichTextBox } from './RichTextBox/RichTextBox';
+export { ConditionalWidget } from './ConditionalWidget';

@@ -4,10 +4,15 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { VideoEmbed } from '@/components/widgets/VideoEmbed/VideoEmbed';
 import { Pencil, Trash2 } from 'lucide-react';
+import { conditionalDisplayAttribute, showWhenBadge, SHOW_WHEN_OPTIONS, SHOW_WHEN_LABELS } from './conditionalDisplay';
+import type { ShowWhen } from './conditionalDisplay';
+import { ConditionalWidget } from '@/components/widgets/ConditionalWidget';
 
 function VideoEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeViewProps) {
   const [editing, setEditing] = useState(!node.attrs.url);
   const [draft, setDraft] = useState<string>(node.attrs.url || '');
+  const showWhen = (node.attrs.show_when || 'always') as ShowWhen;
+  const badge = editor.isEditable ? showWhenBadge(showWhen) : null;
 
   const commit = () => {
     if (!draft.trim()) return;
@@ -15,9 +20,9 @@ function VideoEmbedNodeView({ node, editor, updateAttributes, deleteNode }: Node
     setEditing(false);
   };
 
-  return (
-    <NodeViewWrapper contentEditable={false}>
-      {editor.isEditable && editing ? (
+  if (editor.isEditable && editing) {
+    return (
+      <NodeViewWrapper contentEditable={false}>
         <div className="my-4 p-4 border border-border rounded-lg bg-surface space-y-2">
           <p className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">Insert Video</p>
           <div className="flex gap-2">
@@ -49,11 +54,38 @@ function VideoEmbedNodeView({ node, editor, updateAttributes, deleteNode }: Node
             )}
           </div>
         </div>
-      ) : (
-        <div className="relative group my-4">
-          <VideoEmbed url={node.attrs.url} />
-          {editor.isEditable && (
-            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+      </NodeViewWrapper>
+    );
+  }
+
+  const inner = (
+    <NodeViewWrapper contentEditable={false}>
+      <div className="relative group my-4">
+        {badge && (
+          <div className="absolute top-2 left-2 z-20 text-xs bg-accent/90 text-white px-2 py-0.5 rounded">
+            {badge}
+          </div>
+        )}
+        <VideoEmbed url={node.attrs.url} />
+        {editor.isEditable && (
+          <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            <div className="flex gap-1 flex-wrap justify-end">
+              {SHOW_WHEN_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => updateAttributes({ show_when: opt })}
+                  className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                    opt === showWhen
+                      ? 'bg-accent/80 border-accent text-white'
+                      : 'bg-black/50 border-white/20 text-white hover:bg-black/70'
+                  }`}
+                >
+                  {SHOW_WHEN_LABELS[opt]}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1 justify-end">
               <button
                 type="button"
                 onClick={() => { setDraft(node.attrs.url); setEditing(true); }}
@@ -71,11 +103,16 @@ function VideoEmbedNodeView({ node, editor, updateAttributes, deleteNode }: Node
                 <Trash2 className="w-3 h-3" /> Remove
               </button>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </NodeViewWrapper>
   );
+
+  if (!editor.isEditable) {
+    return <ConditionalWidget showWhen={showWhen}>{inner}</ConditionalWidget>;
+  }
+  return inner;
 }
 
 export const VideoEmbedNode = Node.create({
@@ -90,6 +127,7 @@ export const VideoEmbedNode = Node.create({
         parseHTML: (el) => el.getAttribute('data-url') || '',
         renderHTML: (attrs) => ({ 'data-url': attrs.url }),
       },
+      ...conditionalDisplayAttribute,
     };
   },
 

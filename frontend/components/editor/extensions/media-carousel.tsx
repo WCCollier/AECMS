@@ -7,6 +7,9 @@ import { MediaPicker } from '@/components/admin/MediaPicker';
 import { Pencil, Trash2, Plus, Star, StarOff, Trash, ChevronUp, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import type { MediaItem } from '@/types';
+import { conditionalDisplayAttribute, showWhenBadge, SHOW_WHEN_OPTIONS, SHOW_WHEN_LABELS } from './conditionalDisplay';
+import type { ShowWhen } from './conditionalDisplay';
+import { ConditionalWidget } from '@/components/widgets/ConditionalWidget';
 
 interface CarouselEntry {
   id: string;
@@ -38,7 +41,6 @@ function parseMedia(raw: string): MediaItem[] {
   try { return JSON.parse(raw) as MediaItem[]; } catch { return []; }
 }
 
-// ── Gallery editor panel used both for insert and edit ────────────────────────
 function CarouselPanel({
   initial,
   onSave,
@@ -158,10 +160,11 @@ function CarouselPanel({
   );
 }
 
-// ── NodeView ──────────────────────────────────────────────────────────────────
 function MediaCarouselNodeView({ node, editor, updateAttributes, deleteNode }: NodeViewProps) {
   const [editing, setEditing] = useState(false);
   const media = parseMedia(node.attrs.media as string);
+  const showWhen = (node.attrs.show_when || 'always') as ShowWhen;
+  const badge = editor.isEditable ? showWhenBadge(showWhen) : null;
 
   if (media.length === 0 && editor.isEditable) {
     return (
@@ -192,12 +195,31 @@ function MediaCarouselNodeView({ node, editor, updateAttributes, deleteNode }: N
     );
   }
 
-  return (
+  const inner = (
     <NodeViewWrapper contentEditable={false}>
       <div className="relative group my-4">
+        {badge && (
+          <div className="absolute top-2 left-2 z-20 text-xs bg-accent/90 text-white px-2 py-0.5 rounded">
+            {badge}
+          </div>
+        )}
         <MediaGallery media={media} aspectRatio="video" />
         {editor.isEditable && (
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+            {SHOW_WHEN_OPTIONS.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => updateAttributes({ show_when: opt })}
+                className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                  opt === showWhen
+                    ? 'bg-accent/80 border-accent text-white'
+                    : 'bg-black/50 border-white/20 text-white hover:bg-black/70'
+                }`}
+              >
+                {SHOW_WHEN_LABELS[opt]}
+              </button>
+            ))}
             <button
               type="button"
               onClick={() => setEditing(true)}
@@ -217,9 +239,13 @@ function MediaCarouselNodeView({ node, editor, updateAttributes, deleteNode }: N
       </div>
     </NodeViewWrapper>
   );
+
+  if (!editor.isEditable) {
+    return <ConditionalWidget showWhen={showWhen}>{inner}</ConditionalWidget>;
+  }
+  return inner;
 }
 
-// ── TipTap Node ───────────────────────────────────────────────────────────────
 export const MediaCarouselNode = Node.create({
   name: 'mediaCarousel',
   group: 'block',
@@ -232,6 +258,7 @@ export const MediaCarouselNode = Node.create({
         parseHTML: (el) => el.getAttribute('data-media') || '[]',
         renderHTML: (attrs) => ({ 'data-media': attrs.media }),
       },
+      ...conditionalDisplayAttribute,
     };
   },
 

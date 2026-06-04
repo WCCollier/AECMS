@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Globe,
+  LayoutTemplate,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import { useBackstageActivity } from '@/hooks/useBackstageActivity';
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/articles', label: 'Articles', icon: FileText },
+  { href: '/admin/pages', label: 'Pages', icon: LayoutTemplate },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/domains', label: 'Domains', icon: Globe, ownerOnly: true },
   { href: '/admin/settings', label: 'Settings', icon: Settings },

@@ -1,6 +1,17 @@
-import { Video } from 'lucide-react';
+'use client';
 
-function getEmbedUrl(url: string): string | null {
+import { Video, Play } from 'lucide-react';
+import Image from 'next/image';
+import { useWidgetSize } from '@/contexts/WidgetSizeContext';
+
+interface VideoInfo {
+  embedUrl: string | null;
+  thumbnailUrl: string | null;
+  originalUrl: string;
+}
+
+function parseVideoUrl(url: string): VideoInfo {
+  const result: VideoInfo = { embedUrl: null, thumbnailUrl: null, originalUrl: url };
   try {
     const u = new URL(url);
     if (u.hostname.includes('youtube.com') || u.hostname === 'youtu.be') {
@@ -10,18 +21,24 @@ function getEmbedUrl(url: string): string | null {
         const m = u.pathname.match(/\/embed\/([^/?]+)/);
         if (m) id = m[1];
       }
-      return id ? `https://www.youtube.com/embed/${id}` : null;
-    }
-    if (u.hostname.includes('vimeo.com')) {
+      if (id) {
+        result.embedUrl = `https://www.youtube.com/embed/${id}`;
+        result.thumbnailUrl = `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+      }
+    } else if (u.hostname.includes('vimeo.com')) {
       const m = u.pathname.match(/\/(\d+)/);
-      return m ? `https://player.vimeo.com/video/${m[1]}` : null;
+      if (m) {
+        result.embedUrl = `https://player.vimeo.com/video/${m[1]}`;
+        // Vimeo thumbnail requires oEmbed; fall back to null
+      }
     }
   } catch {}
-  return null;
+  return result;
 }
 
 export function VideoEmbed({ url }: { url: string }) {
-  const embedUrl = getEmbedUrl(url);
+  const size = useWidgetSize();
+  const { embedUrl, thumbnailUrl, originalUrl } = parseVideoUrl(url);
 
   if (!embedUrl) {
     return (
@@ -34,6 +51,37 @@ export function VideoEmbed({ url }: { url: string }) {
           </a>
         </span>
       </div>
+    );
+  }
+
+  if (size === 'small') {
+    return (
+      <a
+        href={originalUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block relative aspect-video rounded-lg overflow-hidden my-2 bg-black group"
+        aria-label="Watch video"
+      >
+        {thumbnailUrl ? (
+          <Image
+            src={thumbnailUrl}
+            alt="Video thumbnail"
+            fill
+            className="object-cover opacity-80 group-hover:opacity-70 transition-opacity"
+            sizes="280px"
+          />
+        ) : (
+          <div className="w-full h-full bg-foreground/10 flex items-center justify-center">
+            <Video className="w-8 h-8 text-foreground/40" />
+          </div>
+        )}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-black/60 rounded-full p-3 group-hover:bg-black/80 transition-colors">
+            <Play className="w-6 h-6 text-white fill-white" />
+          </div>
+        </div>
+      </a>
     );
   }
 

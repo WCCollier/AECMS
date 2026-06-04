@@ -5,6 +5,7 @@ import {
   IsEnum,
   IsBoolean,
   IsUUID,
+  IsIn,
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -40,6 +41,14 @@ export class CreatePageDto {
   @IsString()
   @IsOptional()
   template?: string;
+
+  @ApiPropertyOptional({
+    description: 'Page layout for the zone-based content system',
+    enum: ['no_sidebar', 'sidebar_left', 'sidebar_right', 'split_comparison'],
+  })
+  @IsIn(['no_sidebar', 'sidebar_left', 'sidebar_right', 'split_comparison'])
+  @IsOptional()
+  layout?: string;
 
   @ApiPropertyOptional({
     description: 'Page status',

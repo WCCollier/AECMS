@@ -65,17 +65,32 @@ export interface Article {
   updated_at: string;
 }
 
+export type PageLayout = 'no_sidebar' | 'sidebar_left' | 'sidebar_right' | 'split_comparison';
+
+export interface PageContent {
+  layout: PageLayout;
+  zones: {
+    main?: object;
+    sidebar?: object;
+    left?: object;
+    right?: object;
+  };
+}
+
 export interface Page {
   id: string;
   title: string;
   slug: string;
   content: string;
   template: string | null;
+  layout?: PageLayout;
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   status: 'draft' | 'published' | 'archived';
   published_at: string | null;
   parent_id: string | null;
   sort_order: number;
+  meta_title?: string | null;
+  meta_description?: string | null;
   created_at: string;
   updated_at: string;
 }
