@@ -18,7 +18,7 @@
 
 **Phase 0**: ✅ COMPLETE - Project foundation, Docker, NestJS/Next.js initialized
 **Phase 1**: ✅ COMPLETE - Database schema (30+ models), JWT auth, tests passing
-**Phase 2**: ✅ COMPLETE - Capability-based RBAC (27 capabilities, guards, decorators)
+**Phase 2**: ✅ COMPLETE - Capability-based RBAC (34 capabilities, guards, decorators)
 **Phase 3**: ✅ COMPLETE - Content Management (Media, Categories, Tags, Articles, Pages)
 **Phase 4**: ✅ COMPLETE - Ecommerce Core (Products, Cart, Orders)
 **Phase 5**: ✅ COMPLETE - Payments Module (Stripe, PayPal) - Configured
@@ -28,7 +28,7 @@
 **Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
 **Phase 9**: 🔄 IN PROGRESS - User Testing (structured manual QA, bug fixes)
 
-**Test Status**: 90 frontend + 152 backend unit tests (all passing); 16 backend E2E tests (require Docker)
+**Test Status**: 90 frontend + 154 backend unit tests (all passing); 16 backend E2E tests (require Docker)
 **API Endpoints**: 114 total (added POST /cart/validate)
 
 ## API Endpoint Summary
@@ -53,18 +53,58 @@
 
 ## Key Architecture Decisions
 
-- **User Roles**: Owner > Admin > Member > Guest
-- **Auth Strategy**: Front door (persistent sessions), Back door (7-day + mandatory 2FA)
+- **User Roles**: Owner > Admin > Member > Guest (default shipped bundles, not architectural constraints)
+- **Session Model**: Two fully independent sessions per user — see below
 - **Visibility**: public, logged_in_only, admin_only
 - **Granular Permissions**: Per-content author_can_edit/delete, admin_can_edit/delete flags
 - **Products**: Separate from Articles, dual-nature (content + commerce fields)
+
+## Session Architecture: Customer-Facing vs Backstage
+
+**Terminology**: Never say "front-end / back-end" for the two experiences — those terms already mean client-side / server-side in this codebase. Use **customer-facing** and **backstage**.
+
+### Customer-Facing Session
+- Entry: `POST /auth/login` — no 2FA, persistent refresh token
+- Token storage: `localStorage.access_token` + `localStorage.refresh_token`
+- API client: `frontend/lib/api.ts` (default `api` instance)
+- `session_type: 'customer'` embedded in JWT payload
+
+### Backstage Session
+- Entry: `POST /auth/admin/login` → TOTP 2FA → full tokens
+- Token storage: `localStorage.admin_access_token` + `localStorage.admin_refresh_token`
+- API client: `frontend/lib/adminApi.ts` (`adminApi` instance — always use this in `app/admin/`)
+- `session_type: 'backstage'` embedded in JWT payload
+- 7-day refresh token; killed across machines on new backstage login; 30-min inactivity auto-logout
+- User info for the sidebar stored in `sessionStorage.admin_user` by the login flow
+
+The two sessions are fully independent and can be active simultaneously.
+
+### Backstage Access Control
+Backstage access is **capability-scoped, not role-hardcoded**:
+- A user gains backstage access if `user.role === 'owner'` OR they hold ≥1 capability with `scope = 'backstage'`
+- `BackstageGuard` enforces `session_type === 'backstage'` on every admin API endpoint
+- The default Admin role ships with 19 backstage-scoped capabilities; Member ships with 4 customer-scoped ones
+
+### Capability Scopes
+| Scope | Meaning | Guard chain on API endpoint |
+|-------|---------|----------------------------|
+| `'backstage'` | Requires admin dashboard | `JwtAuthGuard → BackstageGuard → CapabilityGuard` |
+| `'customer'` | Available in customer-facing experience | `JwtAuthGuard → CapabilityGuard` (no BackstageGuard) |
+
+Current counts: **30 backstage** + **4 customer** = **34 total capabilities**.
+
+The 4 customer-scoped capabilities (`comment.article`, `review.article`, `comment.product`, `review.product`) are assigned to Member and Admin by default. Their enforcement is a runtime check inside `CommentsService.create()` — the required capability is derived from the request context (`isReview` + target type), not a static decorator.
+
+### `session_type` in JWT
+Every access and refresh token carries `session_type: 'customer' | 'backstage'`. The JWT strategy exposes it on `req.user.session_type`. Token refresh propagates the type automatically — the stored `RefreshToken` DB row records `session_type` and re-embeds it in the new pair.
 
 ## Coding Conventions
 
 ### Backend (NestJS)
 - DTOs with class-validator for input validation
-- Guards for authorization (JwtAuthGuard, CapabilityGuard, RolesGuard)
-- `@RequiresCapability()` decorator for capability-based access
+- Guards for authorization: `JwtAuthGuard`, `BackstageGuard`, `CapabilityGuard` (see Session Architecture above)
+- `@RequiresCapability()` decorator for static capability checks; runtime checks in service for context-dependent capabilities
+- `RolesGuard` exists but is no longer used in any controller — do not add new usages
 - Prisma for database (no raw SQL)
 - Consistent API response format
 
@@ -156,6 +196,8 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_7_COMPLETION_REPORT.md` - Digital products details
 - `docs/PHASE_8_COMPLETION_REPORT.md` - Domain aliasing & email verification
 - `docs/PHASE_9_COMPLETION_REPORT.md` - User testing progress and bugs found
+- `docs/PHASE_9_BACKSTAGE_COMPLETION.md` - Customer/backstage session bifurcation details
+- `docs/BACKSTAGE_REFACTOR_PLAN.md` - Full implementation plan with completion checklist
 - `docs/TESTING_GUIDE.md` - Full testing guide including Phase 9 manual sequence
 - `docs/prd/` - 12 PRD documents with full specifications
 
@@ -274,11 +316,11 @@ SMTP_PORT=587
 1. ✅ Anonymous article browsing (category/tag filtering fixed)
 2. ✅ Anonymous shop browsing (products recovered, service type added, images working)
 3. ✅ Anonymous cart mechanics (NaN price fixed, stock validation added, session ID working)
-4. Member login + browsing
-5. Member cart mechanics
+4. ✅ Member login + browsing
+5. ✅ Member cart mechanics (anonymous cart merges on login; logout clears display)
 6. ✅ Checkout as member (shipping DTO fixed, order confirmation page built, flow verified)
-7. Guest checkout
-8. Admin back door — 2FA enrollment
+7. ✅ Guest checkout
+8. ✅ Admin back door — session bifurcation + 2FA (fully verified)
 9. Admin CRUD — articles
 10. Admin CRUD — products
 11. Admin orders
@@ -297,10 +339,11 @@ SMTP_PORT=587
 - API Shape Audit (`docs/Shape_Audit.md`) — 9 items identified and resolved
 - Unified Comment/Review system: `CommentRating` table, `ProductReview` dropped, verified purchase enforcement
 - CartProduct partial type, Cart audit fields (user_id, session_id, created_at, updated_at) retained
+- **Customer/backstage session bifurcation** — see Session Architecture section above
+- 4 customer-scoped capabilities (comment/review on articles and products) assigned to Member by default
 
 **Deferred polish** (will fix as bugs surface during Phase 9):
 - Loading skeletons and toast notifications
-- Comment/review UI components (form, display, star input) — backend complete, no frontend yet
 - Stripe Elements card UI (currently stubs via alert)
 - Admin CRUD forms, image upload
 - Responsive design improvements

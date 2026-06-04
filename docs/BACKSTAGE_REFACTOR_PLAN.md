@@ -256,9 +256,11 @@ request shape is unchanged.
 
 ### Phase K — Cleanup & Documentation
 
-- [ ] **K1** Update `CLAUDE.md` — document the customer/backstage session model and the `session_type` convention
-- [ ] **K2** Create `docs/PHASE_9_BACKSTAGE_COMPLETION.md` — record what changed and why
-- [x] **K3** Committed in logical groups: (1) main implementation, (2) fix BackstageGuard providers, (3) fix module dependency imports
+- [x] **K1** `CLAUDE.md` updated — Session Architecture section added; terminology, token keys,
+  guard chain, capability scopes, and `session_type` convention all documented
+- [x] **K2** `docs/PHASE_9_BACKSTAGE_COMPLETION.md` created — full record of what changed and why
+- [x] **K3** Committed in logical groups: (1) main implementation, (2) fix BackstageGuard providers,
+  (3) fix module dependency imports, (4) Phase L capabilities, (5) tests, (6) documentation
 
 ---
 
