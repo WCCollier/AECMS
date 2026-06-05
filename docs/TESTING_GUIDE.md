@@ -247,7 +247,7 @@ See `docs/PHASE_13_PLAN.md` for the full checklist with step-by-step instruction
 **Summary of areas:**
 1. Stripe live sandbox setup
 2. PayPal live sandbox setup
-3. Admin CRUD — Articles (Phase 9 Step 9)
+3. ✅ Admin CRUD — Articles (Phase 9 Step 9)
 4. ✅ Admin CRUD — Products (Phase 9 Step 10)
 5. ✅ Admin CRUD — Pages (Phase 11)
 6. ✅ Widget system — all 6 widget types

@@ -2,7 +2,7 @@
 
 **Project**: AECMS  
 **Phase**: 13  
-**Status**: 📋 PLANNED  
+**Status**: 🔄 IN PROGRESS  
 **Prerequisite**: Phase 12 complete, Stripe/PayPal sandbox configured
 
 ---
@@ -94,7 +94,7 @@ Work through each area in order. Each step's prerequisites are stated. An `[ ]` 
 
 ---
 
-### Area 3 — Admin CRUD: Articles *(Phase 9 Step 9)*
+### Area 3 — Admin CRUD: Articles *(Phase 9 Step 9)* ✅
 
 **Prerequisite**: Backstage session active (logged in at `/admin/login`).
 
@@ -110,18 +110,18 @@ Work through each area in order. Each step's prerequisites are stated. An `[ ]` 
 10. Delete the article — verify it no longer appears in the admin list
 
 **Checklist**
-- [ ] Create article form submits
-- [ ] Slug auto-populates from title on new article
-- [ ] TipTap editor saves and re-loads content correctly (no blank editor on edit)
-- [ ] Image can be inserted into article body
-- [ ] Published article appears on `/latest`
-- [ ] Draft article does not appear on `/latest`
-- [ ] Delete removes article from list
-- [ ] Version History panel is visible in the edit form and loads versions after publish
+- [x] Create article form submits
+- [x] Slug auto-populates from title on new article
+- [x] TipTap editor saves and re-loads content correctly (no blank editor on edit)
+- [x] Image can be inserted into article body
+- [x] Published article appears on `/latest`
+- [x] Draft article does not appear on `/latest`
+- [x] Delete removes article from list
+- [x] Version History panel is visible in the edit form and loads versions after publish
 
 ---
 
-### Area 4 — Admin CRUD: Products *(Phase 9 Step 10)*
+### Area 4 — Admin CRUD: Products *(Phase 9 Step 10)* ✅
 
 1. Navigate to `/admin/products` → click **New Product**
 2. Set type to **Physical**, begin typing name "Test Rifle Case"
@@ -140,23 +140,23 @@ Work through each area in order. Each step's prerequisites are stated. An `[ ]` 
 15. Delete the test product — verify it disappears from shop
 
 **Checklist**
-- [ ] SKU auto-populates from slug as name is typed
-- [ ] SKU prefix changes with product type (P/D/S)
-- [ ] "(auto-generated)" label visible while auto; disappears on manual edit
-- [ ] Manual SKU override persists; auto-generation does not resume
-- [ ] Existing product edit shows stored SKU with no auto-generation
-- [ ] Auto-SKU format matches PRD scheme: `TYPE-WORD-WORD-WORD`
-- [ ] Product create with all required fields
-- [ ] Image upload and display in shop
-- [ ] Stock quantity shown and tracked
-- [ ] Compare-at price displays strikethrough on shop page
-- [ ] Edit saves correctly; price update reflected on storefront
-- [ ] Version history panel shows version after save
-- [ ] Delete soft-deletes (product disappears from shop)
+- [x] SKU auto-populates from slug as name is typed
+- [x] SKU prefix changes with product type (P/D/S)
+- [x] "(auto-generated)" label visible while auto; disappears on manual edit
+- [x] Manual SKU override persists; auto-generation does not resume
+- [x] Existing product edit shows stored SKU with no auto-generation
+- [x] Auto-SKU format matches PRD scheme: `TYPE-WORD-WORD-WORD`
+- [x] Product create with all required fields
+- [x] Image upload and display in shop
+- [x] Stock quantity shown and tracked
+- [x] Compare-at price displays strikethrough on shop page
+- [x] Edit saves correctly; price update reflected on storefront
+- [x] Version history panel shows version after save
+- [x] Delete soft-deletes (product disappears from shop)
 
 ---
 
-### Area 5 — Admin CRUD: Pages *(Phase 11 — new)*
+### Area 5 — Admin CRUD: Pages *(Phase 11 — new)* ✅
 
 1. Navigate to `/admin/pages` → click **New Page**
 2. Select layout **Sidebar Right**, enter title "Test Page", slug "test-page"
@@ -171,57 +171,57 @@ Work through each area in order. Each step's prerequisites are stated. An `[ ]` 
 11. Restore a previous version — verify it creates a draft
 
 **Checklist**
-- [ ] Four layout options appear in the layout picker
-- [ ] Zone editors render for the chosen layout (main + sidebar for sidebar-right)
-- [ ] Widgets insert and save correctly
-- [ ] `show_when` conditional display works (guest vs. member)
-- [ ] "Preview small widgets" toggle changes widget rendering in editor
-- [ ] Published page is reachable at its slug
-- [ ] Page doesn't appear at reserved slug (try creating with slug "shop" — should 409)
-- [ ] Version history records publish; restore creates new draft
+- [x] Four layout options appear in the layout picker
+- [x] Zone editors render for the chosen layout (main + sidebar for sidebar-right)
+- [x] Widgets insert and save correctly
+- [x] `show_when` conditional display works (guest vs. member)
+- [x] "Preview small widgets" toggle changes widget rendering in editor
+- [x] Published page is reachable at its slug
+- [x] Page doesn't appear at reserved slug (try creating with slug "shop" — should 409)
+- [x] Version history records publish; restore creates new draft
 
 ---
 
-### Area 6 — Widget System *(Phase 10A/10B — new)*
+### Area 6 — Widget System *(Phase 10A/10B — new)* ✅
 
 Test each widget type in the TipTap editor (use an article or page in admin).
 
 **MediaCarousel**
-- [ ] Insert MediaCarousel, add 3 images from media library
-- [ ] Carousel renders with arrows and dots in large mode
-- [ ] In a sidebar zone (small mode), carousel auto-rotates with no controls
+- [x] Insert MediaCarousel, add 3 images from media library
+- [x] Carousel renders with arrows and dots in large mode
+- [x] In a sidebar zone (small mode), carousel auto-rotates with no controls
 
 **Callout**
-- [ ] Insert Callout, write 2 sentences
-- [ ] In large mode: full callout box with icon
-- [ ] In small mode: single-line pill with truncated text
-- [ ] `show_when` badge and buttons appear on hover in editor
+- [x] Insert Callout, write 2 sentences
+- [x] In large mode: full callout box with icon
+- [x] In small mode: single-line pill with truncated text
+- [x] `show_when` badge and buttons appear on hover in editor
 
 **VideoEmbed**
-- [ ] Insert VideoEmbed, paste a YouTube URL
-- [ ] Video embeds and plays in large mode
-- [ ] In small mode: thumbnail with play button overlay, links to YouTube in new tab
+- [x] Insert VideoEmbed, paste a YouTube URL
+- [x] Video embeds and plays in large mode
+- [x] In small mode: thumbnail with play button overlay, links to YouTube in new tab
 
 **XEmbed (Twitter/X)**
-- [ ] Insert XEmbed, paste a tweet URL
-- [ ] Tweet renders in large mode (Twitter widget loads)
-- [ ] In small mode: oEmbed card with author, truncated text, "View on X" link
-- [ ] No Twitter `widgets.js` loads in small mode
+- [x] Insert XEmbed, paste a tweet URL
+- [x] Tweet renders in large mode (Twitter widget loads)
+- [x] In small mode: oEmbed card with author, truncated text, "View on X" link
+- [x] No Twitter `widgets.js` loads in small mode
 
 **ArticleEmbed**
-- [ ] Insert ArticleEmbed, search and select an article
-- [ ] Large card shows image, title, date, excerpt (no nested widgets in excerpt)
-- [ ] Small card shows thumbnail, title, excerpt
+- [x] Insert ArticleEmbed, search and select an article
+- [x] Large card shows image, title, date, excerpt (no nested widgets in excerpt)
+- [x] Small card shows thumbnail, title, excerpt
 
 **ProductEmbed**
-- [ ] Insert ProductEmbed, search and select a product
-- [ ] Large card shows image, price, stock status, Add to Cart button
-- [ ] Add to Cart from embed works (item appears in cart)
-- [ ] Small card shows thumbnail, price, mini Add to Cart
+- [x] Insert ProductEmbed, search and select a product
+- [x] Large card shows image, price, stock status, Add to Cart button
+- [x] Add to Cart from embed works (item appears in cart)
+- [x] Small card shows thumbnail, price, mini Add to Cart
 
 **RichTextBox**
-- [ ] Insert RichTextBox, type content and add a heading
-- [ ] In small mode: same content + character-count warning if >300 chars
+- [x] Insert RichTextBox, type content and add a heading
+- [x] In small mode: same content + character-count warning if >300 chars
 
 ---
 
@@ -316,7 +316,7 @@ curl -X PATCH http://localhost:4000/orders/<ORDER_ID>/status \
 
 ---
 
-### Area 10 — Audit Log Viewer *(Phase 12 — new)*
+### Area 10 — Audit Log Viewer *(Phase 12 — new)* ✅
 
 1. Navigate to `/admin/audit-log` (visible only with Owner session)
 2. Verify the events from your testing above appear (logins, order changes, article edits)
@@ -326,13 +326,13 @@ curl -X PATCH http://localhost:4000/orders/<ORDER_ID>/status \
 6. Expand an `auth.login_failed` event — verify `metadata.reason` is shown, `user_id` is null
 
 **Checklist**
-- [ ] Audit log page loads for Owner session
-- [ ] Events from testing appear (login, CRUD, order status changes)
-- [ ] Event type filter works
-- [ ] Resource type filter works
-- [ ] Row expand shows changes and metadata JSON
-- [ ] `auth.login_failed` events have no user_id
-- [ ] Pagination works if >30 events
+- [x] Audit log page loads for Owner session
+- [x] Events from testing appear (login, CRUD, order status changes)
+- [x] Event type filter works
+- [x] Resource type filter works
+- [x] Row expand shows changes and metadata JSON
+- [x] `auth.login_failed` events have no user_id
+- [x] Pagination works if >30 events
 
 ---
 
