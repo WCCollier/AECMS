@@ -65,12 +65,12 @@ api.interceptors.request.use(
     if (config.headers) {
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
-      } else {
-        // Inject guest session ID for anonymous cart support
-        const sessionId = getSessionId();
-        if (sessionId) {
-          config.headers['x-session-id'] = sessionId;
-        }
+      }
+      // Always include session ID — cart endpoints need it as fallback when
+      // the access token is absent or expired
+      const sessionId = getSessionId();
+      if (sessionId) {
+        config.headers['x-session-id'] = sessionId;
       }
     }
     return config;

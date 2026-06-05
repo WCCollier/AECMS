@@ -42,7 +42,7 @@ export class CartService {
    */
   async getCart(userId?: string, sessionId?: string) {
     if (!userId && !sessionId) {
-      throw new BadRequestException('Either userId or sessionId is required');
+      return { id: null, items: [], item_count: 0, subtotal: 0 };
     }
 
     const cart = await this.prisma.cart.findFirst({
