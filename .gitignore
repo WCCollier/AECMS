@@ -67,3 +67,6 @@ seed_data/
 test-results/
 frontend/test-results/
 **/playwright-report/
+
+# Screenshots (local QA captures — not tracked)
+docs/screenshots/
