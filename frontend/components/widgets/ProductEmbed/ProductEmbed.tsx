@@ -7,10 +7,40 @@ import { ShoppingBag, Star, ShoppingCart, ArrowRight } from 'lucide-react';
 import { fetcher } from '@/lib/swr';
 import { useWidgetSize } from '@/contexts/WidgetSizeContext';
 import { useCart } from '@/hooks/useCart';
+import { stripWidgetNodes, extractFirstParagraphText, extractAllText, stripHtml } from '@/lib/stripWidgetNodes';
+import type { TitleAttrs, TitleLevel } from '@/components/editor/extensions/title-settings';
 import type { Product } from '@/types';
 
 interface ProductEmbedProps {
-  productId: string;
+  productId:   string;
+  titleAttrs?: TitleAttrs;
+}
+
+const LEVEL_CLASSES: Record<TitleLevel, string> = {
+  h1:   'text-3xl font-bold',
+  h2:   'text-2xl font-bold',
+  h3:   'text-lg font-semibold',
+  body: 'text-sm font-medium',
+};
+
+function TitleEl({
+  text,
+  level,
+  titleCase,
+  titleAlign,
+  className = '',
+}: {
+  text:       string;
+  level:      TitleLevel;
+  titleCase:  TitleAttrs['titleCase'];
+  titleAlign: TitleAttrs['titleAlign'];
+  className?: string;
+}) {
+  const Tag = (level === 'body' ? 'p' : level) as keyof JSX.IntrinsicElements;
+  const sizeClass  = LEVEL_CLASSES[level];
+  const caseClass  = titleCase === 'uppercase' ? 'uppercase' : '';
+  const alignClass = titleAlign === 'center' ? 'text-center' : titleAlign === 'right' ? 'text-right' : '';
+  return <Tag className={`${sizeClass} ${caseClass} ${alignClass} ${className}`.trim()}>{text}</Tag>;
 }
 
 function formatPrice(price: number): string {
@@ -39,7 +69,27 @@ function StarRating({ rating, count }: { rating: number | null; count: number })
   );
 }
 
-export function ProductEmbed({ productId }: ProductEmbedProps) {
+function getProductDescription(product: Product): string {
+  if (!product.description) return '';
+  const raw = product.description as string;
+  try {
+    const doc = JSON.parse(raw);
+    const clean = stripWidgetNodes(doc);
+    return extractFirstParagraphText(clean) || extractAllText(clean);
+  } catch {
+    return stripHtml(raw);
+  }
+}
+
+const DEFAULT_TITLE_ATTRS: TitleAttrs = {
+  titleOverride: '',
+  titleCase:     'default',
+  titleAlign:    'left',
+  titleLevel:    'h3',
+  titleHidden:   false,
+};
+
+export function ProductEmbed({ productId, titleAttrs = DEFAULT_TITLE_ATTRS }: ProductEmbedProps) {
   const size = useWidgetSize();
   const { addItem } = useCart();
   const { data: product, isLoading } = useSWR<Product>(
@@ -62,7 +112,7 @@ export function ProductEmbed({ productId }: ProductEmbedProps) {
           </>
         ) : (
           <>
-            <div className="aspect-square bg-foreground/10" />
+            <div className="aspect-video bg-foreground/10" />
             <div className="p-4 space-y-2">
               <div className="h-4 bg-foreground/10 rounded w-3/4" />
               <div className="h-3 bg-foreground/10 rounded w-1/4" />
@@ -73,12 +123,17 @@ export function ProductEmbed({ productId }: ProductEmbedProps) {
     );
   }
 
+  const { titleOverride, titleCase, titleAlign, titleLevel, titleHidden } = titleAttrs;
+  const displayTitle = titleOverride || product.name;
   const href = `/shop/${product.slug}`;
+  const description = getProductDescription(product);
   const primaryImage = product.media?.find((m) => m.is_primary) ?? product.media?.[0];
   const imageUrl = primaryImage?.url ?? product.featured_image_url ?? null;
   const canAdd = product.stock_status === 'in_stock' || product.stock_status === 'available';
 
   if (size === 'small') {
+    const alignClass = titleAlign === 'center' ? 'text-center' : titleAlign === 'right' ? 'text-right' : '';
+    const caseClass  = titleCase === 'uppercase' ? 'uppercase' : '';
     return (
       <div className="flex gap-3 p-3 border border-border rounded-lg my-2">
         <Link href={href} className="flex-shrink-0">
@@ -93,9 +148,15 @@ export function ProductEmbed({ productId }: ProductEmbedProps) {
           )}
         </Link>
         <div className="flex-1 min-w-0">
-          <Link href={href} className="font-medium text-sm line-clamp-2 hover:text-accent transition-colors block">
-            {product.name}
-          </Link>
+          {!titleHidden && (
+            <Link
+              href={href}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+              className={`font-medium text-sm line-clamp-2 hover:text-accent transition-colors block ${caseClass} ${alignClass}`.trim()}
+            >
+              {displayTitle}
+            </Link>
+          )}
           <p className="text-sm font-semibold mt-0.5">{formatPrice(product.price)}</p>
           <div className="flex gap-2 mt-1.5">
             <button
@@ -108,7 +169,8 @@ export function ProductEmbed({ productId }: ProductEmbedProps) {
             </button>
             <Link
               href={href}
-              className="p-1.5 rounded border border-border hover:bg-surface-raised transition-colors text-xs flex items-center gap-1 no-underline"
+              style={{ textDecoration: 'none' }}
+              className="p-1.5 rounded border border-border hover:bg-surface-raised transition-colors text-xs flex items-center gap-1"
             >
               View <ArrowRight className="w-3 h-3" />
             </Link>
@@ -121,14 +183,22 @@ export function ProductEmbed({ productId }: ProductEmbedProps) {
   return (
     <div className="border border-border rounded-lg overflow-hidden my-4">
       {imageUrl && (
-        <div className="relative aspect-square bg-foreground/10">
+        <div className="relative aspect-video bg-foreground/10">
           <Image src={imageUrl} alt={product.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
         </div>
       )}
       <div className="p-4">
-        <Link href={href} className="group">
-          <h3 className="text-lg font-semibold group-hover:text-accent transition-colors">{product.name}</h3>
-        </Link>
+        {!titleHidden && (
+          <Link href={href} className="group">
+            <TitleEl
+              text={displayTitle}
+              level={titleLevel}
+              titleCase={titleCase}
+              titleAlign={titleAlign}
+              className="group-hover:text-accent transition-colors"
+            />
+          </Link>
+        )}
         <StarRating rating={product.average_rating} count={product.review_count} />
         <div className="flex items-baseline gap-2 mt-2">
           <span className="text-xl font-bold">{formatPrice(product.price)}</span>
@@ -137,6 +207,9 @@ export function ProductEmbed({ productId }: ProductEmbedProps) {
           )}
         </div>
         <StockBadge status={product.stock_status} />
+        {description && (
+          <p className="text-sm text-foreground/70 mt-2 line-clamp-4">{description}</p>
+        )}
         <div className="flex gap-2 mt-3">
           <button
             onClick={() => canAdd && addItem(product.id, 1)}
@@ -147,7 +220,8 @@ export function ProductEmbed({ productId }: ProductEmbedProps) {
           </button>
           <Link
             href={href}
-            className="px-4 py-2 border border-border rounded-lg hover:bg-surface-raised transition-colors text-sm no-underline"
+            style={{ textDecoration: 'none' }}
+            className="px-4 py-2 border border-border rounded-lg hover:bg-surface-raised transition-colors text-sm"
           >
             View Details
           </Link>

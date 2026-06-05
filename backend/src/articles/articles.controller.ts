@@ -21,6 +21,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { ArticlesService } from './articles.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
@@ -32,7 +33,10 @@ import type { Request } from 'express';
 @ApiTags('articles')
 @Controller('articles')
 export class ArticlesController {
-  constructor(private readonly articlesService: ArticlesService) {}
+  constructor(
+    private readonly articlesService: ArticlesService,
+    private readonly capabilitiesService: CapabilitiesService,
+  ) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
@@ -64,8 +68,18 @@ export class ArticlesController {
   async findAll(@Query() query: QueryArticlesDto, @Req() req: Request) {
     const user = req.user as any;
     const userId = user?.id;
-    const isAdmin = user?.capabilities?.includes('system.configure') || false;
-    return this.articlesService.findAll(query, userId, isAdmin);
+    const isBackstage = user?.session_type === 'backstage';
+
+    let canDeleteOwn = false;
+    let canDeleteAny = false;
+    if (isBackstage && query.include_deleted && userId) {
+      [canDeleteAny, canDeleteOwn] = await Promise.all([
+        this.capabilitiesService.userHasCapability(userId, 'article.delete.any'),
+        this.capabilitiesService.userHasCapability(userId, 'article.delete.own'),
+      ]);
+    }
+
+    return this.articlesService.findAll(query, userId, isBackstage, canDeleteOwn, canDeleteAny);
   }
 
   @Get(':id')
@@ -77,9 +91,7 @@ export class ArticlesController {
   @ApiResponse({ status: 403, description: 'Access denied' })
   async findById(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as any;
-    const userId = user?.id;
-    const isAdmin = user?.capabilities?.includes('system.configure') || false;
-    return this.articlesService.findById(id, userId, isAdmin);
+    return this.articlesService.findById(id, user?.id, user?.session_type === 'backstage');
   }
 
   @Get('by-slug/:slug')
@@ -91,9 +103,7 @@ export class ArticlesController {
   @ApiResponse({ status: 403, description: 'Access denied' })
   async findBySlug(@Param('slug') slug: string, @Req() req: Request) {
     const user = req.user as any;
-    const userId = user?.id;
-    const isAdmin = user?.capabilities?.includes('system.configure') || false;
-    return this.articlesService.findBySlug(slug, userId, isAdmin);
+    return this.articlesService.findBySlug(slug, user?.id, user?.session_type === 'backstage');
   }
 
   @Patch(':id')
@@ -110,10 +120,12 @@ export class ArticlesController {
     @Body() dto: UpdateArticleDto,
     @Req() req: Request,
   ) {
-    const user = req.user as any;
-    const userId = user.id;
-    const isAdmin = user.capabilities?.includes('article.edit.any') || false;
-    return this.articlesService.update(id, dto, userId, isAdmin);
+    const userId = (req.user as any).id;
+    const [canEditAny, canEditOwn] = await Promise.all([
+      this.capabilitiesService.userHasCapability(userId, 'article.edit.any'),
+      this.capabilitiesService.userHasCapability(userId, 'article.edit.own'),
+    ]);
+    return this.articlesService.update(id, dto, userId, canEditOwn, canEditAny);
   }
 
   @Delete(':id')
@@ -126,10 +138,30 @@ export class ArticlesController {
   @ApiResponse({ status: 404, description: 'Article not found' })
   @ApiResponse({ status: 403, description: 'Permission denied' })
   async remove(@Param('id') id: string, @Req() req: Request) {
-    const user = req.user as any;
-    const userId = user.id;
-    const isAdmin = user.capabilities?.includes('article.delete.any') || false;
-    await this.articlesService.remove(id, userId, isAdmin);
+    const userId = (req.user as any).id;
+    const [canDeleteAny, canDeleteOwn] = await Promise.all([
+      this.capabilitiesService.userHasCapability(userId, 'article.delete.any'),
+      this.capabilitiesService.userHasCapability(userId, 'article.delete.own'),
+    ]);
+    await this.articlesService.remove(id, userId, canDeleteOwn, canDeleteAny);
+  }
+
+  @Post(':id/restore')
+  @UseGuards(JwtAuthGuard, BackstageGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Restore a soft-deleted article (reverts to draft)' })
+  @ApiParam({ name: 'id', description: 'Article ID' })
+  @ApiResponse({ status: 200, description: 'Article restored' })
+  @ApiResponse({ status: 403, description: 'Permission denied' })
+  @ApiResponse({ status: 404, description: 'Deleted article not found' })
+  async restore(@Param('id') id: string, @Req() req: Request) {
+    const userId = (req.user as any).id;
+    const [canDeleteAny, canDeleteOwn] = await Promise.all([
+      this.capabilitiesService.userHasCapability(userId, 'article.delete.any'),
+      this.capabilitiesService.userHasCapability(userId, 'article.delete.own'),
+    ]);
+    return this.articlesService.restore(id, userId, canDeleteOwn, canDeleteAny);
   }
 
   @Get(':id/versions')

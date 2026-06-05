@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import useSWR from 'swr';
 import { ChevronDown, ChevronRight, Search, Filter } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
@@ -141,9 +141,8 @@ export function AuditLogClient() {
               </tr>
             )}
             {entries.map((entry) => (
-              <>
+              <React.Fragment key={entry.id}>
                 <tr
-                  key={entry.id}
                   className="hover:bg-foreground/5 cursor-pointer"
                   onClick={() => toggleRow(entry.id)}
                 >
@@ -171,7 +170,7 @@ export function AuditLogClient() {
                   </td>
                 </tr>
                 {expandedId === entry.id && (
-                  <tr key={`${entry.id}-expand`} className="bg-foreground/3">
+                  <tr className="bg-foreground/3">
                     <td colSpan={5} className="px-6 py-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {entry.changes && (
@@ -197,7 +196,7 @@ export function AuditLogClient() {
                     </td>
                   </tr>
                 )}
-              </>
+              </React.Fragment>
             ))}
           </tbody>
         </table>

@@ -106,7 +106,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user' })
   @ApiResponse({ status: 200, description: 'Current user profile' })
   async me(@Request() req: any) {
-    const user = await this.authService.validateUser(req.user.id);
+    const [user, hasBackstageAccess] = await Promise.all([
+      this.authService.validateUser(req.user.id),
+      this.authService.hasBackstageAccess(req.user.id),
+    ]);
     return {
       id: user.id,
       email: user.email,
@@ -115,6 +118,7 @@ export class AuthController {
       role: user.role,
       emailVerified: user.email_verified,
       totpEnabled: user.totp_enabled,
+      hasBackstageAccess,
     };
   }
 

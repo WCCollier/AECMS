@@ -96,4 +96,10 @@ export class QueryProductsDto {
   @IsEnum(['asc', 'desc'])
   @IsOptional()
   sort_order?: 'asc' | 'desc' = 'desc';
+
+  @ApiPropertyOptional({ description: 'Show only soft-deleted products (admin only)' })
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  @IsOptional()
+  include_deleted?: boolean;
 }

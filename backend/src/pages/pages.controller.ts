@@ -39,7 +39,7 @@ export class PagesController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get all pages with filtering and pagination' })
   findAll(@Query() query: QueryPagesDto, @CurrentUser() user: any) {
-    const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.pagesService.findAll(query, user?.id, isAdmin);
   }
 
@@ -47,7 +47,7 @@ export class PagesController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get page hierarchy tree' })
   getHierarchy(@CurrentUser() user: any) {
-    const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.pagesService.getHierarchy(user?.id, isAdmin);
   }
 
@@ -55,7 +55,7 @@ export class PagesController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get page by ID' })
   findById(@Param('id') id: string, @CurrentUser() user: any) {
-    const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.pagesService.findById(id, user?.id, isAdmin);
   }
 
@@ -63,7 +63,7 @@ export class PagesController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get page by slug' })
   findBySlug(@Param('slug') slug: string, @CurrentUser() user: any) {
-    const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.pagesService.findBySlug(slug, user?.id, isAdmin);
   }
 
@@ -77,7 +77,7 @@ export class PagesController {
     @Body() dto: UpdatePageDto,
     @CurrentUser() user: any,
   ) {
-    const isAdmin = user.role === 'owner' || user.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.pagesService.update(id, dto, user.id, isAdmin);
   }
 
@@ -88,7 +88,7 @@ export class PagesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a page' })
   remove(@Param('id') id: string, @CurrentUser() user: any) {
-    const isAdmin = user.role === 'owner' || user.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.pagesService.remove(id, user.id, isAdmin);
   }
 

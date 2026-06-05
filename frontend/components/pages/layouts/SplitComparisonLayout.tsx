@@ -10,12 +10,12 @@ export function SplitComparisonLayout({ zones }: { zones: PageContent['zones'] }
   const size: WidgetSize = isDesktop ? 'large' : 'small';
 
   return (
-    <div className="grid lg:grid-cols-2 min-h-screen">
+    <div className="grid lg:grid-cols-2 min-h-screen px-[10%]">
       <div className="border-r border-border p-8">
         <WidgetSizeProvider size={size}>
           <RichTextContent
             content={zones.left ? JSON.stringify(zones.left) : ''}
-            className="prose-article"
+            className="prose-article prose-page"
           />
         </WidgetSizeProvider>
       </div>
@@ -23,7 +23,7 @@ export function SplitComparisonLayout({ zones }: { zones: PageContent['zones'] }
         <WidgetSizeProvider size={size}>
           <RichTextContent
             content={zones.right ? JSON.stringify(zones.right) : ''}
-            className="prose-article"
+            className="prose-article prose-page"
           />
         </WidgetSizeProvider>
       </div>

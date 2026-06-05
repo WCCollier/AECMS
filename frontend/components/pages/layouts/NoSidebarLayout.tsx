@@ -6,11 +6,11 @@ import type { PageContent } from '@/types';
 
 export function NoSidebarLayout({ zones }: { zones: PageContent['zones'] }) {
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="w-full px-[10%] py-8">
       <WidgetSizeProvider size="large">
         <RichTextContent
           content={zones.main ? JSON.stringify(zones.main) : ''}
-          className="prose-article"
+          className="prose-article prose-page"
         />
       </WidgetSizeProvider>
     </div>

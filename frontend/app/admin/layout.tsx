@@ -17,6 +17,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
+import adminApi from '@/lib/adminApi';
 import { useBackstageActivity } from '@/hooks/useBackstageActivity';
 
 interface AdminUser {
@@ -33,8 +34,8 @@ const navItems = [
   { href: '/admin/articles', label: 'Articles', icon: FileText },
   { href: '/admin/pages', label: 'Pages', icon: LayoutTemplate },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
-  { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, ownerOnly: true },
-  { href: '/admin/domains', label: 'Domains', icon: Globe, ownerOnly: true },
+  { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, requiredCap: 'system.view_audit' },
+  { href: '/admin/domains', label: 'Domains', icon: Globe, requiredCap: 'domain.manage' },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -42,6 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+  const [userCaps, setUserCaps] = useState<string[]>([]);
   const [checked, setChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -63,7 +65,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       ? sessionStorage.getItem('admin_user')
       : null;
     if (stored) {
-      try { setAdminUser(JSON.parse(stored)); } catch { /* ignore */ }
+      try {
+        const u = JSON.parse(stored);
+        setAdminUser(u);
+        adminApi.get(`/capabilities/users/${u.id}`)
+          .then((res) => setUserCaps((res.data as { name: string }[]).map((c) => c.name)))
+          .catch(() => {});
+      } catch { /* ignore */ }
     }
     setChecked(true);
   }, [isLoginRoute, router]);
@@ -83,7 +91,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  const isOwner = adminUser?.role === 'owner';
   const displayName = adminUser?.firstName
     ? `${adminUser.firstName} ${adminUser.lastName ?? ''}`.trim()
     : adminUser?.email ?? '';
@@ -119,7 +126,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
               {navItems
-                .filter(item => !item.ownerOnly || isOwner)
+                .filter(item => !item.requiredCap || userCaps.includes(item.requiredCap))
                 .map(item => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;

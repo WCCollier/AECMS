@@ -7,6 +7,7 @@ import {
   Undo, Redo, Link as LinkIcon, Unlink, Heading1, Heading2, Heading3,
   Minus, ImagePlus, X, Upload, Info, Video, Twitter, GalleryHorizontal,
   FileText, ShoppingBag, Square,
+  AlignLeft, AlignCenter, AlignRight,
 } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
 import { getEditorExtensions } from './extensions';
@@ -69,10 +70,23 @@ export function TipTapEditor({
   // Carousel insert state
   const [carouselEntries, setCarouselEntries] = useState<GalleryEntry[]>([]);
 
+  // content is stored as JSON.stringify(doc) — parse it back so TipTap
+  // receives an object, not a raw JSON string (which it treats as HTML).
+  const initialContent = (() => {
+    if (!content) return '';
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed && typeof parsed === 'object' && parsed.type === 'doc') return parsed;
+    } catch {
+      // legacy HTML string — fall through
+    }
+    return content;
+  })();
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: getEditorExtensions(),
-    content,
+    content: initialContent,
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose-base max-w-none focus:outline-none min-h-[200px] px-4 py-3',
@@ -260,6 +274,18 @@ export function TipTapEditor({
         </MenuButton>
         <MenuButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal rule">
           <Minus className="w-4 h-4" />
+        </MenuButton>
+
+        <MenuDivider />
+
+        <MenuButton onClick={() => editor.chain().focus().setTextAlign('left').run()} isActive={editor.isActive({ textAlign: 'left' })} title="Align left">
+          <AlignLeft className="w-4 h-4" />
+        </MenuButton>
+        <MenuButton onClick={() => editor.chain().focus().setTextAlign('center').run()} isActive={editor.isActive({ textAlign: 'center' })} title="Align center">
+          <AlignCenter className="w-4 h-4" />
+        </MenuButton>
+        <MenuButton onClick={() => editor.chain().focus().setTextAlign('right').run()} isActive={editor.isActive({ textAlign: 'right' })} title="Align right">
+          <AlignRight className="w-4 h-4" />
         </MenuButton>
 
         <MenuDivider />

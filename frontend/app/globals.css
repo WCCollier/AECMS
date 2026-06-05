@@ -47,6 +47,40 @@ body {
 /* ── Focus ring ──────────────────────────────────────────── */
 :focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
 
+/* ── TipTap editor content area ─────────────────────────── */
+/* Styles the .ProseMirror editable div (write editor) and
+   replaces @tailwindcss/typography which is not installed. */
+.ProseMirror {
+  color: #dce8f0;
+  line-height: 1.8;
+  font-size: 1rem;
+  outline: none;
+}
+.ProseMirror p                  { margin-bottom: 1em; }
+.ProseMirror h1                 { font-size: 2em;   font-weight: 700; margin: 1.4em 0 0.4em; color: #dce8f0; }
+.ProseMirror h2                 { font-size: 1.5em; font-weight: 700; margin: 1.3em 0 0.4em; color: #dce8f0; border-left: 3px solid #2dd4bf; padding-left: 0.75rem; }
+.ProseMirror h3                 { font-size: 1.2em; font-weight: 600; margin: 1.2em 0 0.3em; color: #dce8f0; }
+.ProseMirror ul                 { list-style: disc;    padding-left: 1.75em; margin-bottom: 1em; }
+.ProseMirror ol                 { list-style: decimal; padding-left: 1.75em; margin-bottom: 1em; }
+.ProseMirror li                 { margin-bottom: 0.3em; }
+.ProseMirror li p               { margin-bottom: 0; }
+.ProseMirror blockquote         { border: 1px solid rgba(45,212,191,0.35); border-left: 3px solid #2dd4bf; background: rgba(45,212,191,0.06); border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; color: #a8c5d8; font-style: italic; margin: 1.5em 0; }
+.ProseMirror code               { background: #162035; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em; color: #2dd4bf; }
+.ProseMirror pre                { background: #162035; padding: 1rem; border-radius: 6px; overflow-x: auto; margin-bottom: 1em; }
+.ProseMirror pre code           { background: none; padding: 0; color: #dce8f0; }
+.ProseMirror hr                 { border: none; border-top: 1px solid #1a2840; margin: 2em 0; }
+.ProseMirror strong             { color: #2dd4bf; font-weight: 600; }
+.ProseMirror em                 { color: #a8c5d8; font-style: italic; }
+.ProseMirror a                  { color: #2dd4bf; text-decoration: underline; text-underline-offset: 3px; }
+/* Placeholder text */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #6b88a0;
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
 /* ── Prose / article body ────────────────────────────────── */
 .prose-article {
   color: #dce8f0;
@@ -54,6 +88,8 @@ body {
   font-size: 1.05rem;
   max-width: 68ch;
 }
+/* Page zones should fill their grid cell — no reading-width cap */
+.prose-page { max-width: none; }
 .prose-article p   { margin-bottom: 1.25em; }
 .prose-article h1,
 .prose-article h2,
@@ -63,9 +99,12 @@ body {
 .prose-article em  { color: #a8c5d8; font-style: italic; }
 .prose-article a   { color: #2dd4bf; text-decoration: underline; text-underline-offset: 3px; }
 .prose-article blockquote {
-  border-left: 3px solid #0d9488;
-  padding-left: 1rem;
-  color: #6b88a0;
+  border: 1px solid rgba(45,212,191,0.35);
+  border-left: 3px solid #2dd4bf;
+  background: rgba(45,212,191,0.06);
+  border-radius: 0 6px 6px 0;
+  padding: 0.75rem 1rem;
+  color: #a8c5d8;
   font-style: italic;
   margin: 1.5em 0;
 }

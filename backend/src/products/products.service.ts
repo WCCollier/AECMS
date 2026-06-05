@@ -143,7 +143,13 @@ export class ProductsService {
   /**
    * Find all products with filtering and pagination
    */
-  async findAll(query: QueryProductsDto, userId?: string, isAdmin = false) {
+  async findAll(
+    query: QueryProductsDto,
+    userId?: string,
+    isAdmin = false,
+    canDeleteOwn = false,
+    canDeleteAny = false,
+  ) {
     const {
       status,
       visibility,
@@ -159,14 +165,26 @@ export class ProductsService {
       limit = 20,
       sort_by = 'created_at',
       sort_order = 'desc',
+      include_deleted,
     } = query;
 
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: Prisma.ProductWhereInput = {
-      deleted_at: null,
-    };
+    const where: Prisma.ProductWhereInput = {};
+
+    if (isAdmin && include_deleted) {
+      if (canDeleteAny) {
+        where.deleted_at = { not: null };
+      } else if (canDeleteOwn && userId) {
+        where.deleted_at = { not: null };
+        where.author_id = userId;
+      } else {
+        where.deleted_at = null;
+      }
+    } else {
+      where.deleted_at = null;
+    }
 
     // Status filter
     if (status) {
@@ -309,7 +327,7 @@ export class ProductsService {
   /**
    * Update product
    */
-  async update(id: string, dto: UpdateProductDto, userId: string, isAdmin = false) {
+  async update(id: string, dto: UpdateProductDto, userId: string, canEditOwn = false, canEditAny = false) {
     const product = await this.prisma.product.findUnique({
       where: { id },
     });
@@ -319,7 +337,8 @@ export class ProductsService {
     }
 
     // Check edit permissions
-    if (!isAdmin || !product.admin_can_edit) {
+    const authorMatch = product.author_id === userId;
+    if (!(canEditAny && product.admin_can_edit) && !(canEditOwn && authorMatch)) {
       throw new ForbiddenException('You do not have permission to edit this product');
     }
 
@@ -444,7 +463,7 @@ export class ProductsService {
   /**
    * Delete product (soft delete)
    */
-  async remove(id: string, isAdmin = false) {
+  async remove(id: string, userId: string, canDeleteOwn = false, canDeleteAny = false) {
     const product = await this.prisma.product.findUnique({
       where: { id },
     });
@@ -454,7 +473,8 @@ export class ProductsService {
     }
 
     // Check delete permissions
-    if (!isAdmin || !product.admin_can_delete) {
+    const authorMatch = product.author_id === userId;
+    if (!(canDeleteAny && product.admin_can_delete) && !(canDeleteOwn && authorMatch)) {
       throw new ForbiddenException('You do not have permission to delete this product');
     }
 
@@ -469,6 +489,31 @@ export class ProductsService {
       resource_type: 'product',
       resource_id: id,
       metadata: { name: product.name, slug: product.slug },
+    });
+  }
+
+  /**
+   * Restore a soft-deleted product (reverts to draft)
+   */
+  async restore(id: string, userId: string, canDeleteOwn = false, canDeleteAny = false) {
+    const product = await this.prisma.product.findFirst({ where: { id, deleted_at: { not: null } } });
+    if (!product) throw new NotFoundException('Deleted product not found');
+    if (!canDeleteAny && !canDeleteOwn) {
+      throw new ForbiddenException('You do not have permission to restore this product');
+    }
+    if (!canDeleteAny && canDeleteOwn && product.author_id !== userId) {
+      throw new ForbiddenException('You can only restore your own products');
+    }
+    await this.prisma.product.update({
+      where: { id },
+      data: { deleted_at: null, status: 'draft' },
+    });
+    await this.auditLog.log({
+      event_type: 'product.updated',
+      user_id: userId,
+      resource_type: 'product',
+      resource_id: id,
+      metadata: { name: product.name, action: 'restored_from_trash' },
     });
   }
 

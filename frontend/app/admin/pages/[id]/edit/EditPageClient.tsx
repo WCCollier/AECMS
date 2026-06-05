@@ -103,6 +103,16 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
           <h1 className="text-2xl font-bold">Edit Page</h1>
         </div>
         <div className="flex items-center gap-3">
+          {/* Full-page preview — opens in new tab */}
+          <a
+            href={`/admin/pages/${pageId}/preview`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border rounded-lg hover:bg-surface-raised transition-colors"
+          >
+            <Eye className="w-4 h-4" />
+            Preview
+          </a>
           {getZonesForLayout(layout).length > 1 && (
             <button
               type="button"

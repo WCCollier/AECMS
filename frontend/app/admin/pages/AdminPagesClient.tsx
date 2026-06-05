@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { adminFetcher } from '@/lib/swr';
 import adminApi from '@/lib/adminApi';
 import { Button, Card, CardContent, Input } from '@/components/ui';
-import { Plus, Search, Edit, Trash2, LayoutTemplate } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, LayoutTemplate, Eye, ExternalLink } from 'lucide-react';
 import { LAYOUT_LABELS } from '@/lib/pageContent';
 import type { Page, PaginatedResponse } from '@/types';
 
@@ -114,6 +114,29 @@ export function AdminPagesClient() {
                       <td className="px-6 py-4 text-foreground/60 text-sm">{formatDate(p.updated_at)}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {p.status === 'published' ? (
+                            <a
+                              href={`/${p.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Open live page"
+                            >
+                              <Button variant="ghost" size="sm">
+                                <ExternalLink className="w-4 h-4 text-green-500" />
+                              </Button>
+                            </a>
+                          ) : (
+                            <a
+                              href={`/admin/pages/${p.id}/preview`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Preview draft"
+                            >
+                              <Button variant="ghost" size="sm">
+                                <Eye className="w-4 h-4 text-foreground/50" />
+                              </Button>
+                            </a>
+                          )}
                           <Link href={`/admin/pages/${p.id}/edit`}>
                             <Button variant="ghost" size="sm"><Edit className="w-4 h-4" /></Button>
                           </Link>

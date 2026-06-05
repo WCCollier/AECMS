@@ -43,8 +43,10 @@ async function main() {
 
     // Ecommerce
     { name: 'product.create',      category: 'ecommerce', scope: 'backstage', description: 'Create products' },
-    { name: 'product.edit',        category: 'ecommerce', scope: 'backstage', description: 'Edit products' },
-    { name: 'product.delete',      category: 'ecommerce', scope: 'backstage', description: 'Delete products' },
+    { name: 'product.edit.own',    category: 'ecommerce', scope: 'backstage', description: 'Edit own products' },
+    { name: 'product.edit',        category: 'ecommerce', scope: 'backstage', description: 'Edit any product' },
+    { name: 'product.delete.own',  category: 'ecommerce', scope: 'backstage', description: 'Delete own products' },
+    { name: 'product.delete',      category: 'ecommerce', scope: 'backstage', description: 'Delete any product' },
     { name: 'order.view.all',      category: 'ecommerce', scope: 'backstage', description: 'View all orders' },
     { name: 'order.edit',          category: 'ecommerce', scope: 'backstage', description: 'Edit orders' },
     { name: 'order.refund',        category: 'ecommerce', scope: 'backstage', description: 'Process refunds' },
@@ -173,12 +175,20 @@ async function main() {
   // Admin backstage capabilities (in addition to the customer ones above)
   const adminBackstageCapabilities = [
     'article.create',
+    'article.edit.own',
     'article.edit.any',
+    'article.delete.own',
+    'article.delete.any',
     'article.publish',
+    'page.create',
+    'page.edit',
+    'page.delete',
     'media.upload',
     'media.delete',
     'product.create',
+    'product.edit.own',
     'product.edit',
+    'product.delete.own',
     'product.delete',
     'order.view.all',
     'order.edit',

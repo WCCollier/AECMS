@@ -257,10 +257,7 @@ export function AdminDomainsClient() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Only owners can manage domain aliases
-  const isOwner = user?.role === 'owner';
-
-  if (!isOwner) {
+  if (!user) {
     return (
       <div className="p-6">
         <Card>
@@ -268,7 +265,7 @@ export function AdminDomainsClient() {
             <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
             <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
             <p className="text-foreground/60">
-              Only site owners can manage domain aliases.
+              You do not have permission to manage domain aliases.
             </p>
           </CardContent>
         </Card>

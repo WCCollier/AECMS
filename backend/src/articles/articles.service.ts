@@ -129,24 +129,46 @@ export class ArticlesService {
   /**
    * Find all articles with filtering and pagination
    */
-  async findAll(query: QueryArticlesDto, userId?: string, isAdmin = false) {
+  async findAll(
+    query: QueryArticlesDto,
+    userId?: string,
+    isAdmin = false,
+    canDeleteOwn = false,
+    canDeleteAny = false,
+  ) {
     const {
       status, visibility, category_id, category, tag_id, tag,
       author_id, search, page = 1, limit = 20,
       sort_by = 'created_at', sort_order = 'desc',
+      include_deleted,
     } = query;
 
     const skip = (page - 1) * limit;
     const where: Prisma.ArticleWhereInput = {};
 
-    if (status) where.status = status;
+    if (isAdmin && include_deleted) {
+      if (canDeleteAny) {
+        where.deleted_at = { not: null };
+      } else if (canDeleteOwn && userId) {
+        where.deleted_at = { not: null };
+        where.author_id = userId;
+      } else {
+        where.deleted_at = null; // no delete capability — fall back to normal listing
+      }
+    } else {
+      where.deleted_at = null;
+    }
 
+    // Non-admins can only ever see published articles.
     if (!isAdmin) {
+      where.status = ContentStatus.published;
       where.visibility = userId
         ? { in: [ContentVisibility.public, ContentVisibility.logged_in_only] }
         : ContentVisibility.public;
+    } else {
+      if (status) where.status = status;
+      if (visibility) where.visibility = visibility;
     }
-    if (visibility && isAdmin) where.visibility = visibility;
 
     if (category_id) where.categories = { some: { category_id } };
     else if (category) where.categories = { some: { category: { slug: category } } };
@@ -186,8 +208,8 @@ export class ArticlesService {
    * Find article by ID
    */
   async findById(id: string, userId?: string, isAdmin = false) {
-    const article = await this.prisma.article.findUnique({
-      where: { id },
+    const article = await this.prisma.article.findFirst({
+      where: { id, deleted_at: null },
       include: this.getArticleInclude(true),
     });
     if (!article) throw new NotFoundException('Article not found');
@@ -199,8 +221,8 @@ export class ArticlesService {
    * Find article by slug
    */
   async findBySlug(slug: string, userId?: string, isAdmin = false) {
-    const article = await this.prisma.article.findUnique({
-      where: { slug },
+    const article = await this.prisma.article.findFirst({
+      where: { slug, deleted_at: null },
       include: this.getArticleInclude(true),
     });
     if (!article) throw new NotFoundException('Article not found');
@@ -211,10 +233,10 @@ export class ArticlesService {
   /**
    * Update article
    */
-  async update(id: string, dto: UpdateArticleDto, userId: string, isAdmin = false) {
+  async update(id: string, dto: UpdateArticleDto, userId: string, canEditOwn = false, canEditAny = false) {
     const article = await this.prisma.article.findUnique({ where: { id } });
     if (!article) throw new NotFoundException('Article not found');
-    this.checkEditAccess(article, userId, isAdmin);
+    this.checkEditAccess(article, userId, canEditOwn, canEditAny);
 
     if (dto.slug && dto.slug !== article.slug) {
       const existing = await this.prisma.article.findUnique({ where: { slug: dto.slug } });
@@ -294,19 +316,44 @@ export class ArticlesService {
   }
 
   /**
-   * Delete article
+   * Soft-delete article (sets deleted_at; preserves versions and audit trail)
    */
-  async remove(id: string, userId: string, isAdmin = false) {
-    const article = await this.prisma.article.findUnique({ where: { id } });
+  async remove(id: string, userId: string, canDeleteOwn = false, canDeleteAny = false) {
+    const article = await this.prisma.article.findFirst({ where: { id, deleted_at: null } });
     if (!article) throw new NotFoundException('Article not found');
-    this.checkDeleteAccess(article, userId, isAdmin);
-    await this.prisma.article.delete({ where: { id } });
+    this.checkDeleteAccess(article, userId, canDeleteOwn, canDeleteAny);
+    await this.prisma.article.update({ where: { id }, data: { deleted_at: new Date() } });
     await this.auditLog.log({
       event_type: 'article.deleted',
       user_id: userId,
       resource_type: 'article',
       resource_id: id,
       metadata: { title: article.title, slug: article.slug },
+    });
+  }
+
+  /**
+   * Restore a soft-deleted article (clears deleted_at, reverts to draft)
+   */
+  async restore(id: string, userId: string, canDeleteOwn = false, canDeleteAny = false) {
+    const article = await this.prisma.article.findFirst({ where: { id, deleted_at: { not: null } } });
+    if (!article) throw new NotFoundException('Deleted article not found');
+    if (!canDeleteAny && !canDeleteOwn) {
+      throw new ForbiddenException('You do not have permission to restore this article');
+    }
+    if (!canDeleteAny && canDeleteOwn && article.author_id !== userId) {
+      throw new ForbiddenException('You can only restore your own articles');
+    }
+    await this.prisma.article.update({
+      where: { id },
+      data: { deleted_at: null, status: 'draft' },
+    });
+    await this.auditLog.log({
+      event_type: 'article.updated',
+      user_id: userId,
+      resource_type: 'article',
+      resource_id: id,
+      metadata: { title: article.title, action: 'restored_from_trash' },
     });
   }
 
@@ -385,15 +432,15 @@ export class ArticlesService {
     if (article.visibility === ContentVisibility.logged_in_only && !userId) throw new ForbiddenException('Login required');
   }
 
-  private checkEditAccess(article: any, userId: string, isAdmin: boolean) {
-    if (article.author_id === userId && article.author_can_edit) return;
-    if (isAdmin && article.admin_can_edit) return;
+  private checkEditAccess(article: any, userId: string, canEditOwn: boolean, canEditAny: boolean) {
+    if (canEditAny && article.admin_can_edit) return;
+    if (canEditOwn && article.author_id === userId && article.author_can_edit) return;
     throw new ForbiddenException('You do not have permission to edit this article');
   }
 
-  private checkDeleteAccess(article: any, userId: string, isAdmin: boolean) {
-    if (article.author_id === userId && article.author_can_delete) return;
-    if (isAdmin && article.admin_can_delete) return;
+  private checkDeleteAccess(article: any, userId: string, canDeleteOwn: boolean, canDeleteAny: boolean) {
+    if (canDeleteAny && article.admin_can_delete) return;
+    if (canDeleteOwn && article.author_id === userId && article.author_can_delete) return;
     throw new ForbiddenException('You do not have permission to delete this article');
   }
 

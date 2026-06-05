@@ -100,7 +100,7 @@ export function AccountPageClient() {
       <h1 className="text-2xl font-bold mb-8">My Account</h1>
 
       {/* Admin panel shortcut — only for admin/owner logged in via front door */}
-      {(user.role === 'admin' || user.role === 'owner') && (
+      {user.hasBackstageAccess && (
         <div className="mb-6 p-4 bg-surface border border-border rounded-xl flex items-center justify-between text-sm">
           <span className="text-foreground/60">
             You have admin access. The admin panel requires a separate login with 2FA.

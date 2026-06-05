@@ -50,7 +50,8 @@ function XEmbedSmall({ url }: { url: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex flex-col gap-1 p-3 border border-border rounded-lg my-2 hover:bg-surface-raised transition-colors no-underline"
+      style={{ textDecoration: 'none', color: 'inherit' }}
+      className="flex flex-col gap-1 p-3 border border-border rounded-lg my-2 hover:bg-surface-raised transition-colors"
     >
       <div className="flex items-center gap-1.5 text-foreground/60 text-xs">
         <Twitter className="w-3.5 h-3.5 flex-shrink-0" />

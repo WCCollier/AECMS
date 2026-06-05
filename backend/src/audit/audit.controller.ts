@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PrismaService } from '../prisma/prisma.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -14,12 +15,15 @@ import { Prisma } from '@prisma/client';
 @ApiTags('audit-logs')
 @Controller('audit-logs')
 export class AuditController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private capabilitiesService: CapabilitiesService,
+  ) {}
 
   @Get()
   @UseGuards(JwtAuthGuard, BackstageGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Query audit log (Owner sees all; others see own entries)' })
+  @ApiOperation({ summary: 'Query audit log (system.view_audit sees all; others see own entries)' })
   async findAll(
     @CurrentUser() user: any,
     @Query('page') page = 1,
@@ -31,8 +35,8 @@ export class AuditController {
     const skip = (Number(page) - 1) * Number(limit);
     const where: Prisma.AuditLogWhereInput = {};
 
-    // Owner sees all; other roles see only their own entries
-    if (user.role !== 'owner') {
+    const canViewAll = await this.capabilitiesService.userHasCapability(user.id, 'system.view_audit');
+    if (!canViewAll) {
       where.user_id = user.id;
     }
 

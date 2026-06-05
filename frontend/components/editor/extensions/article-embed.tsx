@@ -3,9 +3,11 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { ArticleEmbed } from '@/components/widgets/ArticleEmbed/ArticleEmbed';
-import { Pencil, Trash2, FileText, Search } from 'lucide-react';
+import { Pencil, Trash2, FileText, Search, Type } from 'lucide-react';
 import { conditionalDisplayAttribute, showWhenBadge, SHOW_WHEN_OPTIONS, SHOW_WHEN_LABELS } from './conditionalDisplay';
 import type { ShowWhen } from './conditionalDisplay';
+import { titleAttributeDefaults, TitleSettingsPanel } from './title-settings';
+import type { TitleAttrs } from './title-settings';
 import { ConditionalWidget } from '@/components/widgets/ConditionalWidget';
 import adminApi from '@/lib/adminApi';
 import type { Article, PaginatedResponse } from '@/types';
@@ -74,8 +76,17 @@ function ArticlePicker({ onSelect, onCancel }: { onSelect: (id: string) => void;
 
 function ArticleEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeViewProps) {
   const [picking, setPicking] = useState(!node.attrs.articleId);
+  const [editingTitle, setEditingTitle] = useState(false);
   const showWhen = (node.attrs.show_when || 'always') as ShowWhen;
   const badge = editor.isEditable ? showWhenBadge(showWhen) : null;
+
+  const titleAttrs: TitleAttrs = {
+    titleOverride: node.attrs.titleOverride ?? '',
+    titleCase:     node.attrs.titleCase     ?? 'default',
+    titleAlign:    node.attrs.titleAlign    ?? 'left',
+    titleLevel:    node.attrs.titleLevel    ?? 'h3',
+    titleHidden:   node.attrs.titleHidden   ?? false,
+  };
 
   if (editor.isEditable && picking) {
     return (
@@ -83,6 +94,18 @@ function ArticleEmbedNodeView({ node, editor, updateAttributes, deleteNode }: No
         <ArticlePicker
           onSelect={(id) => { updateAttributes({ articleId: id }); setPicking(false); }}
           onCancel={() => { if (!node.attrs.articleId) deleteNode(); else setPicking(false); }}
+        />
+      </NodeViewWrapper>
+    );
+  }
+
+  if (editor.isEditable && editingTitle) {
+    return (
+      <NodeViewWrapper contentEditable={false}>
+        <TitleSettingsPanel
+          attrs={titleAttrs}
+          onUpdate={(updates) => updateAttributes(updates)}
+          onDone={() => setEditingTitle(false)}
         />
       </NodeViewWrapper>
     );
@@ -96,7 +119,7 @@ function ArticleEmbedNodeView({ node, editor, updateAttributes, deleteNode }: No
             {badge}
           </div>
         )}
-        <ArticleEmbed articleId={node.attrs.articleId} />
+        <ArticleEmbed articleId={node.attrs.articleId} titleAttrs={titleAttrs} />
         {editor.isEditable && (
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex-wrap justify-end">
             {SHOW_WHEN_OPTIONS.map((opt) => (
@@ -113,6 +136,13 @@ function ArticleEmbedNodeView({ node, editor, updateAttributes, deleteNode }: No
                 {SHOW_WHEN_LABELS[opt]}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setEditingTitle(true)}
+              className="bg-black/70 hover:bg-black text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+            >
+              <Type className="w-3 h-3" /> Title
+            </button>
             <button
               type="button"
               onClick={() => setPicking(true)}
@@ -152,6 +182,7 @@ export const ArticleEmbedNode = Node.create({
         renderHTML: (attrs) => ({ 'data-article-id': attrs.articleId }),
       },
       ...conditionalDisplayAttribute,
+      ...titleAttributeDefaults,
     };
   },
 

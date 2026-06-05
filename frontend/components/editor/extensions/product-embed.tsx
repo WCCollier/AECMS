@@ -3,9 +3,11 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { ProductEmbed } from '@/components/widgets/ProductEmbed/ProductEmbed';
-import { Pencil, Trash2, ShoppingBag, Search } from 'lucide-react';
+import { Pencil, Trash2, ShoppingBag, Search, Type } from 'lucide-react';
 import { conditionalDisplayAttribute, showWhenBadge, SHOW_WHEN_OPTIONS, SHOW_WHEN_LABELS } from './conditionalDisplay';
 import type { ShowWhen } from './conditionalDisplay';
+import { titleAttributeDefaults, TitleSettingsPanel } from './title-settings';
+import type { TitleAttrs } from './title-settings';
 import { ConditionalWidget } from '@/components/widgets/ConditionalWidget';
 import adminApi from '@/lib/adminApi';
 import type { Product, PaginatedResponse } from '@/types';
@@ -76,8 +78,17 @@ function ProductPicker({ onSelect, onCancel }: { onSelect: (id: string) => void;
 
 function ProductEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeViewProps) {
   const [picking, setPicking] = useState(!node.attrs.productId);
+  const [editingTitle, setEditingTitle] = useState(false);
   const showWhen = (node.attrs.show_when || 'always') as ShowWhen;
   const badge = editor.isEditable ? showWhenBadge(showWhen) : null;
+
+  const titleAttrs: TitleAttrs = {
+    titleOverride: node.attrs.titleOverride ?? '',
+    titleCase:     node.attrs.titleCase     ?? 'default',
+    titleAlign:    node.attrs.titleAlign    ?? 'left',
+    titleLevel:    node.attrs.titleLevel    ?? 'h3',
+    titleHidden:   node.attrs.titleHidden   ?? false,
+  };
 
   if (editor.isEditable && picking) {
     return (
@@ -85,6 +96,18 @@ function ProductEmbedNodeView({ node, editor, updateAttributes, deleteNode }: No
         <ProductPicker
           onSelect={(id) => { updateAttributes({ productId: id }); setPicking(false); }}
           onCancel={() => { if (!node.attrs.productId) deleteNode(); else setPicking(false); }}
+        />
+      </NodeViewWrapper>
+    );
+  }
+
+  if (editor.isEditable && editingTitle) {
+    return (
+      <NodeViewWrapper contentEditable={false}>
+        <TitleSettingsPanel
+          attrs={titleAttrs}
+          onUpdate={(updates) => updateAttributes(updates)}
+          onDone={() => setEditingTitle(false)}
         />
       </NodeViewWrapper>
     );
@@ -98,7 +121,7 @@ function ProductEmbedNodeView({ node, editor, updateAttributes, deleteNode }: No
             {badge}
           </div>
         )}
-        <ProductEmbed productId={node.attrs.productId} />
+        <ProductEmbed productId={node.attrs.productId} titleAttrs={titleAttrs} />
         {editor.isEditable && (
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex-wrap justify-end">
             {SHOW_WHEN_OPTIONS.map((opt) => (
@@ -115,6 +138,13 @@ function ProductEmbedNodeView({ node, editor, updateAttributes, deleteNode }: No
                 {SHOW_WHEN_LABELS[opt]}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setEditingTitle(true)}
+              className="bg-black/70 hover:bg-black text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+            >
+              <Type className="w-3 h-3" /> Title
+            </button>
             <button
               type="button"
               onClick={() => setPicking(true)}
@@ -154,6 +184,7 @@ export const ProductEmbedNode = Node.create({
         renderHTML: (attrs) => ({ 'data-product-id': attrs.productId }),
       },
       ...conditionalDisplayAttribute,
+      ...titleAttributeDefaults,
     };
   },
 

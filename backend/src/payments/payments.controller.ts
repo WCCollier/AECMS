@@ -93,13 +93,11 @@ export class PaymentsController {
   }
 
   @Post('paypal/reconcile')
-  @UseGuards(JwtAuthGuard, BackstageGuard)
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('order.edit')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Manually trigger PayPal zombie-order reconciliation (owner/admin)' })
-  reconcilePayPal(@CurrentUser() user: any) {
-    if (user.role !== 'owner' && user.role !== 'admin') {
-      throw new Error('Owner or admin required');
-    }
+  @ApiOperation({ summary: 'Manually trigger PayPal zombie-order reconciliation' })
+  reconcilePayPal() {
     return this.paymentsService.reconcilePayPalOrders();
   }
 

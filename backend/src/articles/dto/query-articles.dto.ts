@@ -3,11 +3,12 @@ import {
   IsEnum,
   IsString,
   IsInt,
+  IsBoolean,
   Min,
   Max,
   IsUUID,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ContentStatus, ContentVisibility } from '@prisma/client';
 
@@ -76,4 +77,10 @@ export class QueryArticlesDto {
   @IsEnum(['asc', 'desc'])
   @IsOptional()
   sort_order?: 'asc' | 'desc' = 'desc';
+
+  @ApiPropertyOptional({ description: 'Show only soft-deleted articles (admin only)' })
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  @IsOptional()
+  include_deleted?: boolean;
 }

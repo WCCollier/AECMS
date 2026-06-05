@@ -9,6 +9,7 @@ export interface User {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  hasBackstageAccess?: boolean;
 }
 
 export interface AuthTokens {
@@ -23,6 +24,7 @@ export interface AuthUser {
   lastName?: string;
   role: 'owner' | 'admin' | 'member' | 'guest';
   emailVerified: boolean;
+  hasBackstageAccess?: boolean;
 }
 
 export interface LoginCredentials {

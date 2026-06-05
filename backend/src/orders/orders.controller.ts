@@ -56,7 +56,7 @@ export class OrdersController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get order by ID' })
   findById(@Param('id') id: string, @CurrentUser() user: any) {
-    const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.ordersService.findById(id, user?.id, isAdmin);
   }
 
@@ -67,7 +67,7 @@ export class OrdersController {
     @Param('orderNumber') orderNumber: string,
     @CurrentUser() user: any,
   ) {
-    const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.ordersService.findByOrderNumber(orderNumber, user?.id, isAdmin);
   }
 
@@ -88,7 +88,7 @@ export class OrdersController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Cancel order' })
   cancel(@Param('id') id: string, @CurrentUser() user: any) {
-    const isAdmin = user?.role === 'owner' || user?.role === 'admin';
+    const isAdmin = user?.session_type === 'backstage';
     return this.ordersService.cancel(id, user?.id, isAdmin);
   }
 }

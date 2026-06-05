@@ -429,6 +429,22 @@ export class AuthService {
     return user;
   }
 
+  async hasBackstageAccess(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!user) return false;
+    if (user.role === 'owner') return true;
+    const cap = await this.prisma.capability.findFirst({
+      where: {
+        scope: 'backstage',
+        OR: [
+          { user_capabilities: { some: { user_id: userId } } },
+          { role_capabilities: { some: { role: user.role, enabled: true } } },
+        ],
+      },
+    });
+    return cap !== null;
+  }
+
   /**
    * Verify email with token
    */

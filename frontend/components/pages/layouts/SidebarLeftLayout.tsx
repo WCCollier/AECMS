@@ -6,7 +6,7 @@ import type { PageContent } from '@/types';
 
 export function SidebarLeftLayout({ zones }: { zones: PageContent['zones'] }) {
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 grid lg:grid-cols-[280px_1fr] gap-8">
+    <div className="w-full px-[10%] py-8 grid lg:grid-cols-[25%_1fr] gap-8">
       <aside>
         <WidgetSizeProvider size="small">
           <RichTextContent
@@ -19,7 +19,7 @@ export function SidebarLeftLayout({ zones }: { zones: PageContent['zones'] }) {
         <WidgetSizeProvider size="large">
           <RichTextContent
             content={zones.main ? JSON.stringify(zones.main) : ''}
-            className="prose-article"
+            className="prose-article prose-page"
           />
         </WidgetSizeProvider>
       </main>

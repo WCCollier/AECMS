@@ -47,3 +47,34 @@ export function extractFirstParagraphText(doc: object): string {
   }
   return '';
 }
+
+/** Recursively collects all text from a TipTap doc, up to maxChars. */
+export function extractAllText(doc: object, maxChars = 400): string {
+  const parts: string[] = [];
+  function walk(node: TipTapNode) {
+    if (node.type === 'text' && node.text) parts.push(String(node.text));
+    if (node.content) {
+      for (const child of node.content) {
+        walk(child);
+        if (parts.join('').length >= maxChars) return;
+      }
+    }
+  }
+  walk(doc as TipTapNode);
+  const text = parts.join(' ').replace(/\s+/g, ' ').trim();
+  return text.length > maxChars ? text.slice(0, maxChars) + '…' : text;
+}
+
+/** Strips HTML tags and entities from a string, returning plain text. */
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
