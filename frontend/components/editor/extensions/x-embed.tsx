@@ -12,7 +12,20 @@ function XEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeView
   const [editing, setEditing] = useState(!node.attrs.url);
   const [draft, setDraft] = useState<string>(node.attrs.url || '');
   const showWhen = (node.attrs.show_when || 'always') as ShowWhen;
-  const badge = editor.isEditable ? showWhenBadge(showWhen) : null;
+
+  // Display mode: unconditional early return — nothing from the editor UI can leak through
+  if (!editor.isEditable) {
+    return (
+      <NodeViewWrapper contentEditable={false}>
+        <ConditionalWidget showWhen={showWhen}>
+          <XEmbed url={node.attrs.url} />
+        </ConditionalWidget>
+      </NodeViewWrapper>
+    );
+  }
+
+  // ── Editor mode below ──────────────────────────────────────────────────────
+  const badge = showWhenBadge(showWhen);
 
   const commit = () => {
     if (!draft.trim()) return;
@@ -20,7 +33,7 @@ function XEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeView
     setEditing(false);
   };
 
-  if (editor.isEditable && editing) {
+  if (editing || !node.attrs.url) {
     return (
       <NodeViewWrapper contentEditable={false}>
         <div className="my-4 p-4 border border-border rounded-lg bg-surface space-y-2">
@@ -60,7 +73,7 @@ function XEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeView
     );
   }
 
-  const inner = (
+  return (
     <NodeViewWrapper contentEditable={false}>
       <div className="relative group">
         {badge && (
@@ -69,48 +82,41 @@ function XEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeView
           </div>
         )}
         <XEmbed url={node.attrs.url} />
-        {editor.isEditable && (
-          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex-wrap justify-end">
-            {SHOW_WHEN_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => updateAttributes({ show_when: opt })}
-                className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
-                  opt === showWhen
-                    ? 'bg-accent/80 border-accent text-white'
-                    : 'bg-black/50 border-white/20 text-white hover:bg-black/70'
-                }`}
-              >
-                {SHOW_WHEN_LABELS[opt]}
-              </button>
-            ))}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 flex-wrap justify-end">
+          {SHOW_WHEN_OPTIONS.map((opt) => (
             <button
+              key={opt}
               type="button"
-              onClick={() => { setDraft(node.attrs.url); setEditing(true); }}
-              title="Edit URL"
-              className="bg-black/70 hover:bg-black text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+              onClick={() => updateAttributes({ show_when: opt })}
+              className={`text-xs px-1.5 py-0.5 rounded border transition-colors ${
+                opt === showWhen
+                  ? 'bg-accent/80 border-accent text-white'
+                  : 'bg-black/50 border-white/20 text-white hover:bg-black/70'
+              }`}
             >
-              <Pencil className="w-3 h-3" /> Edit
+              {SHOW_WHEN_LABELS[opt]}
             </button>
-            <button
-              type="button"
-              onClick={() => deleteNode()}
-              title="Remove"
-              className="bg-red-500/80 hover:bg-red-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" /> Remove
-            </button>
-          </div>
-        )}
+          ))}
+          <button
+            type="button"
+            onClick={() => { setDraft(node.attrs.url); setEditing(true); }}
+            title="Edit URL"
+            className="bg-black/70 hover:bg-black text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+          >
+            <Pencil className="w-3 h-3" /> Edit
+          </button>
+          <button
+            type="button"
+            onClick={() => deleteNode()}
+            title="Remove"
+            className="bg-red-500/80 hover:bg-red-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1"
+          >
+            <Trash2 className="w-3 h-3" /> Remove
+          </button>
+        </div>
       </div>
     </NodeViewWrapper>
   );
-
-  if (!editor.isEditable) {
-    return <ConditionalWidget showWhen={showWhen}>{inner}</ConditionalWidget>;
-  }
-  return inner;
 }
 
 export const XEmbedNode = Node.create({
