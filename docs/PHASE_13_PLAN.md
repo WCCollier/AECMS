@@ -225,7 +225,7 @@ Test each widget type in the TipTap editor (use an article or page in admin).
 
 ---
 
-### Area 7 — Full Stripe Sandbox Checkout
+### Area 7 — Full Stripe Sandbox Checkout ✅
 
 **Prerequisite**: Area 1 setup complete, `stripe listen` running.
 
@@ -246,14 +246,16 @@ Test each widget type in the TipTap editor (use an article or page in admin).
 - Order should remain `pending` in admin
 
 **Checklist**
-- [ ] Redirect to Stripe hosted checkout page works
-- [ ] Success card completes and redirects to order confirmation
-- [ ] Order confirmation shows correct items, total, order number
-- [ ] Webhook fires and order transitions to `processing`
+- [x] Redirect to Stripe hosted checkout page works
+- [x] Success card completes and redirects to order confirmation
+- [x] Order confirmation shows correct items, total, order number
+- [x] Webhook fires and order transitions to `processing`
 - [ ] Status history timeline shows the transition
 - [ ] Audit log has `order.status_changed` entry
 - [ ] `webhook_events` table has a row (verify via: `! cd backend && npx prisma studio` or psql)
 - [ ] Decline path leaves order in `pending`
+
+**Note**: Three bugs were discovered and fixed during this area — see `docs/STRIPE_CODESPACES_SETUP.md` for full details.
 
 ---
 

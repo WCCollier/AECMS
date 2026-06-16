@@ -251,7 +251,7 @@ See `docs/PHASE_13_PLAN.md` for the full checklist with step-by-step instruction
 4. ✅ Admin CRUD — Products (Phase 9 Step 10)
 5. ✅ Admin CRUD — Pages (Phase 11)
 6. ✅ Widget system — all 6 widget types
-7. Full Stripe sandbox checkout
+7. ✅ Full Stripe sandbox checkout
 8. PayPal sandbox capture-on-return
 9. Order management with seeded order history
 10. ✅ Audit log viewer
