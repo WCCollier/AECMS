@@ -187,12 +187,14 @@ export interface OrderItem {
   total_price: number;
 }
 
+export type OrderStatus = 'pending' | 'processing' | 'scheduled' | 'shipped' | 'completed' | 'cancelled' | 'refunded';
+
 export interface Order {
   id: string;
   order_number: string;
   user_id: string | null;
   email: string | null;
-  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'refunded';
+  status: OrderStatus;
   payment_method: 'stripe' | 'paypal' | null;
   payment_intent_id: string | null;
   paid_at: string | null;
@@ -201,9 +203,25 @@ export interface Order {
   shipping: number;
   total: number;
   shipping_address: ShippingAddress | null;
+  // Physical fulfillment
+  tracking_number: string | null;
+  tracking_carrier: string | null;
+  shipped_at: string | null;
+  // Service scheduling
+  scheduled_at: string | null;
+  scheduled_note: string | null;
   items: OrderItem[];
   created_at: string;
   updated_at: string;
+}
+
+export interface SavedShippingAddress {
+  shipping_street: string | null;
+  shipping_city: string | null;
+  shipping_state: string | null;
+  shipping_postal_code: string | null;
+  shipping_country: string | null;
+  has_address: boolean;
 }
 
 export interface ShippingAddress {

@@ -38,12 +38,12 @@ export function AdminOrdersClient() {
   };
 
   const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-500/10 text-yellow-500',
-    paid: 'bg-green-500/10 text-green-500',
-    processing: 'bg-blue-500/10 text-blue-500',
-    shipped: 'bg-purple-500/10 text-purple-500',
-    delivered: 'bg-green-500/10 text-green-500',
-    cancelled: 'bg-red-500/10 text-red-500',
+    pending: 'bg-yellow-500/10 text-yellow-600',
+    processing: 'bg-blue-500/10 text-blue-600',
+    scheduled: 'bg-indigo-500/10 text-indigo-600',
+    shipped: 'bg-purple-500/10 text-purple-600',
+    completed: 'bg-green-500/10 text-green-600',
+    cancelled: 'bg-red-500/10 text-red-600',
     refunded: 'bg-gray-500/10 text-gray-500',
   };
 

@@ -790,4 +790,43 @@ export class ProductsService {
     const stats = await this.getRatingStats(product.id);
     return { ...base, ...stats };
   }
+
+  async getInventoryStats(productId: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id: productId },
+      select: { stock_quantity: true, stock_status: true, product_type: true },
+    });
+    if (!product) throw new NotFoundException(`Product ${productId} not found`);
+
+    const [inCarts, purchasedNotShipped, historicalShipped] = await Promise.all([
+      this.prisma.cartItem.aggregate({
+        where: { product_id: productId },
+        _sum: { quantity: true },
+      }),
+      this.prisma.orderItem.aggregate({
+        where: {
+          product_id: productId,
+          order: { status: { in: ['processing', 'scheduled'] } },
+        },
+        _sum: { quantity: true },
+      }),
+      this.prisma.orderItem.aggregate({
+        where: {
+          product_id: productId,
+          order: { status: { in: ['shipped', 'completed'] } },
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
+
+    return {
+      product_type: product.product_type,
+      stock_quantity: product.stock_quantity,
+      stock_status: product.stock_status,
+      units_in_carts: inCarts._sum.quantity ?? 0,
+      units_purchased_not_shipped: purchasedNotShipped._sum.quantity ?? 0,
+      units_available: product.stock_quantity,
+      units_shipped_total: historicalShipped._sum.quantity ?? 0,
+    };
+  }
 }

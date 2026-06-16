@@ -43,6 +43,13 @@ model User {
   updated_at            DateTime  @updatedAt
   deleted_at            DateTime? // Soft delete
 
+  // Saved shipping address
+  shipping_street       String?
+  shipping_city         String?
+  shipping_state        String?
+  shipping_postal_code  String?
+  shipping_country      String?
+
   // Relations
   oauth_accounts        OAuthAccount[]
   refresh_tokens        RefreshToken[]
@@ -589,6 +596,15 @@ model Order {
   shipping_zip      String?
   shipping_country  String?
 
+  // Fulfillment tracking (physical orders)
+  tracking_number   String?
+  tracking_carrier  String?
+  shipped_at        DateTime?
+
+  // Service scheduling
+  scheduled_at      DateTime?
+  scheduled_note    String?
+
   created_at        DateTime    @default(now())
   updated_at        DateTime    @updatedAt
 
@@ -605,6 +621,8 @@ model Order {
 enum OrderStatus {
   pending
   processing
+  scheduled   // service items: appointment/session confirmed
+  shipped     // physical items: in transit
   completed
   cancelled
   refunded

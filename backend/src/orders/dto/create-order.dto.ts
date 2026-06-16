@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEnum,
   IsNotEmpty,
+  IsBoolean,
   ValidateNested,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
@@ -66,8 +67,40 @@ export class CreateOrderDto {
 export class UpdateOrderStatusDto {
   @ApiPropertyOptional({
     description: 'New order status',
-    enum: ['pending', 'processing', 'completed', 'cancelled', 'refunded'],
+    enum: ['pending', 'processing', 'scheduled', 'shipped', 'completed', 'cancelled', 'refunded'],
   })
-  @IsEnum(['pending', 'processing', 'completed', 'cancelled', 'refunded'])
-  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'refunded';
+  @IsEnum(['pending', 'processing', 'scheduled', 'shipped', 'completed', 'cancelled', 'refunded'])
+  status: 'pending' | 'processing' | 'scheduled' | 'shipped' | 'completed' | 'cancelled' | 'refunded';
+}
+
+export class UpdateFulfillmentDto {
+  @ApiPropertyOptional({ description: 'Carrier name (e.g., UPS, USPS, FedEx)' })
+  @IsString()
+  @IsOptional()
+  tracking_carrier?: string;
+
+  @ApiPropertyOptional({ description: 'Tracking number' })
+  @IsString()
+  @IsOptional()
+  tracking_number?: string;
+
+  @ApiPropertyOptional({ description: 'Mark order as shipped (physical)' })
+  @IsBoolean()
+  @IsOptional()
+  mark_shipped?: boolean;
+
+  @ApiPropertyOptional({ description: 'Mark order as scheduled (service)' })
+  @IsBoolean()
+  @IsOptional()
+  mark_scheduled?: boolean;
+
+  @ApiPropertyOptional({ description: 'Scheduled appointment date/time (ISO string)' })
+  @IsString()
+  @IsOptional()
+  scheduled_at?: string;
+
+  @ApiPropertyOptional({ description: 'Note for the customer about the scheduled appointment' })
+  @IsString()
+  @IsOptional()
+  scheduled_note?: string;
 }

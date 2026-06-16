@@ -92,9 +92,11 @@ export function OrderConfirmationClient() {
         <h2 className="font-semibold mb-3">Order Status</h2>
         <div className="flex items-center gap-2">
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-            order.status === 'processing' || order.status === 'completed'
+            order.status === 'processing' || order.status === 'completed' || order.status === 'shipped' || order.status === 'scheduled'
               ? 'bg-green-500/10 text-green-600'
-              : 'bg-amber-500/10 text-amber-600'
+              : order.status === 'cancelled' || order.status === 'refunded'
+                ? 'bg-red-500/10 text-red-600'
+                : 'bg-amber-500/10 text-amber-600'
           }`}>
             {order.status}
           </span>
@@ -106,6 +108,17 @@ export function OrderConfirmationClient() {
           {(order.status === 'processing' || order.status === 'completed') && (
             <span className="text-sm text-green-600">
               Payment confirmed.
+            </span>
+          )}
+          {order.status === 'shipped' && order.tracking_number && (
+            <span className="text-sm text-foreground/70">
+              Tracking: {order.tracking_carrier ? `${order.tracking_carrier} ` : ''}{order.tracking_number}
+            </span>
+          )}
+          {order.status === 'scheduled' && order.scheduled_at && (
+            <span className="text-sm text-foreground/70">
+              Scheduled: {new Date(order.scheduled_at).toLocaleDateString()}
+              {order.scheduled_note && ` — ${order.scheduled_note}`}
             </span>
           )}
         </div>

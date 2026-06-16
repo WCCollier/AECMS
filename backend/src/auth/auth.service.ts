@@ -429,6 +429,36 @@ export class AuthService {
     return user;
   }
 
+  async getShippingAddress(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        shipping_street: true,
+        shipping_city: true,
+        shipping_state: true,
+        shipping_postal_code: true,
+        shipping_country: true,
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    const hasAddress = !!(user.shipping_street || user.shipping_city);
+    return { ...user, has_address: hasAddress };
+  }
+
+  async updateShippingAddress(userId: string, dto: {
+    shipping_street?: string;
+    shipping_city?: string;
+    shipping_state?: string;
+    shipping_postal_code?: string;
+    shipping_country?: string;
+  }) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: dto,
+    });
+    return this.getShippingAddress(userId);
+  }
+
   async hasBackstageAccess(userId: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
     if (!user) return false;

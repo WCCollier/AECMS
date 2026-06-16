@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
-import { CreateOrderDto, UpdateOrderStatusDto, QueryOrdersDto } from './dto';
+import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
@@ -82,6 +82,19 @@ export class OrdersController {
     @CurrentUser() user: any,
   ) {
     return this.ordersService.updateStatus(id, dto, user?.id);
+  }
+
+  @Patch(':id/fulfillment')
+  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @RequiresCapability('order.edit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update fulfillment info: tracking, mark shipped/scheduled (admin)' })
+  updateFulfillment(
+    @Param('id') id: string,
+    @Body() dto: UpdateFulfillmentDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.ordersService.updateFulfillment(id, dto, user?.id);
   }
 
   @Post(':id/cancel')

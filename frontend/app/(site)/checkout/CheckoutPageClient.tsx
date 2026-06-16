@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '@/hooks/useCart';
@@ -11,7 +11,7 @@ import api, { getErrorMessage } from '@/lib/api';
 const ADJUSTMENT_KEY = 'cart_stock_adjustments';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui';
 import { ArrowLeft, CreditCard, ShoppingCart } from 'lucide-react';
-import type { PaymentIntent, ShippingAddress } from '@/types';
+import type { PaymentIntent, ShippingAddress, SavedShippingAddress } from '@/types';
 
 export function CheckoutPageClient() {
   const router = useRouter();
@@ -21,6 +21,8 @@ export function CheckoutPageClient() {
   const [error, setError] = useState('');
   const [step, setStep] = useState<'shipping' | 'payment'>('shipping');
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [saveAddress, setSaveAddress] = useState(false);
+  const [savedAddress, setSavedAddress] = useState<SavedShippingAddress | null>(null);
 
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -30,6 +32,35 @@ export function CheckoutPageClient() {
     postal_code: '',
     country: 'US',
   });
+
+  // Determine if all items in the cart are non-physical (skip shipping step)
+  const needsShipping = items.some((item) => item.product.product_type === 'physical');
+
+  // Load saved shipping address for authenticated users
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    api.get<SavedShippingAddress>('/auth/shipping-address').then((res) => {
+      const addr = res.data;
+      setSavedAddress(addr);
+      if (addr.has_address) {
+        setFormData((prev) => ({
+          ...prev,
+          street: addr.shipping_street ?? '',
+          city: addr.shipping_city ?? '',
+          state: addr.shipping_state ?? '',
+          postal_code: addr.shipping_postal_code ?? '',
+          country: addr.shipping_country ?? 'US',
+        }));
+      }
+    }).catch(() => {});
+  }, [isAuthenticated]);
+
+  // Skip shipping step for digital/service-only carts
+  useEffect(() => {
+    if (items.length > 0 && !needsShipping) {
+      setStep('payment');
+    }
+  }, [items.length, needsShipping]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -78,6 +109,17 @@ export function CheckoutPageClient() {
         country: formData.country,
       };
 
+      // Optionally save address to profile
+      if (saveAddress && isAuthenticated) {
+        await api.patch('/auth/shipping-address', {
+          shipping_street: formData.street,
+          shipping_city: formData.city,
+          shipping_state: formData.state,
+          shipping_postal_code: formData.postal_code,
+          shipping_country: formData.country,
+        });
+      }
+
       const order = await createOrder({
         shipping_address: shippingAddress,
         guest_email: !isAuthenticated ? formData.email : undefined,
@@ -93,28 +135,47 @@ export function CheckoutPageClient() {
   };
 
   const handlePayment = async (provider: 'stripe' | 'paypal') => {
-    if (!orderId) return;
+    let currentOrderId = orderId;
+
+    // For digital/service carts, create the order now if not yet created
+    if (!currentOrderId && !needsShipping) {
+      setIsLoading(true);
+      setError('');
+      try {
+        const validation = await api.post<{ adjusted: boolean; changes: any[] }>('/cart/validate');
+        if (validation.data.adjusted) {
+          await mutateCart();
+          router.push('/cart');
+          return;
+        }
+        const order = await createOrder({
+          guest_email: !isAuthenticated ? formData.email : undefined,
+        });
+        currentOrderId = order.id;
+        setOrderId(order.id);
+      } catch (err) {
+        setError(getErrorMessage(err));
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    if (!currentOrderId) return;
     setIsLoading(true);
     setError('');
 
     try {
       const response = await api.post<PaymentIntent>('/payments/create-intent', {
-        order_id: orderId,
+        order_id: currentOrderId,
         provider,
       });
 
       if (provider === 'stripe') {
-        // client_secret is the Stripe Checkout session URL.
-        // Clear cart before leaving — if payment is cancelled, user returns to /checkout/cancel.
-        // NOTE: Apple Pay, Google Pay, and Amazon Pay are available inside Stripe Checkout
-        // automatically for eligible customers — no separate integration needed.
         if (response.data.client_secret) {
           await clearCart();
           window.location.href = response.data.client_secret;
         }
       } else if (provider === 'paypal') {
-        // client_secret holds the PayPal approval URL (payer-action link).
-        // Cart is cleared by /checkout/success after capture succeeds.
         if (response.data.client_secret) {
           window.location.href = response.data.client_secret;
         }
@@ -144,6 +205,14 @@ export function CheckoutPageClient() {
     );
   }
 
+  const addressChanged = savedAddress?.has_address && (
+    formData.street !== (savedAddress.shipping_street ?? '') ||
+    formData.city !== (savedAddress.shipping_city ?? '') ||
+    formData.state !== (savedAddress.shipping_state ?? '') ||
+    formData.postal_code !== (savedAddress.shipping_postal_code ?? '') ||
+    formData.country !== (savedAddress.shipping_country ?? 'US')
+  );
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <Link href="/cart" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
@@ -161,7 +230,7 @@ export function CheckoutPageClient() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2">
-          {step === 'shipping' ? (
+          {step === 'shipping' && needsShipping ? (
             <Card>
               <CardHeader>
                 <CardTitle>Shipping Information</CardTitle>
@@ -178,6 +247,12 @@ export function CheckoutPageClient() {
                       required
                       placeholder="your@email.com"
                     />
+                  )}
+
+                  {savedAddress?.has_address && (
+                    <div className="text-sm text-foreground/60 bg-foreground/5 rounded-lg px-3 py-2">
+                      Your saved address has been pre-filled below.
+                    </div>
                   )}
 
                   <Input
@@ -236,6 +311,20 @@ export function CheckoutPageClient() {
                       </select>
                     </div>
                   </div>
+
+                  {isAuthenticated && (
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={saveAddress}
+                        onChange={(e) => setSaveAddress(e.target.checked)}
+                        className="rounded"
+                      />
+                      {savedAddress?.has_address
+                        ? 'Update my saved shipping address'
+                        : 'Save this address for future orders'}
+                    </label>
+                  )}
                 </CardContent>
 
                 <CardFooter>
@@ -249,8 +338,25 @@ export function CheckoutPageClient() {
             <Card>
               <CardHeader>
                 <CardTitle>Payment Method</CardTitle>
+                {!needsShipping && (
+                  <p className="text-sm text-foreground/60 mt-1">
+                    No shipping required for your items.
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
+                {!isAuthenticated && !needsShipping && (
+                  <Input
+                    label="Email"
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                    placeholder="your@email.com"
+                  />
+                )}
+
                 <Button
                   className="w-full justify-start h-auto py-4"
                   variant="outline"
@@ -279,14 +385,16 @@ export function CheckoutPageClient() {
                   </div>
                 </Button>
 
-                <Button
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => setStep('shipping')}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Shipping
-                </Button>
+                {needsShipping && (
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => setStep('shipping')}
+                  >
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to Shipping
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
@@ -303,6 +411,11 @@ export function CheckoutPageClient() {
                   <div key={item.id} className="flex justify-between text-sm">
                     <span className="text-foreground/70">
                       {item.product.name} x {item.quantity}
+                      {item.product.product_type !== 'physical' && (
+                        <span className="ml-1 text-foreground/40 text-xs capitalize">
+                          ({item.product.product_type})
+                        </span>
+                      )}
                     </span>
                     <span>{formatPrice(item.unit_price * item.quantity)}</span>
                   </div>
@@ -314,7 +427,7 @@ export function CheckoutPageClient() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-foreground/60">Shipping</span>
-                  <span className="text-foreground/60">Free</span>
+                  <span className="text-foreground/60">{needsShipping ? 'Free' : 'N/A'}</span>
                 </div>
                 <hr className="border-foreground/10" />
                 <div className="flex justify-between font-bold">

@@ -159,4 +159,13 @@ export class ProductsController {
   ) {
     return this.productsService.restoreVersion(id, parseInt(vnum, 10), user.id);
   }
+
+  @Get(':id/inventory-stats')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.view.all')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get inventory statistics for a product (admin)' })
+  getInventoryStats(@Param('id') id: string) {
+    return this.productsService.getInventoryStats(id);
+  }
 }

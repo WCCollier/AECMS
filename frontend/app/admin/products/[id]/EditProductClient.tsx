@@ -3,12 +3,65 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Truck, Package, BarChart3 } from 'lucide-react';
+import useSWR from 'swr';
 import { ProductForm } from '@/components/admin/ProductForm';
 import { VersionHistoryPanel } from '@/components/admin/VersionHistoryPanel';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 import type { MediaItem } from '@/types';
+
+const adminFetcher = (url: string) => adminApi.get(url).then((r) => r.data);
+
+interface InventoryStats {
+  product_type: string;
+  stock_quantity: number | null;
+  stock_status: string;
+  units_in_carts: number;
+  units_purchased_not_shipped: number;
+  units_available: number | null;
+  units_shipped_total: number;
+}
+
+function InventoryTracker({ productId, productType }: { productId: string; productType: string }) {
+  const { data: stats } = useSWR<InventoryStats>(
+    productId ? `/products/${productId}/inventory-stats` : null,
+    adminFetcher,
+  );
+
+  if (productType !== 'physical' || !stats) return null;
+
+  return (
+    <div className="mt-6 border border-border rounded-xl p-5">
+      <h2 className="text-base font-semibold mb-4 flex items-center gap-2">
+        <BarChart3 className="w-4 h-4 text-foreground/60" />
+        Inventory Tracker
+      </h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-foreground/5 rounded-lg p-4 text-center">
+          <ShoppingCart className="w-5 h-5 mx-auto mb-2 text-yellow-500" />
+          <p className="text-2xl font-bold">{stats.units_in_carts}</p>
+          <p className="text-xs text-foreground/50 mt-1">In Carts</p>
+        </div>
+        <div className="bg-foreground/5 rounded-lg p-4 text-center">
+          <Package className="w-5 h-5 mx-auto mb-2 text-blue-500" />
+          <p className="text-2xl font-bold">{stats.units_purchased_not_shipped}</p>
+          <p className="text-xs text-foreground/50 mt-1">Purchased, Not Shipped</p>
+        </div>
+        <div className="bg-foreground/5 rounded-lg p-4 text-center">
+          <BarChart3 className="w-5 h-5 mx-auto mb-2 text-green-500" />
+          <p className="text-2xl font-bold">{stats.units_available ?? '∞'}</p>
+          <p className="text-xs text-foreground/50 mt-1">Available Stock</p>
+        </div>
+        <div className="bg-foreground/5 rounded-lg p-4 text-center">
+          <Truck className="w-5 h-5 mx-auto mb-2 text-purple-500" />
+          <p className="text-2xl font-bold">{stats.units_shipped_total}</p>
+          <p className="text-xs text-foreground/50 mt-1">Total Shipped</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface Product {
   id: string;
@@ -106,6 +159,8 @@ export function EditProductClient() {
             : (product.stock_status as 'in_stock' | 'out_of_stock' | 'back_ordered') ?? 'in_stock',
         }}
       />
+
+      <InventoryTracker productId={productId} productType={product.product_type} />
 
       <div className="mt-6">
         <VersionHistoryPanel resourceType="products" resourceId={productId} />

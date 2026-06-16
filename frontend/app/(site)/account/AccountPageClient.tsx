@@ -7,10 +7,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { Button, Input } from '@/components/ui';
 import api, { getErrorMessage } from '@/lib/api';
-import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink } from 'lucide-react';
+import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin } from 'lucide-react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
-import type { Comment, PaginatedResponse } from '@/types';
+import type { Comment, PaginatedResponse, SavedShippingAddress } from '@/types';
 import { CommentForm } from '@/components/comments/CommentForm';
 
 const formatPrice = (p: number) =>
@@ -28,8 +28,35 @@ export function AccountPageClient() {
     fetcher,
   );
 
-  const [activeSection, setActiveSection] = useState<'orders' | 'comments' | 'password' | 'delete' | null>(null);
+  const [activeSection, setActiveSection] = useState<'orders' | 'comments' | 'shipping' | 'password' | 'delete' | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+
+  // Shipping address state
+  const { data: shippingData, mutate: mutateShipping } = useSWR<SavedShippingAddress>(
+    user ? '/auth/shipping-address' : null,
+    fetcher,
+  );
+  const [shippingForm, setShippingForm] = useState({
+    shipping_street: '',
+    shipping_city: '',
+    shipping_state: '',
+    shipping_postal_code: '',
+    shipping_country: 'US',
+  });
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState('');
+  const [shippingSuccess, setShippingSuccess] = useState('');
+
+  // Populate shipping form when data loads
+  if (shippingData && !shippingLoading && shippingForm.shipping_street === '' && shippingData.has_address) {
+    setShippingForm({
+      shipping_street: shippingData.shipping_street ?? '',
+      shipping_city: shippingData.shipping_city ?? '',
+      shipping_state: shippingData.shipping_state ?? '',
+      shipping_postal_code: shippingData.shipping_postal_code ?? '',
+      shipping_country: shippingData.shipping_country ?? 'US',
+    });
+  }
 
   // Change password state
   const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
@@ -75,6 +102,22 @@ export function AccountPageClient() {
       setPwError(getErrorMessage(err));
     } finally {
       setPwLoading(false);
+    }
+  }
+
+  async function handleShippingUpdate(e: FormEvent) {
+    e.preventDefault();
+    setShippingError('');
+    setShippingSuccess('');
+    setShippingLoading(true);
+    try {
+      await api.patch('/auth/shipping-address', shippingForm);
+      setShippingSuccess('Shipping address saved.');
+      mutateShipping();
+    } catch (err) {
+      setShippingError(getErrorMessage(err));
+    } finally {
+      setShippingLoading(false);
     }
   }
 
@@ -278,6 +321,74 @@ export function AccountPageClient() {
                 )}
               </div>
             )}
+          </div>
+        )}
+      </section>
+
+      {/* Shipping Address */}
+      <section className="bg-surface border border-border rounded-xl mb-6 overflow-hidden">
+        <button
+          onClick={() => setActiveSection(activeSection === 'shipping' ? null : 'shipping')}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-raised transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <MapPin className="w-5 h-5 text-accent" />
+            <span className="font-semibold">Shipping Address</span>
+            {shippingData?.has_address && (
+              <span className="text-xs text-foreground/50">{shippingData.shipping_city}, {shippingData.shipping_state}</span>
+            )}
+          </div>
+          <ChevronRight className={`w-4 h-4 text-foreground/40 transition-transform ${activeSection === 'shipping' ? 'rotate-90' : ''}`} />
+        </button>
+        {activeSection === 'shipping' && (
+          <div className="px-6 pb-6">
+            <form onSubmit={handleShippingUpdate} className="space-y-3">
+              <Input
+                label="Street Address"
+                type="text"
+                value={shippingForm.shipping_street}
+                onChange={(e) => setShippingForm((p) => ({ ...p, shipping_street: e.target.value }))}
+                placeholder="123 Main St"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="City"
+                  type="text"
+                  value={shippingForm.shipping_city}
+                  onChange={(e) => setShippingForm((p) => ({ ...p, shipping_city: e.target.value }))}
+                />
+                <Input
+                  label="State"
+                  type="text"
+                  value={shippingForm.shipping_state}
+                  onChange={(e) => setShippingForm((p) => ({ ...p, shipping_state: e.target.value }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Postal Code"
+                  type="text"
+                  value={shippingForm.shipping_postal_code}
+                  onChange={(e) => setShippingForm((p) => ({ ...p, shipping_postal_code: e.target.value }))}
+                />
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">Country</label>
+                  <select
+                    value={shippingForm.shipping_country}
+                    onChange={(e) => setShippingForm((p) => ({ ...p, shipping_country: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg border border-foreground/20 bg-background text-sm"
+                  >
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="AU">Australia</option>
+                  </select>
+                </div>
+              </div>
+              {shippingError && <p className="text-sm text-red-500">{shippingError}</p>}
+              {shippingSuccess && <p className="text-sm text-green-600">{shippingSuccess}</p>}
+              <Button type="submit" size="sm" isLoading={shippingLoading}>Save Address</Button>
+            </form>
           </div>
         )}
       </section>

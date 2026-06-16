@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
-import { CreateOrderDto, UpdateOrderStatusDto, QueryOrdersDto } from './dto';
+import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';
 import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit/audit.service';
 
@@ -356,6 +356,49 @@ export class OrdersService {
   }
 
   /**
+   * Update fulfillment info for a physical order (tracking number, carrier, mark shipped)
+   */
+  async updateFulfillment(id: string, dto: UpdateFulfillmentDto, actorId?: string) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    const data: any = {};
+    if (dto.tracking_number !== undefined) data.tracking_number = dto.tracking_number;
+    if (dto.tracking_carrier !== undefined) data.tracking_carrier = dto.tracking_carrier;
+    if (dto.mark_shipped && order.status === 'processing') {
+      this.validateStatusTransition(order.status, 'shipped');
+      data.status = 'shipped';
+      data.shipped_at = new Date();
+    }
+    if (dto.scheduled_note !== undefined) data.scheduled_note = dto.scheduled_note;
+    if (dto.mark_scheduled && order.status === 'processing') {
+      this.validateStatusTransition(order.status, 'scheduled');
+      data.status = 'scheduled';
+      data.scheduled_at = dto.scheduled_at ? new Date(dto.scheduled_at) : new Date();
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id },
+      data,
+      include: this.getOrderIncludes(),
+    });
+
+    if (data.status) {
+      await this.auditLog.log({
+        event_type: 'order.status_changed',
+        user_id: actorId ?? undefined,
+        resource_type: 'order',
+        resource_id: id,
+        changes: { before: { status: order.status }, after: { status: data.status } },
+        metadata: undefined,
+      });
+    }
+
+    return this.transformOrder(updated);
+  }
+
+
+  /**
    * Generate unique order number
    */
   private generateOrderNumber(): string {
@@ -370,7 +413,9 @@ export class OrdersService {
   private validateStatusTransition(currentStatus: string, newStatus: string) {
     const validTransitions: Record<string, string[]> = {
       pending: ['processing', 'cancelled'],
-      processing: ['completed', 'cancelled', 'refunded'],
+      processing: ['shipped', 'scheduled', 'completed', 'cancelled', 'refunded'],
+      shipped: ['completed', 'refunded'],
+      scheduled: ['completed', 'cancelled', 'refunded'],
       completed: ['refunded'],
       cancelled: [],
       refunded: [],

@@ -27,6 +27,7 @@ import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { UpdateShippingAddressDto } from './dto/shipping-address.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @ApiTags('auth')
@@ -131,6 +132,23 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Current password incorrect' })
   async changePassword(@Request() req: any, @Body() dto: ChangePasswordDto) {
     return this.authService.changePassword(req.user.id, dto.currentPassword, dto.newPassword);
+  }
+
+  @Get('shipping-address')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get saved shipping address for current user' })
+  getShippingAddress(@Request() req: any) {
+    return this.authService.getShippingAddress(req.user.id);
+  }
+
+  @Patch('shipping-address')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Save or update shipping address for current user' })
+  updateShippingAddress(@Request() req: any, @Body() dto: UpdateShippingAddressDto) {
+    return this.authService.updateShippingAddress(req.user.id, dto);
   }
 
   @Delete('account')
