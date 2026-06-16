@@ -91,12 +91,23 @@ export function OrderConfirmationClient() {
       <div className="bg-surface border border-border rounded-xl p-6 mb-8">
         <h2 className="font-semibold mb-3">Order Status</h2>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-600 capitalize">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
+            order.status === 'processing' || order.status === 'completed'
+              ? 'bg-green-500/10 text-green-600'
+              : 'bg-amber-500/10 text-amber-600'
+          }`}>
             {order.status}
           </span>
-          <span className="text-sm text-foreground/50">
-            Payment will be confirmed shortly.
-          </span>
+          {order.status === 'pending' && (
+            <span className="text-sm text-foreground/50">
+              Payment will be confirmed shortly.
+            </span>
+          )}
+          {(order.status === 'processing' || order.status === 'completed') && (
+            <span className="text-sm text-green-600">
+              Payment confirmed.
+            </span>
+          )}
         </div>
       </div>
 
