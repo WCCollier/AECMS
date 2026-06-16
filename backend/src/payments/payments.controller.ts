@@ -72,7 +72,8 @@ export class PaymentsController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string,
   ) {
-    const payload = req.rawBody;
+    // express.raw() puts the buffer in req.body; rawBody is not used here.
+    const payload = (req.body as Buffer | undefined) ?? req.rawBody;
     if (!payload) {
       throw new Error('Missing raw body');
     }

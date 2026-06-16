@@ -19,8 +19,10 @@ export class StripeProvider implements PaymentProvider {
   private webhookSecret: string | null = null;
 
   constructor(private configService: ConfigService) {
-    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
-    this.webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET') || null;
+    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY') || process.env.STRIPE_SECRET_KEY;
+    // Read webhook secret directly from process.env so that dotenv overrides of
+    // Codespaces-injected secrets (e.g. PLACEHOLDER) take effect at startup.
+    this.webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || this.configService.get<string>('STRIPE_WEBHOOK_SECRET') || null;
 
     if (secretKey) {
       this.stripe = new Stripe(secretKey);
@@ -34,11 +36,23 @@ export class StripeProvider implements PaymentProvider {
     return this.stripe !== null;
   }
 
+  private getFrontendUrl(): string {
+    // In GitHub Codespaces, auto-detect the public URL from injected env vars.
+    // Falls back to FRONTEND_URL for local Docker / production deployments.
+    const codespaceName = process.env.CODESPACE_NAME;
+    const codespaceDomain = process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
+    if (codespaceName && codespaceDomain) {
+      return `https://${codespaceName}-3000.${codespaceDomain}`;
+    }
+    return this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+  }
+
   async createPayment(params: CreatePaymentParams): Promise<PaymentIntent> {
     if (!this.stripe) {
       throw new Error('Stripe is not configured');
     }
 
+    const frontendUrl = this.getFrontendUrl();
     // Use Stripe Checkout (hosted page). Apple Pay, Google Pay, and Amazon Pay
     // are automatically enabled by Stripe for eligible customers — no extra work needed.
     const session = await this.stripe.checkout.sessions.create({
@@ -60,8 +74,8 @@ export class StripeProvider implements PaymentProvider {
         order_id: params.orderId,
         ...params.metadata,
       },
-      success_url: `${this.configService.get('FRONTEND_URL')}/order-confirmation?order=${params.orderId}`,
-      cancel_url: `${this.configService.get('FRONTEND_URL')}/checkout/cancel?order=${params.orderId}`,
+      success_url: `${frontendUrl}/order-confirmation?order=${params.orderId}`,
+      cancel_url: `${frontendUrl}/checkout/cancel?order=${params.orderId}`,
     });
 
     return {
