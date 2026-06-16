@@ -40,6 +40,15 @@ export class PayPalProvider implements PaymentProvider {
     }
   }
 
+  private getFrontendUrl(): string {
+    const codespaceName = process.env.CODESPACE_NAME;
+    const codespaceDomain = process.env.GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN;
+    if (codespaceName && codespaceDomain) {
+      return `https://${codespaceName}-3000.${codespaceDomain}`;
+    }
+    return this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
+  }
+
   isAvailable(): boolean {
     return this.clientId !== null && this.clientSecret !== null;
   }
@@ -78,8 +87,8 @@ export class PayPalProvider implements PaymentProvider {
               locale: 'en-US',
               user_action: 'PAY_NOW',
               // order param carries the AECMS order ID back to our success/cancel pages
-              return_url: `${this.configService.get('FRONTEND_URL')}/checkout/success?order=${params.orderId}`,
-              cancel_url: `${this.configService.get('FRONTEND_URL')}/checkout/cancel?order=${params.orderId}`,
+              return_url: `${this.getFrontendUrl()}/checkout/success?order=${params.orderId}`,
+              cancel_url: `${this.getFrontendUrl()}/checkout/cancel?order=${params.orderId}`,
             },
           },
         },
