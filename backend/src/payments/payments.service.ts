@@ -194,6 +194,16 @@ export class PaymentsService {
       throw new BadRequestException('Access denied');
     }
 
+    // Idempotency: if already captured (e.g. React StrictMode double-fire), return success
+    if (order.status === 'processing' && order.payment_intent_id) {
+      return {
+        success: true,
+        order_id: order.id,
+        payment_id: order.payment_intent_id,
+        status: 'succeeded',
+      };
+    }
+
     // Test mode
     if (this.testMode) {
       await this.ordersService.markAsPaid(order.id, dto.paypal_order_id);

@@ -137,6 +137,28 @@ export class PayPalProvider implements PaymentProvider {
     if (!response.ok) {
       const error = await response.json();
       this.logger.error('PayPal capture failed', error);
+
+      // PayPal sandbox sometimes returns INTERNAL_SERVICE_ERROR even when the
+      // payment was already captured (e.g. duplicate capture from React StrictMode
+      // double-firing useEffect). Fall back to fetching the order status and treat
+      // COMPLETED as success rather than surfacing a misleading error.
+      try {
+        const { rawStatus, captureId } = await this.getOrderRawStatus(paymentId);
+        if (rawStatus === 'COMPLETED' && captureId) {
+          this.logger.warn(`PayPal capture endpoint errored but order ${paymentId} is COMPLETED — treating as success`);
+          return {
+            id: captureId,
+            orderId: '',
+            amount: 0,
+            currency: 'USD',
+            status: 'succeeded',
+            paidAt: new Date(),
+          };
+        }
+      } catch (statusErr) {
+        this.logger.error('Failed to fetch PayPal order status after capture error', statusErr);
+      }
+
       throw new Error(`PayPal capture error: ${error.message || 'Unknown error'}`);
     }
 
