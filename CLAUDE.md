@@ -18,7 +18,7 @@
 
 **Phase 0**: ✅ COMPLETE - Project foundation, Docker, NestJS/Next.js initialized
 **Phase 1**: ✅ COMPLETE - Database schema (30+ models), JWT auth, tests passing
-**Phase 2**: ✅ COMPLETE - Capability-based RBAC (34 capabilities, guards, decorators)
+**Phase 2**: ✅ COMPLETE - Capability-based RBAC (44 capabilities, guards, decorators)
 **Phase 3**: ✅ COMPLETE - Content Management (Media, Categories, Tags, Articles, Pages)
 **Phase 4**: ✅ COMPLETE - Ecommerce Core (Products, Cart, Orders)
 **Phase 5**: ✅ COMPLETE - Payments Module (Stripe, PayPal) - Configured
@@ -98,7 +98,7 @@ The two sessions are fully independent and can be active simultaneously.
 Backstage access is **capability-scoped, not role-hardcoded**:
 - A user gains backstage access if `user.role === 'owner'` OR they hold ≥1 capability with `scope = 'backstage'`
 - `BackstageGuard` enforces `session_type === 'backstage'` on every admin API endpoint
-- The default Admin role ships with 19 backstage-scoped capabilities; Member ships with 4 customer-scoped ones
+- The default Admin role ships with 21 backstage-scoped + 9 customer-scoped capabilities; Member ships with 9 customer-scoped ones; Guest ships with 4 customer-scoped ones
 
 ### Capability Scopes
 | Scope | Meaning | Guard chain on API endpoint |
@@ -106,9 +106,28 @@ Backstage access is **capability-scoped, not role-hardcoded**:
 | `'backstage'` | Requires admin dashboard | `JwtAuthGuard → BackstageGuard → CapabilityGuard` |
 | `'customer'` | Available in customer-facing experience | `JwtAuthGuard → CapabilityGuard` (no BackstageGuard) |
 
-Current counts: **30 backstage** + **4 customer** = **34 total capabilities**.
+Current counts: **32 backstage** + **12 customer** = **44 total capabilities**.
 
-The 4 customer-scoped capabilities (`comment.article`, `review.article`, `comment.product`, `review.product`) are assigned to Member and Admin by default. Their enforcement is a runtime check inside `CommentsService.create()` — the required capability is derived from the request context (`isReview` + target type), not a static decorator.
+**Backstage additions (post-Phase 15):** `system.appearance` (Owner-only; gates `PATCH /settings/appearance`), `digital.deliver` (Admin+Owner; gates token extend/regenerate/admin-grant).
+
+**Customer capabilities** (all scope: `'customer'`):
+
+| Capability | Guest | Member | Admin | Description |
+|-----------|:-----:|:------:|:-----:|-------------|
+| `comment.article` | ❌ | ✅ | ✅ | Post article comment |
+| `review.article` | ❌ | ✅ | ✅ | Post article review |
+| `comment.product` | ❌ | ✅ | ✅ | Post product comment |
+| `review.product` | ❌ | ✅ | ✅ | Post product review |
+| `comment.edit.own` | ❌ | ✅ | ✅ | Edit own comments |
+| `comment.delete.own` | ❌ | ✅ | ✅ | Delete own comments |
+| `checkout.guest` | ✅ | ✅ | ✅ | Checkout without account |
+| `purchase.physical` | ✅ | ✅ | ✅ | Buy physical products |
+| `purchase.digital` | ✅ | ✅ | ✅ | Buy digital products |
+| `purchase.service` | ✅ | ✅ | ✅ | Buy service products |
+
+Guest capabilities are enforced via the virtual `guest` role in `RoleCapability`. `CapabilityGuard` routes null-user requests to `guestHasAnyCapability()` instead of returning false. Purchase caps are enforced in `OrdersService.createFromCart()`.
+
+The 4 comment/review creation capabilities (`comment.article`, `review.article`, `comment.product`, `review.product`) use a runtime check inside `CommentsService.create()` — the required capability is derived from request context (`isReview` + target type), not a static decorator.
 
 ### `session_type` in JWT
 Every access and refresh token carries `session_type: 'customer' | 'backstage'`. The JWT strategy exposes it on `req.user.session_type`. Token refresh propagates the type automatically — the stored `RefreshToken` DB row records `session_type` and re-embeds it in the new pair.
@@ -424,7 +443,7 @@ NEXT_PUBLIC_KINDLE_SENDER_EMAIL=moriakul@gmail.com  # shown to user in wizard St
 - Unified Comment/Review system: `CommentRating` table, `ProductReview` dropped, verified purchase enforcement
 - CartProduct partial type, Cart audit fields (user_id, session_id, created_at, updated_at) retained
 - **Customer/backstage session bifurcation** — see Session Architecture section above
-- 4 customer-scoped capabilities (comment/review on articles and products) assigned to Member by default
+- 12 customer-scoped capabilities (comment/review/edit/delete + checkout + purchase types) — see capability table in Session Architecture section
 
 **Deferred polish** (will fix as bugs surface during Phase 9):
 - Loading skeletons and toast notifications
