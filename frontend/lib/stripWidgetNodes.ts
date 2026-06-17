@@ -5,6 +5,7 @@ const WIDGET_NODE_TYPES = new Set([
   'xEmbed',
   'articleEmbed',
   'productEmbed',
+  'rssEmbed',
   'image',
 ]);
 

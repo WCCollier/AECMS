@@ -6,7 +6,7 @@ import {
   Bold, Italic, Strikethrough, Code, List, ListOrdered, Quote,
   Undo, Redo, Link as LinkIcon, Unlink, Heading1, Heading2, Heading3,
   Minus, ImagePlus, X, Upload, Info, Video, Twitter, GalleryHorizontal,
-  FileText, ShoppingBag, Square,
+  FileText, ShoppingBag, Square, Rss,
   AlignLeft, AlignCenter, AlignRight,
 } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
@@ -221,6 +221,14 @@ export function TipTapEditor({
     }).run();
   }, [editor]);
 
+  const insertRssEmbed = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'rssEmbed',
+      attrs: { feedUrl: '' },
+    }).run();
+  }, [editor]);
+
   if (!editor) {
     return (
       <div className={`border border-border rounded-lg ${className}`}>
@@ -337,6 +345,11 @@ export function TipTapEditor({
         {/* Product embed */}
         <MenuButton onClick={insertProductEmbed} title="Embed product">
           <ShoppingBag className="w-4 h-4" />
+        </MenuButton>
+
+        {/* RSS Feed embed */}
+        <MenuButton onClick={insertRssEmbed} title="Embed RSS feed">
+          <Rss className="w-4 h-4" />
         </MenuButton>
 
         <MenuDivider />
