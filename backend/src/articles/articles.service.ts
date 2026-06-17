@@ -62,7 +62,14 @@ export class ArticlesService {
     const slug = dto.slug || this.generateSlug(dto.title);
 
     const existing = await this.prisma.article.findUnique({ where: { slug } });
-    if (existing) throw new ConflictException(`Article with slug "${slug}" already exists`);
+    if (existing) {
+      if (existing.deleted_at) {
+        throw new ConflictException(
+          `The slug "${slug}" belongs to a deleted article. Choose a different title, or ask an administrator to restore the original article.`,
+        );
+      }
+      throw new ConflictException(`Article with slug "${slug}" already exists`);
+    }
 
     if (dto.category_ids?.length) {
       const cats = await this.prisma.category.findMany({ where: { id: { in: dto.category_ids } } });
@@ -240,7 +247,14 @@ export class ArticlesService {
 
     if (dto.slug && dto.slug !== article.slug) {
       const existing = await this.prisma.article.findUnique({ where: { slug: dto.slug } });
-      if (existing) throw new ConflictException(`Article with slug "${dto.slug}" already exists`);
+      if (existing) {
+        if (existing.deleted_at) {
+          throw new ConflictException(
+            `The slug "${dto.slug}" belongs to a deleted article. Choose a different title, or ask an administrator to restore the original article.`,
+          );
+        }
+        throw new ConflictException(`Article with slug "${dto.slug}" already exists`);
+      }
     }
 
     let published_at = article.published_at;

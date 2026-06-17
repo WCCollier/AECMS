@@ -34,12 +34,14 @@ export class PagesService {
       throw new ConflictException(`"${slug}" is reserved and cannot be used as a page slug`);
     }
 
-    // Check if slug already exists
-    const existing = await this.prisma.page.findUnique({
-      where: { slug },
-    });
-
+    // Check if slug already exists (including soft-deleted pages)
+    const existing = await this.prisma.page.findUnique({ where: { slug } });
     if (existing) {
+      if (existing.deleted_at) {
+        throw new ConflictException(
+          `The slug "${slug}" belongs to a deleted page. Choose a different title, or ask an administrator to restore the original page.`,
+        );
+      }
       throw new ConflictException(`Page with slug "${slug}" already exists`);
     }
 
@@ -285,10 +287,13 @@ export class PagesService {
       if (RESERVED_SLUGS.includes(dto.slug)) {
         throw new ConflictException(`"${dto.slug}" is reserved and cannot be used as a page slug`);
       }
-      const existing = await this.prisma.page.findUnique({
-        where: { slug: dto.slug },
-      });
+      const existing = await this.prisma.page.findUnique({ where: { slug: dto.slug } });
       if (existing) {
+        if (existing.deleted_at) {
+          throw new ConflictException(
+            `The slug "${dto.slug}" belongs to a deleted page. Choose a different title, or ask an administrator to restore the original page.`,
+          );
+        }
         throw new ConflictException(`Page with slug "${dto.slug}" already exists`);
       }
     }

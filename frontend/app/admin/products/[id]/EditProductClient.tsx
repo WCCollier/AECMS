@@ -7,6 +7,7 @@ import { ArrowLeft, ShoppingCart, Truck, Package, BarChart3 } from 'lucide-react
 import useSWR from 'swr';
 import { ProductForm } from '@/components/admin/ProductForm';
 import { VersionHistoryPanel } from '@/components/admin/VersionHistoryPanel';
+import { DigitalFilesPanel } from '@/components/digital/DigitalFilesPanel';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 import type { MediaItem } from '@/types';
@@ -158,9 +159,14 @@ export function EditProductClient() {
             ? 'in_stock'
             : (product.stock_status as 'in_stock' | 'out_of_stock' | 'back_ordered') ?? 'in_stock',
         }}
+        mainExtra={
+          product.product_type === 'digital'
+            ? <DigitalFilesPanel productId={productId} />
+            : product.product_type === 'physical'
+              ? <InventoryTracker productId={productId} productType={product.product_type} />
+              : undefined
+        }
       />
-
-      <InventoryTracker productId={productId} productType={product.product_type} />
 
       <div className="mt-6">
         <VersionHistoryPanel resourceType="products" resourceId={productId} />

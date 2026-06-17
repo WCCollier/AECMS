@@ -179,30 +179,31 @@ Walk a first-time user through: (1) finding their Kindle email, (2) whitelisting
 ### Wizard structure (modal, slideshow-style)
 
 **For users with no saved Kindle devices — full onboarding (4 steps):**
-
+This full onboarding slideshow could include embedded images, as noted in double-brackets, from the new media/ directory, using a carousel consistent with (or actually using) the image carousel we have created for embedding in articles and products. Slow auto-advance, and the image can be clicked to show an enlarged version in a full-screen modal. Additionally, the images are marked up with ovals to show where the user should click, plus highlighting in the same color to show what text the user should focus on. The first step uses a bright green hue. The second step uses a magenta hue. I have noted which words (also in double-brackets) in the instructional text of the wizard should be bolded and colored to match.
 ```
-Step 1 of 4 — Find Your Kindle Email
+Step 1 of 4 — Find Your Kindle Email [[Action color: bright green]]
+[[Image carousel: to-kindle_1_marked.jpg, to-kindle_2_marked.jpg, to-kindle_3_marked.jpg]]
 ─────────────────────────────────────────
 Your Kindle device has a unique email address.
 
-1. Go to amazon.com → Account → Content & Devices
-2. Click the "Devices" tab
-3. Find your Kindle and click it
-4. Copy the "Send-to-Kindle Email" address
+1. Go to amazon.com → Account
+2. At the bottom, under "Digital content and devices," click [[bright green]]Devices[[/bright green]]
+3. On the next page, click [[bright green]]Kindle[[/bright green]]
+4. Copy the device email address from this page, or click [[bright green]]Preferences[[/bright green]] at the top to see the full list
 
-[  ___________________@kindle.com  ]  ← enter it here
+[  ___________________@kindle.com  ]  ← enter the device email address here
 
 [Back]                          [Next →]
 
 
-Step 2 of 4 — Whitelist Our Email
+Step 2 of 4 — Whitelist Our Email [[Action color: magenta]]
+[[Image carousel: to-kindle_3_marked.jpg, to-kindle_4_marked.jpg]]
 ─────────────────────────────────────────
 Amazon only accepts files from approved senders.
 
-1. Go to amazon.com → Account → Content & Devices
-2. Click "Preferences" tab → "Personal Document Settings"
-3. Scroll to "Approved Personal Document E-mail List"
-4. Click "Add a new approved e-mail address"
+1. Click [[bright green]]Preferences[[/bright green]] if you have not already done so
+2. Scroll down to the "Approved Personal Document E-mail List"
+3. Click [[magenta]]Add a new e-mail address[[/magenta]]
 5. Enter: [books@yourstore.com]      ← copy this
 
                                [Next →]

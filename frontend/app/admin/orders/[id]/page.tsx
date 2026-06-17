@@ -11,6 +11,8 @@ import {
 import adminApi from '@/lib/adminApi';
 import { Button } from '@/components/ui';
 import type { Order, OrderStatus } from '@/types';
+import { AdminDigitalPanel } from '@/components/digital/AdminDigitalPanel';
+import { orderStatusClass } from '@/lib/orderStatus';
 
 const fetcher = (url: string) => adminApi.get(url).then((r) => r.data);
 
@@ -24,15 +26,6 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   refunded:   <CheckCircle2 className="w-4 h-4 text-gray-500" />,
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-  processing: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-  scheduled: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20',
-  shipped: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
-  completed: 'bg-green-500/10 text-green-600 border-green-500/20',
-  cancelled: 'bg-red-500/10 text-red-600 border-red-500/20',
-  refunded: 'bg-gray-500/10 text-gray-500 border-gray-500/20',
-};
 
 interface AuditEntry {
   id: string;
@@ -238,10 +231,11 @@ function FulfillmentPanel({ order, onUpdate }: { order: Order; onUpdate: () => v
       {/* Digital */}
       {hasDigital && (
         <div className="bg-foreground/5 border border-foreground/10 rounded-xl p-4">
-          <h3 className="font-semibold text-sm mb-2">Digital Items</h3>
-          <p className="text-sm text-foreground/60">
-            Download tracking and delivery management coming in Phase 14.
-          </p>
+          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+            <Package className="w-4 h-4 text-accent" />
+            Digital Items
+          </h3>
+          <AdminDigitalPanel orderId={order.id} />
         </div>
       )}
 
@@ -320,7 +314,7 @@ export default function AdminOrderDetailPage() {
         </Link>
         <div className="flex items-center gap-3">
           <h1 className="text-3xl font-bold">{order.order_number}</h1>
-          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm border capitalize ${STATUS_COLORS[order.status] ?? STATUS_COLORS.pending}`}>
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-sm border capitalize ${orderStatusClass(order.status, true)}`}>
             {STATUS_ICONS[order.status]}
             {order.status}
           </span>

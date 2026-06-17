@@ -1,8 +1,8 @@
 # AECMS Comprehensive Testing Guide
 
-**Version**: 2.0  
-**Last Updated**: 2026-06-04  
-**Status**: Phase 13 — Full-system QA (see `docs/PHASE_13_PLAN.md` for the detailed checklist)
+**Version**: 2.3  
+**Last Updated**: 2026-06-17  
+**Status**: Phase 14 complete + QA pass — digital delivery verified; SMTP active; badge/cart/slug fixes applied
 
 ---
 
@@ -258,6 +258,19 @@ See `docs/PHASE_13_PLAN.md` for the full checklist with step-by-step instruction
 11. Version history — articles, products, pages
 12. PayPal reconciliation endpoint
 
+**Phase 14 QA fixes applied (2026-06-17):**
+- Cart remove/decrement 403 fixed (userId takes priority over sessionId in ownership check)
+- Digital product creation now redirects to edit page (Digital Files panel immediately available)
+- `personalizationEnabled` string→boolean coercion fixed for FormData uploads
+- PDF upload format sync bug fixed (file picker was showing EPUB filter after EPUB uploaded)
+- Same-format file upload now replaces the existing slot (upsert) with a Replace button per row
+- DigitalFilesPanel moved to left column of product edit form; orange border
+- Digital products blocked from publishing without at least one source file
+- Order status badges normalized: `frontend/lib/orderStatus.ts` used across all 5 locations
+- Product slug mangled on soft-delete (`__DELETED__{ts}__{slug}`) — frees unique slot
+- Product SKU/slug reuse from deleted products triggers a warning alert (not a block)
+- Article and page slugs permanently reserved after deletion — new content with same slug is blocked with a restoration message
+
 ---
 
 ## Automated Testing
@@ -356,7 +369,7 @@ While logged into both customer-facing and backstage simultaneously:
 
 ## Email Verification Testing
 
-Email provider is set to `console` in development — all emails are printed to the backend log (`/tmp/backend.log`), not actually sent.
+> **Email provider**: `EMAIL_PROVIDER_TYPE=smtp` is active — emails are sent via Gmail (`moriakul@gmail.com`). Verification emails for real addresses will land in inboxes. For test accounts with fake addresses (e.g. `verify-test@example.com`), delivery will fail silently; grab the token from the backend log instead.
 
 ```bash
 # Register a new user
@@ -858,57 +871,378 @@ psql $DATABASE_URL -c "SELECT id, entry_hash, previous_hash, created_at FROM aud
 
 ## Digital Products Testing
 
-### Upload and download
+This section covers the full Phase 14 digital delivery flow: creating a digital product with source files, purchasing it, downloading the personalized copy, and sending it to a Kindle device.
 
+> **Email**: `EMAIL_PROVIDER_TYPE=smtp` is active — Kindle delivery emails are sent for real via `moriakul@gmail.com`. Amazon requires that address to be in your **Approved Personal Document E-mail List** before a send will succeed; the wizard guides you through adding it in Step 2. Set `PAYMENT_TEST_MODE=true` in `backend/.env` for instant payment confirmation during testing.
+
+---
+
+### Part A — Create a Digital Product and Upload Source Files
+
+#### 1. Create the product (Admin UI)
+
+1. Log into the admin panel at `/admin` (backstage login + 2FA required)
+2. Navigate to **Products → New Product**
+3. Set **Type** to `Digital`
+4. Give it a name, price, description, and set status to `Published`
+5. Save — note the product ID from the URL (`/admin/products/<ID>/edit`)
+
+**Via API:**
 ```bash
-# Upload a digital file to a product
-curl -s -X POST http://localhost:4000/digital-products/upload \
+PRODUCT=$(curl -s -X POST http://localhost:4000/products \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -F "file=@/path/to/book.pdf" \
-  -F "product_id=<PRODUCT_ID>" \
-  -F "format=pdf" \
-  -F "max_downloads=5" | jq .
-
-# Generate download token (called by the system after order completion)
-curl -s -X POST http://localhost:4000/digital-products/token \
-  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"product_id":"<PRODUCT_ID>","order_id":"<ORDER_ID>"}' | jq '{token,expires_at}'
-
-# Download using token
-curl -s -L "http://localhost:4000/digital-products/download/<TOKEN>" \
-  -H "Authorization: Bearer $TOKEN" \
-  --output /tmp/downloaded.pdf
-ls -lh /tmp/downloaded.pdf
+  -d '{
+    "name": "Test Digital Book",
+    "description": "<p>A test digital product.</p>",
+    "price": 9.99,
+    "product_type": "digital",
+    "status": "published",
+    "visibility": "public"
+  }')
+PRODUCT_ID=$(echo $PRODUCT | jq -r '.id')
+echo "Product ID: $PRODUCT_ID"
 ```
 
-### Kindle delivery
+#### 2. Upload source files (Admin UI — Digital Files panel)
+
+On the product edit page (`/admin/products/<ID>/edit`), scroll past the Inventory Tracker to the **Digital Files** panel. It appears only for `product_type = digital` products.
+
+- Select format **EPUB** from the dropdown, click **Upload EPUB**, choose your `.epub` file
+- Select format **PDF** from the dropdown, click **Upload PDF**, choose your `.pdf` file
+- Each uploaded file appears with its filename and a "⚠️ Not yet tested" badge
+
+**Via API:**
+```bash
+# Upload EPUB
+curl -s -X POST http://localhost:4000/digital-products/files \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -F "file=@/path/to/book.epub" \
+  -F "productId=$PRODUCT_ID" \
+  -F "format=epub" \
+  -F "personalizationEnabled=true" \
+  -F "maxDownloads=5" | jq '{id,format,personalizationEnabled}'
+
+# Upload PDF
+curl -s -X POST http://localhost:4000/digital-products/files \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -F "file=@/path/to/book.pdf" \
+  -F "productId=$PRODUCT_ID" \
+  -F "format=pdf" \
+  -F "personalizationEnabled=true" | jq '{id,format,personalizationEnabled}'
+
+# Verify both files exist
+curl -s "http://localhost:4000/digital-products/products/$PRODUCT_ID/files" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq '.[] | {id,format,personalizationEnabled,personalizationTested}'
+```
+
+#### 3. Test personalization
+
+In the **Digital Files** panel, click **Test** next to the EPUB row. A personalized test copy (`TEST-<filename>.epub`) is generated with dummy data ("Test Customer", order "TEST-00000") and immediately downloaded by your browser. Repeat for PDF.
+
+After testing, the badge changes from "⚠️ Not yet tested" to "✅ Personalization tested".
+
+**Via API** (streams the file):
+```bash
+# Get file ID
+FILE_ID=$(curl -s "http://localhost:4000/digital-products/products/$PRODUCT_ID/files" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq -r '.[0].id')
+
+curl -s -X POST http://localhost:4000/digital-products/files/test-personalization \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"fileId\":\"$FILE_ID\"}" \
+  --output /tmp/test-personalized.epub
+
+ls -lh /tmp/test-personalized.epub
+# Verify: open the file — first page should have "Licensed Copy / Test Customer / TEST-00000"
+```
+
+---
+
+### Part B — Purchase a Digital Product
+
+Digital products skip the shipping step in checkout entirely — the address form is not shown.
+
+#### Test mode (fastest)
 
 ```bash
-# Register a Kindle device
-curl -s -X POST http://localhost:4000/kindle/devices \
-  -H "Authorization: Bearer $TOKEN" \
+# Add to cart (anonymous)
+SESSION_ID=$(cat /proc/sys/kernel/random/uuid)
+curl -s -X POST http://localhost:4000/cart/items \
+  -H "x-session-id: $SESSION_ID" \
   -H "Content-Type: application/json" \
-  -d '{"kindle_email":"yourname@kindle.com","friendly_name":"My Kindle"}' | jq .
+  -d "{\"product_id\":\"$PRODUCT_ID\",\"quantity\":1}" | jq '{id,subtotal}'
 
-# List devices
-curl -s http://localhost:4000/kindle/devices -H "Authorization: Bearer $TOKEN" | jq .
+# Create order (no shipping_address needed for digital-only cart)
+ORDER=$(curl -s -X POST http://localhost:4000/orders \
+  -H "x-session-id: $SESSION_ID" \
+  -H "Content-Type: application/json" \
+  -d '{}')
+ORDER_ID=$(echo $ORDER | jq -r '.id')
+echo "Order ID: $ORDER_ID"
 
-# Send to Kindle (EMAIL_PROVIDER_TYPE=console in dev — no real email sent)
+# Simulate payment completion — creates download tokens automatically
+curl -s -X POST "http://localhost:4000/payments/test/simulate/$ORDER_ID" \
+  -H "x-session-id: $SESSION_ID" | jq .
+# Order status → processing; download tokens created for each file
+
+# Verify tokens were created
+curl -s "http://localhost:4000/digital-products/orders/$ORDER_ID/downloads" \
+  -H "x-session-id: $SESSION_ID" | jq '.[] | {id,format,downloadToken,downloadCount,maxDownloads,expiresAt}'
+```
+
+#### UI flow (test mode with `PAYMENT_TEST_MODE=true`)
+
+1. Go to `/shop`, add the digital product to cart
+2. Proceed to checkout — the **Shipping Information** step is skipped; you land directly on **Payment Method**
+3. Click **Credit or Debit Card**
+4. You are redirected to `/order-confirmation?order=<ID>&test_mode=true`
+5. The **Your Digital Downloads** panel appears below the order summary
+6. Two rows are visible — one for EPUB, one for PDF — each showing "5 of 5 remaining"
+
+#### Stripe sandbox flow
+
+Run the full checkout with `PAYMENT_TEST_MODE=false` (see [Stripe Sandbox Setup](#stripe-sandbox-setup)):
+
+1. Add digital product to cart, checkout — no shipping form shown
+2. Click **Credit or Debit Card** → redirects to Stripe Checkout
+3. Enter test card `4242 4242 4242 4242`, complete payment
+4. Stripe fires `checkout.session.completed` webhook
+5. Backend calls `createDownloadTokensForOrder` automatically
+6. `/order-confirmation` page shows the **Your Digital Downloads** panel
+
+Confirm via backend log:
+```bash
+grep "download tokens" /tmp/backend.log | tail -3
+# Expected: "Created 2 download tokens for order ORD-XXXXXX"
+```
+
+---
+
+### Part C — Download Controls
+
+#### Customer UI (order confirmation page or account page)
+
+On `/order-confirmation?order=<ID>`, the **Your Digital Downloads** panel shows:
+
+- One row per format (EPUB, PDF)
+- A progress bar showing remaining downloads (e.g. "5 of 5 remaining")
+- **Download** button — triggers a browser download of the personalized file
+- **Kindle** button — opens the Kindle delivery wizard (see Part D)
+- Expiry date at the bottom ("Links expire: …")
+
+The same panel appears inline under each order in the **My Account → Order History** section for any order that contains digital items.
+
+After clicking **Download**, refresh the page — the count decrements to "4 of 5 remaining".
+
+#### Download via API
+
+```bash
+# Get the download token for a specific order
+DOWNLOADS=$(curl -s "http://localhost:4000/digital-products/orders/$ORDER_ID/downloads" \
+  -H "Authorization: Bearer $TOKEN")
+TOKEN_EPUB=$(echo $DOWNLOADS | jq -r '.[] | select(.format=="epub") | .downloadToken')
+TOKEN_PDF=$(echo $DOWNLOADS  | jq -r '.[] | select(.format=="pdf")  | .downloadToken')
+
+# Download EPUB (response is the personalized file)
+curl -L "http://localhost:4000/digital-products/download/$TOKEN_EPUB" \
+  --output /tmp/my-book.epub
+ls -lh /tmp/my-book.epub
+
+# Download PDF
+curl -L "http://localhost:4000/digital-products/download/$TOKEN_PDF" \
+  --output /tmp/my-book.pdf
+ls -lh /tmp/my-book.pdf
+
+# Verify personalization: open /tmp/my-book.pdf — first page should show
+# "Licensed Copy / <customer name> / Order: ORD-XXXXX / Purchase Date: …"
+
+# Check count decremented
+curl -s "http://localhost:4000/digital-products/orders/$ORDER_ID/downloads" | \
+  jq '.[] | {format,downloadCount,maxDownloads}'
+```
+
+#### Enforcing the download limit
+
+```bash
+# After 5 downloads, the 6th should return 403
+for i in 1 2 3 4 5; do
+  curl -s -o /dev/null -w "%{http_code}\n" \
+    "http://localhost:4000/digital-products/download/$TOKEN_EPUB"
+done
+# Last line should be 403 with "Maximum downloads reached"
+```
+
+**In the UI**: once exhausted, the EPUB row shows a red "Limit reached" badge. The Download and Kindle buttons are replaced by a **Request renewal** button.
+
+#### Admin: regenerate a token (resets count + extends expiry)
+
+```bash
+DOWNLOAD_ID=$(echo $DOWNLOADS | jq -r '.[] | select(.format=="epub") | .id')
+
+curl -s -X POST "http://localhost:4000/digital-products/downloads/$DOWNLOAD_ID/regenerate" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq '{downloadToken,downloadCount,expiresAt}'
+# downloadCount → 0, new token issued, expires 30 days from now
+```
+
+In the admin UI (`/admin/orders/<ID>`), the **Digital Items** panel shows regenerate and extend-expiry controls per format row.
+
+#### Admin: extend expiry without resetting count
+
+```bash
+curl -s -X POST "http://localhost:4000/digital-products/downloads/$DOWNLOAD_ID/extend" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"days":30}' | jq '{expiresAt}'
+# expiresAt advanced by 30 days from current expiry (or today if already expired)
+```
+
+---
+
+### Part D — Send to Kindle
+
+The Kindle wizard opens when the customer clicks the **Kindle** button on any download row in the **Your Digital Downloads** panel.
+
+> **Email**: `EMAIL_PROVIDER_TYPE=smtp` is active — clicking Send to Kindle will deliver a real email from `moriakul@gmail.com` to the Kindle address. Amazon will reject the delivery if that sender isn't whitelisted; the wizard walks you through whitelisting it in Step 2. Confirm delivery in `/tmp/backend.log` (`grep -i "kindle"`) and in your Kindle library.
+
+#### New user — full 4-step onboarding wizard
+
+**Step 1 — Find Your Kindle Email**
+- Image carousel auto-advances through `to-kindle_1–3_marked.jpg` (6 s per slide)
+- Slides show the Amazon Devices page with **green** ovals on "Devices", "Kindle", and "Preferences"
+- Enter the device's `@kindle.com` email address in the field
+- "Next" is disabled until the address contains `@kindle`
+
+**Step 2 — Whitelist Our Email**
+- Carousel shows `to-kindle_3–4_marked.jpg` with a **magenta** oval on "Add a new e-mail address"
+- "Add a new e-mail address" text in the instructions is highlighted magenta; "Preferences" is highlighted green
+- A copyable code block shows the store's sending address (`moriakul@gmail.com`)
+- **Do this step now**: open Amazon → Account & Lists → Content & Devices → Preferences → Personal Document Settings → Approved Personal Document E-mail List → Add `moriakul@gmail.com`
+- Once added, click "Next" to confirm
+
+**Step 3 — Name This Device**
+- Text input for a friendly name (default: "My Kindle")
+- Checkbox: "Save this device to my account" (checked by default)
+
+**Step 4 — Confirm & Send**
+- Format selector: EPUB or PDF
+- Confirmation summary: product name, email address, device name
+- Remaining download count notice ("counts as 1 of your N downloads")
+- **Send to Kindle** button
+
+**API equivalent (new device, no save):**
+```bash
 curl -s -X POST http://localhost:4000/kindle/send \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"product_id":"<PRODUCT_ID>","device_id":"<DEVICE_ID>"}' | jq .
-# Check /tmp/backend.log for the simulated email
+  -d "{
+    \"downloadId\": \"$DOWNLOAD_ID\",
+    \"kindleEmail\": \"yourname_123@kindle.com\"
+  }" | jq .
+
+# Confirm delivery in backend log (look for messageId, not a console dump):
+grep -i "kindle" /tmp/backend.log | tail -5
+# Then check your Kindle library — the file should appear within a few minutes.
 ```
 
+#### Returning user — 2-step short flow
+
+If the user has saved Kindle devices, the wizard opens with a device picker instead:
+
+**Step 1 — Choose Your Device**
+- Radio list of saved devices (email + friendly name)
+- "Add new device" option at the bottom (triggers inline fields for email + name)
+- Format selector (EPUB / PDF)
+- **Send to Kindle** button (skips all setup steps)
+
+**API equivalent (saved device):**
+```bash
+# List saved devices
+DEVICE_ID=$(curl -s http://localhost:4000/kindle/devices \
+  -H "Authorization: Bearer $TOKEN" | jq -r '.[0].id')
+
+curl -s -X POST http://localhost:4000/kindle/send \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"downloadId\":\"$DOWNLOAD_ID\",\"kindleDeviceId\":\"$DEVICE_ID\"}" | jq .
+```
+
+#### Verify Kindle tracking
+
+After a successful send, both `download_count` and `kindle_send_count` increment:
+
+```bash
+curl -s "http://localhost:4000/digital-products/orders/$ORDER_ID/downloads" | \
+  jq '.[] | {format,downloadCount,kindleSendCount,maxDownloads}'
+```
+
+In the admin order detail (**Digital Items** panel), the Kindle sends row shows "Kindle sends: N" per format.
+
+#### Image carousel — click to enlarge
+
+Any image in the wizard can be clicked to open a full-screen lightbox. Click outside the enlarged image or the ✕ button to close.
+
+---
+
+### Part E — Admin Digital Tracking Panel
+
+In `/admin/orders/<ID>`, the **Fulfillment → Digital Items** panel shows live download records for every digital item in the order.
+
+Per format row:
+- **Usage bar** (e.g. "2 of 5 used")
+- Kindle sends count (if any)
+- Last downloaded date
+- Expiry date (red-highlighted if expired)
+- **Regenerate token** button — issues new token, resets count to 0, extends expiry 30 days
+- **Extend expiry** input + button — adds N days to current (or today's) expiry without resetting count
+
+If no download tokens exist yet (payment pending), the panel shows a message explaining tokens are auto-created on payment confirmation.
+
+---
+
 ### Checklist
-- [ ] File upload creates `DigitalProductFile` record
-- [ ] Download token generated and expires
-- [ ] Download count increments per download
-- [ ] Max download limit enforced
-- [ ] Kindle device registration works
-- [ ] Send to Kindle logs email content to console
+
+**Setup**
+- [ ] Digital product created with `product_type = digital`
+- [ ] EPUB and PDF files uploaded via Digital Files panel
+- [ ] `personalization_tested` badge updates to ✅ after clicking Test
+
+**Purchase**
+- [ ] Shipping step is skipped entirely for digital-only carts
+- [ ] Download tokens created automatically on payment confirmation (check backend log)
+- [ ] Two download records created — one per uploaded format
+
+**Personalization**
+- [ ] Test download: first page of EPUB contains "Licensed Copy / Test Customer / TEST-00000"
+- [ ] Test download: first page of PDF contains customer name, order number, purchase date
+- [ ] Real download: personalized with actual customer name and order number
+
+**Download controls**
+- [ ] Download button triggers browser file download
+- [ ] `downloadCount` increments after each download
+- [ ] "Remaining" count updates on panel refresh
+- [ ] 6th download on a limit-5 token returns 403 "Maximum downloads reached"
+- [ ] Expired token returns 403 "Download link has expired"
+- [ ] "Request renewal" button visible when limit reached or expired
+
+**Admin token management**
+- [ ] Regenerate resets count to 0 and issues a new token
+- [ ] Extend expiry advances `expiresAt` by specified days
+- [ ] Admin panel shows `kindleSendCount` and `lastDownloadedAt`
+
+**Kindle wizard — new user**
+- [ ] Step 1: carousel auto-advances; click-to-enlarge works; "Next" disabled without valid Kindle email
+- [ ] Step 2: store sending address (`moriakul@gmail.com`) is copyable; whitelist it in Amazon during this step
+- [ ] Step 3: device name input; save checkbox
+- [ ] Step 4: summary shows email + device name + remaining count
+- [ ] Send: backend log shows SMTP `messageId`; file appears in Kindle library; `downloadCount` and `kindleSendCount` both increment
+
+**Kindle wizard — returning user**
+- [ ] Device picker shows all saved devices
+- [ ] "Add new device" option expands inline fields
+- [ ] Send with saved device: no 4-step flow, goes directly to delivery
+- [ ] Kindle device CRUD: add, list, update name, delete, default assignment
 
 ---
 
@@ -1059,7 +1393,7 @@ curl -s "http://localhost:4000/domain-aliases" -H "Authorization: Bearer $MEMBER
 
 ---
 
-## Quick Reference: API Endpoints (127 total)
+## Quick Reference: API Endpoints (129 total)
 
 | Module | Endpoints | Backstage Required |
 |--------|-----------|-------------------|
@@ -1075,11 +1409,11 @@ curl -s "http://localhost:4000/domain-aliases" -H "Authorization: Bearer $MEMBER
 | Orders | 7 | Partial |
 | Payments | 12 (incl. reconcile) | Partial |
 | Comments | 12 | Partial |
-| Digital Products | 11 | Yes |
-| Kindle | 7 | Yes |
+| Digital Products | 13 (incl. test-personalization, extend) | Yes |
+| Kindle | 7 | No (customer JWT) |
 | Domain Aliases | 10 | Owner Only |
 | Audit Log | 1 | Yes |
 
 ---
 
-*Updated for AECMS Phase 12/13 — 2026-06-04*
+*Updated for AECMS Phase 14 — 2026-06-16*

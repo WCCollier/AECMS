@@ -25,6 +25,7 @@ describe('KindleService', () => {
     },
     digitalDownload: {
       findUnique: jest.fn(),
+      update: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -261,6 +262,9 @@ describe('KindleService', () => {
       id: 'download-123',
       user_id: userId,
       expires_at: new Date(Date.now() + 86400000),
+      download_count: 0,
+      kindle_send_count: 0,
+      max_downloads: 5,
       digital_file: {
         id: 'file-123',
         format: 'epub',
@@ -280,7 +284,9 @@ describe('KindleService', () => {
       const fileBuffer = Buffer.from('epub content');
 
       prisma.digitalDownload.findUnique.mockResolvedValue(mockDownload);
+      prisma.digitalDownload.update.mockResolvedValue(mockDownload);
       prisma.kindleDevice.findFirst.mockResolvedValue(mockDevice);
+      prisma.kindleDevice.update.mockResolvedValue(mockDevice);
       storageProvider.download.mockResolvedValue(fileBuffer);
       emailProvider.sendWithAttachment.mockResolvedValue({ success: true, messageId: 'msg-123' });
 
@@ -295,6 +301,7 @@ describe('KindleService', () => {
       const fileBuffer = Buffer.from('epub content');
 
       prisma.digitalDownload.findUnique.mockResolvedValue(mockDownload);
+      prisma.digitalDownload.update.mockResolvedValue(mockDownload);
       storageProvider.download.mockResolvedValue(fileBuffer);
       emailProvider.sendWithAttachment.mockResolvedValue({ success: true });
 
@@ -351,7 +358,9 @@ describe('KindleService', () => {
       const personalizedBuffer = Buffer.from('personalized');
 
       prisma.digitalDownload.findUnique.mockResolvedValue(personalizedDownload);
+      prisma.digitalDownload.update.mockResolvedValue(personalizedDownload);
       prisma.kindleDevice.findFirst.mockResolvedValue(mockDevice);
+      prisma.kindleDevice.update.mockResolvedValue(mockDevice);
       prisma.user.findUnique.mockResolvedValue({ email: 'user@example.com', first_name: 'John', last_name: 'Doe' });
       storageProvider.download.mockResolvedValue(originalBuffer);
       personalizationService.personalize.mockResolvedValue(personalizedBuffer);

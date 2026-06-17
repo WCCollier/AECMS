@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { adminFetcher } from '@/lib/swr';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui';
 import { Package, FileText, ShoppingCart, DollarSign, TrendingUp } from 'lucide-react';
+import { orderStatusClass } from '@/lib/orderStatus';
 
 interface PaginatedResponse<T> {
   data: T[];
@@ -163,11 +164,7 @@ export function AdminDashboardClient() {
                     </div>
                     <div className="text-right">
                       <p className="font-medium">{formatPrice(order.total)}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        order.status === 'paid' ? 'bg-green-500/10 text-green-500' :
-                        order.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
-                        'bg-foreground/10 text-foreground/60'
-                      }`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${orderStatusClass(order.status)}`}>
                         {order.status}
                       </span>
                     </div>

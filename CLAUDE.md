@@ -27,14 +27,16 @@
 **Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
 **Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
 **Phase 9**: ✅ COMPLETE - User Testing (Steps 1–8 verified; Steps 9–11 superseded by Phase 13)
-**Phase 13**: 📋 PLANNED - Full-system QA: admin CRUD, Stripe/PayPal live sandbox, widgets, pages, audit log, version history
+**Phase 13**: 🔄 IN PROGRESS - Full-system QA: digital products verified; Stripe/PayPal sandbox, widgets, pages, audit log, version history remaining
 **Phase 10A**: ✅ COMPLETE - Widget System: MediaGallery hero carousel, media schema normalization
 **Phase 10B**: ✅ COMPLETE - TipTap JSON migration + inline widget nodes (MediaCarousel, Callout, VideoEmbed, XEmbed)
 **Phase 11**: ✅ COMPLETE - Pages: widget-composed page builder, dual-size widget system, ArticleEmbed/ProductEmbed/RichTextBox
 **Phase 12**: ✅ COMPLETE - Audit trail, transaction logging, content version history
+**Phase 14**: ✅ COMPLETE - Digital item delivery: personalization, downloads, Kindle wizard (2026-06-16)
+**Phase 14 QA fixes** (2026-06-17): order status badge normalization, digital product UX polish, cart 403 fix, SKU/slug uniqueness hardening
 
 **Test Status**: 125 frontend + 176 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 124 total (Phase 12: +3 article versions, +3 product versions, +3 page versions, +1 audit-logs)
+**API Endpoints**: 129 total (Phase 14: +POST files/test-personalization, +POST downloads/:id/extend)
 
 ## API Endpoint Summary
 
@@ -295,9 +297,17 @@ STORAGE_PROVIDER_TYPE=local
 STORAGE_PATH=/app/uploads
 
 # Email (for Send to Kindle)
-EMAIL_PROVIDER_TYPE=console  # Use 'smtp' in production
-SMTP_HOST=smtp.example.com
+# Codespaces testbed: EMAIL_PROVIDER_TYPE=smtp via Gmail (moriakul@gmail.com, app password in backend/.env)
+# Production: EMAIL_PROVIDER_TYPE=smtp with a dedicated transactional address
+EMAIL_PROVIDER_TYPE=smtp
+SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
+SMTP_FROM=moriakul@gmail.com
+```
+
+**Frontend env** (`frontend/.env.local`):
+```env
+NEXT_PUBLIC_KINDLE_SENDER_EMAIL=moriakul@gmail.com  # shown to user in wizard Step 2
 ```
 
 ## Phase 8: Polish & Production (✅ COMPLETE)
@@ -318,6 +328,26 @@ SMTP_PORT=587
 - 24-hour token expiry
 - Resend verification endpoint
 - Login blocked until verified
+
+## Phase 14 QA Fixes (2026-06-17)
+
+**Bugs fixed during operational testing:**
+
+- **Cart 403 on remove/decrement**: `cart.service.ts` `updateItem` and `removeItem` — `userId` now takes priority over `sessionId` in ownership check; sessionId check is skipped when user is authenticated. Old code threw 403 when the cart's stored `session_id` didn't match the header for a logged-in user's cart.
+- **`personalizationEnabled` validation**: FormData sends strings; added `@Transform(({ value }) => value === 'true' || value === true)` before `@IsBoolean()` in `CreateDigitalFileDto` and `UpdateDigitalFileDto`.
+- **Digital file format sync**: After uploading EPUB, the `uploadFormat` state stayed `'epub'` while the dropdown switched to PDF, so the file picker's `accept` filter was wrong. Fixed with `useEffect` that syncs state to first available format.
+- **Digital file slot upsert**: Uploading a second file of the same format now replaces the existing record (resets `personalization_tested`) instead of throwing a conflict. Each existing file row has a Replace button.
+- **New product redirect**: `ProductForm` now pushes to `/admin/products/${res.data.id}` on create so the admin lands on the edit page where Digital Files panel is visible.
+- **DigitalFilesPanel layout**: Moved into `ProductForm`'s `lg:col-span-2` left column via a `mainExtra` prop. Orange border (`border-orange-500/50`) to distinguish it.
+- **Digital product publish gate**: Backend blocks setting `status: published` on a digital product with zero source files (422 Unprocessable Entity).
+- **Order status badge normalization**: `frontend/lib/orderStatus.ts` — single source of truth for all 7 status colors. Used in AdminOrdersClient, admin order detail, AdminDashboardClient, OrderConfirmationClient, AccountPageClient. Removed stale `'paid'` check in dashboard.
+
+**Slug/SKU uniqueness hardening:**
+
+- **Products — soft-delete mangles both fields**: On `remove()`, slug becomes `__DELETED__{ts}__{slug}` and SKU becomes `__DELETED__{ts}__{sku}`, freeing both unique DB slots immediately.
+- **Products — reuse warning**: When `create()` or `update()` uses a slug or SKU that matches a deleted product's mangled value (`endsWith: '__${value}'` among `deleted_at: { not: null }`), the product is saved and a `warnings: string[]` field is included in the response. `ProductForm` shows an `alert()` before redirecting.
+- **Products — uniqueness checks exclude deleted**: All slug/SKU checks in `create()`, `update()`, and `generateUniqueSku()` now use `findFirst({ deleted_at: null })` instead of `findUnique()`.
+- **Articles & pages — slugs permanently reserved**: Slug is NOT mangled on soft-delete. If a new article/page uses a deleted record's slug, a `ConflictException` is thrown with message: *"The slug 'X' belongs to a deleted article/page. Choose a different title, or ask an administrator to restore the original."*
 
 ## Phase 9: User Testing (🔄 IN PROGRESS)
 

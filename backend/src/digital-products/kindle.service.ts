@@ -250,6 +250,10 @@ export class KindleService {
       throw new ForbiddenException('Download has expired');
     }
 
+    if (download.download_count >= download.max_downloads) {
+      throw new ForbiddenException('Maximum downloads reached');
+    }
+
     // Determine Kindle email
     let kindleEmail: string;
 
@@ -345,6 +349,16 @@ export class KindleService {
         format,
       };
     }
+
+    // Increment download count + kindle_send_count (Kindle send counts as a download)
+    await this.prisma.digitalDownload.update({
+      where: { id: dto.downloadId },
+      data: {
+        download_count: download.download_count + 1,
+        kindle_send_count: (download.kindle_send_count ?? 0) + 1,
+        last_downloaded_at: new Date(),
+      },
+    });
 
     // Update last used on device if applicable
     if (dto.kindleDeviceId) {

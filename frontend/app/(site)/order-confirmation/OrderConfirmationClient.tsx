@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/hooks/useOrders';
 import { Button } from '@/components/ui';
 import { CheckCircle, ShoppingBag, ArrowRight } from 'lucide-react';
+import { DigitalDownloadsPanel } from '@/components/digital/DigitalDownloadsPanel';
+import { orderStatusClass } from '@/lib/orderStatus';
 
 export function OrderConfirmationClient() {
   const searchParams = useSearchParams();
@@ -91,13 +93,7 @@ export function OrderConfirmationClient() {
       <div className="bg-surface border border-border rounded-xl p-6 mb-8">
         <h2 className="font-semibold mb-3">Order Status</h2>
         <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-            order.status === 'processing' || order.status === 'completed' || order.status === 'shipped' || order.status === 'scheduled'
-              ? 'bg-green-500/10 text-green-600'
-              : order.status === 'cancelled' || order.status === 'refunded'
-                ? 'bg-red-500/10 text-red-600'
-                : 'bg-amber-500/10 text-amber-600'
-          }`}>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${orderStatusClass(order.status)}`}>
             {order.status}
           </span>
           {order.status === 'pending' && (
@@ -123,6 +119,11 @@ export function OrderConfirmationClient() {
           )}
         </div>
       </div>
+
+      {/* Digital downloads (shown when order contains digital products) */}
+      {order.items.some((i) => i.product?.product_type === 'digital') && (
+        <DigitalDownloadsPanel orderId={order.id} />
+      )}
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">

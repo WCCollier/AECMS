@@ -167,11 +167,12 @@ export class CartService {
       throw new NotFoundException('Cart item not found');
     }
 
-    // Verify ownership
-    if (userId && item.cart.user_id !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
-    if (sessionId && item.cart.session_id !== sessionId) {
+    // Verify ownership — userId takes priority; only check sessionId for guest carts
+    if (userId) {
+      if (item.cart.user_id !== userId) throw new ForbiddenException('Access denied');
+    } else if (sessionId) {
+      if (item.cart.session_id !== sessionId) throw new ForbiddenException('Access denied');
+    } else {
       throw new ForbiddenException('Access denied');
     }
 
@@ -225,11 +226,12 @@ export class CartService {
       throw new NotFoundException('Cart item not found');
     }
 
-    // Verify ownership
-    if (userId && item.cart.user_id !== userId) {
-      throw new ForbiddenException('Access denied');
-    }
-    if (sessionId && item.cart.session_id !== sessionId) {
+    // Verify ownership — userId takes priority; only check sessionId for guest carts
+    if (userId) {
+      if (item.cart.user_id !== userId) throw new ForbiddenException('Access denied');
+    } else if (sessionId) {
+      if (item.cart.session_id !== sessionId) throw new ForbiddenException('Access denied');
+    } else {
       throw new ForbiddenException('Access denied');
     }
 

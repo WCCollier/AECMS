@@ -18,6 +18,7 @@ import {
   DigitalDownloadResponseDto,
   PersonalizationOptionsDto,
   FileFormat,
+  TestPersonalizationDto,
 } from './dto/digital-product.dto';
 import { randomBytes } from 'crypto';
 
@@ -53,7 +54,7 @@ export class DigitalProductsService {
       throw new BadRequestException('Product must be a digital product');
     }
 
-    // Check if file for this format already exists
+    // Check if file for this format already exists (upsert: replace if so)
     const existing = await this.prisma.digitalProductFile.findUnique({
       where: {
         product_id_format: {
@@ -62,12 +63,6 @@ export class DigitalProductsService {
         },
       },
     });
-
-    if (existing) {
-      throw new BadRequestException(
-        `A ${dto.format.toUpperCase()} file already exists for this product`,
-      );
-    }
 
     // Validate file format
     const extension = originalFilename.toLowerCase().split('.').pop();
@@ -88,16 +83,26 @@ export class DigitalProductsService {
       },
     });
 
-    // Create database record
-    const digitalFile = await this.prisma.digitalProductFile.create({
-      data: {
-        product_id: dto.productId,
-        format: dto.format,
-        file_id: storagePath, // Using storage path as file reference
-        personalization_enabled: dto.personalizationEnabled ?? false,
-        max_downloads: dto.maxDownloads ?? 5,
-      },
-    });
+    // Upsert database record — replace existing slot if present
+    const digitalFile = existing
+      ? await this.prisma.digitalProductFile.update({
+          where: { id: existing.id },
+          data: {
+            file_id: storagePath,
+            personalization_enabled: dto.personalizationEnabled ?? existing.personalization_enabled,
+            max_downloads: dto.maxDownloads ?? existing.max_downloads,
+            personalization_tested: false,
+          },
+        })
+      : await this.prisma.digitalProductFile.create({
+          data: {
+            product_id: dto.productId,
+            format: dto.format,
+            file_id: storagePath,
+            personalization_enabled: dto.personalizationEnabled ?? false,
+            max_downloads: dto.maxDownloads ?? 5,
+          },
+        });
 
     this.logger.log(
       `Uploaded ${dto.format} file for product ${dto.productId}`,
@@ -396,6 +401,96 @@ export class DigitalProductsService {
   }
 
   /**
+   * Test personalization — generate a sample personalized file using dummy data.
+   * Admin only — used to verify personalization before publishing.
+   */
+  async testPersonalization(
+    dto: TestPersonalizationDto,
+  ): Promise<{ buffer: Buffer; filename: string; contentType: string }> {
+    let file: any;
+
+    if (dto.fileId) {
+      file = await this.prisma.digitalProductFile.findUnique({
+        where: { id: dto.fileId },
+        include: { product: true },
+      });
+    } else if (dto.productId && dto.format) {
+      file = await this.prisma.digitalProductFile.findUnique({
+        where: {
+          product_id_format: {
+            product_id: dto.productId,
+            format: dto.format,
+          },
+        },
+        include: { product: true },
+      });
+    }
+
+    if (!file) {
+      throw new NotFoundException('Digital file not found');
+    }
+
+    const fileBuffer = await this.storageProvider.download(file.file_id);
+    const dummyOptions: PersonalizationOptionsDto = {
+      customerName: 'Test Customer',
+      orderNumber: 'TEST-00000',
+      purchaseDate: new Date().toLocaleDateString(),
+    };
+
+    const personalizedBuffer = await this.personalizationService.personalize(
+      fileBuffer,
+      file.format as FileFormat,
+      dummyOptions,
+    );
+
+    // Mark as tested
+    await this.prisma.digitalProductFile.update({
+      where: { id: file.id },
+      data: { personalization_tested: true },
+    });
+
+    const productName = file.product?.name || 'document';
+    const filename = `TEST-${productName}.${file.format}`;
+    const contentType = this.getContentType(file.format as FileFormat);
+
+    this.logger.log(`Test personalization generated for file ${file.id}`);
+
+    return { buffer: personalizedBuffer, filename, contentType };
+  }
+
+  /**
+   * Extend download token expiry by N days.
+   * Admin only.
+   */
+  async extendExpiry(
+    downloadId: string,
+    days: number,
+  ): Promise<DigitalDownloadResponseDto> {
+    const download = await this.prisma.digitalDownload.findUnique({
+      where: { id: downloadId },
+      include: { digital_file: { include: { product: true } } },
+    });
+
+    if (!download) {
+      throw new NotFoundException('Download not found');
+    }
+
+    const base = download.expires_at > new Date() ? download.expires_at : new Date();
+    const newExpiresAt = new Date(base);
+    newExpiresAt.setDate(newExpiresAt.getDate() + days);
+
+    const updated = await this.prisma.digitalDownload.update({
+      where: { id: downloadId },
+      data: { expires_at: newExpiresAt },
+      include: { digital_file: { include: { product: true } } },
+    });
+
+    this.logger.log(`Extended download ${downloadId} expiry by ${days} days`);
+
+    return this.mapToDownloadResponse(updated);
+  }
+
+  /**
    * Regenerate download token (extend expiry, reset count)
    * Admin only
    */
@@ -464,6 +559,7 @@ export class DigitalProductsService {
       format: file.format,
       fileId: file.file_id,
       personalizationEnabled: file.personalization_enabled,
+      personalizationTested: file.personalization_tested ?? false,
       maxDownloads: file.max_downloads,
       createdAt: file.created_at,
       updatedAt: file.updated_at,
@@ -477,6 +573,7 @@ export class DigitalProductsService {
       orderId: download.order_id,
       downloadToken: download.download_token,
       downloadCount: download.download_count,
+      kindleSendCount: download.kindle_send_count ?? 0,
       maxDownloads: download.max_downloads,
       expiresAt: download.expires_at,
       createdAt: download.created_at,

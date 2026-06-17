@@ -8,6 +8,7 @@ import {
   Max,
   IsEnum,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export enum FileFormat {
   EPUB = 'epub',
@@ -21,6 +22,7 @@ export class CreateDigitalFileDto {
   @IsEnum(FileFormat)
   format: FileFormat;
 
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   @IsOptional()
   personalizationEnabled?: boolean;
@@ -33,6 +35,7 @@ export class CreateDigitalFileDto {
 }
 
 export class UpdateDigitalFileDto {
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   @IsOptional()
   personalizationEnabled?: boolean;
@@ -50,6 +53,7 @@ export class DigitalFileResponseDto {
   format: string;
   fileId: string;
   personalizationEnabled: boolean;
+  personalizationTested: boolean;
   maxDownloads: number;
   createdAt: Date;
   updatedAt: Date;
@@ -61,12 +65,34 @@ export class DigitalDownloadResponseDto {
   orderId: string;
   downloadToken: string;
   downloadCount: number;
+  kindleSendCount: number;
   maxDownloads: number;
   expiresAt: Date;
   createdAt: Date;
   lastDownloadedAt: Date | null;
   format: string;
   productName: string;
+}
+
+export class TestPersonalizationDto {
+  @IsUUID()
+  @IsOptional()
+  fileId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  productId?: string;
+
+  @IsEnum(FileFormat)
+  @IsOptional()
+  format?: FileFormat;
+}
+
+export class ExtendExpiryDto {
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  days: number;
 }
 
 export class CreateDownloadTokenDto {

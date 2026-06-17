@@ -185,6 +185,11 @@ export interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  product?: {
+    id: string;
+    name: string;
+    product_type: 'physical' | 'digital' | 'service';
+  };
 }
 
 export type OrderStatus = 'pending' | 'processing' | 'scheduled' | 'shipped' | 'completed' | 'cancelled' | 'refunded';
@@ -230,6 +235,46 @@ export interface ShippingAddress {
   state: string;
   postal_code: string;
   country: string;
+}
+
+// Digital products types
+
+export interface DigitalDownload {
+  id: string;
+  digitalFileId: string;
+  orderId: string;
+  downloadToken: string;
+  downloadCount: number;
+  kindleSendCount: number;
+  maxDownloads: number;
+  expiresAt: string;
+  createdAt: string;
+  lastDownloadedAt: string | null;
+  format: string;
+  productName: string;
+}
+
+export interface DigitalProductFile {
+  id: string;
+  productId: string;
+  format: string;
+  fileId: string;
+  personalizationEnabled: boolean;
+  personalizationTested: boolean;
+  maxDownloads: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KindleDevice {
+  id: string;
+  userId: string;
+  friendlyName: string;
+  kindleEmail: string;
+  isDefault: boolean;
+  lastUsedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Comment types

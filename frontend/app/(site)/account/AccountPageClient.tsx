@@ -7,11 +7,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { Button, Input } from '@/components/ui';
 import api, { getErrorMessage } from '@/lib/api';
-import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin } from 'lucide-react';
+import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin, Download } from 'lucide-react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import type { Comment, PaginatedResponse, SavedShippingAddress } from '@/types';
 import { CommentForm } from '@/components/comments/CommentForm';
+import { DigitalDownloadsPanel } from '@/components/digital/DigitalDownloadsPanel';
+import { orderStatusClass } from '@/lib/orderStatus';
 
 const formatPrice = (p: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p);
@@ -199,18 +201,26 @@ export function AccountPageClient() {
             ) : (
               <div className="space-y-3">
                 {orders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between text-sm py-2 border-b border-border last:border-0">
-                    <div>
-                      <p className="font-medium font-mono text-xs text-foreground/50">{order.order_number}</p>
-                      <p className="font-medium">{formatPrice(order.total)}</p>
-                      <p className="text-foreground/50 text-xs">{formatDate(order.created_at)}</p>
+                  <div key={order.id} className="py-2 border-b border-border last:border-0">
+                    <div className="flex items-center justify-between text-sm">
+                      <div>
+                        <p className="font-medium font-mono text-xs text-foreground/50">{order.order_number}</p>
+                        <p className="font-medium">{formatPrice(order.total)}</p>
+                        <p className="text-foreground/50 text-xs">{formatDate(order.created_at)}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`capitalize text-xs px-2 py-0.5 rounded-full ${orderStatusClass(order.status)}`}>{order.status}</span>
+                        <Link href={`/order-confirmation?order=${order.id}`} className="text-accent hover:underline text-xs">
+                          View
+                        </Link>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="capitalize text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent">{order.status}</span>
-                      <Link href={`/order-confirmation?order=${order.id}`} className="text-accent hover:underline text-xs">
-                        View
-                      </Link>
-                    </div>
+                    {/* Show downloads section inline when order has digital items */}
+                    {order.items?.some((i) => i.product?.product_type === 'digital') && (
+                      <div className="mt-2 pl-0">
+                        <DigitalDownloadsPanel orderId={order.id} />
+                      </div>
+                    )}
                   </div>
                 ))}
                 {orders.length === 5 && (

@@ -37,6 +37,7 @@ interface ProductFormData {
 interface ProductFormProps {
   productId?: string;
   initialData?: Partial<ProductFormData & { media?: MediaItem[] }>;
+  mainExtra?: React.ReactNode;
 }
 
 function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
@@ -46,7 +47,7 @@ function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
     .map((m) => ({ mediaId: m.id, url: m.url, isPrimary: m.is_primary }));
 }
 
-export function ProductForm({ productId, initialData }: ProductFormProps) {
+export function ProductForm({ productId, initialData, mainExtra }: ProductFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,12 +133,18 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
       }
 
       if (productId) {
-        await adminApi.patch(`/products/${productId}`, payload);
+        const res = await adminApi.patch(`/products/${productId}`, payload);
+        if (res.data.warnings?.length) {
+          alert(`Saved with notice:\n\n${(res.data.warnings as string[]).join('\n')}`);
+        }
+        router.push('/admin/products');
       } else {
-        await adminApi.post('/products', payload);
+        const res = await adminApi.post('/products', payload);
+        if (res.data.warnings?.length) {
+          alert(`Product created with notice:\n\n${(res.data.warnings as string[]).join('\n')}`);
+        }
+        router.push(`/admin/products/${res.data.id}`);
       }
-
-      router.push('/admin/products');
       router.refresh();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -206,6 +213,8 @@ export function ProductForm({ productId, initialData }: ProductFormProps) {
               </div>
             </CardContent>
           </Card>
+
+          {mainExtra}
         </div>
 
         {/* Sidebar */}

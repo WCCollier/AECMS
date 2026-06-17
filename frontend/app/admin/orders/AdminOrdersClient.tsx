@@ -7,6 +7,7 @@ import { adminFetcher } from '@/lib/swr';
 import { Button, Card, CardContent, Input } from '@/components/ui';
 import { Search, Eye, ShoppingCart } from 'lucide-react';
 import type { Order, PaginatedResponse } from '@/types';
+import { orderStatusClass } from '@/lib/orderStatus';
 
 export function AdminOrdersClient() {
   const [page, setPage] = useState(1);
@@ -35,16 +36,6 @@ export function AdminOrdersClient() {
       style: 'currency',
       currency: 'USD',
     }).format(price);
-  };
-
-  const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-500/10 text-yellow-600',
-    processing: 'bg-blue-500/10 text-blue-600',
-    scheduled: 'bg-indigo-500/10 text-indigo-600',
-    shipped: 'bg-purple-500/10 text-purple-600',
-    completed: 'bg-green-500/10 text-green-600',
-    cancelled: 'bg-red-500/10 text-red-600',
-    refunded: 'bg-gray-500/10 text-gray-500',
   };
 
   return (
@@ -104,7 +95,7 @@ export function AdminOrdersClient() {
                         {formatDate(order.created_at)}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`text-xs px-2 py-1 rounded-full ${statusColors[order.status] || statusColors.pending}`}>
+                        <span className={`text-xs px-2 py-1 rounded-full ${orderStatusClass(order.status)}`}>
                           {order.status}
                         </span>
                       </td>

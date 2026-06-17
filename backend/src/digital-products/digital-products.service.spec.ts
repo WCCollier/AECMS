@@ -117,12 +117,32 @@ describe('DigitalProductsService', () => {
         .rejects.toThrow(BadRequestException);
     });
 
-    it('should throw BadRequestException if file format already exists', async () => {
-      prisma.product.findUnique.mockResolvedValue({ id: 'product-123', product_type: 'digital' });
-      prisma.digitalProductFile.findUnique.mockResolvedValue({ id: 'existing-file' });
+    it('should replace an existing file when the same format is uploaded again', async () => {
+      const existingFile = {
+        id: 'existing-file',
+        product_id: 'product-123',
+        format: 'epub',
+        file_id: 'old-path.epub',
+        personalization_enabled: true,
+        max_downloads: 5,
+        personalization_tested: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      };
+      const updatedFile = { ...existingFile, file_id: 'new-path.epub', personalization_tested: false };
 
-      await expect(service.uploadDigitalFile(dto, fileBuffer, filename))
-        .rejects.toThrow(BadRequestException);
+      prisma.product.findUnique.mockResolvedValue({ id: 'product-123', product_type: 'digital' });
+      prisma.digitalProductFile.findUnique.mockResolvedValue(existingFile);
+      storageProvider.upload.mockResolvedValue('new-path.epub');
+      prisma.digitalProductFile.update.mockResolvedValue(updatedFile);
+
+      const result = await service.uploadDigitalFile(dto, fileBuffer, filename);
+
+      expect(prisma.digitalProductFile.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'existing-file' } }),
+      );
+      expect(prisma.digitalProductFile.create).not.toHaveBeenCalled();
+      expect(result.format).toBe('epub');
     });
 
     it('should throw BadRequestException if file extension does not match format', async () => {

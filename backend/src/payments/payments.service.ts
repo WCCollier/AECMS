@@ -8,6 +8,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { OrdersService } from '../orders/orders.service';
+import { DigitalProductsService } from '../digital-products/digital-products.service';
 import { StripeProvider } from './providers/stripe.provider';
 import { PayPalProvider } from './providers/paypal.provider';
 import {
@@ -27,6 +28,7 @@ export class PaymentsService {
   constructor(
     private prisma: PrismaService,
     private ordersService: OrdersService,
+    private digitalProductsService: DigitalProductsService,
     private configService: ConfigService,
     private stripeProvider: StripeProvider,
     private paypalProvider: PayPalProvider,
@@ -207,6 +209,11 @@ export class PaymentsService {
     // Test mode
     if (this.testMode) {
       await this.ordersService.markAsPaid(order.id, dto.paypal_order_id);
+      try {
+        await this.digitalProductsService.createDownloadTokensForOrder(order.id);
+      } catch (dlErr) {
+        this.logger.error(`Failed to create download tokens for order ${order.id}`, dlErr);
+      }
       return {
         success: true,
         order_id: order.id,
@@ -224,6 +231,11 @@ export class PaymentsService {
 
     if (capture.status === 'succeeded') {
       await this.ordersService.markAsPaid(order.id, dto.paypal_order_id);
+      try {
+        await this.digitalProductsService.createDownloadTokensForOrder(order.id);
+      } catch (dlErr) {
+        this.logger.error(`Failed to create download tokens for order ${order.id}`, dlErr);
+      }
     }
 
     return {
@@ -426,6 +438,12 @@ export class PaymentsService {
     try {
       await this.ordersService.markAsPaid(orderId, paymentId);
       this.logger.log(`Order ${orderId} marked as paid`);
+      // Create download tokens for any digital items in the order (idempotent)
+      try {
+        await this.digitalProductsService.createDownloadTokensForOrder(orderId);
+      } catch (dlErr) {
+        this.logger.error(`Failed to create download tokens for order ${orderId}`, dlErr);
+      }
     } catch (error) {
       this.logger.error(`Failed to mark order ${orderId} as paid`, error);
     }
@@ -508,6 +526,7 @@ export class PaymentsService {
           const capture = await provider.capturePayment(paypalId);
           if (capture.status === 'succeeded') {
             await this.ordersService.markAsPaid(order.id, capture.id);
+            try { await this.digitalProductsService.createDownloadTokensForOrder(order.id); } catch (_) {}
             await this.auditLog.log({
               event_type: 'order.status_changed',
               resource_type: 'order',
@@ -521,6 +540,7 @@ export class PaymentsService {
         } else if (rawStatus === 'COMPLETED') {
           // Already captured (maybe by a late webhook) — sync our side.
           await this.ordersService.markAsPaid(order.id, paypalId);
+          try { await this.digitalProductsService.createDownloadTokensForOrder(order.id); } catch (_) {}
           await this.auditLog.log({
             event_type: 'order.status_changed',
             resource_type: 'order',
@@ -565,6 +585,11 @@ export class PaymentsService {
     }
 
     await this.ordersService.markAsPaid(orderId, order.payment_intent_id || `test_${Date.now()}`);
+    try {
+      await this.digitalProductsService.createDownloadTokensForOrder(orderId);
+    } catch (dlErr) {
+      this.logger.error(`Failed to create download tokens for order ${orderId}`, dlErr);
+    }
 
     return {
       success: true,

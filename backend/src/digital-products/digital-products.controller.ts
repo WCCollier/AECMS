@@ -24,6 +24,8 @@ import {
   CreateDigitalFileDto,
   UpdateDigitalFileDto,
   PersonalizationOptionsDto,
+  TestPersonalizationDto,
+  ExtendExpiryDto,
 } from './dto/digital-product.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -179,5 +181,40 @@ export class DigitalProductsController {
   ) {
     const days = expiryDays ? parseInt(expiryDays, 10) : 30;
     return this.digitalProductsService.regenerateToken(id, days);
+  }
+
+  /**
+   * Extend a download token's expiry (Admin only)
+   */
+  @Post('downloads/:id/extend')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
+  async extendExpiry(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExtendExpiryDto,
+  ) {
+    return this.digitalProductsService.extendExpiry(id, dto.days);
+  }
+
+  /**
+   * Test personalization — generates a sample personalized file (Admin only)
+   */
+  @Post('files/test-personalization')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('product.edit')
+  async testPersonalization(
+    @Body() dto: TestPersonalizationDto,
+    @Res() res: Response,
+  ) {
+    const { buffer, filename, contentType } =
+      await this.digitalProductsService.testPersonalization(dto);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${encodeURIComponent(filename)}"`,
+    );
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
   }
 }

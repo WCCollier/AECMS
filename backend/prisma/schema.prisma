@@ -450,6 +450,7 @@ model DigitalProductFile {
   format                  FileFormat
   file_id                 String      // References Media
   personalization_enabled Boolean     @default(false)
+  personalization_tested  Boolean     @default(false)
   max_downloads           Int         @default(5)
   created_at              DateTime    @default(now())
   updated_at              DateTime    @updatedAt
@@ -467,15 +468,16 @@ enum FileFormat {
 }
 
 model DigitalDownload {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   digital_file_id   String
   order_id          String
   user_id           String?
-  download_token    String   @unique
-  download_count    Int      @default(0)
-  max_downloads     Int      @default(5)
+  download_token    String    @unique
+  download_count    Int       @default(0)
+  kindle_send_count Int       @default(0)
+  max_downloads     Int       @default(5)
   expires_at        DateTime
-  created_at        DateTime @default(now())
+  created_at        DateTime  @default(now())
   last_downloaded_at DateTime?
 
   digital_file DigitalProductFile @relation(fields: [digital_file_id], references: [id])

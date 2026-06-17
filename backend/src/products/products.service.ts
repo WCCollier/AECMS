@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   BadRequestException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, UpdateProductDto, QueryProductsDto } from './dto';
@@ -24,24 +25,38 @@ export class ProductsService {
     // Generate slug if not provided
     const slug = dto.slug || this.generateSlug(dto.name);
 
-    // Check if slug already exists
-    const existing = await this.prisma.product.findUnique({
-      where: { slug },
-    });
-
-    if (existing) {
+    // Check if slug already exists among active (non-deleted) products
+    const existingSlug = await this.prisma.product.findFirst({ where: { slug, deleted_at: null } });
+    if (existingSlug) {
       throw new ConflictException(`Product with slug "${slug}" already exists`);
     }
 
     // Resolve SKU: use provided value, or auto-generate from slug
     const sku = dto.sku ? dto.sku : await this.generateUniqueSku(slug, dto.product_type || 'physical');
 
-    // Check if SKU already exists (only relevant when explicitly provided)
+    // Check if SKU already exists among non-deleted products
     if (dto.sku) {
-      const existingSku = await this.prisma.product.findUnique({ where: { sku } });
+      const existingSku = await this.prisma.product.findFirst({ where: { sku, deleted_at: null } });
       if (existingSku) {
         throw new ConflictException(`Product with SKU "${sku}" already exists`);
       }
+    }
+
+    // Warn if reusing a slug or SKU that belonged to a deleted product
+    const warnings: string[] = [];
+    const [deletedSlug, deletedSku] = await Promise.all([
+      this.prisma.product.findFirst({
+        where: { deleted_at: { not: null }, slug: { endsWith: `__${slug}` } },
+      }),
+      sku ? this.prisma.product.findFirst({
+        where: { deleted_at: { not: null }, sku: { endsWith: `__${sku}` } },
+      }) : Promise.resolve(null),
+    ]);
+    if (deletedSlug) {
+      warnings.push(`The slug "${slug}" was previously used by a deleted product. You may be recreating similar content.`);
+    }
+    if (deletedSku) {
+      warnings.push(`The SKU "${sku}" was previously used by a deleted product. You may be recreating similar content.`);
     }
 
     // Validate categories exist
@@ -112,10 +127,12 @@ export class ProductsService {
         where: { id: product.id },
         include: this.getProductIncludes(),
       });
-      return this.transformProduct(fresh!);
+      const result = this.transformProduct(fresh!);
+      return warnings.length ? { ...result, warnings } : result;
     }
 
-    return this.transformProduct(product);
+    const result = this.transformProduct(product);
+    return warnings.length ? { ...result, warnings } : result;
   }
 
   private async createProductVersion(product: any, userId: string, summary?: string) {
@@ -342,23 +359,50 @@ export class ProductsService {
       throw new ForbiddenException('You do not have permission to edit this product');
     }
 
-    // Check slug uniqueness if changing
+    const updateWarnings: string[] = [];
+
+    // Check slug uniqueness if changing (exclude soft-deleted and self)
     if (dto.slug && dto.slug !== product.slug) {
-      const existing = await this.prisma.product.findUnique({
-        where: { slug: dto.slug },
+      const existing = await this.prisma.product.findFirst({
+        where: { slug: dto.slug, deleted_at: null, NOT: { id } },
       });
       if (existing) {
         throw new ConflictException(`Product with slug "${dto.slug}" already exists`);
       }
+      const deletedSlug = await this.prisma.product.findFirst({
+        where: { deleted_at: { not: null }, slug: { endsWith: `__${dto.slug}` } },
+      });
+      if (deletedSlug) {
+        updateWarnings.push(`The slug "${dto.slug}" was previously used by a deleted product. You may be recreating similar content.`);
+      }
     }
 
-    // Check SKU uniqueness if changing
+    // Check SKU uniqueness if changing (exclude soft-deleted and self)
     if (dto.sku && dto.sku !== product.sku) {
-      const existingSku = await this.prisma.product.findUnique({
-        where: { sku: dto.sku },
+      const existingSku = await this.prisma.product.findFirst({
+        where: { sku: dto.sku, deleted_at: null, NOT: { id } },
       });
       if (existingSku) {
         throw new ConflictException(`Product with SKU "${dto.sku}" already exists`);
+      }
+      const deletedSku = await this.prisma.product.findFirst({
+        where: { deleted_at: { not: null }, sku: { endsWith: `__${dto.sku}` } },
+      });
+      if (deletedSku) {
+        updateWarnings.push(`The SKU "${dto.sku}" was previously used by a deleted product. You may be recreating similar content.`);
+      }
+    }
+
+    // Digital products require at least one source file before publishing
+    const effectiveType = dto.product_type ?? product.product_type;
+    if (dto.status === 'published' && effectiveType === 'digital') {
+      const fileCount = await this.prisma.digitalProductFile.count({
+        where: { product_id: id },
+      });
+      if (fileCount === 0) {
+        throw new UnprocessableEntityException(
+          'Digital products must have at least one source file before they can be published',
+        );
       }
     }
 
@@ -444,7 +488,8 @@ export class ProductsService {
         resource_id: id,
         changes: diffChanges(product as any, dto as any),
       });
-      return this.transformProduct(fresh!);
+      const freshResult = this.transformProduct(fresh!);
+      return updateWarnings.length ? { ...freshResult, warnings: updateWarnings } : freshResult;
     }
 
     await this.createProductVersion(updated, userId, (dto as any).change_summary);
@@ -457,7 +502,8 @@ export class ProductsService {
       changes: Object.keys(diff.before).length ? diff : undefined,
     });
 
-    return this.transformProduct(updated);
+    const updatedResult = this.transformProduct(updated);
+    return updateWarnings.length ? { ...updatedResult, warnings: updateWarnings } : updatedResult;
   }
 
   /**
@@ -478,10 +524,15 @@ export class ProductsService {
       throw new ForbiddenException('You do not have permission to delete this product');
     }
 
-    // Soft delete
+    // Soft delete — mangle slug and SKU so both unique slots are freed for reuse
+    const ts = Date.now();
     await this.prisma.product.update({
       where: { id },
-      data: { deleted_at: new Date() },
+      data: {
+        deleted_at: new Date(),
+        slug: `__DELETED__${ts}__${product.slug}`,
+        sku: product.sku ? `__DELETED__${ts}__${product.sku}` : product.sku,
+      },
     });
 
     await this.auditLog.log({
@@ -625,11 +676,11 @@ export class ProductsService {
 
   private async generateUniqueSku(slug: string, type: string): Promise<string> {
     const base = this.generateSkuFromSlug(slug, type);
-    const taken = await this.prisma.product.findUnique({ where: { sku: base } });
+    const taken = await this.prisma.product.findFirst({ where: { sku: base, deleted_at: null } });
     if (!taken) return base;
     for (let i = 2; i <= 99; i++) {
       const candidate = `${base}-${i}`;
-      const conflict = await this.prisma.product.findUnique({ where: { sku: candidate } });
+      const conflict = await this.prisma.product.findFirst({ where: { sku: candidate, deleted_at: null } });
       if (!conflict) return candidate;
     }
     return `${base}-${Date.now()}`;
