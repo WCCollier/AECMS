@@ -322,23 +322,123 @@ An attacker who steals only the database gets ciphertext they cannot decrypt wit
 
 ### What this is NOT
 
-- **Not HSM / KMS**: A proper production deployment would use AWS KMS, HashiCorp Vault, or similar — the encryption key would never be on the same host as the data. This implementation is designed for the AECMS target deployment model (single Docker host, low-traffic personal site) where a managed KMS is disproportionate.
-- **Not a replacement for `.env`-only storage**: For deployments where the owner is comfortable with `.env` and server restarts, nothing changes — `.env` values continue to work as fallback and the settings UI can simply be left empty.
 - **Not protection against a compromised NestJS process**: If the application itself is compromised, the attacker can call `settingsService.get()` and receive the plaintext key. Envelope encryption protects the database at rest, not the running process.
+
+### Pluggable Key Provider Architecture
+
+The encryption helper is designed as a replaceable backend so the same codebase serves owners with `.env` access AND owners whose hosting platform provides a managed KMS. The interface:
+
+```typescript
+// backend/src/settings/key-provider.interface.ts
+export interface KeyProvider {
+  /** Encrypt plaintext; returns opaque ciphertext string safe for DB storage */
+  encrypt(plaintext: string): Promise<string>;
+  /** Decrypt ciphertext returned by encrypt() */
+  decrypt(ciphertext: string): Promise<string>;
+}
+```
+
+Two implementations ship in Phase 15:
+
+#### Implementation 1 — Local AES-256-GCM (default)
+
+Uses `SETTINGS_ENCRYPTION_KEY` env var (64-char hex, 32 bytes). Selected when no KMS config is present.
+
+```typescript
+// backend/src/settings/local-key.provider.ts
+export class LocalKeyProvider implements KeyProvider {
+  constructor(private masterKey: string) {}
+  async encrypt(plaintext: string): Promise<string> { /* AES-256-GCM */ }
+  async decrypt(ciphertext: string): Promise<string> { /* AES-256-GCM */ }
+}
+```
+
+This is the approach that was already planned. An owner comfortable with `.env` files sets `SETTINGS_ENCRYPTION_KEY` and never thinks about this again.
+
+#### Implementation 2 — Hosted KMS (pluggable)
+
+Selected when the owner has configured KMS credentials (via `.env` or the settings UI itself). The application calls the KMS API to encrypt/decrypt — the raw key material never leaves the KMS service.
+
+The `SETTINGS_KMS_PROVIDER` env var selects the backend:
+
+| `SETTINGS_KMS_PROVIDER` | Provider | Env vars required |
+|------------------------|----------|------------------|
+| `local` (default) | AES-256-GCM in-process | `SETTINGS_ENCRYPTION_KEY` |
+| `gcp` | Google Cloud KMS | `GCP_KMS_KEY_RING`, `GCP_KMS_KEY_NAME`, `GCP_PROJECT` |
+| `aws` | AWS KMS | `AWS_KMS_KEY_ID`, `AWS_REGION` (+ standard AWS credentials) |
+| `vault` | HashiCorp Vault Transit Engine | `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_TRANSIT_KEY` |
+
+**Google Cloud KMS** (most relevant for Phase 19's Cloud Run deployment):
+```typescript
+// backend/src/settings/gcp-kms.provider.ts
+import { KeyManagementServiceClient } from '@google-cloud/kms';
+export class GcpKmsKeyProvider implements KeyProvider {
+  private client = new KeyManagementServiceClient();
+  async encrypt(plaintext: string): Promise<string> {
+    const [result] = await this.client.encrypt({ name: this.keyName, plaintext: Buffer.from(plaintext) });
+    return (result.ciphertext as Buffer).toString('base64');
+  }
+  async decrypt(ciphertext: string): Promise<string> {
+    const [result] = await this.client.decrypt({ name: this.keyName, ciphertext: Buffer.from(ciphertext, 'base64') });
+    return (result.plaintext as Buffer).toString('utf8');
+  }
+}
+```
+
+On Cloud Run with Workload Identity, no credentials are needed — the service account that runs the backend just needs the `roles/cloudkms.cryptoKeyEncrypterDecrypter` IAM role. Zero secret management.
+
+**Module factory** (selects implementation at startup):
+```typescript
+// settings.module.ts
+const keyProviderFactory = {
+  provide: KEY_PROVIDER,
+  useFactory: (config: ConfigService) => {
+    const provider = config.get('SETTINGS_KMS_PROVIDER', 'local');
+    switch (provider) {
+      case 'gcp': return new GcpKmsKeyProvider(config);
+      case 'aws': return new AwsKmsKeyProvider(config);
+      case 'vault': return new VaultKeyProvider(config);
+      default: return new LocalKeyProvider(config.get('SETTINGS_ENCRYPTION_KEY'));
+    }
+  },
+  inject: [ConfigService],
+};
+```
+
+`SettingsService` injects `KEY_PROVIDER` and delegates all encryption/decryption to it — it never calls `encrypt()`/`decrypt()` directly.
+
+### Choosing a key provider
+
+| Deployment context | Recommended provider | Why |
+|-------------------|---------------------|-----|
+| Local dev / Codespace | `local` | Simple; no external dependency |
+| Single-server Docker | `local` | `.env` is fine for a personal site |
+| Google Cloud Run (Phase 19) | `gcp` | No key to manage; Workload Identity handles auth automatically |
+| AWS | `aws` | Same rationale as GCP |
+| Any host with Vault | `vault` | Works across all cloud providers |
+
+### Tradeoffs: local vs KMS
+
+| Factor | Local AES-256-GCM | Hosted KMS |
+|--------|-------------------|------------|
+| Threat model | DB breach only | DB breach + partial server breach |
+| Latency | Zero (in-process) | ~1–10ms per decrypt call |
+| Cost | Free | ~$0.003 per 10k API calls (GCP/AWS) |
+| Dependency | None | KMS service must be reachable |
+| Key rotation | Manual re-entry or `POST /settings/re-encrypt` | KMS handles rotation; no re-encrypt needed |
+| Setup effort | Generate one hex string | Configure IAM role or API key |
+
+For fantasyvreality.com on Cloud Run, `gcp` KMS is the natural choice — it is more secure than `local`, costs essentially nothing at this traffic level, and requires no manual key management.
 
 ### Key rotation
 
-When `SETTINGS_ENCRYPTION_KEY` is rotated:
-1. New key generated and placed in `.env`
-2. Admin triggers `POST /settings/re-encrypt` (Owner-only, not exposed in UI — curl only)
-3. Service reads all `_enc` values, decrypts with old key, re-encrypts with new key, writes back
-4. Old key discarded
+**Local provider**: When `SETTINGS_ENCRYPTION_KEY` is rotated, trigger `POST /settings/re-encrypt` (Owner-only, curl-only endpoint). Service re-encrypts all `_enc` values with the new key. Not built in Phase 15 but the architecture supports adding it later. Until then, re-entry through the UI is the rotation path.
 
-This endpoint is not built in Phase 15 but the architecture supports it. Until it exists, rotation requires a brief manual re-entry of credentials through the UI.
+**KMS providers**: Rotation is managed entirely within the KMS service (Google/AWS key rotation schedules). The application code is unaffected — it calls the KMS API with the same key name; the KMS service handles the underlying rotation and keeps old ciphertext decryptable.
 
-### Recommendation for production deployments
+### Recommendation for Phase 19
 
-If AECMS is ever deployed to a multi-tenant or commercial hosting context, migrate to AWS KMS or equivalent. The `settings.crypto.ts` helper is the only file that would need to change — the rest of the service is key-management-agnostic.
+When deploying to Cloud Run, set `SETTINGS_KMS_PROVIDER=gcp` and grant the Cloud Run service account `roles/cloudkms.cryptoKeyEncrypterDecrypter` on a single KMS key. This is strictly better than `local` with no added operational burden.
 
 ---
 

@@ -81,21 +81,27 @@ No DB table needed for Phase 18 (the feed URL is stored in the widget's JSON dat
 
 ## Part B — Frontend Widget
 
-### B1 — Widget type: `SubstackFeed`
+### B1 — Widget type: `RssFeed` ✅ DECIDED
+
+> **Decision**: Single configurable widget (not two separate widgets). Generalized as `RssFeed` (works for Substack and any RSS source). When `specificItemUrl` is set, shows that post; otherwise shows latest N posts. CTA links to the specific post URL (single-post mode) or the publication home (multi-post mode). Option B (client-side SWR fetch) confirmed. TipTap inline node to be added.
 
 New widget type alongside the existing `MediaCarousel`, `Callout`, `VideoEmbed`, `XEmbed` types. Widget data structure:
 
 ```typescript
-interface SubstackFeedWidgetData {
-  feedUrl: string;           // e.g., "https://wccollier.substack.com/feed"
-  count: number;             // 1–5 posts
-  layout: 'list' | 'card';  // card = grid cards; list = stacked rows
-  showImage: boolean;        // show post image/thumbnail
-  fadeHeight: number;        // px cutoff for the fade (default 200)
-  ctaLabel: string;          // button label (default "Continue Reading on Substack")
-  specificItemUrl?: string;  // pin a specific post instead of showing latest
+interface RssFeedWidgetData {
+  feedUrl: string;            // e.g., "https://wccollier.substack.com/feed"
+  specificItemUrl?: string;   // if set: show only this post (matched by <link> in feed)
+  count: number;              // 1–5 posts shown when specificItemUrl is not set
+  layout: 'list' | 'card';   // card = grid cards; list = stacked rows
+  showImage: boolean;         // show post image/thumbnail
+  fadeHeight: number;         // px height cutoff for the fade (default 200)
+  ctaLabel: string;           // button label (default "Continue Reading")
 }
 ```
+
+**CTA URL logic** (no extra field needed — derived automatically):
+- `specificItemUrl` set → CTA links to `specificItemUrl` (the specific post)
+- `specificItemUrl` not set → CTA links to the feed's `<link>` element (the publication home)
 
 ### B2 — Widget renderer
 
@@ -143,22 +149,24 @@ Recommendation: Use Option B. The widget is supplementary content, not primary S
 
 In the backstage page builder, the widget config panel (the drawer that opens when you click a widget) should have:
 - **Feed URL** — text input with placeholder `https://yourname.substack.com/feed`
-- **Number of posts** — number input (1–5)
+- **Specific post URL** — optional text input; hint: "Leave blank to show latest posts"
+- **Number of posts** — number input (1–5); disabled/hidden when specific post URL is set
 - **Layout** — select: List / Cards
 - **Show image** — toggle
 - **Fade height** — number input (px)
-- **CTA label** — text input
-- **Pin specific post** — toggle; when on, shows a URL input for the specific post URL
+- **CTA label** — text input; placeholder auto-updates based on mode ("Continue Reading" for specific post, "Visit [publication name]" for multi-post)
 
-### B5 — Inline TipTap node (optional)
+### B5 — Inline TipTap node ✅ DECIDED
 
-If you want the widget to also be embeddable inside article body text (as a TipTap node), add a `SubstackEmbed` node type similar to the existing `VideoEmbed` or `XEmbed` nodes. The data would be the same structure; the rendering would be narrower (constrained to article body width). This is a low-effort addition once the standalone widget exists.
+Add an `RssEmbed` TipTap node type alongside the existing `VideoEmbed` and `XEmbed` nodes. Data structure is the same `RssFeedWidgetData` interface; the TipTap renderer constrains the widget to article body width and uses the same `RssFeedWidget` component. Single-post mode is most natural for article embeds (reference a related piece); multi-post mode works as a "More from the author" footer block inside an article.
 
 ---
 
-## Part C — Generalization: RSS Widget
+## Part C — Generalization: RSS Widget ✅ DECIDED
 
-The same widget can be generalized beyond Substack. If you expand to other newsletters or external blogs, the `feedUrl` just points to a different RSS feed. The backend allowlist controls which external domains are permitted. Name the widget "RSS Feed" or "Newsletter Preview" in the backstage to make it clear it's not Substack-only.
+> **Decision**: Generalized RSS widget approved. Named "RSS Feed" in the backstage widget picker to make it clear it is not Substack-exclusive.
+
+The `feedUrl` just points to any RSS feed. The backend allowlist (or open-by-default with SSRF protection) controls which external domains are permitted.
 
 Future feed sources this would support:
 - Substack publications
@@ -183,9 +191,12 @@ Estimated effort: 2–3 days for the full implementation.
 
 ---
 
-## Open Questions for Owner
+## Decisions Summary
 
-1. **Scope**: RSS-only (Substack), or general RSS from any URL (with allowlist)? General is barely more work and more useful long-term.
-2. **Layout preference**: Do you want multiple posts stacked with fades on each, or a single-post feature preview? Single-post with a strong CTA is simpler and often more effective.
-3. **SEO**: Is it important that the Substack preview content appear in Google's index of your site? If so, we should use Option A (SSR). If it's supplementary, Option B (client-side SWR) is fine.
-4. **"Continue reading" destination**: Should the CTA open the full Substack post in a new tab, or link to your Substack profile/index page? Probably the individual post URL for a specific-post widget; the publication home for a "latest posts" widget.
+| Decision | Choice |
+|----------|--------|
+| Widget scope | Generalized RSS (not Substack-only); named "RSS Feed" in backstage |
+| Single vs multi-post | One configurable widget; `specificItemUrl` selects single-post mode |
+| CTA destination | Single-post mode → specific post URL; multi-post mode → publication home |
+| Data fetch | Option B: client-side SWR (page renders instantly; feed loads after) |
+| TipTap node | ✅ Add `RssEmbed` node (same component, article-width constrained) |

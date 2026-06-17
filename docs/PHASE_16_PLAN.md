@@ -47,23 +47,11 @@ The `Page` model already has `parent_id` and the `PageHierarchy` self-relation d
 
 ## Part B — Navigation Menu System
 
-### B1 — Data model options
+### B1 — Approach: `nav_order` + `show_in_nav` on Page ✅ DECIDED
 
-Three approaches, in increasing complexity:
+> **Decision**: Option 2 (per-page flags). Option 3 (full menu manager) held for a future phase.
 
-#### Option 1 — Auto-nav (no DB model, no admin UI)
-Build the nav automatically from the page tree at runtime: hard routes (Home, Shop, Articles) are always first; published top-level pages follow; their published children appear as dropdown items.
-
-- **Pros**: Zero admin work; always current; no new schema; fast to build.
-- **Cons**: No way to hide a page from the nav, reorder items, or add a custom label. Pages appear in creation order unless a `nav_order` int is added.
-- **Best for**: Simple sites with few pages.
-
-#### Option 2 — `nav_order` + `show_in_nav` on Page (recommended for now)
 Add two fields to the `Page` model: `nav_order Int @default(0)` and `show_in_nav Boolean @default(true)`. The nav reads all published, top-level pages ordered by `nav_order`, filtered by `show_in_nav`. Children with `show_in_nav = true` become submenu items under their parent.
-
-- **Pros**: No new tables; owner controls per-page visibility and ordering from the page edit form; still fully automatic.
-- **Cons**: Can't add hard routes (Shop, Articles) to the managed list or reorder them relative to pages; can't have a page appear in two positions.
-- **Best for**: This project. Simple enough to implement immediately; solves 90% of the need.
 
 **Schema change** (minimal, one migration):
 ```prisma
@@ -74,62 +62,41 @@ model Page {
 }
 ```
 
-#### Option 3 — Full menu manager (Wordpress-style)
-New `NavigationMenu` and `NavigationMenuItem` tables. Owner creates named menus (Primary, Footer), adds items of type `page`, `route` (hardcoded URL), or `external`. Drag-and-drop ordering. Multiple menus for header vs footer.
+### B2 — Hard routes vs page taxonomy: visual separation ✅ DECIDED
 
-- **Pros**: Maximum flexibility; footer vs header can differ; external links possible; custom labels.
-- **Cons**: Significant work (2 new tables, admin CRUD UI, drag-and-drop). Overkill for a personal site.
-- **Best for**: Multi-author sites or when the owner wants fine-grained control.
+> **Decision**: Shop and Articles are always visible and always rendered. They are visually separated from the page taxonomy section of the nav.
 
-**Schema** (if Option 3 is chosen later):
-```prisma
-model NavigationMenu {
-  id        String   @id @default(uuid())
-  name      String   @unique  // 'primary', 'footer', 'mobile'
-  label     String            // Display label for backstage
-  items     NavigationMenuItem[]
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-  @@map("navigation_menus")
-}
+**Desktop header layout:**
 
-model NavigationMenuItem {
-  id          String   @id @default(uuid())
-  menu_id     String
-  parent_item_id String?   // for nested items within the menu
-  type        String       // 'page' | 'route' | 'external'
-  page_id     String?      // if type = 'page'
-  route       String?      // if type = 'route' ('/shop', '/articles')
-  url         String?      // if type = 'external'
-  label       String?      // override page title
-  order       Int @default(0)
-  opens_new_tab Boolean @default(false)
-  menu        NavigationMenu @relation(fields: [menu_id], references: [id])
-  page        Page?   @relation(fields: [page_id], references: [id])
-  children    NavigationMenuItem[] @relation("MenuItemChildren")
-  parent      NavigationMenuItem? @relation("MenuItemChildren", fields: [parent_item_id], references: [id])
-  @@index([menu_id])
-  @@map("navigation_menu_items")
-}
+```
+[Logo]   Shop  |  Articles  ||  Author  ›  Contact   [Cart] [Login]
+                ↑ hard routes ↑  ↑ page taxonomy items ↑
 ```
 
-### B2 — Recommended implementation sequence
+The `||` separator is a subtle vertical divider (`border-l border-border/40 h-4 mx-1`). Hard routes are hardcoded in `Header.tsx` and never affected by the `SiteSettings` nav query. Page taxonomy items are fetched dynamically.
 
-1. Implement **Option 2** (nav_order + show_in_nav on Page) — fast, covers the real need
-2. Update `Header.tsx` to fetch the page tree via a new `GET /pages/nav` endpoint (returns published, show_in_nav=true pages in a tree, nav_order sorted)
-3. Hard routes (Shop, Articles) are still hardcoded in the template but placed before dynamic pages
-4. Submenu rendering: desktop nav gets a dropdown for any top-level page that has published children with `show_in_nav = true`
-5. Backstage page editor gets two new fields: "Show in navigation" (checkbox) and "Navigation order" (number input)
+If no published pages have `show_in_nav = true`, the divider and page section are omitted entirely — the nav shows only Shop and Articles.
 
-If the site grows or multi-menu support is needed, migrate to Option 3 at that point — the `Page.nav_order` / `show_in_nav` fields can coexist.
+### B3 — Implementation sequence
+
+1. Add `nav_order` and `show_in_nav` to `Page` schema + migration
+2. `GET /pages/nav` endpoint — returns published, `show_in_nav = true` pages in a tree, sorted by `nav_order`; depth limited to 3
+3. Update `Header.tsx` to fetch `/pages/nav` and render dynamic items after the separator
+4. Submenu dropdown: desktop nav gets a dropdown for any top-level page that has published children
+5. Mobile menu: flat list with indented children
+6. Backstage page editor: add "Show in navigation" (checkbox) and "Navigation order" (number) fields
+
+If the site later needs fine-grained menu management (multiple menus, custom labels, external links), the Option 3 schema is documented in the git history and can be implemented without conflicting with these fields.
 
 ---
 
 ## Part C — Hierarchical URL Routing
 
-### C1 — URL structure
+### C1 — URL structure ✅ DECIDED
 
-Pages should be addressable by their natural path, not under `/pages/`:
+> **Decision**: Top-level pages at the root (e.g., `fantasyvreality.com/author`). Max depth: 3 levels (root → child → grandchild).
+
+Pages are addressable by their natural path, not under `/pages/`:
 
 | Page | Parent | URL |
 |------|--------|-----|
@@ -206,9 +173,12 @@ A read-only "Navigation Preview" panel in the backstage (perhaps in the site set
 
 ---
 
-## Open Questions for Owner
+## Decisions Summary
 
-1. **URL for pages**: Do you want top-level pages at the root (e.g., `fantasyvreality.com/author`) or under a `/pages/` prefix? Root is cleaner but requires the catch-all route to be careful.
-2. **Max depth**: How deep should the page tree go? 2 levels (root + children) is almost always enough. 3 levels is the practical maximum for readable URLs.
-3. **Nav approach**: Option 2 (per-page flags) vs Option 3 (full menu manager)? Option 2 is recommended to start.
-4. **Hard routes in the menu**: Should Shop and Articles be moveable/removeable from the nav, or always pinned?
+| Decision | Choice |
+|----------|--------|
+| Nav approach | Option 2: `nav_order` + `show_in_nav` on Page |
+| Page URL style | Root (e.g., `/author`, `/author/bio`) |
+| Max depth | 3 levels (root → child → grandchild) |
+| Hard routes (Shop, Articles) | Always visible; visually separated from page taxonomy items |
+| Advanced menu manager | Deferred to a future phase |

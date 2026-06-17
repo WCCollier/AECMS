@@ -84,6 +84,12 @@ Each palette defines:
 - Dark mode: same set of variables for dark variant
 - Both modes are stored together and injected with a `@media (prefers-color-scheme: dark)` block
 
+### A3a — Dark mode ✅ DECIDED
+
+> **Decision**: No user-togglable dark mode. The owner sets the theme; visitors see exactly that. Dark mode / user-switching held for a future upgrade.
+
+The theme is applied unconditionally — no `@media (prefers-color-scheme: dark)` block, no toggle button for visitors. The owner may choose to set a dark palette if desired; that simply becomes the site's permanent appearance.
+
 ### A4 — Custom palette builder
 
 Option for the owner to define a custom palette:
@@ -135,7 +141,17 @@ Currently using system font stack. Add three settable font roles:
 | Authorly | Cormorant Garamond | Source Sans Pro |
 | Friendly | Nunito | Nunito Sans |
 
-### B2 — Type scale
+### B2 — Font scope ✅ DECIDED
+
+> **Decision**: Lock the font to the selected pairing. Do not allow browser font preferences to override the site's typography.
+
+**Why this is the right call**: When the owner chooses a pairing like Cormorant Garamond + Source Sans Pro, that choice is part of the site's visual identity. A visitor's "override document fonts" browser setting (Chrome: Settings → Appearance → Customize fonts → "Override website fonts") is opt-in and disabled by default — the overwhelming majority of users will see the selected font. The tiny minority who have explicitly overridden fonts have made an accessibility choice for themselves; nothing in CSS can reliably override that without accessibility implications.
+
+**How to enforce it**: Specify `font-family` explicitly on `body`, `h1`–`h4`, and `code` elements using the Google Fonts `@import`. This is sufficient — browsers apply the override setting only when the user has actively enabled it, and specifying the font is no more or less "locked" than standard web font usage.
+
+No extra work is required: standard Google Fonts usage already applies the font to all users who haven't explicitly opted into browser overrides.
+
+### B3 — Type scale
 
 Expose a single "type size" slider: Compact / Default / Generous. This adjusts the CSS `font-size` root value (affects all `rem`-based sizing throughout the app).
 
@@ -164,9 +180,9 @@ The site header (`<header>`) and any full-width hero sections can have their own
 - Custom image with parallax scroll effect (CSS `background-attachment: fixed`)
 - Dark overlay + image (for text legibility)
 
-### C3 — Per-page background (Page builder)
+### C3 — Per-page background ✅ DECIDED
 
-Individual pages should be able to override the global background. Add a "Page appearance" section to the page editor with background image upload and overlay opacity controls. This feeds a `page_background_image` field on the `Page` model and a CSS variable injected only when that page is rendered.
+> **Decision**: No per-page themes for now. KISS. All pages share the site-wide theme set by the owner. Can be revisited in a later upgrade.
 
 ---
 
@@ -244,9 +260,11 @@ Store the active theme as a single `SiteSettings` entry with key `theme`:
 
 ---
 
-## Open Questions for Owner
+## Decisions Summary
 
-1. **Dark mode**: Do you want a manual dark mode toggle (the user chooses), automatic (follows OS preference), or light-only for now?
-2. **Font scope**: Should users be able to override the site font with their browser preferences, or should the font be locked to the selected pairing?
-3. **Per-page themes**: Should individual pages be able to override any theme element, or just background image and template?
-4. **CSS-in-JS vs CSS variables**: Tailwind v4 is CSS-first, which makes CSS variables the natural choice. Is there any reason to deviate from this approach?
+| Decision | Choice |
+|----------|--------|
+| Dark mode | No user toggle; owner sets theme; visitors see it as-is |
+| Font scope | Lock to selected pairing via standard Google Fonts CSS; browser override opt-in is a user's explicit choice, not a design concern |
+| Per-page themes | Not in scope for Phase 20; deferred |
+| CSS approach | CSS variables (Tailwind v4 compatible, no rebuild needed) |

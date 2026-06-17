@@ -65,7 +65,7 @@ export async function middleware(request: NextRequest) {
 1. **TXT record** (already exists): Proves you own the domain to AECMS
 2. **A/CNAME record** (new instruction): Routes traffic from that domain to your server
 
-**Path rewriting**: The redirect should append the sub-path so that `wccollier.com/bio` redirects to `fantasyvreality.com/author/bio` — not just to `/author`. This means the `DomainAlias` record represents the "mount point" and sub-paths flow through automatically.
+**Path rewriting**: The redirect appends the sub-path so `wccollier.com/bio` redirects to `fantasyvreality.com/author/bio` — the alias is a mount point, not a single-URL redirect. Sub-paths that don't resolve to a valid page on the primary site return a 404 from Next.js as normal. No special handling needed — the catch-all route (Phase 16) or named routes handle it.
 
 **DB schema change**: Add `alias_type` to `DomainAlias`:
 ```prisma
@@ -157,17 +157,11 @@ addEventListener('fetch', event => {
 
 ---
 
-### Recommended Phase 17 Implementation Plan
+### Phase 17 Scope ✅ DECIDED
 
-| Phase | Feature | Approach | Effort |
-|-------|---------|---------|--------|
-| 17A | Simple redirect | Next.js middleware with 301 | 1–2 days |
-| 17B-dev | Transparent proxy (dev) | Next.js middleware rewrite | 2–3 days |
-| 17B-prod | Transparent proxy (prod) | Defer to Phase 19 topology decision | — |
+> **Decision**: Implement **17A only** (simple redirect). Transparent proxy (17B) held for a future phase.
 
-**17A is the clear starting point.** It solves the stated need (route `wccollier.com` to `/author`) and is fully controllable from the existing backstage UI with minor additions.
-
-**17B-dev** (middleware rewrite) should be built and tested in the Codespace but its production behavior depends on the hosting setup in Phase 19. Document it as "requires same-server deployment with multi-domain TLS."
+**17A is the complete Phase 17 scope.** It solves the stated need — `wccollier.com` routes to `/author` — and is fully controllable from the existing backstage UI with minor additions. TLS is not a factor for 17A: the browser simply follows a redirect to the canonical `https://fantasyvreality.com` domain, where TLS is already handled.
 
 ---
 
@@ -203,9 +197,15 @@ A simple status panel showing:
 
 ---
 
-## Open Questions for Owner
+## Decisions Summary
 
-1. **Same server requirement**: For transparent proxy (17B), both `wccollier.com` and `fantasyvreality.com` must resolve to the same server. Is that the intended production setup?
-2. **TLS certificate**: Who manages the TLS cert for `wccollier.com`? Let's Encrypt (automatic via Certbot), Cloud Run (automatic for custom domains it manages), or Cloudflare?
-3. **Cloudflare**: Are either/both domains behind Cloudflare? If so, Option 3 (Cloudflare Worker) is probably the easiest production path for transparent aliasing.
-4. **Subpath behavior**: Should `wccollier.com/somethingelse` (a path that doesn't exist under `/author/`) 404, or redirect to the alias root?
+| Decision | Choice |
+|----------|--------|
+| Phase 17 scope | 17A only (simple 301 redirect via Next.js middleware) |
+| Transparent proxy | Deferred to a future phase |
+| TLS for 17A | Not a factor — redirect sends browser to primary domain where TLS is already handled |
+| Bad subpaths | 404 (Next.js normal handling on the primary domain) |
+
+## Deferred: Transparent Proxy Options
+
+For reference when revisiting — the three approaches analyzed above (Next.js rewrite, separate proxy service, Cloudflare Worker) remain valid options. The Cloudflare Worker approach is likely the cleanest production path if `wccollier.com` DNS is managed through Cloudflare. TLS for the secondary domain is the key open question to resolve before implementing 17B — owner to confirm DNS/Cloudflare setup during Phase 19.
