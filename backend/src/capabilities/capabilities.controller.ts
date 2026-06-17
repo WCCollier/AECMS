@@ -8,6 +8,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -48,10 +49,17 @@ export class CapabilitiesController {
   }
 
   @Get('users/:userId')
-  @ApiOperation({ summary: 'Get capabilities for a specific user' })
+  @ApiOperation({ summary: 'Get capabilities for a specific user (own caps: any auth; others: backstage required)' })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiResponse({ status: 200, description: 'Returns user capabilities' })
-  async getUserCapabilities(@Param('userId') userId: string) {
+  @ApiResponse({ status: 403, description: 'Backstage session required to view other users\' capabilities' })
+  async getUserCapabilities(
+    @Param('userId') userId: string,
+    @CurrentUser() currentUser: any,
+  ) {
+    if (userId !== currentUser.id && currentUser.session_type !== 'backstage') {
+      throw new ForbiddenException('Backstage session required to view other users\' capabilities');
+    }
     return this.capabilitiesService.getUserCapabilities(userId);
   }
 

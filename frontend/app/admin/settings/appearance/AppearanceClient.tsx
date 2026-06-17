@@ -6,10 +6,14 @@ import { Save, Loader2, Palette, Type, ExternalLink } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
 import { PALETTES, FONT_PAIRINGS, buildCssOverrides, getPaletteById, getFontPairingById } from '@/lib/themes';
 
-const fetcher = (url: string) => adminApi.get(url).then((r) => r.data);
+// Fetch current theme from the public endpoint (no auth needed, avoids system.configure requirement)
+const publicFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function AppearanceClient() {
-  const { data: settings, mutate } = useSWR<Record<string, string>>('/settings', fetcher);
+  const { data: currentTheme } = useSWR<{ palette: string; fontPairing: string }>(
+    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/settings-public/theme`,
+    publicFetcher,
+  );
 
   const [selectedPalette, setSelectedPalette] = useState('midnight');
   const [selectedFont, setSelectedFont] = useState('default');
@@ -18,15 +22,10 @@ export function AppearanceClient() {
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    if (!settings) return;
-    try {
-      const theme = settings['theme'] ? JSON.parse(settings['theme'] || '{}') : {};
-      if (theme.palette) setSelectedPalette(theme.palette);
-      if (theme.fontPairing) setSelectedFont(theme.fontPairing);
-    } catch {
-      // use defaults
-    }
-  }, [settings]);
+    if (!currentTheme) return;
+    if (currentTheme.palette) setSelectedPalette(currentTheme.palette);
+    if (currentTheme.fontPairing) setSelectedFont(currentTheme.fontPairing);
+  }, [currentTheme]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -36,7 +35,6 @@ export function AppearanceClient() {
           theme: JSON.stringify({ palette: selectedPalette, fontPairing: selectedFont }),
         },
       });
-      await mutate();
       setSaved(true);
       setDirty(false);
     } finally {
