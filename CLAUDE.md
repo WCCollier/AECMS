@@ -38,7 +38,7 @@
 **Phase 15**: 📋 PLANNED - Admin Settings
 **Phase 16**: 📋 PLANNED - Navigation menus: dynamic header, page hierarchy, catch-all routing
 **Phase 17**: 📋 PLANNED - Alternate domain capture: redirect + transparent proxy aliasing
-**Phase 18**: 📋 PLANNED - External content widget: Substack/RSS feed preview
+**Phase 18**: 📋 PLANNED - Substack integration widget: RSS feed preview with fade and CTA
 **Phase 19**: 📋 PLANNED - First deployment: fantasyvreality.com on Google Cloud Run
 **Phase 20**: 📋 PLANNED - Themes and templates: color palettes, typography, backgrounds
 **Phase 21**: 📋 PLANNED - Multi-owner deployability: setup wizard, SiteSettings, update strategy
@@ -222,7 +222,7 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_12_COMPLETION_REPORT.md` - Phase 12 implementation details
 - `docs/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
 - `docs/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
-- `docs/PHASE_18_PLAN.md` - External content widget: Substack/RSS feed with fade and CTA
+- `docs/PHASE_18_PLAN.md` - Substack integration widget: RSS feed preview with height fade and CTA
 - `docs/PHASE_19_PLAN.md` - First deployment: Google Cloud Run, GCS, Cloud SQL, secrets
 - `docs/PHASE_20_PLAN.md` - Themes and templates: color palettes, typography, backgrounds
 - `docs/PHASE_21_PLAN.md` - Multi-owner deployability: setup wizard, update strategy, SiteSettings

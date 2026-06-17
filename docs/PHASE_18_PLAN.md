@@ -1,15 +1,9 @@
-# Phase 18: External Content Widget (Substack / RSS)
+# Phase 18: Substack Integration Widget
 
 **Project**: AECMS  
 **Phase**: 18  
 **Status**: 📋 PLANNED  
 **Dependencies**: Phase 10B (Widget system — inline nodes), Phase 11 (Page builder)
-
----
-
-## Clarification Note
-
-The phase title says "Wordpress Integration" but the description is: *"a widget which displays a latest or specific article from my substack, perhaps with a hard height fade and a 'Continue Reading on Substack' button."* This plan covers a **Substack feed widget** (and an RSS widget more generally). A separate Wordpress import/migration topic is covered in Phase 19. Please confirm the intent.
 
 ---
 
