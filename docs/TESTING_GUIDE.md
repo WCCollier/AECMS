@@ -1,8 +1,8 @@
 # AECMS Comprehensive Testing Guide
 
-**Version**: 2.3  
+**Version**: 2.4  
 **Last Updated**: 2026-06-17  
-**Status**: Phase 14 complete + QA pass — digital delivery verified; SMTP active; badge/cart/slug fixes applied
+**Status**: Phase 14 complete + QA pass — digital delivery verified; SMTP active; badge/cart/slug fixes applied; username + name-at-checkout implemented
 
 ---
 
@@ -57,7 +57,7 @@ cd /workspaces/AECMS/frontend && npm run test    # 125 frontend unit tests
 |------|-------|----------|-------|
 | Owner | owner@aecms.local | Admin123!@# | All permissions; owner of seeded content |
 | Admin | admin@aecms.local | Admin123!@# | Most backstage capabilities |
-| Member | member@aecms.local | Member123!@# | Customer-facing only |
+| Member | member@aecms.local | Let' | Customer-facing only |
 
 **Get a customer-session token (curl):**
 ```bash
@@ -270,6 +270,15 @@ See `docs/PHASE_13_PLAN.md` for the full checklist with step-by-step instruction
 - Product slug mangled on soft-delete (`__DELETED__{ts}__{slug}`) — frees unique slot
 - Product SKU/slug reuse from deleted products triggers a warning alert (not a block)
 - Article and page slugs permanently reserved after deletion — new content with same slug is blocked with a restoration message
+
+**Name fields (2026-06-17, session 2):**
+- `users.username` column added (unique) — now required at registration and persisted
+- Registration form: `display_name` replaced with optional First Name + Last Name fields; `username` correctly wired to backend
+- `orders.customer_name` column added — stores resolved full name at purchase time
+- Checkout now collects first + last name from all buyers (guests always; authenticated users prompted if name missing from account)
+- Collected name back-filled to `users.first_name`/`last_name` on first purchase so subsequent checkouts are pre-filled
+- Personalization chain updated: `order.customer_name` now takes priority over separate user lookup
+- Account page updated: shows Name, @username, email, role, member since
 
 ---
 
@@ -964,6 +973,8 @@ ls -lh /tmp/test-personalized.epub
 
 Digital products skip the shipping step in checkout entirely — the address form is not shown.
 
+> **Name at checkout**: The Payment Method step now prompts for First Name + Last Name when the buyer doesn't have a name on file. For guests, name is always collected. The name is stored on the order (`customer_name`) and used for personalization. For the API test below, pass `customer_first_name` to get a personalized name on the download.
+
 #### Test mode (fastest)
 
 ```bash
@@ -975,10 +986,11 @@ curl -s -X POST http://localhost:4000/cart/items \
   -d "{\"product_id\":\"$PRODUCT_ID\",\"quantity\":1}" | jq '{id,subtotal}'
 
 # Create order (no shipping_address needed for digital-only cart)
+# Pass customer_first_name for personalization; omit to use email as fallback
 ORDER=$(curl -s -X POST http://localhost:4000/orders \
   -H "x-session-id: $SESSION_ID" \
   -H "Content-Type: application/json" \
-  -d '{}')
+  -d '{"customer_first_name":"Jane","customer_last_name":"Tester"}')
 ORDER_ID=$(echo $ORDER | jq -r '.id')
 echo "Order ID: $ORDER_ID"
 
@@ -996,10 +1008,11 @@ curl -s "http://localhost:4000/digital-products/orders/$ORDER_ID/downloads" \
 
 1. Go to `/shop`, add the digital product to cart
 2. Proceed to checkout — the **Shipping Information** step is skipped; you land directly on **Payment Method**
-3. Click **Credit or Debit Card**
-4. You are redirected to `/order-confirmation?order=<ID>&test_mode=true`
-5. The **Your Digital Downloads** panel appears below the order summary
-6. Two rows are visible — one for EPUB, one for PDF — each showing "5 of 5 remaining"
+3. If not logged in (or logged in without a name on file): enter First Name + Last Name in the name fields that appear above the payment buttons
+4. Click **Credit or Debit Card**
+5. You are redirected to `/order-confirmation?order=<ID>&test_mode=true`
+6. The **Your Digital Downloads** panel appears below the order summary
+7. Two rows are visible — one for EPUB, one for PDF — each showing "5 of 5 remaining"
 
 #### Stripe sandbox flow
 

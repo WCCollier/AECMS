@@ -34,6 +34,7 @@
 **Phase 12**: ✅ COMPLETE - Audit trail, transaction logging, content version history
 **Phase 14**: ✅ COMPLETE - Digital item delivery: personalization, downloads, Kindle wizard (2026-06-16)
 **Phase 14 QA fixes** (2026-06-17): order status badge normalization, digital product UX polish, cart 403 fix, SKU/slug uniqueness hardening
+**Phase 14 QA fixes, session 2** (2026-06-17): name field implementation — username at registration, first+last required at checkout
 
 **Test Status**: 125 frontend + 176 backend unit tests (all passing); 16 backend E2E tests (require Docker)
 **API Endpoints**: 129 total (Phase 14: +POST files/test-personalization, +POST downloads/:id/extend)
@@ -348,6 +349,31 @@ NEXT_PUBLIC_KINDLE_SENDER_EMAIL=moriakul@gmail.com  # shown to user in wizard St
 - **Products — reuse warning**: When `create()` or `update()` uses a slug or SKU that matches a deleted product's mangled value (`endsWith: '__${value}'` among `deleted_at: { not: null }`), the product is saved and a `warnings: string[]` field is included in the response. `ProductForm` shows an `alert()` before redirecting.
 - **Products — uniqueness checks exclude deleted**: All slug/SKU checks in `create()`, `update()`, and `generateUniqueSku()` now use `findFirst({ deleted_at: null })` instead of `findUnique()`.
 - **Articles & pages — slugs permanently reserved**: Slug is NOT mangled on soft-delete. If a new article/page uses a deleted record's slug, a `ConflictException` is thrown with message: *"The slug 'X' belongs to a deleted article/page. Choose a different title, or ask an administrator to restore the original."*
+
+## Name Field Design (implemented 2026-06-17)
+
+**Two distinct identity fields — different lifecycle:**
+
+- **`username`** — public-facing social handle for comments, reviews, and future social features. Required at registration. Stored as `users.username` (unique, nullable for accounts created before this change). Shown with `@` prefix on Account page.
+- **`first_name` + `last_name`** — legal/commercial identity for receipts, personalized files, and shipping. Optional at registration; **required at point of purchase** (prompted at checkout if missing). Back-filled to user record on first purchase so subsequent checkouts are pre-filled.
+
+**Checkout name collection:**
+- **Physical product checkout, guest**: Name fields shown on the Shipping Information step (goes on the package as `shipping_name`).
+- **Digital/service checkout, guest**: Name + email shown on the Payment Method step.
+- **Logged-in user, no name on file**: Name fields shown on the Payment Method step with a note that name is used for personalised files and receipts.
+- **Logged-in user, name already on file**: No name prompt — pre-populated silently.
+
+**Personalization priority chain** (in `digital-products.service.ts` `downloadFile()`):
+1. Explicit `?customerName=` query param (admin/test use)
+2. `order.customer_name` (set at checkout from first+last fields)
+3. User record `first_name + last_name` (fallback for orders before this change)
+4. `order.email` (last resort)
+
+**DB migration**: `20260617200000_add_username_and_order_customer_name`
+- `users.username VARCHAR UNIQUE` (nullable — existing accounts unaffected)
+- `orders.customer_name VARCHAR` (resolved full name stored at checkout time)
+
+**Seeded accounts** (owner, admin, member) have `username = NULL` — they will be prompted for a name on their first purchase.
 
 ## Phase 9: User Testing (🔄 IN PROGRESS)
 
