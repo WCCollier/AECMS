@@ -37,7 +37,7 @@
 **Phase 14 QA fixes, session 2** (2026-06-17): name field implementation — username at registration, first+last required at checkout
 **Phase 15**: ✅ COMPLETE - Admin Settings: SiteSettings DB table, pluggable KeyProvider (AES-256-GCM), settings UI (General/Identity/Email/Payment tabs), audit logging (2026-06-17)
 **Phase 16**: ✅ COMPLETE - Navigation menus: /latest→/articles rename, dynamic header nav from DB, catch-all [...slug] route, page hierarchy, admin nav fields (2026-06-17)
-**Phase 17**: 📋 PLANNED - Alternate domain capture: redirect + transparent proxy aliasing
+**Phase 17**: ✅ COMPLETE - Alternate domain capture: Next.js middleware 301 redirects from secondary domains; alias_type field for future proxy support (2026-06-17)
 **Phase 18**: 📋 PLANNED - Substack integration widget: RSS feed preview with fade and CTA
 **Phase 19**: 📋 PLANNED - First deployment: fantasyvreality.com on Google Cloud Run
 **Phase 20**: 📋 PLANNED - Themes and templates: color palettes, typography, backgrounds

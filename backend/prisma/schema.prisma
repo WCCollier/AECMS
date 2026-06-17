@@ -779,6 +779,7 @@ model DomainAlias {
   id                  String    @id @default(uuid())
   domain              String    @unique // e.g., "wccollier.com"
   target_route        String    // e.g., "/author"
+  alias_type          String    @default("redirect") // 'redirect' | 'proxy'
   is_active           Boolean   @default(false)
   verification_token  String?   // DNS TXT record token for verification
   verified_at         DateTime?
