@@ -16,6 +16,31 @@ import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { TestEmailService } from './test-email.service';
 
+// Public read-only settings endpoint (no auth) — used by root layout for theme injection
+@ApiTags('settings-public')
+@Controller('settings-public')
+export class PublicSettingsController {
+  constructor(private settingsService: SettingsService) {}
+
+  @Get('theme')
+  @ApiOperation({ summary: 'Get current theme settings (palette, font pairing)' })
+  async getTheme() {
+    const raw = await this.settingsService.get('theme');
+    if (!raw) return { palette: 'midnight', fontPairing: 'default' };
+    try { return JSON.parse(raw); } catch { return { palette: 'midnight', fontPairing: 'default' }; }
+  }
+
+  @Get('general')
+  @ApiOperation({ summary: 'Get general site settings (title, tagline)' })
+  async getGeneral() {
+    const [site_title, tagline] = await Promise.all([
+      this.settingsService.getEffective('general.site_title'),
+      this.settingsService.getEffective('general.tagline'),
+    ]);
+    return { site_title, tagline };
+  }
+}
+
 @ApiTags('settings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)

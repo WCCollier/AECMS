@@ -15,6 +15,7 @@ import {
   Globe,
   LayoutTemplate,
   ClipboardList,
+  Paintbrush,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import adminApi from '@/lib/adminApi';
@@ -36,7 +37,8 @@ const navItems = [
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, requiredCap: 'system.view_audit' },
   { href: '/admin/domains', label: 'Domains', icon: Globe, requiredCap: 'domain.manage' },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/settings/appearance', label: 'Appearance', icon: Paintbrush, requiredCap: 'system.configure' },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, requiredCap: 'system.configure' },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

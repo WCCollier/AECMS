@@ -40,7 +40,7 @@
 **Phase 17**: ✅ COMPLETE - Alternate domain capture: Next.js middleware 301 redirects from secondary domains; alias_type field for future proxy support (2026-06-17)
 **Phase 18**: ✅ COMPLETE - RSS Feed widget: ExternalFeedsModule backend (Redis cache, SSRF validation), RssFeedWidget component, RssEmbed TipTap node (2026-06-17)
 **Phase 19**: 📋 PLANNED - First deployment: fantasyvreality.com on Google Cloud Run
-**Phase 20**: 📋 PLANNED - Themes and templates: color palettes, typography, backgrounds
+**Phase 20**: ✅ COMPLETE - Themes and templates: 8 curated palettes, 5 font pairings, CSS variable injection in root layout, /admin/settings/appearance backstage UI (2026-06-17)
 **Phase 21**: 📋 PLANNED - Multi-owner deployability: setup wizard, SiteSettings, update strategy
 
 **Test Status**: 125 frontend + 190 backend unit tests (all passing); 16 backend E2E tests (require Docker)

@@ -5,7 +5,7 @@ import { AuditModule } from '../audit/audit.module';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import { EmailModule } from '../email/email.module';
 import { SettingsService } from './settings.service';
-import { SettingsController } from './settings.controller';
+import { SettingsController, PublicSettingsController } from './settings.controller';
 import { TestEmailService } from './test-email.service';
 import { KEY_PROVIDER } from './key-provider.interface';
 import { LocalKeyProvider } from './local-key.provider';
@@ -25,7 +25,7 @@ const keyProviderFactory = {
 
 @Module({
   imports: [PrismaModule, AuditModule, CapabilitiesModule, EmailModule],
-  controllers: [SettingsController],
+  controllers: [SettingsController, PublicSettingsController],
   providers: [keyProviderFactory, SettingsService, TestEmailService],
   exports: [SettingsService],
 })

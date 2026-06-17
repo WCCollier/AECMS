@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/Providers';
+import { getPaletteById, getFontPairingById, buildCssOverrides } from '@/lib/themes';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -17,13 +18,58 @@ export const metadata: Metadata = {
   keywords: ['cms', 'ecommerce', 'content management'],
 };
 
-export default function RootLayout({
+async function getSiteTheme(): Promise<{ paletteId: string; fontPairingId: string; siteTitle: string }> {
+  try {
+    const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:4000';
+    const [themeRes, titleRes] = await Promise.allSettled([
+      fetch(`${backendUrl}/settings-public/theme`, { next: { revalidate: 300 } }),
+      fetch(`${backendUrl}/settings-public/general`, { next: { revalidate: 300 } }),
+    ]);
+    let paletteId = 'midnight';
+    let fontPairingId = 'default';
+    let siteTitle = 'AECMS';
+
+    if (themeRes.status === 'fulfilled' && themeRes.value.ok) {
+      const theme = await themeRes.value.json();
+      paletteId = theme.palette ?? 'midnight';
+      fontPairingId = theme.fontPairing ?? 'default';
+    }
+    if (titleRes.status === 'fulfilled' && titleRes.value.ok) {
+      const general = await titleRes.value.json();
+      siteTitle = general.site_title ?? 'AECMS';
+    }
+    return { paletteId, fontPairingId, siteTitle };
+  } catch {
+    return { paletteId: 'midnight', fontPairingId: 'default', siteTitle: 'AECMS' };
+  }
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const { paletteId, fontPairingId, siteTitle } = await getSiteTheme();
+  const palette = getPaletteById(paletteId);
+  const fontPairing = getFontPairingById(fontPairingId);
+  const cssOverrides = buildCssOverrides(palette, fontPairing);
+
   return (
     <html lang="en">
+      <head>
+        {/* Google Fonts */}
+        {fontPairing.id !== 'default' && (
+          <>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+            <link href={fontPairing.googleFontsUrl} rel="stylesheet" />
+          </>
+        )}
+        {/* Runtime theme override */}
+        <style dangerouslySetInnerHTML={{ __html: cssOverrides }} />
+        {/* Site title from settings */}
+        <title>{siteTitle}</title>
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <Providers>
           {children}
