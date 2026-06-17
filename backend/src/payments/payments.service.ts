@@ -568,6 +568,34 @@ export class PaymentsService {
     return { checked: staleOrders.length, recovered, errors };
   }
 
+  async verifyStripe(): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!this.stripeProvider.isAvailable()) {
+        return { success: false, message: 'Stripe secret key is not configured' };
+      }
+      // Attempt a lightweight Stripe API call to verify the key is valid
+      await (this.stripeProvider as any).stripe.balance.retrieve();
+      return { success: true, message: 'Stripe connection verified' };
+    } catch (err: any) {
+      const msg = err?.message ?? 'Stripe verification failed';
+      return { success: false, message: msg };
+    }
+  }
+
+  async verifyPayPal(): Promise<{ success: boolean; message: string }> {
+    try {
+      if (!this.paypalProvider.isAvailable()) {
+        return { success: false, message: 'PayPal credentials are not configured' };
+      }
+      // Attempt to fetch an access token as a connection test
+      await (this.paypalProvider as any).getAccessToken();
+      return { success: true, message: 'PayPal connection verified' };
+    } catch (err: any) {
+      const msg = err?.message ?? 'PayPal verification failed';
+      return { success: false, message: msg };
+    }
+  }
+
   /**
    * Simulate payment completion (test mode only)
    */

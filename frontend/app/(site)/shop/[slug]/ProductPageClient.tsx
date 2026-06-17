@@ -95,8 +95,9 @@ export function ProductPageClient() {
   }
 
   const isService = product.product_type === 'service';
+  const isDigital = product.product_type === 'digital';
   const isUnavailable = isService && product.stock_status === 'unavailable';
-  const isOutOfStock = !isService && product.stock_quantity != null && product.stock_quantity <= 0;
+  const isOutOfStock = !isService && !isDigital && product.stock_quantity != null && product.stock_quantity <= 0;
   const discount = product.compare_at_price && product.compare_at_price > product.price
     ? Math.round((1 - product.price / product.compare_at_price) * 100)
     : null;
@@ -152,7 +153,9 @@ export function ProductPageClient() {
 
           {/* Stock / Availability Status */}
           <div className="mb-6">
-            {isService ? (
+            {isDigital ? (
+              <span className="text-green-500 font-medium">Available for download</span>
+            ) : isService ? (
               isUnavailable ? (
                 <span className="text-red-500 font-medium">Not Available</span>
               ) : (
@@ -171,8 +174,8 @@ export function ProductPageClient() {
           <Card className="mb-6">
             <CardContent className="p-4">
               <div className="flex items-center gap-4">
-                {/* Hide quantity selector for service products */}
-                {!isService && (
+                {/* Hide quantity selector for service and digital products */}
+                {!isService && !isDigital && (
                   <div className="flex items-center border border-foreground/20 rounded-lg">
                     <button
                       className="p-2 hover:bg-foreground/5"

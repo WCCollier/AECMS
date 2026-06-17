@@ -30,6 +30,7 @@ interface ProductFormData {
   product_type: 'physical' | 'digital' | 'service';
   status: 'draft' | 'published' | 'archived';
   visibility: 'public' | 'logged_in_only' | 'admin_only';
+  guest_purchaseable: boolean;
   meta_title: string;
   meta_description: string;
 }
@@ -38,6 +39,7 @@ interface ProductFormProps {
   productId?: string;
   initialData?: Partial<ProductFormData & { media?: MediaItem[] }>;
   mainExtra?: React.ReactNode;
+  digitalFileCount?: number;
 }
 
 function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
@@ -47,7 +49,7 @@ function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
     .map((m) => ({ mediaId: m.id, url: m.url, isPrimary: m.is_primary }));
 }
 
-export function ProductForm({ productId, initialData, mainExtra }: ProductFormProps) {
+export function ProductForm({ productId, initialData, mainExtra, digitalFileCount = 0 }: ProductFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +78,7 @@ export function ProductForm({ productId, initialData, mainExtra }: ProductFormPr
       product_type: initialData?.product_type || 'physical',
       status: initialData?.status || 'draft',
       visibility: initialData?.visibility || 'public',
+      guest_purchaseable: initialData?.guest_purchaseable ?? true,
       meta_title: initialData?.meta_title || '',
       meta_description: initialData?.meta_description || '',
     },
@@ -84,6 +87,17 @@ export function ProductForm({ productId, initialData, mainExtra }: ProductFormPr
   const name = watch('name');
   const slug = watch('slug');
   const productType = watch('product_type');
+  const currentStatus = watch('status');
+
+  // Digital products cannot be published until at least one source file is attached
+  const canPublish = productType !== 'digital' || digitalFileCount > 0;
+
+  // Auto-reset to draft if the user switches to digital while status is published
+  useEffect(() => {
+    if (!canPublish && currentStatus === 'published') {
+      setValue('status', 'draft');
+    }
+  }, [canPublish, currentStatus, setValue]);
 
   // Auto-derive slug from name on new products
   useEffect(() => {
@@ -122,6 +136,7 @@ export function ProductForm({ productId, initialData, mainExtra }: ProductFormPr
         product_type: data.product_type,
         status: data.status,
         visibility: data.visibility,
+        guest_purchaseable: data.guest_purchaseable,
         meta_title: data.meta_title || undefined,
         meta_description: data.meta_description || undefined,
         media_ids: gallery.map((e) => e.mediaId),
@@ -255,9 +270,14 @@ export function ProductForm({ productId, initialData, mainExtra }: ProductFormPr
                   className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 >
                   <option value="draft">Draft</option>
-                  <option value="published">Published</option>
+                  {canPublish && <option value="published">Published</option>}
                   <option value="archived">Discontinued</option>
                 </select>
+                {productType === 'digital' && !canPublish && (
+                  <p className="text-xs text-orange-500 mt-1.5">
+                    Upload at least one source file to enable publishing.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -270,6 +290,20 @@ export function ProductForm({ productId, initialData, mainExtra }: ProductFormPr
                   <option value="logged_in_only">Members Only</option>
                   <option value="admin_only">Admin Only</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Purchase Access</label>
+                <select
+                  {...register('guest_purchaseable', { setValueAs: (v) => v === 'true' || v === true })}
+                  className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                >
+                  <option value="true">Open — guests may purchase</option>
+                  <option value="false">Members only — login required</option>
+                </select>
+                <p className="text-xs text-foreground/50 mt-1">
+                  Separate from visibility. Controls whether a login is required to buy.
+                </p>
               </div>
 
               <div className="pt-4 flex gap-3">

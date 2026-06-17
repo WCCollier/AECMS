@@ -49,8 +49,9 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   };
 
   const isService = product.product_type === 'service';
+  const isDigital = product.product_type === 'digital';
   const isUnavailable = isService && product.stock_status === 'unavailable';
-  const isOutOfStock = !isService && product.stock_quantity != null && product.stock_quantity <= 0;
+  const isOutOfStock = !isService && !isDigital && product.stock_quantity != null && product.stock_quantity <= 0;
 
   return (
     <Link href={`/shop/${product.slug}`} className="group">

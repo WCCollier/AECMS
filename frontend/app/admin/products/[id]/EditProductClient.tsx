@@ -90,6 +90,7 @@ export function EditProductClient() {
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [digitalFileCount, setDigitalFileCount] = useState(0);
 
   useEffect(() => {
     async function fetchProduct() {
@@ -159,9 +160,10 @@ export function EditProductClient() {
             ? 'in_stock'
             : (product.stock_status as 'in_stock' | 'out_of_stock' | 'back_ordered') ?? 'in_stock',
         }}
+        digitalFileCount={digitalFileCount}
         mainExtra={
           product.product_type === 'digital'
-            ? <DigitalFilesPanel productId={productId} />
+            ? <DigitalFilesPanel productId={productId} onFileCountChange={setDigitalFileCount} />
             : product.product_type === 'physical'
               ? <InventoryTracker productId={productId} productType={product.product_type} />
               : undefined

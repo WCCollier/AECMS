@@ -40,7 +40,8 @@ export class SmtpEmailProvider implements EmailProvider {
   private initializeTransporter(): void {
     const host = this.configService.get<string>('SMTP_HOST');
     const port = this.configService.get<number>('SMTP_PORT', 587);
-    const secure = this.configService.get<boolean>('SMTP_SECURE', false);
+    // env values are always strings — explicit parse to avoid 'false' being truthy
+    const secure = this.configService.get<string>('SMTP_SECURE', 'false') === 'true';
     const user = this.configService.get<string>('SMTP_USER');
     const pass = this.configService.get<string>('SMTP_PASS');
 

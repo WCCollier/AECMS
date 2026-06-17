@@ -27,7 +27,7 @@
 **Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
 **Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
 **Phase 9**: ✅ COMPLETE - User Testing (Steps 1–8 verified; Steps 9–11 superseded by Phase 13)
-**Phase 13**: 🔄 IN PROGRESS - Full-system QA: digital products verified; Stripe/PayPal sandbox, widgets, pages, audit log, version history remaining
+**Phase 13**: ✅ COMPLETE - Full-system QA: Admin CRUD (articles, products, pages), widget system, Stripe sandbox, audit log verified; PayPal E2E, version history restore, order management UI deferred
 **Phase 10A**: ✅ COMPLETE - Widget System: MediaGallery hero carousel, media schema normalization
 **Phase 10B**: ✅ COMPLETE - TipTap JSON migration + inline widget nodes (MediaCarousel, Callout, VideoEmbed, XEmbed)
 **Phase 11**: ✅ COMPLETE - Pages: widget-composed page builder, dual-size widget system, ArticleEmbed/ProductEmbed/RichTextBox
@@ -35,7 +35,7 @@
 **Phase 14**: ✅ COMPLETE - Digital item delivery: personalization, downloads, Kindle wizard (2026-06-16)
 **Phase 14 QA fixes** (2026-06-17): order status badge normalization, digital product UX polish, cart 403 fix, SKU/slug uniqueness hardening
 **Phase 14 QA fixes, session 2** (2026-06-17): name field implementation — username at registration, first+last required at checkout
-**Phase 15**: 📋 PLANNED - Admin Settings
+**Phase 15**: ✅ COMPLETE - Admin Settings: SiteSettings DB table, pluggable KeyProvider (AES-256-GCM), settings UI (General/Identity/Email/Payment tabs), audit logging (2026-06-17)
 **Phase 16**: 📋 PLANNED - Navigation menus: dynamic header, page hierarchy, catch-all routing
 **Phase 17**: 📋 PLANNED - Alternate domain capture: redirect + transparent proxy aliasing
 **Phase 18**: 📋 PLANNED - Substack integration widget: RSS feed preview with fade and CTA
@@ -43,8 +43,8 @@
 **Phase 20**: 📋 PLANNED - Themes and templates: color palettes, typography, backgrounds
 **Phase 21**: 📋 PLANNED - Multi-owner deployability: setup wizard, SiteSettings, update strategy
 
-**Test Status**: 125 frontend + 176 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 129 total (Phase 14: +POST files/test-personalization, +POST downloads/:id/extend)
+**Test Status**: 125 frontend + 190 backend unit tests (all passing); 16 backend E2E tests (require Docker)
+**API Endpoints**: 133 total (Phase 15: +GET /settings, +PATCH /settings, +POST /settings/test-email, +POST /payments/verify/stripe, +POST /payments/verify/paypal)
 
 ## API Endpoint Summary
 
@@ -220,6 +220,9 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_11_COMPLETION_REPORT.md` - Phase 11 implementation details
 - `docs/PHASE_12_PLAN.md` - Audit trail, transaction logging, content version history
 - `docs/PHASE_12_COMPLETION_REPORT.md` - Phase 12 implementation details
+- `docs/PHASE_13_COMPLETION_REPORT.md` - Phase 13 QA results, capability refactor, bug fixes
+- `docs/PHASE_14_COMPLETION_REPORT.md` - Phase 14 digital delivery, Kindle wizard, name fields
+- `docs/PHASE_15_COMPLETION_REPORT.md` - Phase 15 admin settings: SiteSettings, KeyProvider, settings UI
 - `docs/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
 - `docs/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
 - `docs/PHASE_18_PLAN.md` - Substack integration widget: RSS feed preview with height fade and CTA

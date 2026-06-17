@@ -143,6 +143,7 @@ export function AdminProductsClient() {
                     <th className="px-6 py-3 text-left text-sm font-medium text-foreground/70">Price</th>
                     <th className="px-6 py-3 text-left text-sm font-medium text-foreground/70">Stock</th>
                     <th className="px-6 py-3 text-left text-sm font-medium text-foreground/70">Status</th>
+                    <th className="px-6 py-3 text-left text-sm font-medium text-foreground/70">Purchase</th>
                     <th className="px-6 py-3 text-right text-sm font-medium text-foreground/70">Actions</th>
                   </tr>
                 </thead>
@@ -176,6 +177,13 @@ export function AdminProductsClient() {
                         <span className={`text-xs px-2 py-1 rounded-full capitalize ${statusClass(product.status)}`}>
                           {statusLabel(product.status)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {product.guest_purchaseable ? (
+                          <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-600">Open</span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600">Members</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">

@@ -144,13 +144,13 @@ export function CartPageClient() {
                         {item.product.name}
                       </h3>
                     </Link>
-                    {item.product.product_type !== 'service' && (
+                    {item.product.product_type === 'physical' && (
                       <p className="text-sm text-foreground/60">{formatPrice(item.unit_price)} each</p>
                     )}
 
                     {/* Quantity Controls */}
                     <div className="flex items-center gap-4 mt-3">
-                      {item.product.product_type !== 'service' && (
+                      {item.product.product_type === 'physical' && (
                         <div className="flex items-center border border-foreground/20 rounded-lg">
                           <button
                             className="p-1.5 hover:bg-foreground/5"

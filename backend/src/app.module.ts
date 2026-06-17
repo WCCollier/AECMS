@@ -24,6 +24,7 @@ import { EmailModule } from './email/email.module';
 import { DigitalProductsModule } from './digital-products/digital-products.module';
 import { DomainAliasesModule } from './domain-aliases/domain-aliases.module';
 import { AuditModule } from './audit/audit.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { AuditModule } from './audit/audit.module';
     DigitalProductsModule,
     DomainAliasesModule,
     AuditModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

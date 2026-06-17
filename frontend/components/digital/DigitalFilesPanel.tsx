@@ -22,9 +22,10 @@ const MIME_TYPES: Record<string, string> = {
 
 interface Props {
   productId: string;
+  onFileCountChange?: (count: number) => void;
 }
 
-export function DigitalFilesPanel({ productId }: Props) {
+export function DigitalFilesPanel({ productId, onFileCountChange }: Props) {
   const { data: files, isLoading, mutate } = useSWR<DigitalProductFile[]>(
     productId ? `/digital-products/products/${productId}/files` : null,
     adminFetcher,
@@ -48,6 +49,13 @@ export function DigitalFilesPanel({ productId }: Props) {
       setUploadFormat(availableFormats[0]);
     }
   }, [availableFormats.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Notify parent of file count whenever the list changes
+  useEffect(() => {
+    if (files !== undefined) {
+      onFileCountChange?.(files.length);
+    }
+  }, [files, onFileCountChange]);
 
   const doUpload = async (file: File, format: 'epub' | 'pdf', isReplace: boolean, existingId?: string) => {
     setUploadError('');

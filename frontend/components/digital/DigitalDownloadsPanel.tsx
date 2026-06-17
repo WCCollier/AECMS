@@ -5,11 +5,13 @@ import useSWR from 'swr';
 import { Download, Send, RefreshCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { fetcher } from '@/lib/swr';
+import api from '@/lib/api';
 import type { DigitalDownload } from '@/types';
 import { KindleWizard } from './KindleWizard';
 
 interface Props {
   orderId: string;
+  showAccountHint?: boolean;
 }
 
 function DownloadBar({ count, max }: { count: number; max: number }) {
@@ -28,7 +30,7 @@ function DownloadBar({ count, max }: { count: number; max: number }) {
   );
 }
 
-export function DigitalDownloadsPanel({ orderId }: Props) {
+export function DigitalDownloadsPanel({ orderId, showAccountHint = false }: Props) {
   const { data: downloads, isLoading, mutate } = useSWR<DigitalDownload[]>(
     orderId ? `/digital-products/orders/${orderId}/downloads` : null,
     fetcher,
@@ -36,6 +38,28 @@ export function DigitalDownloadsPanel({ orderId }: Props) {
   const [kindleTarget, setKindleTarget] = useState<DigitalDownload | null>(null);
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [regenerated, setRegenerated] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
+
+  const handleDownload = async (d: DigitalDownload) => {
+    setDownloading(d.id);
+    try {
+      const res = await api.get(`/digital-products/download/${d.downloadToken}`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: res.headers['content-type'] ?? 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${d.productName}-${d.format}.${d.format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setTimeout(() => mutate(), 1500);
+    } catch {
+      alert('Download failed. Please try again.');
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   if (isLoading) return null;
   if (!downloads || downloads.length === 0) return null;
@@ -130,16 +154,15 @@ export function DigitalDownloadsPanel({ orderId }: Props) {
                           </Button>
                         ) : (
                           <>
-                            <a
-                              href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'}/digital-products/download/${d.downloadToken}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-sm px-3 py-1.5 rounded-lg border border-border hover:bg-accent hover:text-white hover:border-accent transition-colors"
-                              onClick={() => setTimeout(() => mutate(), 2000)}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDownload(d)}
+                              isLoading={downloading === d.id}
                             >
-                              <Download className="w-3 h-3" />
+                              <Download className="w-3 h-3 mr-1" />
                               Download
-                            </a>
+                            </Button>
                             <Button
                               size="sm"
                               variant="outline"
@@ -162,6 +185,12 @@ export function DigitalDownloadsPanel({ orderId }: Props) {
         {earliestExpiry && (
           <p className="text-xs text-foreground/40 mt-4">
             Links expire: {earliestExpiry.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+        )}
+        {showAccountHint && (
+          <p className="text-xs text-foreground/50 mt-3">
+            You can also access your downloads any time from your{' '}
+            <a href="/account" className="underline hover:text-foreground transition-colors">Account page</a>.
           </p>
         )}
       </div>

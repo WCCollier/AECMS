@@ -850,3 +850,17 @@ model PageVersion {
   @@unique([page_id, version_number])
   @@map("page_versions")
 }
+
+// ============================================================================
+// SITE SETTINGS
+// ============================================================================
+
+model SiteSettings {
+  id         String   @id @default(uuid())
+  key        String   @unique
+  value      String   @db.Text
+  updated_at DateTime @updatedAt
+  updated_by String?
+
+  @@map("site_settings")
+}

@@ -89,7 +89,7 @@ export class ProductsService {
         price: dto.price,
         compare_at_price: dto.compare_at_price ?? null,
         sku,
-        stock_quantity: dto.product_type === 'service' ? null : (dto.stock_quantity ?? 0),
+        stock_quantity: (dto.product_type === 'service' || dto.product_type === 'digital') ? null : (dto.stock_quantity ?? 0),
         stock_status: dto.stock_status || (dto.product_type === 'service' ? 'available' : 'in_stock'),
         status: dto.status || 'draft',
         visibility: dto.visibility || 'public',
@@ -127,11 +127,11 @@ export class ProductsService {
         where: { id: product.id },
         include: this.getProductIncludes(),
       });
-      const result = this.transformProduct(fresh!);
+      const result = await this.transformProduct(fresh!);
       return warnings.length ? { ...result, warnings } : result;
     }
 
-    const result = this.transformProduct(product);
+    const result = await this.transformProduct(product);
     return warnings.length ? { ...result, warnings } : result;
   }
 
@@ -488,7 +488,7 @@ export class ProductsService {
         resource_id: id,
         changes: diffChanges(product as any, dto as any),
       });
-      const freshResult = this.transformProduct(fresh!);
+      const freshResult = await this.transformProduct(fresh!);
       return updateWarnings.length ? { ...freshResult, warnings: updateWarnings } : freshResult;
     }
 
@@ -502,7 +502,7 @@ export class ProductsService {
       changes: Object.keys(diff.before).length ? diff : undefined,
     });
 
-    const updatedResult = this.transformProduct(updated);
+    const updatedResult = await this.transformProduct(updated);
     return updateWarnings.length ? { ...updatedResult, warnings: updateWarnings } : updatedResult;
   }
 
@@ -555,9 +555,13 @@ export class ProductsService {
     if (!canDeleteAny && canDeleteOwn && product.author_id !== userId) {
       throw new ForbiddenException('You can only restore your own products');
     }
+    // Strip the __DELETED__{ts}__ prefix from slug and SKU that was applied on soft-delete
+    const restoredSlug = product.slug.replace(/^__DELETED__\d+__/, '');
+    const restoredSku = product.sku ? product.sku.replace(/^__DELETED__\d+__/, '') : product.sku;
+
     await this.prisma.product.update({
       where: { id },
-      data: { deleted_at: null, status: 'draft' },
+      data: { deleted_at: null, status: 'draft', slug: restoredSlug, sku: restoredSku },
     });
     await this.auditLog.log({
       event_type: 'product.updated',

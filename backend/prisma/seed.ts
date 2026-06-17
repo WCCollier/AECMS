@@ -225,6 +225,29 @@ async function main() {
   console.log(`✓ Assigned ${memberCount} capabilities to Member role`);
   console.log('✓ Owner role has all capabilities by default');
 
+  // ============================================
+  // SEED DEFAULT SITE SETTINGS
+  // ============================================
+  console.log('\n[4/4] Seeding default site settings...');
+
+  const defaultSettings = [
+    { key: 'general.site_title',    value: 'My AECMS Site' },
+    { key: 'general.tagline',       value: '' },
+    { key: 'general.timezone',      value: 'America/New_York' },
+    { key: 'general.date_format',   value: 'MMM D, YYYY' },
+    { key: 'general.homepage_mode', value: 'latest_articles' },
+    { key: 'payment.test_mode',     value: 'true' },
+  ];
+
+  for (const setting of defaultSettings) {
+    await prisma.siteSettings.upsert({
+      where: { key: setting.key },
+      create: setting,
+      update: {},
+    });
+  }
+  console.log(`✓ Seeded ${defaultSettings.length} default settings`);
+
   console.log('\n=== Database seeding completed ===');
   console.log('\nTest credentials:');
   console.log('Owner:  owner@aecms.local  / Admin123!@#');

@@ -109,4 +109,22 @@ export class PaymentsController {
   simulatePayment(@Param('orderId') orderId: string) {
     return this.paymentsService.simulatePaymentCompletion(orderId);
   }
+
+  @Post('verify/stripe')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('system.configure')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify Stripe connection using stored credentials' })
+  verifyStripe() {
+    return this.paymentsService.verifyStripe();
+  }
+
+  @Post('verify/paypal')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('system.configure')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Verify PayPal connection using stored credentials' })
+  verifyPayPal() {
+    return this.paymentsService.verifyPayPal();
+  }
 }

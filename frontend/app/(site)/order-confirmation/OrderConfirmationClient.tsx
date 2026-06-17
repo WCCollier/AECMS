@@ -122,7 +122,7 @@ export function OrderConfirmationClient() {
 
       {/* Digital downloads (shown when order contains digital products) */}
       {order.items.some((i) => i.product?.product_type === 'digital') && (
-        <DigitalDownloadsPanel orderId={order.id} />
+        <DigitalDownloadsPanel orderId={order.id} showAccountHint />
       )}
 
       {/* Actions */}
