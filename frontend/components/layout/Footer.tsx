@@ -21,9 +21,9 @@ export function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-3 text-foreground/80 uppercase tracking-wider">Reading</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/latest" className={footerLink}>Latest Articles</Link></li>
-              <li><Link href="/latest?category=short-thoughts" className={footerLink}>Short Thoughts</Link></li>
-              <li><Link href="/latest?category=reviews" className={footerLink}>Book Reviews</Link></li>
+              <li><Link href="/articles" className={footerLink}>Articles</Link></li>
+              <li><Link href="/articles?category=short-thoughts" className={footerLink}>Short Thoughts</Link></li>
+              <li><Link href="/articles?category=reviews" className={footerLink}>Book Reviews</Link></li>
             </ul>
           </div>
 

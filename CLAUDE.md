@@ -36,7 +36,7 @@
 **Phase 14 QA fixes** (2026-06-17): order status badge normalization, digital product UX polish, cart 403 fix, SKU/slug uniqueness hardening
 **Phase 14 QA fixes, session 2** (2026-06-17): name field implementation — username at registration, first+last required at checkout
 **Phase 15**: ✅ COMPLETE - Admin Settings: SiteSettings DB table, pluggable KeyProvider (AES-256-GCM), settings UI (General/Identity/Email/Payment tabs), audit logging (2026-06-17)
-**Phase 16**: 📋 PLANNED - Navigation menus: dynamic header, page hierarchy, catch-all routing
+**Phase 16**: ✅ COMPLETE - Navigation menus: /latest→/articles rename, dynamic header nav from DB, catch-all [...slug] route, page hierarchy, admin nav fields (2026-06-17)
 **Phase 17**: 📋 PLANNED - Alternate domain capture: redirect + transparent proxy aliasing
 **Phase 18**: 📋 PLANNED - Substack integration widget: RSS feed preview with fade and CTA
 **Phase 19**: 📋 PLANNED - First deployment: fantasyvreality.com on Google Cloud Run
@@ -44,7 +44,7 @@
 **Phase 21**: 📋 PLANNED - Multi-owner deployability: setup wizard, SiteSettings, update strategy
 
 **Test Status**: 125 frontend + 190 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 133 total (Phase 15: +GET /settings, +PATCH /settings, +POST /settings/test-email, +POST /payments/verify/stripe, +POST /payments/verify/paypal)
+**API Endpoints**: 135 total (Phase 16: +GET /pages/nav, +GET /pages/by-path)
 
 ## API Endpoint Summary
 
@@ -223,6 +223,7 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_13_COMPLETION_REPORT.md` - Phase 13 QA results, capability refactor, bug fixes
 - `docs/PHASE_14_COMPLETION_REPORT.md` - Phase 14 digital delivery, Kindle wizard, name fields
 - `docs/PHASE_15_COMPLETION_REPORT.md` - Phase 15 admin settings: SiteSettings, KeyProvider, settings UI
+- `docs/PHASE_16_COMPLETION_REPORT.md` - Phase 16 nav menus: articles route, dynamic header, catch-all pages
 - `docs/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
 - `docs/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
 - `docs/PHASE_18_PLAN.md` - Substack integration widget: RSS feed preview with height fade and CTA

@@ -207,8 +207,8 @@ async function importPages(): Promise<void> {
   let skipped = 0;
 
   for (const page of pages) {
-    const existing = await prisma.page.findUnique({
-      where: { slug: page.slug },
+    const existing = await prisma.page.findFirst({
+      where: { slug: page.slug, parent_id: null },
     });
 
     if (!existing) {

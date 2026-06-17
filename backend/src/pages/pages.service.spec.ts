@@ -10,11 +10,19 @@ describe('PagesService', () => {
   const mockPrisma = {
     page: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
       count: jest.fn(),
+    },
+    pageVersion: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+      findMany: jest.fn(),
+      count: jest.fn(),
+      findUnique: jest.fn(),
     },
   };
 
@@ -34,7 +42,7 @@ describe('PagesService', () => {
   });
 
   describe('create — reserved slug validation', () => {
-    const RESERVED = ['shop', 'latest', 'cart', 'checkout', 'account', 'order-confirmation', 'admin', 'auth', 'api'];
+    const RESERVED = ['shop', 'articles', 'cart', 'checkout', 'account', 'order-confirmation', 'admin', 'auth', 'api'];
 
     it.each(RESERVED)('throws ConflictException for reserved slug "%s"', async (slug) => {
       await expect(
@@ -49,11 +57,11 @@ describe('PagesService', () => {
     });
 
     it('does not throw for a non-reserved slug that is unique', async () => {
-      mockPrisma.page.findUnique.mockResolvedValue(null);
+      mockPrisma.page.findFirst.mockResolvedValue(null);
       mockPrisma.page.create.mockResolvedValue({
         id: 'p-1', title: 'About', slug: 'about', content: '{}',
         status: 'draft', visibility: 'public', template: null,
-        parent_id: null, sort_order: 0, published_at: null,
+        parent_id: null, nav_order: 0, show_in_nav: true, published_at: null,
         meta_title: null, meta_description: null,
         author_can_edit: true, author_can_delete: true,
         admin_can_edit: true, admin_can_delete: true,
@@ -66,8 +74,8 @@ describe('PagesService', () => {
       ).resolves.toBeDefined();
     });
 
-    it('throws ConflictException when slug already exists', async () => {
-      mockPrisma.page.findUnique.mockResolvedValue({ id: 'existing', slug: 'about' });
+    it('throws ConflictException when slug already exists at same level', async () => {
+      mockPrisma.page.findFirst.mockResolvedValue({ id: 'existing', slug: 'about' });
 
       await expect(
         service.create({ title: 'About', content: '{}', slug: 'about' }, 'user-1'),
@@ -79,7 +87,7 @@ describe('PagesService', () => {
     const existingPage = {
       id: 'p-1', title: 'About', slug: 'about', content: '{}',
       status: 'draft', visibility: 'public', template: null,
-      parent_id: null, sort_order: 0, published_at: null,
+      parent_id: null, nav_order: 0, show_in_nav: true, published_at: null,
       author_can_edit: true, author_can_delete: true,
       admin_can_edit: true, admin_can_delete: true,
       created_at: new Date(), updated_at: new Date(),
@@ -96,7 +104,7 @@ describe('PagesService', () => {
 
   describe('findBySlug', () => {
     it('throws NotFoundException for unknown slug', async () => {
-      mockPrisma.page.findUnique.mockResolvedValue(null);
+      mockPrisma.page.findFirst.mockResolvedValue(null);
       await expect(service.findBySlug('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
@@ -104,11 +112,11 @@ describe('PagesService', () => {
       const page = {
         id: 'p-1', title: 'About', slug: 'about', content: '{}',
         status: 'published', visibility: 'public', template: null,
-        parent_id: null, sort_order: 0, published_at: new Date(),
+        parent_id: null, nav_order: 0, show_in_nav: true, published_at: new Date(),
         created_at: new Date(), updated_at: new Date(),
         parent: null, children: [],
       };
-      mockPrisma.page.findUnique.mockResolvedValue(page);
+      mockPrisma.page.findFirst.mockResolvedValue(page);
       const result = await service.findBySlug('about');
       expect(result.slug).toBe('about');
     });

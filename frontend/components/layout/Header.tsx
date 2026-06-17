@@ -4,9 +4,61 @@ import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
 import { Button, Input } from '@/components/ui';
-import { ShoppingCart, User, Menu, X, LogIn } from 'lucide-react';
+import { ShoppingCart, User, Menu, X, LogIn, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect, FormEvent } from 'react';
 import { getErrorMessage } from '@/lib/api';
+import useSWR from 'swr';
+import api from '@/lib/api';
+
+interface NavPage {
+  id: string;
+  title: string;
+  slug: string;
+  parent_id: string | null;
+  nav_order: number;
+  children?: NavPage[];
+}
+
+const navFetcher = (url: string) => api.get(url).then((r) => r.data);
+
+function buildPagePath(page: NavPage, ancestors: NavPage[] = []): string {
+  const allSlugs = [...ancestors.map((a) => a.slug), page.slug];
+  return '/' + allSlugs.join('/');
+}
+
+function PageNavItem({ page, ancestors = [], navLink, onClose }: {
+  page: NavPage;
+  ancestors?: NavPage[];
+  navLink: string;
+  onClose?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const href = buildPagePath(page, ancestors);
+  const hasChildren = page.children && page.children.length > 0;
+
+  return (
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <div className="flex items-center gap-0.5">
+        <Link href={href} className={navLink} onClick={onClose}>{page.title}</Link>
+        {hasChildren && <ChevronDown size={12} className="text-foreground/40" />}
+      </div>
+      {hasChildren && open && (
+        <div className="absolute top-full left-0 mt-1 w-48 bg-surface border border-border rounded-lg shadow-lg py-1 z-50">
+          {page.children!.map((child) => (
+            <Link
+              key={child.id}
+              href={buildPagePath(child, [...ancestors, page])}
+              className="block px-3 py-2 text-sm text-foreground/70 hover:text-accent hover:bg-surface-raised transition-colors"
+              onClick={onClose}
+            >
+              {child.title}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Header() {
   const { user, isAuthenticated, login, logout } = useAuth();
@@ -19,9 +71,13 @@ export function Header() {
   const flyoutRef = useRef<HTMLDivElement>(null);
   const loginBtnRef = useRef<HTMLButtonElement>(null);
 
+  const { data: navPages } = useSWR<NavPage[]>('/pages/nav', navFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60000,
+  });
+
   const navLink = 'text-foreground/60 hover:text-accent transition-colors text-sm font-medium';
 
-  // Close flyout on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (
@@ -64,8 +120,19 @@ export function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-7">
+            {/* Hard routes — always visible */}
             <Link href="/shop" className={navLink}>Shop</Link>
-            <Link href="/latest" className={navLink}>Latest</Link>
+            <Link href="/articles" className={navLink}>Articles</Link>
+
+            {/* Page taxonomy — shown only when pages exist */}
+            {navPages && navPages.length > 0 && (
+              <>
+                <span className="border-l border-border/40 h-4" />
+                {navPages.map((page) => (
+                  <PageNavItem key={page.id} page={page} navLink={navLink} />
+                ))}
+              </>
+            )}
           </nav>
 
           {/* Desktop Actions */}
@@ -166,7 +233,33 @@ export function Header() {
           <div className="md:hidden py-4 border-t border-border">
             <nav className="flex flex-col gap-4">
               <Link href="/shop" className={navLink} onClick={() => setMobileMenuOpen(false)}>Shop</Link>
-              <Link href="/latest" className={navLink} onClick={() => setMobileMenuOpen(false)}>Latest</Link>
+              <Link href="/articles" className={navLink} onClick={() => setMobileMenuOpen(false)}>Articles</Link>
+              {navPages && navPages.length > 0 && (
+                <>
+                  <hr className="border-border/40" />
+                  {navPages.map((page) => (
+                    <div key={page.id}>
+                      <Link
+                        href={buildPagePath(page)}
+                        className={navLink}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {page.title}
+                      </Link>
+                      {page.children?.map((child) => (
+                        <Link
+                          key={child.id}
+                          href={buildPagePath(child, [page])}
+                          className={`block ml-4 mt-2 ${navLink}`}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {child.title}
+                        </Link>
+                      ))}
+                    </div>
+                  ))}
+                </>
+              )}
               <Link href="/cart" className={`${navLink} flex items-center gap-2`} onClick={() => setMobileMenuOpen(false)}>
                 Cart {itemCount > 0 && <span className="bg-accent text-accent-foreground text-xs px-1.5 rounded-full font-bold">{itemCount}</span>}
               </Link>

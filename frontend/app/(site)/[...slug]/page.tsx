@@ -4,10 +4,11 @@ import type { Page } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
-async function getPage(slug: string): Promise<Page | null> {
+async function getPageByPath(segments: string[]): Promise<Page | null> {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
-    const res = await fetch(`${baseUrl}/pages/slug/${encodeURIComponent(slug)}`, {
+    const path = encodeURIComponent('/' + segments.join('/'));
+    const res = await fetch(`${baseUrl}/pages/by-path?path=${path}`, {
       cache: 'no-store',
     });
     if (!res.ok) return null;
@@ -17,8 +18,9 @@ async function getPage(slug: string): Promise<Page | null> {
   }
 }
 
-export default async function SlugPage({ params }: { params: { slug: string } }) {
-  const page = await getPage(params.slug);
+export default async function DynamicPage({ params }: { params: { slug: string[] } }) {
+  const segments = params.slug ?? [];
+  const page = await getPageByPath(segments);
 
   if (!page || page.status !== 'published' || page.visibility === 'admin_only') {
     notFound();

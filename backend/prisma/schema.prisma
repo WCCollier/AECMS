@@ -252,7 +252,7 @@ model UserAcceptance {
 model Page {
   id                  String      @id @default(uuid())
   title               String
-  slug                String      @unique
+  slug                String
   content             String      @db.Text
   parent_id           String?
   template            String      @default("full-width")
@@ -261,6 +261,8 @@ model Page {
   published_at        DateTime?
   meta_title          String?
   meta_description    String?
+  show_in_nav         Boolean     @default(true)
+  nav_order           Int         @default(0)
 
   // Granular permissions
   author_can_edit     Boolean     @default(true)
@@ -276,7 +278,7 @@ model Page {
   children Page[] @relation("PageHierarchy")
   versions PageVersion[]
 
-  @@index([slug])
+  @@unique([parent_id, slug])
   @@index([parent_id])
   @@map("pages")
 }

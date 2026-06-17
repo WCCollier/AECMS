@@ -11,7 +11,7 @@ import { Prisma, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
 
 const RESERVED_SLUGS = [
-  'shop', 'latest', 'cart', 'checkout', 'account',
+  'shop', 'articles', 'cart', 'checkout', 'account',
   'order-confirmation', 'admin', 'auth', 'api',
 ];
 
@@ -34,15 +34,18 @@ export class PagesService {
       throw new ConflictException(`"${slug}" is reserved and cannot be used as a page slug`);
     }
 
-    // Check if slug already exists (including soft-deleted pages)
-    const existing = await this.prisma.page.findUnique({ where: { slug } });
+    // Check sibling slug uniqueness (including soft-deleted pages)
+    const siblingParentId = dto.parent_id ?? null;
+    const existing = await this.prisma.page.findFirst({
+      where: { parent_id: siblingParentId, slug },
+    });
     if (existing) {
       if (existing.deleted_at) {
         throw new ConflictException(
           `The slug "${slug}" belongs to a deleted page. Choose a different title, or ask an administrator to restore the original page.`,
         );
       }
-      throw new ConflictException(`Page with slug "${slug}" already exists`);
+      throw new ConflictException(`Page with slug "${slug}" already exists at this level`);
     }
 
     // Validate parent page exists if provided
@@ -71,6 +74,8 @@ export class PagesService {
         author_can_delete: dto.author_can_delete ?? true,
         admin_can_edit: dto.admin_can_edit ?? true,
         admin_can_delete: dto.admin_can_delete ?? true,
+        show_in_nav: (dto as any).show_in_nav ?? true,
+        nav_order: (dto as any).nav_order ?? 0,
         published_at: dto.status === 'published' ? new Date() : null,
       },
       include: {
@@ -242,17 +247,18 @@ export class PagesService {
   }
 
   /**
-   * Find page by slug
+   * Find root page by slug (parent_id = null). Used for backward-compatible single-slug lookup.
    */
   async findBySlug(slug: string, userId?: string, isAdmin = false) {
-    const page = await this.prisma.page.findUnique({
-      where: { slug },
+    const page = await this.prisma.page.findFirst({
+      where: { slug, parent_id: null, deleted_at: null },
       include: {
         parent: {
           select: { id: true, title: true, slug: true },
         },
         children: {
-          select: { id: true, title: true, slug: true },
+          where: { deleted_at: null },
+          select: { id: true, title: true, slug: true, show_in_nav: true, nav_order: true },
         },
       },
     });
@@ -261,10 +267,80 @@ export class PagesService {
       throw new NotFoundException('Page not found');
     }
 
-    // Check visibility permissions
     this.checkVisibilityAccess(page, userId, isAdmin);
-
     return this.transformPage(page);
+  }
+
+  /**
+   * Resolve a URL path like ['author', 'bio'] to the matching page.
+   * Max 3 levels deep. Root-level pages have parent_id = null.
+   */
+  async findByPath(segments: string[], userId?: string, isAdmin = false) {
+    if (segments.length === 0 || segments.length > 3) {
+      throw new NotFoundException('Page not found');
+    }
+
+    // Find root page
+    let page: any = await this.prisma.page.findFirst({
+      where: { slug: segments[0], parent_id: null, deleted_at: null },
+      include: { parent: { select: { id: true, title: true, slug: true } }, children: { where: { deleted_at: null }, select: { id: true, title: true, slug: true, show_in_nav: true, nav_order: true } } },
+    });
+    if (!page) throw new NotFoundException('Page not found');
+
+    // Walk down for deeper segments
+    for (let i = 1; i < segments.length; i++) {
+      page = await this.prisma.page.findFirst({
+        where: { slug: segments[i], parent_id: page.id, deleted_at: null },
+        include: { parent: { select: { id: true, title: true, slug: true } }, children: { where: { deleted_at: null }, select: { id: true, title: true, slug: true, show_in_nav: true, nav_order: true } } },
+      });
+      if (!page) throw new NotFoundException('Page not found');
+    }
+
+    if (!isAdmin && page.status !== 'published') {
+      throw new NotFoundException('Page not found');
+    }
+
+    this.checkVisibilityAccess(page, userId, isAdmin);
+    return this.transformPage(page);
+  }
+
+  /**
+   * Returns published, show_in_nav=true pages as a nav tree (max depth 3).
+   */
+  async getNavItems(userId?: string) {
+    const where: any = {
+      status: 'published',
+      show_in_nav: true,
+      deleted_at: null,
+    };
+    if (!userId) {
+      where.visibility = 'public';
+    } else {
+      where.visibility = { in: ['public', 'logged_in_only'] };
+    }
+
+    const pages = await this.prisma.page.findMany({
+      where,
+      orderBy: [{ nav_order: 'asc' }, { title: 'asc' }],
+      select: {
+        id: true, title: true, slug: true, parent_id: true, nav_order: true,
+        children: {
+          where: { status: 'published', show_in_nav: true, deleted_at: null },
+          orderBy: [{ nav_order: 'asc' }, { title: 'asc' }],
+          select: {
+            id: true, title: true, slug: true, parent_id: true, nav_order: true,
+            children: {
+              where: { status: 'published', show_in_nav: true, deleted_at: null },
+              orderBy: [{ nav_order: 'asc' }, { title: 'asc' }],
+              select: { id: true, title: true, slug: true, parent_id: true, nav_order: true },
+            },
+          },
+        },
+      },
+    });
+
+    // Only return root pages (parent_id = null) — children are already nested
+    return pages.filter((p) => p.parent_id === null);
   }
 
   /**
@@ -282,19 +358,22 @@ export class PagesService {
     // Check edit permissions
     this.checkEditAccess(page, userId, isAdmin);
 
-    // Check slug uniqueness if changing
+    // Check slug uniqueness if changing (within siblings only)
     if (dto.slug && dto.slug !== page.slug) {
       if (RESERVED_SLUGS.includes(dto.slug)) {
         throw new ConflictException(`"${dto.slug}" is reserved and cannot be used as a page slug`);
       }
-      const existing = await this.prisma.page.findUnique({ where: { slug: dto.slug } });
+      const siblingParentId = (dto.parent_id !== undefined ? dto.parent_id : page.parent_id) ?? null;
+      const existing = await this.prisma.page.findFirst({
+        where: { parent_id: siblingParentId, slug: dto.slug, id: { not: id } },
+      });
       if (existing) {
         if (existing.deleted_at) {
           throw new ConflictException(
             `The slug "${dto.slug}" belongs to a deleted page. Choose a different title, or ask an administrator to restore the original page.`,
           );
         }
-        throw new ConflictException(`Page with slug "${dto.slug}" already exists`);
+        throw new ConflictException(`Page with slug "${dto.slug}" already exists at this level`);
       }
     }
 
@@ -340,6 +419,8 @@ export class PagesService {
       author_can_delete: dto.author_can_delete,
       admin_can_edit: dto.admin_can_edit,
       admin_can_delete: dto.admin_can_delete,
+      show_in_nav: (dto as any).show_in_nav,
+      nav_order: (dto as any).nav_order,
       published_at,
     };
 

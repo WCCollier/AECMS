@@ -133,7 +133,7 @@ export function OrderConfirmationClient() {
             Continue Shopping
           </Button>
         </Link>
-        <Link href="/latest" className="flex-1">
+        <Link href="/articles" className="flex-1">
           <Button variant="outline" className="w-full">
             Read Latest Articles
             <ArrowRight className="w-4 h-4 ml-2" />

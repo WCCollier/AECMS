@@ -3,6 +3,13 @@ const nextConfig = {
   // Use standalone output for production deployment
   output: 'standalone',
 
+  async redirects() {
+    return [
+      { source: '/latest', destination: '/articles', permanent: true },
+      { source: '/latest/:path*', destination: '/articles/:path*', permanent: true },
+    ];
+  },
+
   // Proxy /api-proxy/* → backend on port 4000 (server-side, avoids browser CORS/port issues)
   async rewrites() {
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';

@@ -51,6 +51,22 @@ export class PagesController {
     return this.pagesService.getHierarchy(user?.id, isAdmin);
   }
 
+  @Get('nav')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get published nav items as a tree (for the site header)' })
+  getNavItems(@CurrentUser() user: any) {
+    return this.pagesService.getNavItems(user?.id);
+  }
+
+  @Get('by-path')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Resolve a URL path to a page (e.g., /author/bio)' })
+  findByPath(@Query('path') path: string, @CurrentUser() user: any) {
+    const isAdmin = user?.session_type === 'backstage';
+    const segments = (path || '').replace(/^\//, '').split('/').filter(Boolean);
+    return this.pagesService.findByPath(segments, user?.id, isAdmin);
+  }
+
   @Get(':id')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get page by ID' })

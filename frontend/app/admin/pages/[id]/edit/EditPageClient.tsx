@@ -26,6 +26,10 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
   const [layout, setLayout] = useState<PageLayout>('no_sidebar');
   const [zones, setZones] = useState<PageContent['zones']>({});
+  const [showInNav, setShowInNav] = useState(true);
+  const [navOrder, setNavOrder] = useState(0);
+  const [parentId, setParentId] = useState<string | null>(null);
+  const [allPages, setAllPages] = useState<Array<{ id: string; title: string }>>([]);
   const [previewSmall, setPreviewSmall] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +37,10 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [pendingLayout, setPendingLayout] = useState<PageLayout | null>(null);
 
   useEffect(() => {
+    adminApi.get('/pages?limit=100&status=published').then((res) => {
+      setAllPages((res.data?.data ?? []).filter((p: any) => p.id !== pageId));
+    }).catch(() => {});
+
     adminApi.get<Page>(`/pages/${pageId}`)
       .then((res) => {
         const p = res.data;
@@ -40,6 +48,9 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         setTitle(p.title);
         setSlug(p.slug);
         setStatus(p.status);
+        setShowInNav((p as any).show_in_nav ?? true);
+        setNavOrder((p as any).nav_order ?? 0);
+        setParentId(p.parent_id ?? null);
         const content = parsePageContent(p.content);
         setLayout(content.layout);
         setZones(content.zones);
@@ -75,6 +86,9 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         content: JSON.stringify(pageContent),
         layout,
         status,
+        show_in_nav: showInNav,
+        nav_order: navOrder,
+        parent_id: parentId,
       });
       router.push('/admin/pages');
     } catch (err: unknown) {
@@ -147,7 +161,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
       )}
 
       {/* Metadata row */}
-      <div className="grid sm:grid-cols-2 gap-4 mb-6 p-4 bg-surface rounded-lg border border-border">
+      <div className="grid sm:grid-cols-2 gap-4 mb-4 p-4 bg-surface rounded-lg border border-border">
         <div>
           <label className="block text-sm font-medium mb-1">Title</label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -158,6 +172,52 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
             <span className="text-foreground/40 text-sm">/</span>
             <Input value={slug} onChange={(e) => setSlug(e.target.value)} />
           </div>
+        </div>
+      </div>
+
+      {/* Navigation settings */}
+      <div className="grid sm:grid-cols-3 gap-4 mb-6 p-4 bg-surface rounded-lg border border-border">
+        <div>
+          <label className="block text-sm font-medium mb-1">Parent Page</label>
+          <select
+            value={parentId ?? ''}
+            onChange={(e) => setParentId(e.target.value || null)}
+            className="w-full text-sm px-3 py-1.5 border border-border rounded-lg bg-background"
+          >
+            <option value="">None (top-level)</option>
+            {allPages.map((p) => (
+              <option key={p.id} value={p.id}>{p.title}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Nav Order</label>
+          <Input
+            type="number"
+            value={String(navOrder)}
+            onChange={(e) => setNavOrder(parseInt(e.target.value) || 0)}
+          />
+          <p className="text-xs text-foreground/40 mt-0.5">Lower = earlier in nav</p>
+        </div>
+        <div className="flex items-center gap-2 pt-5">
+          <input
+            type="checkbox"
+            id="show_in_nav"
+            checked={showInNav}
+            onChange={(e) => setShowInNav(e.target.checked)}
+            className="accent-accent"
+          />
+          <label htmlFor="show_in_nav" className="text-sm font-medium cursor-pointer">Show in navigation</label>
+        </div>
+        {/* URL preview */}
+        <div className="sm:col-span-3">
+          <p className="text-xs text-foreground/40">
+            URL: <span className="font-mono text-foreground/60">
+              {parentId
+                ? `/${allPages.find((p) => p.id === parentId)?.title?.toLowerCase().replace(/\s+/g, '-') ?? '…'}/${slug}`
+                : `/${slug}`}
+            </span>
+          </p>
         </div>
       </div>
 

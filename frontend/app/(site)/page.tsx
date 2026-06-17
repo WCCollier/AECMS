@@ -24,7 +24,7 @@ export default function HomePage() {
             Philosophy, fiction, and firearms — written from principle, not from permission.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">
-            <Link href="/latest">
+            <Link href="/articles">
               <Button size="lg">Read Latest</Button>
             </Link>
             <Link href="/shop">
@@ -45,14 +45,14 @@ export default function HomePage() {
               label="Short Thoughts"
               title="Philosophy"
               description="Brief, direct takes on ideas that matter — rights, language, courage, government, and what it means to be a warrior."
-              href="/latest"
+              href="/articles"
               count="50+"
             />
             <PillarCard
               label="Book Reviews"
               title="Reading"
               description="Honest reviews of fiction and non-fiction — sci-fi, military, fantasy, and Christian literature."
-              href="/latest"
+              href="/articles"
               count="15+"
             />
             <PillarCard
