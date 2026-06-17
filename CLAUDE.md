@@ -35,6 +35,13 @@
 **Phase 14**: ✅ COMPLETE - Digital item delivery: personalization, downloads, Kindle wizard (2026-06-16)
 **Phase 14 QA fixes** (2026-06-17): order status badge normalization, digital product UX polish, cart 403 fix, SKU/slug uniqueness hardening
 **Phase 14 QA fixes, session 2** (2026-06-17): name field implementation — username at registration, first+last required at checkout
+**Phase 15**: 📋 PLANNED - Admin Settings
+**Phase 16**: 📋 PLANNED - Navigation menus: dynamic header, page hierarchy, catch-all routing
+**Phase 17**: 📋 PLANNED - Alternate domain capture: redirect + transparent proxy aliasing
+**Phase 18**: 📋 PLANNED - External content widget: Substack/RSS feed preview
+**Phase 19**: 📋 PLANNED - First deployment: fantasyvreality.com on Google Cloud Run
+**Phase 20**: 📋 PLANNED - Themes and templates: color palettes, typography, backgrounds
+**Phase 21**: 📋 PLANNED - Multi-owner deployability: setup wizard, SiteSettings, update strategy
 
 **Test Status**: 125 frontend + 176 backend unit tests (all passing); 16 backend E2E tests (require Docker)
 **API Endpoints**: 129 total (Phase 14: +POST files/test-personalization, +POST downloads/:id/extend)
@@ -213,6 +220,12 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_11_COMPLETION_REPORT.md` - Phase 11 implementation details
 - `docs/PHASE_12_PLAN.md` - Audit trail, transaction logging, content version history
 - `docs/PHASE_12_COMPLETION_REPORT.md` - Phase 12 implementation details
+- `docs/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
+- `docs/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
+- `docs/PHASE_18_PLAN.md` - External content widget: Substack/RSS feed with fade and CTA
+- `docs/PHASE_19_PLAN.md` - First deployment: Google Cloud Run, GCS, Cloud SQL, secrets
+- `docs/PHASE_20_PLAN.md` - Themes and templates: color palettes, typography, backgrounds
+- `docs/PHASE_21_PLAN.md` - Multi-owner deployability: setup wizard, update strategy, SiteSettings
 - `docs/prd/` - 12 PRD documents with full specifications
 
 ## Notes for Claude
