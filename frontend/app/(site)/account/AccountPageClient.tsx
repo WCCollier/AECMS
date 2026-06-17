@@ -7,12 +7,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { Button, Input } from '@/components/ui';
 import api, { getErrorMessage } from '@/lib/api';
-import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin, Download } from 'lucide-react';
+import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin } from 'lucide-react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import type { Comment, PaginatedResponse, SavedShippingAddress } from '@/types';
 import { CommentForm } from '@/components/comments/CommentForm';
-import { DigitalDownloadsPanel } from '@/components/digital/DigitalDownloadsPanel';
+import { DigitalLibraryPanel } from '@/components/digital/DigitalLibraryPanel';
 import { orderStatusClass } from '@/lib/orderStatus';
 
 const formatPrice = (p: number) =>
@@ -191,6 +191,9 @@ export function AccountPageClient() {
         </div>
       </section>
 
+      {/* Digital Library — only renders if user has downloads */}
+      <DigitalLibraryPanel />
+
       {/* Order History */}
       <section className="bg-surface border border-border rounded-xl mb-6 overflow-hidden">
         <button
@@ -227,12 +230,6 @@ export function AccountPageClient() {
                         </Link>
                       </div>
                     </div>
-                    {/* Show downloads section inline when order has digital items */}
-                    {order.items?.some((i) => i.product?.product_type === 'digital') && (
-                      <div className="mt-2 pl-0">
-                        <DigitalDownloadsPanel orderId={order.id} />
-                      </div>
-                    )}
                   </div>
                 ))}
                 {orders.length === 5 && (
@@ -268,7 +265,7 @@ export function AccountPageClient() {
                 {comments.map((c) => {
                   const overallRating = c.ratings?.find((r) => r.title === 'Overall');
                   const target = c.article
-                    ? { href: `/latest/${c.article.slug}`, name: c.article.title }
+                    ? { href: `/articles/${c.article.slug}`, name: c.article.title }
                     : c.product
                     ? { href: `/shop/${c.product.slug}`, name: c.product.name }
                     : null;
