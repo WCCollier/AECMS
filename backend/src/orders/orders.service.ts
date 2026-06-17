@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';
 import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit/audit.service';
@@ -16,6 +17,7 @@ export class OrdersService {
     private prisma: PrismaService,
     private cartService: CartService,
     private auditLog: AuditLogService,
+    private capabilitiesService: CapabilitiesService,
   ) {}
 
   /**
@@ -34,10 +36,37 @@ export class OrdersService {
       throw new BadRequestException('Cart is empty');
     }
 
-    // Check if physical products require shipping address
-    const hasPhysical = cart.items.some(
-      (item: any) => item.product.product_type === 'physical',
-    );
+    // Determine product types in the cart
+    const hasPhysical = cart.items.some((item: any) => item.product.product_type === 'physical');
+    const hasDigital = cart.items.some((item: any) => item.product.product_type === 'digital');
+    const hasService = cart.items.some((item: any) => item.product.product_type === 'service');
+
+    // Enforce purchase capabilities
+    if (!userId) {
+      // Guest checkout
+      if (!await this.capabilitiesService.guestHasCapability('checkout.guest')) {
+        throw new ForbiddenException('Guest checkout is not enabled on this site');
+      }
+      if (hasPhysical && !await this.capabilitiesService.guestHasCapability('purchase.physical')) {
+        throw new ForbiddenException('An account is required to purchase physical products');
+      }
+      if (hasDigital && !await this.capabilitiesService.guestHasCapability('purchase.digital')) {
+        throw new ForbiddenException('An account is required to purchase digital products');
+      }
+      if (hasService && !await this.capabilitiesService.guestHasCapability('purchase.service')) {
+        throw new ForbiddenException('An account is required to purchase service products');
+      }
+    } else {
+      if (hasPhysical && !await this.capabilitiesService.userHasCapability(userId, 'purchase.physical')) {
+        throw new ForbiddenException('You do not have permission to purchase physical products');
+      }
+      if (hasDigital && !await this.capabilitiesService.userHasCapability(userId, 'purchase.digital')) {
+        throw new ForbiddenException('You do not have permission to purchase digital products');
+      }
+      if (hasService && !await this.capabilitiesService.userHasCapability(userId, 'purchase.service')) {
+        throw new ForbiddenException('You do not have permission to purchase service products');
+      }
+    }
 
     if (hasPhysical && !dto.shipping_address) {
       throw new BadRequestException(

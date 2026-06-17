@@ -142,6 +142,30 @@ export class CapabilitiesService {
   }
 
   /**
+   * Check if a guest (unauthenticated) user has a capability via the guest role
+   */
+  async guestHasCapability(capabilityName: string): Promise<boolean> {
+    const capability = await this.prisma.capability.findUnique({
+      where: { name: capabilityName },
+    });
+    if (!capability) return false;
+    const rc = await this.prisma.roleCapability.findFirst({
+      where: { role: UserRole.guest, capability_id: capability.id },
+    });
+    return !!rc;
+  }
+
+  /**
+   * Check if a guest has ANY of the specified capabilities (OR logic)
+   */
+  async guestHasAnyCapability(capabilityNames: string[]): Promise<boolean> {
+    for (const capName of capabilityNames) {
+      if (await this.guestHasCapability(capName)) return true;
+    }
+    return false;
+  }
+
+  /**
    * Assign a capability to a role
    */
   async assignCapabilityToRole(role: UserRole, capabilityId: string): Promise<RoleCapability> {

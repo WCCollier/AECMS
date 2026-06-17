@@ -31,7 +31,7 @@ export function AppearanceClient() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await adminApi.patch('/settings', {
+      await adminApi.patch('/settings/appearance', {
         updates: {
           theme: JSON.stringify({ palette: selectedPalette, fontPairing: selectedFont }),
         },

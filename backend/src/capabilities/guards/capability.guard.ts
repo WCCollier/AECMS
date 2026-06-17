@@ -25,12 +25,12 @@ export class CapabilityGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
-    // User must be authenticated
+    // Unauthenticated request — check against guest role capabilities
     if (!user || !user.id) {
-      return false;
+      return this.capabilitiesService.guestHasAnyCapability(requiredCapabilities);
     }
 
-    // Check if user has ANY of the required capabilities (OR logic)
+    // Authenticated user — check role + user-specific capabilities
     return this.capabilitiesService.userHasAnyCapability(
       user.id,
       requiredCapabilities,

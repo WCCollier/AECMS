@@ -20,6 +20,7 @@ import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
 import { DigitalProductsService } from './digital-products.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 import {
   CreateDigitalFileDto,
   UpdateDigitalFileDto,
@@ -31,7 +32,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('digital-products')
 export class DigitalProductsController {
-  constructor(private readonly digitalProductsService: DigitalProductsService) {}
+  constructor(
+    private readonly digitalProductsService: DigitalProductsService,
+    private readonly capabilitiesService: CapabilitiesService,
+  ) {}
 
   /**
    * Upload a digital file for a product (Admin only)
@@ -104,7 +108,7 @@ export class DigitalProductsController {
    */
   @Post('orders/:orderId/downloads')
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-  @RequiresCapability('product.edit')
+  @RequiresCapability('digital.deliver')
   async createOrderDownloads(
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @Query('expiryDays') expiryDays?: string,
@@ -114,7 +118,7 @@ export class DigitalProductsController {
   }
 
   /**
-   * Get download tokens for an order
+   * Get download tokens for an order — owner of the order or digital.deliver cap required
    */
   @Get('orders/:orderId/downloads')
   @UseGuards(JwtAuthGuard)
@@ -122,8 +126,8 @@ export class DigitalProductsController {
     @Param('orderId', ParseUUIDPipe) orderId: string,
     @CurrentUser() user: any,
   ) {
-    // TODO: Verify user owns this order or is admin
-    return this.digitalProductsService.getOrderDownloads(orderId);
+    const canAdmin = await this.capabilitiesService.userHasCapability(user.id, 'digital.deliver');
+    return this.digitalProductsService.getOrderDownloads(orderId, user.id, canAdmin);
   }
 
   /**
@@ -170,11 +174,11 @@ export class DigitalProductsController {
   }
 
   /**
-   * Regenerate a download token (Admin only)
+   * Regenerate a download token (digital.deliver required)
    */
   @Post('downloads/:id/regenerate')
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-  @RequiresCapability('product.edit')
+  @RequiresCapability('digital.deliver')
   async regenerateToken(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('expiryDays') expiryDays?: string,
@@ -184,11 +188,11 @@ export class DigitalProductsController {
   }
 
   /**
-   * Extend a download token's expiry (Admin only)
+   * Extend a download token's expiry (digital.deliver required)
    */
   @Post('downloads/:id/extend')
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-  @RequiresCapability('product.edit')
+  @RequiresCapability('digital.deliver')
   async extendExpiry(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ExtendExpiryDto,

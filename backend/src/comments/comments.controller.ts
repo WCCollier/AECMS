@@ -94,10 +94,11 @@ export class CommentsController {
   }
 
   /**
-   * Update own comment
+   * Update own comment (comment.edit.own required)
    */
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @RequiresCapability('comment.edit.own')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update your own comment' })
   @ApiResponse({ status: 200, description: 'Comment updated successfully' })
@@ -113,10 +114,11 @@ export class CommentsController {
   }
 
   /**
-   * Delete own comment
+   * Delete own comment (comment.delete.own required; comment.delete gives admin delete-any)
    */
   @Delete(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CapabilityGuard)
+  @RequiresCapability('comment.delete.own', 'comment.delete')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete your own comment' })
   @ApiResponse({ status: 200, description: 'Comment deleted successfully' })

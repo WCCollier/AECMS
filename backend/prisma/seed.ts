@@ -72,11 +72,25 @@ async function main() {
     // Domain Management (Owner-only by default)
     { name: 'domain.manage',       category: 'system',    scope: 'backstage', description: 'Manage domain aliases' },
 
+    // System — Appearance (Owner-only by default; split from system.configure so it can be delegated)
+    { name: 'system.appearance',   category: 'system',    scope: 'backstage', description: 'Change site visual theme (colour palette and typography)' },
+
+    // Digital Delivery (Admin by default; separate from product editing)
+    { name: 'digital.deliver',     category: 'ecommerce', scope: 'backstage', description: 'Manage digital delivery — extend/regenerate download tokens, create admin grants' },
+
     // Customer-facing: comment & review actions (scope:'customer' — no backstage required)
     { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
     { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
     { name: 'comment.product',     category: 'ecommerce', scope: 'customer',  description: 'Post a comment on a product' },
     { name: 'review.product',      category: 'ecommerce', scope: 'customer',  description: 'Post a rated review on a product (verified purchase required)' },
+    { name: 'comment.edit.own',    category: 'content',   scope: 'customer',  description: 'Edit own comments and reviews' },
+    { name: 'comment.delete.own',  category: 'content',   scope: 'customer',  description: 'Delete own comments and reviews' },
+
+    // Customer-facing: checkout and purchase actions
+    { name: 'checkout.guest',      category: 'ecommerce', scope: 'customer',  description: 'Complete a purchase without creating an account (guest checkout)' },
+    { name: 'purchase.physical',   category: 'ecommerce', scope: 'customer',  description: 'Purchase physical products requiring a shipping address' },
+    { name: 'purchase.digital',    category: 'ecommerce', scope: 'customer',  description: 'Purchase digital products and receive download access' },
+    { name: 'purchase.service',    category: 'ecommerce', scope: 'customer',  description: 'Purchase service products (consultations, access passes, etc.)' },
   ];
 
   for (const cap of capabilities) {
@@ -165,11 +179,24 @@ async function main() {
   console.log('\n[3/3] Seeding role capabilities...');
 
   // Customer-facing capabilities shared by Member and Admin
-  const customerCapabilities = [
+  const memberCustomerCapabilities = [
     'comment.article',
     'review.article',
     'comment.product',
     'review.product',
+    'comment.edit.own',
+    'comment.delete.own',
+    'purchase.physical',
+    'purchase.digital',
+    'purchase.service',
+  ];
+
+  // Guest role: subset of customer capabilities available without an account
+  const guestCapabilities = [
+    'checkout.guest',
+    'purchase.physical',
+    'purchase.digital',
+    'purchase.service',
   ];
 
   // Admin backstage capabilities (in addition to the customer ones above)
@@ -197,6 +224,7 @@ async function main() {
     'comment.moderate',
     'comment.delete',
     'review.moderate',
+    'digital.deliver',
   ];
 
   async function assignCapsToRole(role: UserRole, capNames: string[]) {
@@ -217,12 +245,14 @@ async function main() {
 
   const adminCount = await assignCapsToRole(UserRole.admin, [
     ...adminBackstageCapabilities,
-    ...customerCapabilities,
+    ...memberCustomerCapabilities,
   ]);
-  const memberCount = await assignCapsToRole(UserRole.member, customerCapabilities);
+  const memberCount = await assignCapsToRole(UserRole.member, memberCustomerCapabilities);
+  const guestCount = await assignCapsToRole(UserRole.guest, guestCapabilities);
 
   console.log(`✓ Assigned ${adminCount} capabilities to Admin role`);
   console.log(`✓ Assigned ${memberCount} capabilities to Member role`);
+  console.log(`✓ Assigned ${guestCount} capabilities to Guest role`);
   console.log('✓ Owner role has all capabilities by default');
 
   // ============================================

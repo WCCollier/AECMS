@@ -65,6 +65,17 @@ export class SettingsController {
     return { message: 'Settings saved' };
   }
 
+  @Patch('appearance')
+  @RequiresCapability('system.appearance')
+  @ApiOperation({ summary: 'Update appearance settings (theme key only) — requires system.appearance' })
+  async updateAppearance(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k === 'theme'),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'Appearance saved' };
+  }
+
   @Post('test-email')
   @ApiOperation({ summary: 'Send a test email using current SMTP config' })
   async testEmail(@Request() req: any) {

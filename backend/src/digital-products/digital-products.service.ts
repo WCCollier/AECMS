@@ -281,7 +281,17 @@ export class DigitalProductsService {
   /**
    * Get download tokens for an order
    */
-  async getOrderDownloads(orderId: string): Promise<DigitalDownloadResponseDto[]> {
+  async getOrderDownloads(orderId: string, requestingUserId: string, isAdmin: boolean): Promise<DigitalDownloadResponseDto[]> {
+    if (!isAdmin) {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { user_id: true },
+      });
+      if (!order || order.user_id !== requestingUserId) {
+        throw new ForbiddenException('Access denied');
+      }
+    }
+
     const downloads = await this.prisma.digitalDownload.findMany({
       where: { order_id: orderId },
       include: {
