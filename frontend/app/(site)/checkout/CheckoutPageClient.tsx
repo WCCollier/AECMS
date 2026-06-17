@@ -10,7 +10,7 @@ import api, { getErrorMessage } from '@/lib/api';
 
 const ADJUSTMENT_KEY = 'cart_stock_adjustments';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui';
-import { ArrowLeft, CreditCard, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Loader2 } from 'lucide-react';
 import type { PaymentIntent, ShippingAddress, SavedShippingAddress } from '@/types';
 
 export function CheckoutPageClient() {
@@ -18,6 +18,7 @@ export function CheckoutPageClient() {
   const { items, subtotal, clearCart, mutate: mutateCart } = useCart();
   const { user, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'shipping' | 'payment'>('shipping');
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -26,6 +27,8 @@ export function CheckoutPageClient() {
 
   const [formData, setFormData] = useState({
     email: user?.email || '',
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
     street: '',
     city: '',
     state: '',
@@ -35,6 +38,8 @@ export function CheckoutPageClient() {
 
   // Determine if all items in the cart are non-physical (skip shipping step)
   const needsShipping = items.some((item) => item.product.product_type === 'physical');
+  // Show name fields when guest, or when logged-in user hasn't provided a name yet
+  const needsName = !isAuthenticated || !user?.firstName;
 
   // Load saved shipping address for authenticated users
   useEffect(() => {
@@ -123,6 +128,8 @@ export function CheckoutPageClient() {
       const order = await createOrder({
         shipping_address: shippingAddress,
         guest_email: !isAuthenticated ? formData.email : undefined,
+        customer_first_name: formData.firstName || undefined,
+        customer_last_name: formData.lastName || undefined,
       });
 
       setOrderId(order.id);
@@ -135,6 +142,11 @@ export function CheckoutPageClient() {
   };
 
   const handlePayment = async (provider: 'stripe' | 'paypal') => {
+    if (needsName && !formData.firstName) {
+      setError('Please enter your first name before continuing.');
+      return;
+    }
+
     let currentOrderId = orderId;
 
     // For digital/service carts, create the order now if not yet created
@@ -150,6 +162,8 @@ export function CheckoutPageClient() {
         }
         const order = await createOrder({
           guest_email: !isAuthenticated ? formData.email : undefined,
+          customer_first_name: formData.firstName || undefined,
+          customer_last_name: formData.lastName || undefined,
         });
         currentOrderId = order.id;
         setOrderId(order.id);
@@ -172,11 +186,13 @@ export function CheckoutPageClient() {
 
       if (provider === 'stripe') {
         if (response.data.client_secret) {
+          setRedirecting(true);
           await clearCart();
           window.location.href = response.data.client_secret;
         }
       } else if (provider === 'paypal') {
         if (response.data.client_secret) {
+          setRedirecting(true);
           window.location.href = response.data.client_secret;
         }
       }
@@ -186,6 +202,18 @@ export function CheckoutPageClient() {
       setIsLoading(false);
     }
   };
+
+  if (redirecting) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-16">
+          <Loader2 className="w-12 h-12 mx-auto text-foreground/40 mb-4 animate-spin" />
+          <h2 className="text-xl font-semibold mb-2">Redirecting to secure payment…</h2>
+          <p className="text-foreground/50">Please do not close this page.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -247,6 +275,31 @@ export function CheckoutPageClient() {
                       required
                       placeholder="your@email.com"
                     />
+                  )}
+
+                  {needsName && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="First Name"
+                        type="text"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleChange}
+                        required
+                        placeholder="Jane"
+                        autoComplete="given-name"
+                      />
+                      <Input
+                        label="Last Name"
+                        type="text"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleChange}
+                        required
+                        placeholder="Smith"
+                        autoComplete="family-name"
+                      />
+                    </div>
                   )}
 
                   {savedAddress?.has_address && (
@@ -357,16 +410,55 @@ export function CheckoutPageClient() {
                   />
                 )}
 
+                {needsName && !needsShipping && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-foreground/60">
+                      {isAuthenticated
+                        ? 'Please add your name — it\'ll be used for personalised digital files and receipts.'
+                        : 'Your name is used for personalised digital files and receipts.'}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="First Name"
+                        type="text"
+                        name="firstName"
+                        value={formData.firstName}
+                        onChange={handleChange}
+                        required
+                        placeholder="Jane"
+                        autoComplete="given-name"
+                      />
+                      <Input
+                        label="Last Name"
+                        type="text"
+                        name="lastName"
+                        value={formData.lastName}
+                        onChange={handleChange}
+                        required
+                        placeholder="Smith"
+                        autoComplete="family-name"
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <Button
                   className="w-full justify-start h-auto py-4"
                   variant="outline"
                   onClick={() => handlePayment('stripe')}
                   disabled={isLoading}
                 >
-                  <CreditCard className="w-6 h-6 mr-4" />
+                  <img src="/stripe-logo.svg" alt="Stripe" className="h-5 mr-4 flex-shrink-0" />
                   <div className="text-left">
                     <p className="font-semibold">Credit or Debit Card</p>
-                    <p className="text-sm text-foreground/60">Visa, Mastercard, AMEX — secured by Stripe</p>
+                    <p className="text-sm text-foreground/60 flex items-center gap-1.5 flex-wrap">
+                      Visa, Mastercard, AMEX
+                      <span className="text-foreground/30">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        includes
+                        <img src="/amazon-pay-logo.svg" alt="Amazon Pay" className="h-5 inline-block" />
+                      </span>
+                    </p>
                   </div>
                 </Button>
 

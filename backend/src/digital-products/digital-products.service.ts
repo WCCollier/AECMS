@@ -336,8 +336,23 @@ export class DigitalProductsService {
 
     // Apply personalization if enabled
     if (download.digital_file.personalization_enabled) {
+      // Resolve customer name: explicit param → order.customer_name → user record → order email
+      let resolvedName = personalizationOptions?.customerName;
+      if (!resolvedName) {
+        if ((download.order as any).customer_name) {
+          resolvedName = (download.order as any).customer_name;
+        } else if (download.user_id) {
+          const user = await this.prisma.user.findUnique({ where: { id: download.user_id } });
+          resolvedName = user
+            ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
+            : download.order.email;
+        } else {
+          resolvedName = download.order.email;
+        }
+      }
+
       const options: PersonalizationOptionsDto = {
-        customerName: personalizationOptions?.customerName,
+        customerName: resolvedName || undefined,
         orderNumber: download.order.order_number,
         purchaseDate: download.order.created_at.toLocaleDateString(),
       };

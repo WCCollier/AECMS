@@ -16,7 +16,8 @@ export function RegisterPageClient() {
     username: '',
     password: '',
     confirmPassword: '',
-    display_name: '',
+    firstName: '',
+    lastName: '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,7 +50,8 @@ export function RegisterPageClient() {
         email: formData.email,
         username: formData.username,
         password: formData.password,
-        display_name: formData.display_name || undefined,
+        firstName: formData.firstName || undefined,
+        lastName: formData.lastName || undefined,
       });
       router.push('/');
     } catch (err) {
@@ -101,16 +103,27 @@ export function RegisterPageClient() {
               hint="3-30 characters, letters, numbers, underscores"
             />
 
-            <Input
-              label="Display Name"
-              type="text"
-              name="display_name"
-              placeholder="John Doe"
-              value={formData.display_name}
-              onChange={handleChange}
-              autoComplete="name"
-              hint="Optional - how your name appears publicly"
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="First Name"
+                type="text"
+                name="firstName"
+                placeholder="John"
+                value={formData.firstName}
+                onChange={handleChange}
+                autoComplete="given-name"
+                hint="Optional"
+              />
+              <Input
+                label="Last Name"
+                type="text"
+                name="lastName"
+                placeholder="Doe"
+                value={formData.lastName}
+                onChange={handleChange}
+                autoComplete="family-name"
+              />
+            </div>
 
             <Input
               label="Password"

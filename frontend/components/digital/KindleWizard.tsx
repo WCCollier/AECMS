@@ -221,7 +221,12 @@ export function KindleWizard({ download, onClose }: Props) {
         <div className="text-center py-10">
           <CheckCircle className="w-14 h-14 text-green-500 mx-auto mb-4" />
           <h3 className="text-lg font-semibold mb-2">Sent!</h3>
-          <p className="text-foreground/60 text-sm mb-6">{successMsg}</p>
+          <p className="text-foreground/60 text-sm mb-4">{successMsg}</p>
+          <div className="text-sm bg-foreground/5 border border-foreground/10 rounded-lg px-4 py-3 text-foreground/70 text-left mb-6">
+            <span className="font-medium text-foreground">Reminder:</span> On your Kindle, go to{' '}
+            <span className="font-medium text-foreground">Settings → Sync</span> (or pull down on the home screen)
+            to download your new book.
+          </div>
           <Button onClick={onClose}>Close</Button>
         </div>
       </ModalShell>
@@ -418,7 +423,7 @@ export function KindleWizard({ download, onClose }: Props) {
         <p className="text-sm text-foreground/70 mb-3">Your Kindle device has a unique email address.</p>
         <ol className="text-sm space-y-2 text-foreground/80 mb-5">
           <li>1. Go to <strong>amazon.com</strong> → <strong>Account</strong></li>
-          <li>2. At the bottom, under "Digital content and devices," click <G>Devices</G></li>
+          <li>2. At the bottom, under &quot;Digital content and devices,&quot; click <G>Devices</G></li>
           <li>3. On the next page, click <G>Kindle</G></li>
           <li>4. Copy the device email address from this page, or click <G>Preferences</G> at the top to see the full list</li>
         </ol>
@@ -451,7 +456,7 @@ export function KindleWizard({ download, onClose }: Props) {
         <p className="text-sm text-foreground/70 mb-3">Amazon only accepts files from approved senders.</p>
         <ol className="text-sm space-y-2 text-foreground/80 mb-5">
           <li>1. Click <G>Preferences</G> if you have not already done so</li>
-          <li>2. Scroll down to the "Approved Personal Document E-mail List"</li>
+          <li>2. Scroll down to the &quot;Approved Personal Document E-mail List&quot;</li>
           <li>3. Click <M>Add a new e-mail address</M></li>
           <li>4. Enter:</li>
         </ol>

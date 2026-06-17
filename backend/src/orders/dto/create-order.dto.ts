@@ -48,6 +48,16 @@ export class CreateOrderDto {
   @IsOptional()
   guest_email?: string;
 
+  @ApiPropertyOptional({ description: 'Customer first name (required at purchase; saved to user record if authenticated and missing)' })
+  @IsString()
+  @IsOptional()
+  customer_first_name?: string;
+
+  @ApiPropertyOptional({ description: 'Customer last name (required at purchase; saved to user record if authenticated and missing)' })
+  @IsString()
+  @IsOptional()
+  customer_last_name?: string;
+
   // NOTE: Amazon Pay is surfaced automatically by Stripe Checkout — no separate provider.
   @ApiPropertyOptional({
     description: 'Payment method (set when payment is initiated)',

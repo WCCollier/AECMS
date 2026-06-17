@@ -50,6 +50,8 @@ export interface CreateOrderData {
   shipping_address?: ShippingAddress;
   billing_address?: ShippingAddress;
   guest_email?: string;
+  customer_first_name?: string;
+  customer_last_name?: string;
 }
 
 export async function createOrder(data: CreateOrderData): Promise<Order> {

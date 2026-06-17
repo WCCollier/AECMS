@@ -160,7 +160,7 @@ export function AdminArticlesClient() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-foreground/70">
-                        {article.author?.display_name || article.author?.username || (article.author?.first_name ? `${article.author.first_name} ${article.author.last_name || ''}`.trim() : null) || article.author?.email || 'Unknown'}
+                        {(article.author?.first_name ? `${article.author.first_name} ${article.author.last_name || ''}`.trim() : null) || article.author?.username || article.author?.email || 'Unknown'}
                       </td>
                       <td className="px-6 py-4">
                         <span className={`text-xs px-2 py-1 rounded-full ${

@@ -24,6 +24,7 @@ datasource db {
 model User {
   id                    String    @id @default(uuid())
   email                 String    @unique
+  username              String?   @unique
   password_hash         String?   // Null for OAuth-only users
   first_name            String?
   last_name             String?
@@ -589,6 +590,9 @@ model Order {
   payment_method    String      // 'stripe', 'paypal', 'amazon_pay'
   payment_intent_id String?
   paid_at           DateTime?
+
+  // Customer name for personalization (set at checkout; saved to user record if authenticated)
+  customer_name     String?
 
   // Shipping (null for digital-only orders)
   shipping_name     String?

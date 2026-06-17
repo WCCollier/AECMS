@@ -160,10 +160,20 @@ export function AccountPageClient() {
       <section className="bg-surface border border-border rounded-xl p-6 mb-6">
         <h2 className="font-semibold text-lg mb-4">Profile</h2>
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-foreground/60">Display name</span>
-            <span className="font-medium">{user.display_name ?? user.username}</span>
-          </div>
+          {(user.firstName || user.lastName) && (
+            <div className="flex justify-between">
+              <span className="text-foreground/60">Name</span>
+              <span className="font-medium">
+                {[user.firstName, user.lastName].filter(Boolean).join(' ')}
+              </span>
+            </div>
+          )}
+          {user.username && (
+            <div className="flex justify-between">
+              <span className="text-foreground/60">Username</span>
+              <span className="font-medium">@{user.username}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-foreground/60">Email</span>
             <span className="font-medium">{user.email}</span>
@@ -172,10 +182,12 @@ export function AccountPageClient() {
             <span className="text-foreground/60">Role</span>
             <span className="capitalize font-medium">{user.role}</span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-foreground/60">Member since</span>
-            <span className="font-medium">{formatDate(user.created_at)}</span>
-          </div>
+          {user.createdAt && (
+            <div className="flex justify-between">
+              <span className="text-foreground/60">Member since</span>
+              <span className="font-medium">{formatDate(user.createdAt!)}</span>
+            </div>
+          )}
         </div>
       </section>
 

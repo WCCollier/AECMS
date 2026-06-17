@@ -2,14 +2,14 @@
 export interface User {
   id: string;
   email: string;
-  username: string;
-  display_name: string | null;
+  username: string | null;
+  firstName: string | null;
+  lastName: string | null;
   role: 'owner' | 'admin' | 'member' | 'guest';
-  avatar_url: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  emailVerified: boolean;
+  totpEnabled?: boolean;
   hasBackstageAccess?: boolean;
+  createdAt?: string;
 }
 
 export interface AuthTokens {
@@ -20,8 +20,9 @@ export interface AuthTokens {
 export interface AuthUser {
   id: string;
   email: string;
-  firstName?: string;
-  lastName?: string;
+  username?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   role: 'owner' | 'admin' | 'member' | 'guest';
   emailVerified: boolean;
   hasBackstageAccess?: boolean;
@@ -36,7 +37,8 @@ export interface RegisterData {
   email: string;
   username: string;
   password: string;
-  display_name?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 // Media widget type — shared across Articles, Products (and future Pages)
@@ -60,7 +62,7 @@ export interface Article {
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   status: 'draft' | 'published' | 'archived';
   published_at: string | null;
-  author: User & { first_name?: string; last_name?: string; email?: string };
+  author: User & { first_name?: string; last_name?: string };
   categories: Category[];
   tags: Tag[];
   created_at: string;

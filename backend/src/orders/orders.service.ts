@@ -76,19 +76,25 @@ export class OrdersService {
     const shipping = hasPhysical ? 0 : 0; // Shipping calculation would go here
     const total = subtotal + tax + shipping;
 
+    // Compose customer name from checkout form (first+last) or shipping address name
+    const customerName = dto.customer_first_name
+      ? `${dto.customer_first_name}${dto.customer_last_name ? ' ' + dto.customer_last_name : ''}`.trim()
+      : dto.shipping_address?.name ?? undefined;
+
     // Create order
     const order = await this.prisma.order.create({
       data: {
         order_number: orderNumber,
         user_id: userId,
         email: userEmail ?? dto.guest_email ?? '',
+        customer_name: customerName,
         status: 'pending',
         subtotal,
         tax,
         shipping,
         total,
         payment_method: dto.payment_method ?? 'stripe',
-        shipping_name: dto.shipping_address?.name,
+        shipping_name: dto.shipping_address?.name ?? customerName,
         shipping_address: dto.shipping_address?.street,
         shipping_city: dto.shipping_address?.city,
         shipping_state: dto.shipping_address?.state,
@@ -104,6 +110,23 @@ export class OrdersService {
       },
       include: this.getOrderIncludes(),
     });
+
+    // Back-fill first/last name on user record if they didn't have one yet
+    if (userId && dto.customer_first_name) {
+      const userRecord = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { first_name: true },
+      });
+      if (!userRecord?.first_name) {
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: {
+            first_name: dto.customer_first_name,
+            last_name: dto.customer_last_name ?? null,
+          },
+        });
+      }
+    }
 
     // Update stock quantities
     for (const item of cart.items) {

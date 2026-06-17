@@ -114,12 +114,14 @@ export class AuthController {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
       firstName: user.first_name,
       lastName: user.last_name,
       role: user.role,
       emailVerified: user.email_verified,
       totpEnabled: user.totp_enabled,
       hasBackstageAccess,
+      createdAt: user.created_at,
     };
   }
 
