@@ -236,11 +236,11 @@ ISM consumer wiring confirmed working end-to-end: credentials read from `site_se
 
 ## Remaining / Deferred
 
-- **GCP/AWS/Vault KeyProvider implementations** — stub comments exist in the factory switch-case; implement when Phase 19 (Cloud Run deployment) requires KMS
-- **ISM key rotation tooling** — CLI script or Owner-only endpoint to re-encrypt all `_enc` rows under a new SEK; deferred to Phase 21
-- **Logo URL wiring** — field saved but header/layout does not yet render it
-- **Brand Color wiring** — field saved but CSS variable system does not yet consume it
-- **Media upload settings (S3/GCS bucket URL, CDN prefix)** — Phase 19 scope
+- **GCP KeyProvider (Cloud Secret Manager)** — Phase 19 scope. The SEK will be stored in GCP Secret Manager; the `LocalKeyProvider` path (env var) remains the correct choice for VPS/single-server deployments. Stub switch-case in the factory is ready for the `'gcp'` implementation.
+- **AWS/Vault KeyProvider** — stub exists; implement on demand if a non-GCP deployment needs it.
+- **ISM key rotation tooling** — CLI script or Owner-only endpoint to re-encrypt all `_enc` rows under a new SEK; deferred to Phase 21.
+- **Logo URL wiring** — field saved but header/layout does not yet render it.
+- **Brand Color wiring** — field saved but CSS variable system does not yet consume it.
 
 ---
 

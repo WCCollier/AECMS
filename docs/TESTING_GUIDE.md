@@ -512,7 +512,15 @@ curl -s "http://localhost:4000/media?limit=5" \
 
 The TipTap editor supports 7 inline widget types. Test via the article or page editor in the admin.
 
-### Inserting widgets
+### Inline image upload
+
+The toolbar's image icon (ImagePlus) opens an inline image panel with two paths:
+- **URL tab** — paste an external image URL directly
+- **Upload tab** — drag a file onto the drop zone or click "Upload from device"; the file is posted to `POST /media/upload` using the backstage session and the returned `url` is inserted into the editor
+
+Both paths are verified working as of 2026-06-18. Note: uses `adminApi` (backstage token) — a customer-session `api` call here would 401.
+
+### Inserting widget nodes
 
 All widget types are available in the TipTap toolbar via their respective icons. Click the icon to insert; a picker or URL input dialog appears as needed.
 
@@ -1617,13 +1625,24 @@ curl -s -X POST http://localhost:4000/settings/test-storage \
 # Expected: { "success": true, "provider": "local", "message": "..." }
 ```
 
-### Checklist
-- [ ] File Storage tab is visible in Admin Settings (Owner only)
-- [ ] Provider selector shows current `STORAGE_PROVIDER_TYPE`
-- [ ] Local: Test Storage Connection → green ✓ with provider = `local`
+### Checklist — local provider
+- [x] File Storage tab is visible in Admin Settings (Owner only) *(verified 2026-06-18)*
+- [x] Provider selector shows current `STORAGE_PROVIDER_TYPE` *(verified 2026-06-18)*
+- [x] Local: Test Storage Connection → green ✓ with provider = `local` *(verified 2026-06-18)*
+- [x] Media upload in Admin → Media works end-to-end with local provider *(verified 2026-06-18 — featured image drag-and-drop on article editor)*
+- [x] TipTap inline image upload → image inserted into editor at correct URL *(verified 2026-06-18 after fix: adminApi + response.data.url)*
 - [ ] `POST /settings/test-storage` requires Owner backstage token; Member customer token returns 401
-- [ ] Media upload in Admin → Media still works end-to-end with local provider
 - [ ] Thumbnail is generated and stored alongside the original
+
+### Checklist — GCS provider *(deferred to Phase 19 — requires live GCP environment)*
+- [ ] GCS credentials entered via Admin Settings → File Storage (Workload Identity path: leave JSON empty)
+- [ ] Test Storage Connection → green ✓ for GCS with real buckets
+- [ ] Media upload routed to public media bucket; digital product files routed to private bucket
+- [ ] `getUrl()` returns signed URL (or CDN URL if `storage.cdn_base_url` is set)
+- [ ] Workload Identity auth works on Cloud Run without service account JSON
+
+### Remaining ISM test *(deferred to Phase 19)*
+The ISM's `LocalKeyProvider` (AES-256-GCM + `SETTINGS_ENCRYPTION_KEY` env var) has been fully verified in the Codespaces testbed. The remaining test is the GCP `KeyProvider` path using **Cloud Secret Manager** to hold the SEK — this requires a live GCP project and is Phase 19 scope. Until then, `SETTINGS_KMS_PROVIDER=local` with the SEK in a `chmod 600 .env` file is the production-ready path for VPS/single-server deployments.
 
 ---
 
