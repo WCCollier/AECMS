@@ -211,10 +211,20 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Slug</label>
-          <div className="flex items-center gap-2">
-            <span className="text-foreground/40 text-sm">/</span>
-            <Input value={slug} onChange={(e) => { setSlug(e.target.value); setDirty(true); }} />
-          </div>
+          {page?.slug === '_home_' ? (
+            <div className="flex items-center gap-2">
+              <span className="text-foreground/40 text-sm">/</span>
+              <span className="flex-1 text-sm font-mono px-3 py-1.5 bg-foreground/5 border border-border rounded-lg text-foreground/40 cursor-not-allowed select-none">
+                _home_
+              </span>
+              <span className="text-xs text-foreground/40">System page — slug is fixed</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-foreground/40 text-sm">/</span>
+              <Input value={slug} onChange={(e) => { setSlug(e.target.value); setDirty(true); }} />
+            </div>
+          )}
         </div>
       </div>
 

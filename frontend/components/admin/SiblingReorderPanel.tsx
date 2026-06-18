@@ -100,7 +100,10 @@ export function SiblingReorderPanel({ pageId, parentId, currentTitle, currentSho
     adminApi.get('/pages?limit=100').then((res) => {
       const all: SiblingPage[] = res.data?.data ?? res.data ?? [];
       const sibs = all
-        .filter((p) => p.parent_id === parentId && p.slug !== '_home_')
+        .filter((p) => {
+          const effectiveParentId = p.id === pageId ? parentId : p.parent_id;
+          return effectiveParentId === parentId && p.slug !== '_home_';
+        })
         .sort((a, b) => (a.nav_order ?? 0) - (b.nav_order ?? 0) || a.title.localeCompare(b.title));
       setSiblings(sibs);
     }).catch(() => {}).finally(() => setLoading(false));

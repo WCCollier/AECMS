@@ -111,6 +111,13 @@ export function SettingsClient() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Pages list for homepage picker
+  const { data: pagesData } = useSWR<{ data: { id: string; title: string; slug: string }[] }>(
+    f('general.homepage_mode') === 'static_page' ? '/pages?limit=100&status=published' : null,
+    fetcher,
+  );
+  const publishedPages = pagesData?.data ?? [];
+
   // Email test state
   const [emailTesting, setEmailTesting] = useState(false);
   const [emailTestResult, setEmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -242,36 +249,65 @@ export function SettingsClient() {
               ]}
             />
           </FieldRow>
-          <FieldRow label="Homepage">
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 cursor-pointer">
+          <FieldRow label="Homepage" help="What visitors see when they arrive at the root URL (/)">
+            <div className="space-y-4">
+              <label className="flex items-start gap-3 cursor-pointer group">
                 <input
                   type="radio"
                   name="homepage_mode"
                   value="latest_articles"
                   checked={f('general.homepage_mode') !== 'static_page'}
                   onChange={() => set('general.homepage_mode', 'latest_articles')}
-                  className="accent-blue-500"
+                  className="accent-blue-500 mt-0.5"
                 />
-                <span className="text-sm text-neutral-200">Latest Articles</span>
+                <div>
+                  <span className="text-sm font-medium text-neutral-200">Article Feed</span>
+                  <p className="text-xs text-neutral-500 mt-0.5">Visitors arriving at / are redirected to /articles</p>
+                </div>
               </label>
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label className="flex items-start gap-3 cursor-pointer group">
                 <input
                   type="radio"
                   name="homepage_mode"
                   value="static_page"
                   checked={f('general.homepage_mode') === 'static_page'}
                   onChange={() => set('general.homepage_mode', 'static_page')}
-                  className="accent-blue-500"
+                  className="accent-blue-500 mt-0.5"
                 />
-                <span className="text-sm text-neutral-200">Static Page</span>
+                <div>
+                  <span className="text-sm font-medium text-neutral-200">Custom Page</span>
+                  <p className="text-xs text-neutral-500 mt-0.5">A specific page from your Pages library is displayed at /</p>
+                </div>
               </label>
               {f('general.homepage_mode') === 'static_page' && (
-                <TextInput
-                  value={f('general.homepage_page_id')}
-                  onChange={(v) => set('general.homepage_page_id', v)}
-                  placeholder="Page ID"
-                />
+                <div className="ml-7 space-y-2">
+                  <select
+                    value={f('general.homepage_page_id')}
+                    onChange={(e) => set('general.homepage_page_id', e.target.value)}
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-neutral-500"
+                  >
+                    <option value="">— select a page —</option>
+                    {publishedPages.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.title}{p.slug === '_home_' ? ' (built-in homepage)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {f('general.homepage_page_id') && (() => {
+                    const selected = publishedPages.find((p) => p.id === f('general.homepage_page_id'));
+                    return selected ? (
+                      <p className="text-xs text-neutral-500">
+                        Edit this page at{' '}
+                        <a
+                          href={`/admin/pages/${selected.id}/edit`}
+                          className="text-blue-400 hover:underline"
+                        >
+                          Admin → Pages → {selected.title}
+                        </a>
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
               )}
             </div>
           </FieldRow>

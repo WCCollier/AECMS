@@ -359,6 +359,11 @@ export class PagesService {
     // Check edit permissions
     this.checkEditAccess(page, userId, isAdmin);
 
+    // Prevent the system homepage page from having its slug changed
+    if (page.slug === '_home_' && dto.slug && dto.slug !== '_home_') {
+      throw new ConflictException('The system homepage slug "_home_" cannot be changed.');
+    }
+
     // Check slug uniqueness if changing (within siblings only)
     if (dto.slug && dto.slug !== page.slug) {
       if (RESERVED_SLUGS.includes(dto.slug)) {

@@ -31,13 +31,15 @@ export class PublicSettingsController {
   }
 
   @Get('general')
-  @ApiOperation({ summary: 'Get general site settings (title, tagline)' })
+  @ApiOperation({ summary: 'Get general site settings (title, tagline, homepage mode)' })
   async getGeneral() {
-    const [site_title, tagline] = await Promise.all([
+    const [site_title, tagline, homepage_mode, homepage_page_id] = await Promise.all([
       this.settingsService.getEffective('general.site_title'),
       this.settingsService.getEffective('general.tagline'),
+      this.settingsService.getEffective('general.homepage_mode'),
+      this.settingsService.getEffective('general.homepage_page_id'),
     ]);
-    return { site_title, tagline };
+    return { site_title, tagline, homepage_mode, homepage_page_id };
   }
 }
 
