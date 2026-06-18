@@ -273,7 +273,7 @@ describe('DigitalProductsService', () => {
         format: 'epub',
         file_id: 'path/file.epub',
         personalization_enabled: false,
-        product: { name: 'Test Book' },
+        product: { title: 'Test Book' },
       },
       order: { order_number: 'ORD-001', created_at: new Date() },
     };
@@ -367,7 +367,7 @@ describe('DigitalProductsService', () => {
         last_downloaded_at: null,
         digital_file: {
           format: 'epub',
-          product: { name: 'Test Book' },
+          product: { title: 'Test Book' },
         },
       };
 

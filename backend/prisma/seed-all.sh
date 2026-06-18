@@ -2,8 +2,17 @@
 set -e
 cd "$(dirname "$0")/.."
 
-echo "=== Running all seed scripts ==="
-npx ts-node prisma/seed.ts        # users, capabilities, site settings
-npx ts-node prisma/seed-fvr.ts    # FvR articles + lessons (reads FvR_Deployment/fvr-content.xml)
-npx ts-node prisma/seed-orders.ts # faux order history
-echo "=== All seeds complete ==="
+PROFILE=${SEED_PROFILE:-minimal}
+echo "=== Running seed scripts (SEED_PROFILE=${PROFILE}) ==="
+
+# Always: capabilities, roles, site settings defaults
+npx ts-node prisma/seed.ts
+
+# fvr profile: FvR-specific content + test orders
+if [ "$PROFILE" = "fvr" ] || [ "$PROFILE" = "demo" ]; then
+  echo "--- Profile '${PROFILE}': seeding FvR content ---"
+  npx ts-node prisma/seed-fvr.ts
+  npx ts-node prisma/seed-orders.ts
+fi
+
+echo "=== Seed complete ==="

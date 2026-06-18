@@ -18,7 +18,8 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log('Starting database seeding...');
+  const profile = (process.env.SEED_PROFILE ?? 'minimal').trim();
+  console.log(`Starting database seeding (SEED_PROFILE=${profile})...`);
 
   // ============================================
   // SEED CAPABILITIES
@@ -116,74 +117,59 @@ async function main() {
   }
 
   // ============================================
-  // SEED USERS
+  // SEED USERS  (skipped in minimal profile — setup wizard creates the Owner)
   // ============================================
-  console.log('\n[2/3] Seeding users...');
+  if (profile !== 'minimal') {
+    console.log('\n[2/3] Seeding dev users...');
 
-  // Hash password with same cost factor as auth service
-  const passwordHash = await bcrypt.hash('Admin123!@#', 12);
+    const passwordHash = await bcrypt.hash('Admin123!@#', 12);
 
-  // Create Owner user
-  const owner = await prisma.user.upsert({
-    where: { email: 'owner@aecms.local' },
-    update: {},
-    create: {
-      email: 'owner@aecms.local',
-      password_hash: passwordHash,
-      first_name: 'System',
-      last_name: 'Owner',
-      role: UserRole.owner,
-      email_verified: true,
-    },
-  });
+    const owner = await prisma.user.upsert({
+      where: { email: 'owner@aecms.local' },
+      update: {},
+      create: {
+        email: 'owner@aecms.local',
+        password_hash: passwordHash,
+        first_name: 'System',
+        last_name: 'Owner',
+        role: UserRole.owner,
+        email_verified: true,
+      },
+    });
+    console.log('✓ Created Owner user:', { email: owner.email, role: owner.role, id: owner.id });
 
-  console.log('✓ Created Owner user:', {
-    email: owner.email,
-    role: owner.role,
-    id: owner.id,
-  });
+    const adminHash = await bcrypt.hash('Admin123!@#', 12);
+    const admin = await prisma.user.upsert({
+      where: { email: 'admin@aecms.local' },
+      update: {},
+      create: {
+        email: 'admin@aecms.local',
+        password_hash: adminHash,
+        first_name: 'System',
+        last_name: 'Admin',
+        role: UserRole.admin,
+        email_verified: true,
+      },
+    });
+    console.log('✓ Created Admin user:', { email: admin.email, role: admin.role, id: admin.id });
 
-  // Create test Admin user
-  const adminHash = await bcrypt.hash('Admin123!@#', 12);
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@aecms.local' },
-    update: {},
-    create: {
-      email: 'admin@aecms.local',
-      password_hash: adminHash,
-      first_name: 'System',
-      last_name: 'Admin',
-      role: UserRole.admin,
-      email_verified: true,
-    },
-  });
-
-  console.log('✓ Created Admin user:', {
-    email: admin.email,
-    role: admin.role,
-    id: admin.id,
-  });
-
-  // Create test Member user
-  const memberHash = await bcrypt.hash('Member123!@#', 12);
-  const member = await prisma.user.upsert({
-    where: { email: 'member@aecms.local' },
-    update: {},
-    create: {
-      email: 'member@aecms.local',
-      password_hash: memberHash,
-      first_name: 'Test',
-      last_name: 'Member',
-      role: UserRole.member,
-      email_verified: true,
-    },
-  });
-
-  console.log('✓ Created Member user:', {
-    email: member.email,
-    role: member.role,
-    id: member.id,
-  });
+    const memberHash = await bcrypt.hash('Member123!@#', 12);
+    const member = await prisma.user.upsert({
+      where: { email: 'member@aecms.local' },
+      update: {},
+      create: {
+        email: 'member@aecms.local',
+        password_hash: memberHash,
+        first_name: 'Test',
+        last_name: 'Member',
+        role: UserRole.member,
+        email_verified: true,
+      },
+    });
+    console.log('✓ Created Member user:', { email: member.email, role: member.role, id: member.id });
+  } else {
+    console.log('\n[2/3] Skipping dev users (minimal profile — setup wizard creates Owner)');
+  }
 
   // ============================================
   // SEED ROLE CAPABILITIES
@@ -273,12 +259,11 @@ async function main() {
   console.log('\n[4/4] Seeding default site settings...');
 
   const defaultSettings = [
-    { key: 'general.site_title',    value: 'My AECMS Site' },
+    { key: 'general.site_title',    value: 'My Site' },
     { key: 'general.tagline',       value: '' },
     { key: 'general.timezone',      value: 'America/New_York' },
     { key: 'general.date_format',   value: 'MMM D, YYYY' },
     { key: 'general.homepage_mode', value: 'latest_articles' },
-    { key: 'payment.test_mode',     value: 'true' },
   ];
 
   for (const setting of defaultSettings) {
@@ -291,8 +276,11 @@ async function main() {
   console.log(`✓ Seeded ${defaultSettings.length} default settings`);
 
   // ============================================
-  // SEED HOMEPAGE PAGE
+  // SEED HOMEPAGE PAGE  (skipped in minimal profile — FvR-specific content)
   // ============================================
+  if (profile === 'minimal') {
+    console.log('\n[5/5] Skipping homepage page (minimal profile)');
+  } else {
   console.log('\n[5/5] Seeding homepage page...');
 
   const homepageContent = {
@@ -468,11 +456,17 @@ async function main() {
     console.log('✓ Homepage page already exists — skipping');
   }
 
+  } // end: profile !== 'minimal'
+
   console.log('\n=== Database seeding completed ===');
-  console.log('\nTest credentials:');
-  console.log('Owner:  owner@aecms.local  / Admin123!@#');
-  console.log('Admin:  admin@aecms.local  / Admin123!@#');
-  console.log('Member: member@aecms.local / Member123!@#');
+  if (profile !== 'minimal') {
+    console.log('\nTest credentials:');
+    console.log('Owner:  owner@aecms.local  / Admin123!@#');
+    console.log('Admin:  admin@aecms.local  / Admin123!@#');
+    console.log('Member: member@aecms.local / Member123!@#');
+  } else {
+    console.log('Minimal profile: no users created. Visit /setup to create your Owner account.');
+  }
 }
 
 main()

@@ -1,6 +1,32 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// ── Setup status cache ────────────────────────────────────────────────────────
+let setupRequired: boolean | null = null;
+let setupRequiredExpiry = 0;
+
+async function checkSetupRequired(): Promise<boolean> {
+  // Once confirmed not required, never need to check again (Owner cannot be deleted)
+  if (setupRequired === false) return false;
+  // Re-check every 30s while required (so redirect lifts quickly after wizard completes)
+  if (setupRequired === true && Date.now() < setupRequiredExpiry) return true;
+
+  try {
+    const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:4000';
+    const res = await fetch(`${backendUrl}/setup/status`, { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      setupRequired = Boolean(data.required);
+      setupRequiredExpiry = Date.now() + 30_000;
+    }
+  } catch {
+    // If backend is unreachable, don't block the request
+    return false;
+  }
+  return setupRequired ?? false;
+}
+
+// ── Domain alias cache ────────────────────────────────────────────────────────
 let aliasCache: Array<{ domain: string; target_route: string; alias_type: string }> | null = null;
 let aliasCacheExpiry = 0;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -26,6 +52,23 @@ async function getActiveAliases() {
 }
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // ── First-run setup redirect ──────────────────────────────────────────────
+  // Allow /setup itself and API proxy calls through unconditionally
+  const isSetupExempt =
+    pathname === '/setup' ||
+    pathname.startsWith('/api-proxy/') ||
+    pathname.startsWith('/uploads/');
+
+  if (!isSetupExempt) {
+    const required = await checkSetupRequired();
+    if (required) {
+      return NextResponse.redirect(new URL('/setup', request.url));
+    }
+  }
+
+  // ── Domain alias redirect ─────────────────────────────────────────────────
   const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN ?? '';
   const host = (request.headers.get('host') ?? '').replace(/:\d+$/, ''); // strip port
 

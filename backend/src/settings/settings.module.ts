@@ -9,13 +9,18 @@ import { SettingsController, PublicSettingsController } from './settings.control
 import { TestEmailService } from './test-email.service';
 import { KEY_PROVIDER } from './key-provider.interface';
 import { LocalKeyProvider } from './local-key.provider';
+import { GcpKeyProvider } from './gcp-key.provider';
 
 const keyProviderFactory = {
   provide: KEY_PROVIDER,
   useFactory: (config: ConfigService) => {
     const providerType = config.get<string>('SETTINGS_KMS_PROVIDER', 'local');
     switch (providerType) {
-      // Future: 'gcp', 'aws', 'vault' providers go here
+      case 'gcp':
+        return new GcpKeyProvider(
+          config.get<string>('GCP_PROJECT_ID', ''),
+          config.get<string>('SETTINGS_KMS_SECRET_ID', 'aecms-sek'),
+        );
       default:
         return new LocalKeyProvider(config.get<string>('SETTINGS_ENCRYPTION_KEY', ''));
     }

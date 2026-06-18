@@ -63,7 +63,7 @@ function ProductPicker({ onSelect, onCancel }: { onSelect: (id: string) => void;
               onClick={() => onSelect(p.id)}
               className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-raised transition-colors"
             >
-              <p className="text-sm font-medium line-clamp-1">{p.name}</p>
+              <p className="text-sm font-medium line-clamp-1">{p.title}</p>
               <p className="text-xs text-foreground/50">
                 {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(p.price)}
                 {' · '}{p.status}

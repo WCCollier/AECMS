@@ -26,6 +26,7 @@ import { DomainAliasesModule } from './domain-aliases/domain-aliases.module';
 import { AuditModule } from './audit/audit.module';
 import { SettingsModule } from './settings/settings.module';
 import { ExternalFeedsModule } from './external-feeds/external-feeds.module';
+import { SetupModule } from './setup/setup.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { ExternalFeedsModule } from './external-feeds/external-feeds.module';
     AuditModule,
     SettingsModule,
     ExternalFeedsModule,
+    SetupModule,
   ],
   controllers: [AppController],
   providers: [AppService],

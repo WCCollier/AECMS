@@ -153,7 +153,7 @@ export interface Product {
 // See docs/Shape_Audit.md Item 7 for the full rationale.
 export interface CartProduct {
   id: string;
-  name: string;
+  title: string;
   slug: string;
   price: number;
   product_type: 'physical' | 'digital' | 'service';
