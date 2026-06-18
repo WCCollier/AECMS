@@ -5,6 +5,7 @@ import { SettingsService } from '../settings/settings.service';
 import { LocalStorageProvider } from './local-storage.provider';
 import { GcsStorageProvider } from './gcs-storage.provider';
 import { S3StorageProvider } from './s3-storage.provider';
+import { StorageController } from './storage.controller';
 import { STORAGE_PROVIDER, StorageProviderType } from './storage.interface';
 
 /**
@@ -22,6 +23,7 @@ import { STORAGE_PROVIDER, StorageProviderType } from './storage.interface';
 @Global()
 @Module({
   imports: [ConfigModule, SettingsModule],
+  controllers: [StorageController],
   providers: [
     {
       provide: STORAGE_PROVIDER,

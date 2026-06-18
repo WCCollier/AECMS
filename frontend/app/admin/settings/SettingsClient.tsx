@@ -7,13 +7,14 @@ import adminApi from '@/lib/adminApi';
 
 const fetcher = (url: string) => adminApi.get(url).then((r) => r.data);
 
-type TabId = 'general' | 'identity' | 'email' | 'payment';
+type TabId = 'general' | 'identity' | 'email' | 'payment' | 'storage';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'identity', label: 'Site Identity' },
   { id: 'email', label: 'Email / SMTP' },
   { id: 'payment', label: 'Payment Providers' },
+  { id: 'storage', label: 'File Storage' },
 ];
 
 const TIMEZONES = [
@@ -216,6 +217,27 @@ export function SettingsClient() {
     } catch (err: any) {
       setPaypalStatus('error');
       setPaypalError(err?.response?.data?.message ?? 'PayPal connection failed');
+    }
+  };
+
+  const [storageStatus, setStorageStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
+  const [storageMessage, setStorageMessage] = useState('');
+
+  const handleTestStorage = async () => {
+    setStorageStatus('checking');
+    setStorageMessage('');
+    try {
+      const res = await adminApi.post<{ success: boolean; provider: string; message: string }>('/settings/test-storage');
+      if (res.data.success) {
+        setStorageStatus('ok');
+        setStorageMessage(res.data.message);
+      } else {
+        setStorageStatus('error');
+        setStorageMessage(res.data.message);
+      }
+    } catch (err: any) {
+      setStorageStatus('error');
+      setStorageMessage(err?.response?.data?.message ?? 'Storage test failed');
     }
   };
 
@@ -455,43 +477,6 @@ export function SettingsClient() {
       {/* ─── Payment Providers ─── */}
       {activeTab === 'payment' && (
         <div className="space-y-8">
-          {/* Mode toggle */}
-          <FieldRow label="Payment Mode">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="payment_mode"
-                  value="true"
-                  checked={f('payment.test_mode') !== 'false'}
-                  onChange={() => set('payment.test_mode', 'true')}
-                  className="accent-blue-500"
-                />
-                <span className="text-sm text-neutral-200">Test Mode</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="payment_mode"
-                  value="false"
-                  checked={f('payment.test_mode') === 'false'}
-                  onChange={() => {
-                    if (window.confirm('Switch to Live Mode? Real charges will be processed. Make sure your live API keys are configured.')) {
-                      set('payment.test_mode', 'false');
-                    }
-                  }}
-                  className="accent-red-500"
-                />
-                <span className="text-sm text-red-400 font-medium">Live Mode ⚠️</span>
-              </label>
-            </div>
-            {f('payment.test_mode') === 'false' && (
-              <p className="mt-2 text-xs text-red-400 bg-red-900/20 border border-red-800 rounded p-2">
-                Live mode is active. Real charges will be processed.
-              </p>
-            )}
-          </FieldRow>
-
           {/* Stripe */}
           <div className="border border-neutral-800 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
@@ -549,6 +534,108 @@ export function SettingsClient() {
             >
               {paypalStatus === 'checking' ? <Loader2 size={12} className="animate-spin" /> : null}
               Verify PayPal Connection
+            </button>
+          </div>
+
+          <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />
+        </div>
+      )}
+
+      {/* ─── File Storage (ESM) ─── */}
+      {activeTab === 'storage' && (
+        <div className="space-y-8">
+          {/* Provider selector */}
+          <FieldRow label="Storage Provider" help="Where uploaded media and digital product files are stored">
+            <Select
+              value={f('storage.provider_type') || 'local'}
+              onChange={(v) => set('storage.provider_type', v)}
+              options={[
+                { value: 'local', label: 'Local filesystem (default — dev / single-server)' },
+                { value: 'gcs', label: 'Google Cloud Storage (GCS)' },
+                { value: 's3', label: 'S3-compatible (AWS, Cloudflare R2, Backblaze B2, etc.)' },
+              ]}
+            />
+            <p className="text-xs text-neutral-500 mt-1">
+              Changing this requires restarting the backend. Credentials are read lazily — no restart needed after saving keys.
+            </p>
+          </FieldRow>
+
+          {/* CDN Base URL — applies to any cloud provider */}
+          {(f('storage.provider_type') === 'gcs' || f('storage.provider_type') === 's3') && (
+            <FieldRow label="CDN Base URL" help="Optional. If set, public media URLs are prefixed with this instead of the default bucket URL (e.g. https://cdn.example.com)">
+              <TextInput value={f('storage.cdn_base_url')} onChange={(v) => set('storage.cdn_base_url', v)} placeholder="https://cdn.yourdomain.com" />
+            </FieldRow>
+          )}
+
+          {/* GCS config */}
+          {f('storage.provider_type') === 'gcs' && (
+            <div className="border border-neutral-800 rounded-lg p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-neutral-200 mb-2">Google Cloud Storage</h3>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Media Bucket <span className="text-neutral-500">(public images, uploaded media)</span></label>
+                <TextInput value={f('storage.gcs_bucket_media')} onChange={(v) => set('storage.gcs_bucket_media', v)} placeholder="my-site-media" />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Digital Files Bucket <span className="text-neutral-500">(private — EPUBs, PDFs, downloads)</span></label>
+                <TextInput value={f('storage.gcs_bucket_digital')} onChange={(v) => set('storage.gcs_bucket_digital', v)} placeholder="my-site-digital" />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">GCP Project ID <span className="text-neutral-500">(optional if using Workload Identity)</span></label>
+                <TextInput value={f('storage.gcs_project_id')} onChange={(v) => set('storage.gcs_project_id', v)} placeholder="my-gcp-project" />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Service Account JSON <span className="text-neutral-500">(leave blank on Cloud Run — uses Workload Identity automatically)</span></label>
+                <SecretInput value={f('storage.gcs_credentials_json_enc')} onChange={(v) => set('storage.gcs_credentials_json_enc', v)} placeholder='{"type":"service_account",...}' />
+              </div>
+            </div>
+          )}
+
+          {/* S3 config */}
+          {f('storage.provider_type') === 's3' && (
+            <div className="border border-neutral-800 rounded-lg p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-neutral-200 mb-2">S3-Compatible Storage</h3>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Media Bucket <span className="text-neutral-500">(public images, uploaded media)</span></label>
+                <TextInput value={f('storage.s3_bucket_media')} onChange={(v) => set('storage.s3_bucket_media', v)} placeholder="my-site-media" />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Digital Files Bucket <span className="text-neutral-500">(private — EPUBs, PDFs, downloads)</span></label>
+                <TextInput value={f('storage.s3_bucket_digital')} onChange={(v) => set('storage.s3_bucket_digital', v)} placeholder="my-site-digital" />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Region</label>
+                <TextInput value={f('storage.s3_region')} onChange={(v) => set('storage.s3_region', v)} placeholder="us-east-1" />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Endpoint URL <span className="text-neutral-500">(leave blank for AWS; required for R2, B2, Spaces, etc.)</span></label>
+                <TextInput value={f('storage.s3_endpoint')} onChange={(v) => set('storage.s3_endpoint', v)} placeholder="https://abc123.r2.cloudflarestorage.com" />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Access Key ID</label>
+                <TextInput value={f('storage.s3_access_key_id')} onChange={(v) => set('storage.s3_access_key_id', v)} placeholder="AKIA..." />
+              </div>
+              <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Secret Access Key</label>
+                <SecretInput value={f('storage.s3_secret_access_key_enc')} onChange={(v) => set('storage.s3_secret_access_key_enc', v)} />
+              </div>
+            </div>
+          )}
+
+          {/* Test connection */}
+          <div className="border border-neutral-800 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-neutral-200">Connection Test</h3>
+              {storageStatus === 'ok' && <span className="flex items-center gap-1 text-xs text-green-400"><CheckCircle size={12} /> {storageMessage}</span>}
+              {storageStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-400"><XCircle size={12} /> {storageMessage}</span>}
+            </div>
+            <p className="text-xs text-neutral-500 mb-3">Save your settings first, then click Test to verify a write/read/delete round-trip against the active provider.</p>
+            <button
+              onClick={handleTestStorage}
+              disabled={storageStatus === 'checking'}
+              className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white text-xs px-3 py-1.5 rounded"
+            >
+              {storageStatus === 'checking' ? <Loader2 size={12} className="animate-spin" /> : null}
+              Test Storage Connection
             </button>
           </div>
 
