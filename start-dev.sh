@@ -78,6 +78,9 @@ pkill -f "nest start" 2>/dev/null || true
 kill "$(lsof -ti:4000)" 2>/dev/null || true
 sleep 1
 cd "$BACKEND_DIR"
+# Override any shell-level REDIS_URL (Codespace secret uses Docker hostname 'redis';
+# the backend runs on the host so it must connect via localhost:6379)
+export REDIS_URL=redis://localhost:6379
 nohup npm run start:dev > /tmp/backend.log 2>&1 &
 echo "  Backend PID: $!  (logs: tail -f /tmp/backend.log)"
 

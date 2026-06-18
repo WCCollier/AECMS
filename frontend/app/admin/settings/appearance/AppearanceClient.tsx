@@ -6,13 +6,10 @@ import { Save, Loader2, Palette, Type, ExternalLink } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
 import { PALETTES, FONT_PAIRINGS, buildCssOverrides, getPaletteById, getFontPairingById } from '@/lib/themes';
 
-// Fetch current theme from the public endpoint (no auth needed, avoids system.configure requirement)
-const publicFetcher = (url: string) => fetch(url).then((r) => r.json());
-
 export function AppearanceClient() {
   const { data: currentTheme } = useSWR<{ palette: string; fontPairing: string }>(
-    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/settings-public/theme`,
-    publicFetcher,
+    '/settings-public/theme',
+    (url: string) => adminApi.get(url).then((r) => r.data),
   );
 
   const [selectedPalette, setSelectedPalette] = useState('midnight');

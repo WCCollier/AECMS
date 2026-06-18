@@ -278,6 +278,184 @@ async function main() {
   }
   console.log(`✓ Seeded ${defaultSettings.length} default settings`);
 
+  // ============================================
+  // SEED HOMEPAGE PAGE
+  // ============================================
+  console.log('\n[5/5] Seeding homepage page...');
+
+  const homepageContent = {
+    layout: 'no_sidebar',
+    zones: {
+      main: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            attrs: { textAlign: 'center' },
+            content: [{ type: 'text', text: 'Fantasy v Reality' }],
+          },
+          {
+            type: 'heading',
+            attrs: { level: 1, textAlign: 'center' },
+            content: [{ type: 'text', text: 'Ideas worth fighting for' }],
+          },
+          {
+            type: 'paragraph',
+            attrs: { textAlign: 'center' },
+            content: [
+              {
+                type: 'text',
+                text: 'Philosophy, fiction, and firearms — written from principle, not from permission.',
+              },
+            ],
+          },
+          {
+            type: 'paragraph',
+            attrs: { textAlign: 'center' },
+            content: [
+              {
+                type: 'text',
+                marks: [{ type: 'link', attrs: { href: '/articles', target: '_self' } }],
+                text: 'Read Latest',
+              },
+              { type: 'text', text: ' · ' },
+              {
+                type: 'text',
+                marks: [{ type: 'link', attrs: { href: '/shop', target: '_self' } }],
+                text: 'Browse Shop',
+              },
+            ],
+          },
+          {
+            type: 'richTextBox',
+            attrs: { show_when: 'always' },
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', marks: [{ type: 'bold' }], text: 'Short Thoughts' }],
+              },
+              {
+                type: 'heading',
+                attrs: { level: 2 },
+                content: [{ type: 'text', text: 'Philosophy' }],
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Brief, direct takes on ideas that matter — rights, language, courage, government, and what it means to be a warrior.',
+                  },
+                ],
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    marks: [{ type: 'link', attrs: { href: '/articles', target: '_self' } }],
+                    text: 'Read 50+ articles →',
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'richTextBox',
+            attrs: { show_when: 'always' },
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', marks: [{ type: 'bold' }], text: 'Book Reviews' }],
+              },
+              {
+                type: 'heading',
+                attrs: { level: 2 },
+                content: [{ type: 'text', text: 'Reading' }],
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Honest reviews of fiction and non-fiction — sci-fi, military, fantasy, and Christian literature.',
+                  },
+                ],
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    marks: [{ type: 'link', attrs: { href: '/articles', target: '_self' } }],
+                    text: 'Browse reviews →',
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            type: 'richTextBox',
+            attrs: { show_when: 'always' },
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', marks: [{ type: 'bold' }], text: 'Shop' }],
+              },
+              {
+                type: 'heading',
+                attrs: { level: 2 },
+                content: [{ type: 'text', text: 'American Shooter' }],
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text: 'Curriculum for gun owners who want to think clearly about firearms, safety, and self-defense.',
+                  },
+                ],
+              },
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    marks: [{ type: 'link', attrs: { href: '/shop', target: '_self' } }],
+                    text: 'Browse 3 courses →',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    },
+  };
+
+  const homepageExists = await prisma.page.findFirst({
+    where: { slug: '_home_', parent_id: null },
+  });
+
+  if (!homepageExists) {
+    await prisma.page.create({
+      data: {
+        title: 'Homepage',
+        slug: '_home_',
+        content: JSON.stringify(homepageContent),
+        status: 'published',
+        visibility: 'public',
+        show_in_nav: false,
+        nav_order: 0,
+        published_at: new Date(),
+        admin_can_delete: false, // prevent accidental deletion from admin list
+      },
+    });
+    console.log('✓ Created homepage page (slug: _home_)');
+  } else {
+    console.log('✓ Homepage page already exists — skipping');
+  }
+
   console.log('\n=== Database seeding completed ===');
   console.log('\nTest credentials:');
   console.log('Owner:  owner@aecms.local  / Admin123!@#');

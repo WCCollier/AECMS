@@ -114,6 +114,13 @@ This document describes content features for articles, but these apply equally t
 - Block quotes
 - Horizontal rules
 
+**Text Coloring — Design Constraint and Future Roadmap**:
+
+> **Literal (hex/RGB) text colors are explicitly excluded from the editor.** The application uses a runtime theme system where all color values are CSS custom properties (`--color-foreground`, `--color-accent`, etc.) resolved at render time from the active palette. Inline `style="color: #xxxxxx"` attributes written by a color picker would bypass the theme system entirely, becoming permanently hardcoded to the palette that was active when the content was authored. After a theme change, such text can become illegible (e.g. near-white text on a light background).
+
+- **MVP**: No text coloring tool in the editor. Authors use structural emphasis (bold, italic, headings, callout widgets) instead of color.
+- **Future upgrade (post-MVP)**: Semantic text coloring — a color picker that stores Tailwind utility class names (`text-accent`, `text-muted`, `text-danger`) rather than hex values. The TipTap `TextStyle` + custom `Color` mark would store `class="text-accent"` on the span, which the theme system resolves correctly at render time regardless of which palette is active. This requires a custom mark extension and a palette-aware color picker UI that shows theme swatches, not a color wheel.
+
 **Media Embedding**:
 
 **Embedding Capabilities by Role**:

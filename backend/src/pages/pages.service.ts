@@ -13,6 +13,7 @@ import { AuditLogService, diffChanges } from '../audit/audit.service';
 const RESERVED_SLUGS = [
   'shop', 'articles', 'cart', 'checkout', 'account',
   'order-confirmation', 'admin', 'auth', 'api',
+  '_home_', // system slug for the editable root landing page
 ];
 
 @Injectable()

@@ -93,6 +93,10 @@ export interface Page {
   published_at: string | null;
   parent_id: string | null;
   sort_order: number;
+  show_in_nav: boolean;
+  nav_order: number;
+  admin_can_edit: boolean;
+  admin_can_delete: boolean;
   meta_title?: string | null;
   meta_description?: string | null;
   created_at: string;

@@ -1,13 +1,37 @@
 export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { Button } from '@/components/ui';
+import { PageRenderer } from '@/components/pages/PageRenderer';
+import type { Page } from '@/types';
 
-export default function HomePage() {
+async function getHomepage(): Promise<Page | null> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+    const res = await fetch(`${baseUrl}/pages/slug/_home_`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    const page: Page = await res.json();
+    if (page.status !== 'published' || page.visibility === 'admin_only') return null;
+    return page;
+  } catch {
+    return null;
+  }
+}
+
+export default async function HomePage() {
+  const page = await getHomepage();
+
+  if (page) {
+    return (
+      <div>
+        <PageRenderer page={page} />
+      </div>
+    );
+  }
+
+  // Fallback: rendered when the _home_ page hasn't been seeded yet
   return (
     <>
-      {/* Hero */}
       <section className="relative py-28 px-4 overflow-hidden">
-        {/* subtle radial glow */}
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="w-[600px] h-[600px] rounded-full bg-accent/5 blur-3xl" />
         </div>
@@ -34,10 +58,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Divider */}
       <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent mx-4" />
 
-      {/* Content pillars */}
       <section className="py-20 px-4 bg-surface/40">
         <div className="container mx-auto max-w-6xl">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

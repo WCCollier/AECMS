@@ -1,8 +1,8 @@
 # AECMS Comprehensive Testing Guide
 
-**Version**: 2.4  
-**Last Updated**: 2026-06-17  
-**Status**: Phase 14 complete + QA pass — digital delivery verified; SMTP active; badge/cart/slug fixes applied; username + name-at-checkout implemented
+**Version**: 2.5  
+**Last Updated**: 2026-06-18  
+**Status**: Phases 14–20 complete — digital delivery, settings UI, dynamic nav, alternate domain redirects, RSS feed widget, and themes all verified; Digital Library panel on account page; two security bugs fixed (capability info disclosure, appearance endpoint auth)
 
 ---
 
@@ -23,7 +23,7 @@ tail -f /tmp/backend.log /tmp/frontend.log
 
 **Run unit tests**
 ```bash
-cd /workspaces/AECMS/backend && npm run test     # 176 backend unit tests
+cd /workspaces/AECMS/backend && npm run test     # 190 backend unit tests
 cd /workspaces/AECMS/frontend && npm run test    # 125 frontend unit tests
 ```
 
@@ -47,7 +47,13 @@ cd /workspaces/AECMS/frontend && npm run test    # 125 frontend unit tests
 14. [Digital Products Testing](#digital-products-testing)
 15. [Comments & Moderation Testing](#comments--moderation-testing)
 16. [Domain Aliases Testing](#domain-aliases-testing)
-17. [Production Checklist](#production-checklist)
+17. [Digital Library Panel Testing](#digital-library-panel-testing-phase-14-qa)
+18. [Admin Settings Testing](#admin-settings-testing-phase-15)
+19. [Navigation & Routing Testing](#navigation--routing-testing-phase-16)
+20. [Alternate Domain Redirect Testing](#alternate-domain-redirect-testing-phase-17)
+21. [RSS Feed Widget Testing](#rss-feed-widget-testing-phase-18)
+22. [Themes & Appearance Testing](#themes--appearance-testing-phase-20)
+23. [Production Checklist](#production-checklist)
 
 ---
 
@@ -57,7 +63,7 @@ cd /workspaces/AECMS/frontend && npm run test    # 125 frontend unit tests
 |------|-------|----------|-------|
 | Owner | owner@aecms.local | Admin123!@# | All permissions; owner of seeded content |
 | Admin | admin@aecms.local | Admin123!@# | Most backstage capabilities |
-| Member | member@aecms.local | Let' | Customer-facing only |
+| Member | member@aecms.local | Member123!@# | Customer-facing only |
 
 **Get a customer-session token (curl):**
 ```bash
@@ -284,7 +290,7 @@ See `docs/PHASE_13_PLAN.md` for the full checklist with step-by-step instruction
 
 ## Automated Testing
 
-### Backend Unit Tests (176 tests)
+### Backend Unit Tests (190 tests)
 
 ```bash
 cd /workspaces/AECMS/backend && npm run test
@@ -332,10 +338,10 @@ curl -s -X POST http://localhost:4000/auth/login \
 # Get profile
 curl -s http://localhost:4000/auth/me -H "Authorization: Bearer $TOKEN" | jq .
 
-# Refresh token
+# Refresh token (field name is camelCase: refreshToken)
 curl -s -X POST http://localhost:4000/auth/refresh \
   -H "Content-Type: application/json" \
-  -d '{"refresh_token":"<REFRESH_TOKEN>"}' | jq .
+  -d '{"refreshToken":"<REFRESH_TOKEN>"}' | jq .
 
 # Logout
 curl -s -X POST http://localhost:4000/auth/logout \
@@ -1359,6 +1365,398 @@ curl -s "http://localhost:4000/domain-aliases" -H "Authorization: Bearer $MEMBER
 
 ---
 
+## Digital Library Panel Testing (Phase 14 QA)
+
+The Digital Library panel on `/account` gives buyers a single consolidated view of all their digital purchases across all orders, so they don't have to dig through order history to find download links.
+
+### Backend: all-purchases endpoint
+
+```bash
+MEMBER_TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"member@aecms.local","password":"Member123!@#"}' | jq -r '.accessToken')
+
+# Get all download records across all orders for this user
+curl -s http://localhost:4000/digital-products/my-downloads \
+  -H "Authorization: Bearer $MEMBER_TOKEN" \
+  | jq '.[] | {format, productName: .product.name, downloadCount, maxDownloads, expiresAt}'
+
+# Returns [] for users with no digital purchases — panel is hidden in that case
+```
+
+### Verify download token is usable from panel
+
+```bash
+DOWNLOADS=$(curl -s http://localhost:4000/digital-products/my-downloads \
+  -H "Authorization: Bearer $MEMBER_TOKEN")
+DL_TOKEN=$(echo $DOWNLOADS | jq -r '.[0].downloadToken')
+
+curl -sI "http://localhost:4000/digital-products/download/$DL_TOKEN"
+# Expected: 200 with Content-Disposition: attachment
+```
+
+### Account page panel (UI)
+
+1. Log in as a member who has purchased a digital product
+2. Navigate to `/account`
+3. The **My Digital Library** section appears between Profile and Order History
+4. The section is absent entirely if the user has no digital purchases
+5. Each purchased product appears as a group heading
+6. Under each product: one row per format (EPUB / PDF) showing:
+   - Format badge
+   - Download progress bar ("3 of 5 remaining")
+   - Expiry date
+   - **Download** button
+   - **Kindle** button (EPUB rows only)
+   - **Request renewal** button (replaces the above when exhausted or expired)
+
+### Checklist
+- [ ] `GET /digital-products/my-downloads` returns all formats across all orders for the user
+- [ ] Returns `[]` for users with no digital purchases
+- [ ] Panel is invisible on `/account` for users with no purchases
+- [ ] Panel appears between Profile and Order History sections
+- [ ] Each product is a group with its formats listed below
+- [ ] Download button works from the panel (count decrements)
+- [ ] Kindle button appears for EPUB rows only
+- [ ] Exhausted/expired rows show "Request renewal" button instead
+
+---
+
+## Admin Settings Testing (Phase 15)
+
+Covers SiteSettings DB table, AES-256-GCM KeyProvider, and the settings UI tabs (General / Identity / Email / Payment). **Owner** role has `system.configure` (full read/write). **Admin** role has `system.appearance` only (can update the `theme` key via `PATCH /settings/appearance`).
+
+### Public settings (no auth required)
+
+```bash
+# Theme — used by root layout for CSS variable injection
+curl -s http://localhost:4000/settings-public/theme | jq .
+# Returns: { "palette": "midnight", "fontPairing": "default" }
+
+# General — site title and tagline
+curl -s http://localhost:4000/settings-public/general | jq .
+# Returns: { "site_title": "AECMS", "tagline": "..." }
+```
+
+### Full settings read (Owner only — requires `system.configure`)
+
+```bash
+# Backstage Owner token required
+curl -s http://localhost:4000/settings \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq 'keys'
+# Encrypted fields (SMTP password, API keys) are returned as "***"
+```
+
+### Update general settings (Owner only)
+
+```bash
+curl -s -X PATCH http://localhost:4000/settings \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "updates": {
+      "general.site_title": "My Site",
+      "general.tagline": "Powered by AECMS"
+    }
+  }' | jq .
+
+# Verify via public endpoint
+curl -s http://localhost:4000/settings-public/general | jq .
+# Should return updated values immediately
+```
+
+### Appearance update (`system.appearance` — Admin and Owner)
+
+```bash
+# Admin backstage token can update the theme key
+curl -s -X PATCH http://localhost:4000/settings/appearance \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "updates": {
+      "theme": "{\"palette\":\"forest\",\"fontPairing\":\"serif-classic\"}"
+    }
+  }' | jq .
+
+# Only the "theme" key is accepted — other keys are silently dropped
+curl -s -X PATCH http://localhost:4000/settings/appearance \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"updates":{"general.site_title":"Hack"}}' | jq .
+# Returns { "message": "Appearance saved" } but the setting is NOT changed
+
+# Confirm original value unchanged
+curl -s http://localhost:4000/settings-public/general | jq .site_title
+```
+
+### Test email (Owner only)
+
+```bash
+curl -s -X POST http://localhost:4000/settings/test-email \
+  -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
+# Sends a test email to the logged-in owner's email address
+
+# Confirm delivery in backend log
+grep -i "test email\|messageId" /tmp/backend.log | tail -3
+```
+
+### Access control
+
+```bash
+MEMBER_TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"member@aecms.local","password":"Member123!@#"}' | jq -r '.accessToken')
+
+# Customer-session token cannot reach any /settings endpoints
+curl -s http://localhost:4000/settings \
+  -H "Authorization: Bearer $MEMBER_TOKEN" | jq .
+# Expected: 401 (no backstage session)
+
+curl -s -X PATCH http://localhost:4000/settings/appearance \
+  -H "Authorization: Bearer $MEMBER_TOKEN" | jq .
+# Expected: 401
+```
+
+### Checklist
+- [ ] `GET /settings-public/theme` returns palette and fontPairing without auth
+- [ ] `GET /settings-public/general` returns site_title and tagline without auth
+- [ ] `GET /settings` requires Owner backstage token; encrypted fields shown as "***"
+- [ ] `PATCH /settings` updates general settings; verified via public endpoint
+- [ ] `PATCH /settings/appearance` accepted with Admin backstage token
+- [ ] `PATCH /settings/appearance` ignores non-theme keys silently
+- [ ] `POST /settings/test-email` sends and logs a messageId
+- [ ] Member and guest tokens receive 401 on all `/settings` endpoints
+
+---
+
+## Navigation & Routing Testing (Phase 16)
+
+Phase 16 added dynamic navigation menus sourced from the database, the `/articles` route (replacing `/latest`), a catch-all `[...slug]` route for pages, and page hierarchy (parent → child).
+
+### Dynamic nav endpoint
+
+```bash
+# Returns only published pages that have nav_label set
+curl -s http://localhost:4000/pages/nav | jq '.[] | {title,slug,nav_label,nav_order,parent_id}'
+```
+
+Open `http://localhost:3000` — the header should list links for every page returned by this endpoint, in `nav_order` sequence.
+
+### Articles route (formerly /latest)
+
+```bash
+# /articles returns published articles
+curl -s "http://localhost:4000/articles?status=published&limit=3" | jq '.data[] | {title,slug}'
+
+# /latest should 301-redirect to /articles in the browser
+curl -sI http://localhost:3000/latest | grep -E "^HTTP|^location"
+# Expected: HTTP/1.1 301 ... and location: /articles
+
+# Individual article at /articles/<slug>
+curl -s "http://localhost:4000/articles/slug/how-writing-works" | jq '{title,slug}'
+```
+
+### Catch-all page routing
+
+```bash
+# Get a page by slug (single level)
+curl -s "http://localhost:4000/pages/by-path/about" | jq '{id,title,slug,status}'
+
+# Create a parent + child page to test nesting
+PARENT=$(curl -s -X POST http://localhost:4000/pages \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"About","slug":"about","content":"{}","status":"published","visibility":"public"}')
+PARENT_ID=$(echo $PARENT | jq -r '.id')
+
+curl -s -X POST http://localhost:4000/pages \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Team\",\"slug\":\"team\",\"parent_id\":\"$PARENT_ID\",\"content\":\"{}\",\"status\":\"published\",\"visibility\":\"public\"}" \
+  | jq '{id,title,slug,parent_id}'
+
+# Child page is accessible at /about/team in the frontend
+```
+
+### Admin nav fields (UI)
+
+1. Log in at `/admin` (backstage session)
+2. **Pages → Edit** any published page
+3. Set **Nav Label** (e.g. "About Us") and **Nav Order** (e.g. 10), save
+4. Reload `http://localhost:3000` — header updates without a frontend rebuild
+
+### Checklist
+- [ ] `GET /pages/nav` returns only published pages with `nav_label` set
+- [ ] `/latest` in browser 301-redirects to `/articles`
+- [ ] `/articles` page loads with published articles
+- [ ] `/articles/<slug>` loads the individual article
+- [ ] `GET /pages/by-path/<slug>` returns the matching page
+- [ ] Catch-all `[...slug]` route renders the correct page from DB
+- [ ] Nav label set in admin appears in header without a server restart
+- [ ] Page hierarchy: child accessible at `/parent-slug/child-slug`
+
+---
+
+## Alternate Domain Redirect Testing (Phase 17)
+
+Phase 17 added Next.js middleware that issues a `301` redirect when a request arrives via a secondary domain configured with `alias_type = 'redirect'`.
+
+> Full end-to-end testing requires a real secondary domain pointing to your server. In development, verify the API shape and review the middleware source at `frontend/middleware.ts`.
+
+### Create a redirect alias
+
+```bash
+ALIAS=$(curl -s -X POST http://localhost:4000/domain-aliases \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"old.example.com","target_route":"/shop","alias_type":"redirect"}')
+echo $ALIAS | jq '{id,domain,alias_type,target_route,verification_token}'
+```
+
+### alias_type field
+
+```bash
+# List aliases and confirm alias_type is stored
+curl -s http://localhost:4000/domain-aliases \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  | jq '.[] | {domain,alias_type,status,target_route}'
+# alias_type "proxy" is reserved for a future phase (not yet implemented)
+```
+
+### Middleware behaviour (with real domain)
+
+When `Host: old.example.com` arrives at Next.js and the alias status is `active`:
+1. Middleware loads alias list from the DB (via backend API, cached)
+2. Matches `Host` header against `domain` field
+3. Issues `HTTP 301` to `https://<primary-domain><target_route>`
+
+### Checklist
+- [ ] `POST /domain-aliases` with `alias_type: "redirect"` stores the value correctly
+- [ ] `GET /domain-aliases` returns `alias_type` on each record
+- [ ] Only Owner backstage token can create/update/delete aliases
+- [ ] DNS verification flow generates a unique `verification_token`
+- [ ] Verified alias status transitions to `active`
+
+---
+
+## RSS Feed Widget Testing (Phase 18)
+
+Phase 18 added an external feeds module with Redis-cached preview and SSRF protection, an `RssFeedWidget` component, and an `RssEmbed` TipTap node for embedding feeds in articles and pages.
+
+### Backend: preview an RSS feed
+
+```bash
+# Preview a public RSS feed (Redis-cached for 15 min)
+curl -s "http://localhost:4000/external-feeds/preview?url=https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" \
+  | jq '{feedTitle:.feed.title, itemCount:(.items|length)}'
+
+# SSRF protection: private/internal addresses must be blocked
+curl -s "http://localhost:4000/external-feeds/preview?url=http://localhost:5432" | jq .
+# Expected: 400 "SSRF protection: private/internal addresses are not allowed"
+
+curl -s "http://localhost:4000/external-feeds/preview?url=http://169.254.169.254/metadata" | jq .
+# Expected: 400 (AWS metadata endpoint blocked)
+
+# Invalid URL
+curl -s "http://localhost:4000/external-feeds/preview?url=not-a-url" | jq .
+# Expected: 400 validation error
+```
+
+### Cache behaviour
+
+```bash
+# First call fetches live; subsequent calls within 15 min serve from Redis
+time curl -s "http://localhost:4000/external-feeds/preview?url=https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" > /dev/null
+time curl -s "http://localhost:4000/external-feeds/preview?url=https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml" > /dev/null
+# Second call should be <10 ms if cache hit
+```
+
+### Frontend: RssEmbed widget in TipTap editor
+
+1. Open an article at `/admin/articles/<ID>/edit`
+2. In the TipTap toolbar, click the RSS icon (External Feed)
+3. Paste a valid RSS URL in the dialog and click Insert
+4. The editor shows a live preview: feed title, first few items with a height fade, and a CTA button
+5. Save and view the published article — the feed renders the same way for visitors
+
+### Checklist
+- [ ] `GET /external-feeds/preview?url=<RSS_URL>` returns feed metadata and items
+- [ ] Private and link-local IP addresses return 400 (SSRF protection)
+- [ ] Second request for the same URL is noticeably faster (cache hit)
+- [ ] `RssEmbed` node insertable from TipTap toolbar
+- [ ] Feed preview in editor shows title, item list, and CTA
+- [ ] Feed renders correctly on the published article/page frontend
+
+---
+
+## Themes & Appearance Testing (Phase 20)
+
+Phase 20 added 8 color palettes, 5 typography pairings, CSS variable injection in the root layout, and the `/admin/settings/appearance` backstage UI.
+
+### Available palettes and font pairings
+
+Palette IDs: `midnight`, `ocean`, `forest`, `ember`, `monochrome`, `lavender`, `rose-gold`, `desert`  
+Font pairing IDs: `default`, `serif-classic`, `humanist`, `technical`, `editorial`
+
+All definitions live in `frontend/lib/themes.ts`.
+
+### Update theme via API
+
+```bash
+curl -s -X PATCH http://localhost:4000/settings/appearance \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "updates": {
+      "theme": "{\"palette\":\"ocean\",\"fontPairing\":\"serif-classic\"}"
+    }
+  }' | jq .
+
+# Verify publicly
+curl -s http://localhost:4000/settings-public/theme | jq .
+# Returns: { "palette": "ocean", "fontPairing": "serif-classic" }
+```
+
+### CSS variable injection
+
+The root layout (`frontend/app/layout.tsx`) fetches `/settings-public/theme` at request time and injects CSS custom properties on `<html>`. Verify:
+
+```bash
+curl -s http://localhost:3000 | grep -o 'style="--[^"]*"' | head -1
+# Expected output contains --color-background, --color-foreground, --color-accent, etc.
+```
+
+### Admin appearance UI
+
+1. Log in at `/admin` (Admin or Owner backstage session)
+2. Navigate to **Settings → Appearance**
+3. Current palette and font are pre-selected (loaded from `GET /settings-public/theme` — no `system.configure` required)
+4. Click a different palette — selection highlight moves; "Unsaved changes" label appears
+5. Click **Save & Publish**
+6. Hard-reload `http://localhost:3000` — site colours and fonts reflect the new theme
+
+### Reset to defaults
+
+```bash
+curl -s -X PATCH http://localhost:4000/settings/appearance \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"updates":{"theme":"{\"palette\":\"midnight\",\"fontPairing\":\"default\"}"}}' | jq .
+```
+
+### Checklist
+- [ ] 8 palette cards visible in `/admin/settings/appearance`
+- [ ] 5 font pairing rows visible
+- [ ] Current palette and font pre-selected on page load (no login as owner needed)
+- [ ] Selecting palette/font marks form dirty ("Unsaved changes")
+- [ ] Save & Publish writes to DB; `GET /settings-public/theme` reflects new values immediately
+- [ ] CSS variables injected on `<html>` element on `http://localhost:3000`
+- [ ] Site colours change after theme update + hard refresh
+- [ ] Member customer token cannot reach `/settings/appearance` (401)
+- [ ] `GET /settings-public/theme` returns `{ palette: "midnight", fontPairing: "default" }` when no theme stored
+
+---
+
 ## Production Checklist
 
 ### Before go-live
@@ -1406,27 +1804,30 @@ curl -s "http://localhost:4000/domain-aliases" -H "Authorization: Bearer $MEMBER
 
 ---
 
-## Quick Reference: API Endpoints (129 total)
+## Quick Reference: API Endpoints (135 total)
 
 | Module | Endpoints | Backstage Required |
 |--------|-----------|-------------------|
 | Auth | 7 | Partial |
-| Capabilities | 7 | Yes |
+| Capabilities | 7 | Partial (own caps: any auth) |
 | Media | 6 | Yes |
 | Categories | 5 | Partial |
 | Tags | 5 | Partial |
 | Articles | 9 (incl. 3 version) | Partial |
-| Pages | 10 (incl. 3 version) | Partial |
+| Pages | 10 (incl. 3 version + /nav + /by-path) | Partial |
 | Products | 10 (incl. 3 version) | Partial |
 | Cart | 6 | No (optional auth) |
 | Orders | 7 | Partial |
 | Payments | 12 (incl. reconcile) | Partial |
 | Comments | 12 | Partial |
-| Digital Products | 13 (incl. test-personalization, extend) | Yes |
+| Digital Products | 14 (incl. my-downloads, extend, test-personalization) | Partial |
 | Kindle | 7 | No (customer JWT) |
 | Domain Aliases | 10 | Owner Only |
 | Audit Log | 1 | Yes |
+| Settings (private) | 3 (GET, PATCH, PATCH /appearance, POST /test-email) | Owner / Admin |
+| Settings (public) | 2 (GET /theme, GET /general) | None |
+| External Feeds | 1 (GET /preview) | None |
 
 ---
 
-*Updated for AECMS Phase 14 — 2026-06-16*
+*Updated for AECMS Phases 14–20 — 2026-06-18*

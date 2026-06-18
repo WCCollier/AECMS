@@ -6,105 +6,160 @@
 @source "../hooks/**/*.{tsx,ts}";
 @source "../contexts/**/*.{tsx,ts}";
 
-/* ── Midnight / teal theme — direct hex values for v4 ───── */
+/* ── Default palette: Midnight ───────────────────────────── */
+/* These are the compile-time defaults for Tailwind utility   */
+/* class generation (text-foreground, bg-accent, etc.).       */
+/* At runtime, buildCssOverrides() always overwrites :root    */
+/* with the active palette — so these values only matter if   */
+/* the server fails to inject a theme (e.g. cold-boot SSR    */
+/* error). Midnight is the canonical fallback palette and its */
+/* values are the single source of truth in PALETTES[0].     */
 @theme {
-  --color-background:        #080d18;
-  --color-surface:           #0f1929;
-  --color-surface-raised:    #162035;
-  --color-foreground:        #dce8f0;
-  --color-muted:             #6b88a0;
-  --color-border:            #1a2840;
-  --color-accent:            #2dd4bf;
-  --color-accent-hover:      #14b8a6;
-  --color-accent-dim:        #0d9488;
-  --color-accent-foreground: #06111f;
+  /* !! SENTINEL VALUES — these are never used at runtime.                  !!
+  ** buildCssOverrides() in themes.ts overwrites all --color-* tokens on   **
+  ** every SSR render before the browser sees them. If you see a red-on-   **
+  ** white UI, the theme injection pipeline is broken — check RootLayout.  **
+  !! DO NOT set these to real theme values — they are intentionally wrong. !! */
+  --color-background:        #ffffff;
+  --color-surface:           #ffffff;
+  --color-surface-raised:    #ffffff;
+  --color-foreground:        #cc0000;
+  --color-muted:             #cc0000;
+  --color-border:            #cc0000;
+  --color-accent:            #cc0000;
+  --color-accent-hover:      #aa0000;
+  --color-accent-dim:        #aa0000;
+  --color-accent-foreground: #ffffff;
+  --color-accent-subtle:     rgba(204, 0, 0, 0.12);
+  --color-accent-ghost:      rgba(204, 0, 0, 0.06);
+  --color-accent-border:     rgba(204, 0, 0, 0.35);
+  --color-selection-bg:      rgba(204, 0, 0, 0.15);
+  --color-danger:            #cc0000;
+  --color-danger-bg:         rgba(204, 0, 0, 0.12);
 
   --font-sans: var(--font-inter), system-ui, sans-serif;
 }
 
-/* ── Runtime CSS vars (available in raw CSS) ─────────────── */
-:root {
-  --accent-subtle: rgba(45, 212, 191, 0.12);
-  --danger:        #f87171;
-  --danger-bg:     rgba(248, 113, 113, 0.12);
-}
-
 /* ── Base ────────────────────────────────────────────────── */
 body {
-  background-color: #080d18;
-  color: #dce8f0;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
 }
 
 /* ── Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: #080d18; }
-::-webkit-scrollbar-thumb { background: #1a2840; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #0d9488; }
+::-webkit-scrollbar-track { background: var(--color-background); }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-accent-dim); }
 
 /* ── Selection ───────────────────────────────────────────── */
-::selection { background: rgba(45,212,191,0.15); color: #2dd4bf; }
+::selection { background: var(--color-selection-bg); color: var(--color-accent); }
 
 /* ── Focus ring ──────────────────────────────────────────── */
-:focus-visible { outline: 2px solid #2dd4bf; outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
 /* ── TipTap editor content area ─────────────────────────── */
-/* Styles the .ProseMirror editable div (write editor) and
-   replaces @tailwindcss/typography which is not installed. */
+/* Styles the .ProseMirror editable div (write editor).      */
 .ProseMirror {
-  color: #dce8f0;
+  color: var(--color-foreground);
   line-height: 1.8;
   font-size: 1rem;
   outline: none;
 }
 .ProseMirror p                  { margin-bottom: 1em; }
-.ProseMirror h1                 { font-size: 2em;   font-weight: 700; margin: 1.4em 0 0.4em; color: #dce8f0; }
-.ProseMirror h2                 { font-size: 1.5em; font-weight: 700; margin: 1.3em 0 0.4em; color: #dce8f0; border-left: 3px solid #2dd4bf; padding-left: 0.75rem; }
-.ProseMirror h3                 { font-size: 1.2em; font-weight: 600; margin: 1.2em 0 0.3em; color: #dce8f0; }
+.ProseMirror h1                 { font-size: 2em;   font-weight: 700; margin: 1.4em 0 0.4em; color: var(--color-foreground); }
+.ProseMirror h2                 { font-size: 1.5em; font-weight: 700; margin: 1.3em 0 0.4em; color: var(--color-foreground); border-left: 3px solid var(--color-accent); padding-left: 0.75rem; }
+.ProseMirror h3                 { font-size: 1.2em; font-weight: 600; margin: 1.2em 0 0.3em; color: var(--color-foreground); }
 .ProseMirror ul                 { list-style: disc;    padding-left: 1.75em; margin-bottom: 1em; }
 .ProseMirror ol                 { list-style: decimal; padding-left: 1.75em; margin-bottom: 1em; }
 .ProseMirror li                 { margin-bottom: 0.3em; }
 .ProseMirror li p               { margin-bottom: 0; }
-.ProseMirror blockquote         { border: 1px solid rgba(45,212,191,0.35); border-left: 3px solid #2dd4bf; background: rgba(45,212,191,0.06); border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; color: #a8c5d8; font-style: italic; margin: 1.5em 0; }
-.ProseMirror code               { background: #162035; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em; color: #2dd4bf; }
-.ProseMirror pre                { background: #162035; padding: 1rem; border-radius: 6px; overflow-x: auto; margin-bottom: 1em; }
-.ProseMirror pre code           { background: none; padding: 0; color: #dce8f0; }
-.ProseMirror hr                 { border: none; border-top: 1px solid #1a2840; margin: 2em 0; }
-.ProseMirror strong             { color: #2dd4bf; font-weight: 600; }
-.ProseMirror em                 { color: #a8c5d8; font-style: italic; }
-.ProseMirror a                  { color: #2dd4bf; text-decoration: underline; text-underline-offset: 3px; }
+.ProseMirror blockquote         { border: 1px solid var(--color-accent-border); border-left: 3px solid var(--color-accent); background: var(--color-accent-ghost); border-radius: 0 6px 6px 0; padding: 0.75rem 1rem; color: var(--color-muted); font-style: italic; margin: 1.5em 0; }
+.ProseMirror code               { background: var(--color-surface-raised); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em; color: var(--color-accent); }
+.ProseMirror pre                { background: var(--color-surface-raised); padding: 1rem; border-radius: 6px; overflow-x: auto; margin-bottom: 1em; }
+.ProseMirror pre code           { background: none; padding: 0; color: var(--color-foreground); }
+.ProseMirror hr                 { border: none; border-top: 1px solid var(--color-border); margin: 2em 0; }
+.ProseMirror strong             { color: var(--color-accent); font-weight: 600; }
+.ProseMirror em                 { color: var(--color-muted); font-style: italic; }
+.ProseMirror a                  { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
 /* Placeholder text */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #6b88a0;
+  color: var(--color-muted);
   pointer-events: none;
   float: left;
   height: 0;
 }
 
-/* ── Prose / article body ────────────────────────────────── */
+/* ── Prose / article and page body ──────────────────────── */
+/* Rendered by RichTextContent (read-only TipTap display).   */
 .prose-article {
-  color: #dce8f0;
+  color: var(--color-foreground);
   line-height: 1.8;
   font-size: 1.05rem;
   max-width: 68ch;
 }
-/* Page zones should fill their grid cell — no reading-width cap */
+/* Page zones fill their grid cell — no reading-width cap */
 .prose-page { max-width: none; }
 .prose-article p   { margin-bottom: 1.25em; }
 .prose-article h1,
 .prose-article h2,
-.prose-article h3  { color: #dce8f0; margin: 1.6em 0 0.5em; font-weight: 700; }
-.prose-article h2  { border-left: 3px solid #2dd4bf; padding-left: 0.75rem; }
-.prose-article strong { color: #2dd4bf; font-weight: 600; }
-.prose-article em  { color: #a8c5d8; font-style: italic; }
-.prose-article a   { color: #2dd4bf; text-decoration: underline; text-underline-offset: 3px; }
+.prose-article h3  { color: var(--color-foreground); margin: 1.6em 0 0.5em; font-weight: 700; }
+.prose-article h2  { border-left: 3px solid var(--color-accent); padding-left: 0.75rem; }
+.prose-article strong { color: var(--color-accent); font-weight: 600; }
+.prose-article em  { color: var(--color-muted); font-style: italic; }
+.prose-article a   { color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; }
 .prose-article blockquote {
-  border: 1px solid rgba(45,212,191,0.35);
-  border-left: 3px solid #2dd4bf;
-  background: rgba(45,212,191,0.06);
+  border: 1px solid var(--color-accent-border);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-ghost);
   border-radius: 0 6px 6px 0;
   padding: 0.75rem 1rem;
-  color: #a8c5d8;
+  color: var(--color-muted);
   font-style: italic;
   margin: 1.5em 0;
+}
+.prose-article code {
+  background: var(--color-surface-raised);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: var(--color-accent);
+}
+.prose-article pre {
+  background: var(--color-surface-raised);
+  padding: 1rem;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin-bottom: 1em;
+}
+.prose-article pre code { background: none; padding: 0; color: var(--color-foreground); }
+.prose-article hr  { border: none; border-top: 1px solid var(--color-border); margin: 2em 0; }
+.prose-article ul  { list-style: disc;    padding-left: 1.75em; margin-bottom: 1em; }
+.prose-article ol  { list-style: decimal; padding-left: 1.75em; margin-bottom: 1em; }
+.prose-article li  { margin-bottom: 0.3em; }
+.prose-article li p { margin-bottom: 0; }
+
+/* ── Tailwind typography plugin (prose prose-sm) ─────────── */
+/* Product descriptions and any component using the built-in  */
+/* @tailwindcss/typography prose classes. Maps Tailwind's     */
+/* internal --tw-prose-* tokens to our CSS custom properties  */
+/* so prose text honours the active theme palette.            */
+.prose {
+  --tw-prose-body:         var(--color-foreground);
+  --tw-prose-headings:     var(--color-foreground);
+  --tw-prose-lead:         var(--color-muted);
+  --tw-prose-links:        var(--color-accent);
+  --tw-prose-bold:         var(--color-foreground);
+  --tw-prose-counters:     var(--color-muted);
+  --tw-prose-bullets:      var(--color-muted);
+  --tw-prose-hr:           var(--color-border);
+  --tw-prose-quotes:       var(--color-muted);
+  --tw-prose-quote-borders: var(--color-border);
+  --tw-prose-captions:     var(--color-muted);
+  --tw-prose-code:         var(--color-accent);
+  --tw-prose-pre-code:     var(--color-foreground);
+  --tw-prose-pre-bg:       var(--color-surface-raised);
+  --tw-prose-th-borders:   var(--color-border);
+  --tw-prose-td-borders:   var(--color-border);
 }

@@ -140,13 +140,15 @@ export function AdminPagesClient() {
                           <Link href={`/admin/pages/${p.id}/edit`}>
                             <Button variant="ghost" size="sm"><Edit className="w-4 h-4" /></Button>
                           </Link>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(p.id, p.title)}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          </Button>
+                          {p.admin_can_delete !== false && p.slug !== '_home_' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(p.id, p.title)}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>

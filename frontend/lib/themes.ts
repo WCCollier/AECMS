@@ -236,10 +236,17 @@ export function buildCssOverrides(palette: ThemePalette, fontPairing: FontPairin
   --color-accent-hover: ${c['accent-hover']};
   --color-accent-dim: ${c['accent-dim']};
   --color-accent-foreground: ${c['accent-foreground']};
+  /* Derived transparency tokens — resolved from the above at runtime */
+  --color-accent-subtle:    color-mix(in srgb, var(--color-accent) 12%, transparent);
+  --color-accent-ghost:     color-mix(in srgb, var(--color-accent)  6%, transparent);
+  --color-accent-border:    color-mix(in srgb, var(--color-accent) 35%, transparent);
+  --color-selection-bg:     color-mix(in srgb, var(--color-accent) 15%, transparent);
+  --color-danger:           #f87171;
+  --color-danger-bg:        color-mix(in srgb, #f87171 12%, transparent);
 }
 body {
-  background-color: ${c.background};
-  color: ${c.foreground};
+  background-color: var(--color-background);
+  color: var(--color-foreground);
   font-family: ${fontPairing.bodyCss};
 }
 h1, h2, h3, h4, h5, h6 {
