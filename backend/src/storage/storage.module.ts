@@ -2,6 +2,7 @@ import { Module, Global } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
+import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import { LocalStorageProvider } from './local-storage.provider';
 import { GcsStorageProvider } from './gcs-storage.provider';
 import { S3StorageProvider } from './s3-storage.provider';
@@ -22,7 +23,7 @@ import { STORAGE_PROVIDER, StorageProviderType } from './storage.interface';
  */
 @Global()
 @Module({
-  imports: [ConfigModule, SettingsModule],
+  imports: [ConfigModule, SettingsModule, CapabilitiesModule],
   controllers: [StorageController],
   providers: [
     {
