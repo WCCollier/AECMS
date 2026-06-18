@@ -39,10 +39,10 @@
 **Phase 16**: ✅ COMPLETE - Navigation menus: /latest→/articles rename, dynamic header nav from DB, catch-all [...slug] route, page hierarchy, admin nav fields (2026-06-17)
 **Phase 17**: ✅ COMPLETE - Alternate domain capture: Next.js middleware 301 redirects from secondary domains; alias_type field for future proxy support (2026-06-17)
 **Phase 18**: ✅ COMPLETE - RSS Feed widget: ExternalFeedsModule backend (Redis cache, SSRF validation), RssFeedWidget component, RssEmbed TipTap node (2026-06-17)
-**Phase 19**: 📋 PLANNED - First deployment: fantasyvreality.com on Google Cloud Run
+**Phase 19**: ♻️ MERGED INTO PHASE 21 - See PHASE_19_PLAN.md
 **Phase 20**: ✅ COMPLETE - Themes and templates: 8 curated palettes, 5 font pairings, CSS variable injection in root layout, /admin/settings/appearance backstage UI (2026-06-17)
 **Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
-**Phase 21**: 📋 PLANNED - Multi-owner deployability: setup wizard, SiteSettings, update strategy
+**Phase 21**: 🚧 IN PROGRESS - Deployability + first live deployment (merged with Phase 19): SEED_PROFILE system, setup wizard, GcpKeyProvider, Dockerfiles, GitHub Actions CI/CD, Cloud Run, FvR content migration
 
 **Session 2026-06-18 improvements** (not phase-tracked):
 - TipTap link insertion modal (Pages/Articles/Products/URL tabs, new-tab toggle, inline search)
@@ -270,9 +270,9 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
 - `docs/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
 - `docs/PHASE_18_PLAN.md` - Substack integration widget: RSS feed preview with height fade and CTA
-- `docs/PHASE_19_PLAN.md` - First deployment: Google Cloud Run, GCS, Cloud SQL, secrets
+- `docs/PHASE_19_PLAN.md` - ♻️ Merged into Phase 21 (redirect doc)
 - `docs/PHASE_20_PLAN.md` - Themes and templates: color palettes, typography, backgrounds
-- `docs/PHASE_21_PLAN.md` - Multi-owner deployability: setup wizard, update strategy, SiteSettings
+- `docs/PHASE_21_PLAN.md` - ⭐ CURRENT PHASE: Deployability + FvR live deployment (merged 19+21)
 - `docs/prd/` - 12 PRD documents with full specifications
 
 ## Notes for Claude
