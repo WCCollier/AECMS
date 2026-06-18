@@ -1424,7 +1424,7 @@ curl -sI "http://localhost:4000/digital-products/download/$DL_TOKEN"
 
 ## Admin Settings Testing (Phase 15)
 
-Covers SiteSettings DB table, AES-256-GCM KeyProvider, and the settings UI tabs (General / Site Identity / Email / Payment Providers). Navigate to `/admin/settings` — requires backstage login + 2FA as Owner.
+Covers the Internal Secrets Manager (ISM), the settings UI tabs (General / Site Identity / Email / Payment Providers), and ISM consumer wiring for SMTP, Stripe, and PayPal. Navigate to `/admin/settings` — requires backstage login + 2FA as Owner.
 
 **Access levels**: Owner has `system.configure` (full read/write on all tabs). Admin has `system.appearance` only (can update the theme key via `PATCH /settings/appearance` but cannot reach the main settings page).
 
@@ -1439,33 +1439,44 @@ Covers SiteSettings DB table, AES-256-GCM KeyProvider, and the settings UI tabs 
    ```bash
    curl -s http://localhost:4000/settings-public/general | jq .
    ```
-5. Change **Homepage** to **Static Page** — a Page ID input appears. Switch back to **Latest Articles** and save
-6. Revert site title to its original value and save
+5. **Homepage toggle — Article Feed**: confirm `/` redirects to `/articles`
+6. **Homepage toggle — Custom Page**:
+   - Select a published page from the dropdown (the `_home_` page is listed as "(built-in homepage)")
+   - Save — visit `http://localhost:3000` to confirm the page renders at the root URL
+   - An edit link appears below the dropdown pointing to the selected page's editor
+7. Switch back to **Article Feed** and save
+8. Revert site title to its original value and save
 
 ---
 
 ### Tab 2 — Site Identity (UI)
 
-1. Enter any image URL in **Logo URL** — a small preview renders below the field immediately
-2. Enter a URL in **Favicon URL** — 32×32 preview appears
-3. Use the color picker to change **Brand Color** — hex input and picker stay in sync
-4. Save — confirm no error (logo/favicon wiring is production-only; visual effect comes at deployment)
+1. **Favicon upload**: click **Upload file**, select any PNG or ICO image
+   - A thumbnail preview appears immediately after upload (no Save needed)
+   - Verify the file was stored: `ls /workspaces/AECMS/backend/uploads/system-favicon-*`
+   - Hard-refresh `http://localhost:3000` — the favicon should appear in the browser tab
+2. **Logo URL** — labelled "Not yet active": enter a URL, save; confirm no error (field is stored but not yet rendered in the header)
+3. **Brand Color** — labelled "Not yet active": use the color picker, save; confirm no error
+
+---
 
 ---
 
 ### Tab 3 — Email / SMTP (UI)
 
-The fields should already be populated from the working Gmail SMTP config (`smtp.gmail.com`, port 587, STARTTLS, `moriakul@gmail.com`).
+The SMTP provider now reads credentials from the ISM at send time. Fields here populate the ISM; the env-var fallback (`SMTP_HOST`, `SMTP_PASS`, etc. in `.env`) is used if a field has no DB value.
 
-1. Confirm all fields are pre-populated
+1. Confirm all fields are pre-populated (populated from env vars via `getEffective()` fallback on first load, or from previously saved ISM values)
 2. The password field shows `•••••••` — click the eye icon to reveal/hide
-3. **Do not change any values** — you don't want to overwrite the working SMTP config
+3. **To test ISM wiring**: enter the SMTP password into the password field and save — it is now encrypted and stored in the ISM, superseding the env var
 4. Click **Send Test Email** — spinner appears, then green ✓ or red ✗ with message
+   - The provider now reads host/port/user/pass from the ISM at send time (not from the constructor)
 5. Confirm delivery:
    ```bash
    grep -i "messageId\|test email" /tmp/backend.log | tail -3
    ```
 6. Check inbox at moriakul@gmail.com for the test email
+7. **Verify ISM storage**: the password is now in the DB encrypted; the GET `/settings` response still shows `••••••••` for `email.smtp_pass_enc`
 
 ---
 
@@ -1505,7 +1516,10 @@ curl -s http://localhost:4000/settings-public/theme | jq .
 # Returns: { "palette": "midnight", "fontPairing": "default" }
 
 curl -s http://localhost:4000/settings-public/general | jq .
-# Returns: { "site_title": "...", "tagline": "..." }
+# Returns: { "site_title": "...", "tagline": "...", "homepage_mode": "...", "homepage_page_id": "..." }
+
+curl -s http://localhost:4000/settings-public/identity | jq .
+# Returns: { "favicon_url": "/uploads/system-favicon-...", "logo_url": "", "brand_color": "" }
 
 # Full settings read — Owner backstage token required
 curl -s http://localhost:4000/settings \

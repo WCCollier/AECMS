@@ -178,11 +178,54 @@ Both exposed via `POST /payments/verify/stripe` and `POST /payments/verify/paypa
 
 ---
 
+## Post-Phase-15 Additions (2026-06-18)
+
+The following work was completed in a follow-up session and is considered part of the Phase 15 deliverable.
+
+### ISM Consumer Wiring (commit `13017aa`)
+
+All three service-provider consumers now read credentials from `SettingsService.getEffective()` lazily at the time of each operation rather than from environment variables at constructor time. Configuration changes in the Admin Settings UI take effect on the next request without a service restart. Env-var-only deployments continue to work unchanged via `ENV_KEY_MAP` fallback.
+
+**`SmtpEmailProvider`** (`backend/src/email/smtp-email.provider.ts`)
+- Removed constructor-time transporter init
+- `buildTransporter()` called lazily inside `send()` and `sendWithAttachment()`; reads all `email.*` keys from ISM
+- `ConfigService` dependency removed; `SettingsService` injected via `@Optional()` to survive circular-dep resolution ordering
+
+**`StripeProvider`** (`backend/src/payments/providers/stripe.provider.ts`)
+- Added `private async getStripe()` — calls `getEffective('payment.stripe_secret_key_enc')`, returns a fresh `Stripe` instance
+- Added `private async getWebhookSecret()` — calls `getEffective('payment.stripe_webhook_secret_enc')`
+- All operations (`createPayment`, `getPaymentStatus`, `refund`, `verifyWebhook`) use these helpers
+
+**`PayPalProvider`** (`backend/src/payments/providers/paypal.provider.ts`)
+- Added `private async getCredentials()` — calls `getEffective()` for both `payment.paypal_client_id` and `payment.paypal_client_secret_enc`; invalidates the OAuth token cache on every call
+- `getAccessToken()` now calls `getCredentials()` rather than reading instance fields set at construction time
+
+**Module changes:**
+- `EmailModule` ↔ `SettingsModule` circular dependency resolved with `forwardRef()` in both modules
+- `PaymentsModule` imports `SettingsModule`
+
+### Settings UI Fixes (commits `6fc669a`, `0ded1ed`, `ab2dfec`)
+
+| Fix | Detail |
+|-----|--------|
+| SettingsClient TDZ crash | `useSWR` key used `f('general.homepage_mode')` before `f` was declared; replaced with `fields['general.homepage_mode']` |
+| Homepage mode toggle | General tab: Article Feed mode redirects `/` → `/articles`; Custom Page mode renders the designated published page; fallback chain to `_home_` then `/articles` |
+| `_home_` slug lock | Slug field read-only in EditPageClient when `page.slug === '_home_'`; backend 409 guard prevents API-level change |
+| `GET /settings-public/identity` | New public endpoint returns `{ favicon_url, logo_url, brand_color }` |
+| `GET /settings-public/general` | Now also returns `homepage_mode` and `homepage_page_id` |
+| Favicon upload | `POST /settings/favicon` — accepts ICO/PNG/JPG/SVG; writes to `uploads/system-favicon-{ts}.{ext}`; saves URL to `identity.favicon_url`; no Save button needed |
+| Site Identity UI | Favicon field replaced with file picker + preview; Logo URL and Brand Color labelled "Not yet active" with help text |
+| Root layout | Fetches `/settings-public/identity`; injects `<link rel="icon">` when `favicon_url` is set |
+
+---
+
 ## Remaining / Deferred
 
 - **GCP/AWS/Vault KeyProvider implementations** — stub comments exist in the factory switch-case; implement when Phase 19 (Cloud Run deployment) requires KMS
-- **Media upload settings (S3/GCS bucket URL, CDN prefix)** — not in Phase 15 scope; will be added in Phase 19 alongside the storage provider migration
-- **Webhook URL display** — the Stripe webhook endpoint URL could be shown in the UI as a convenience; deferred
+- **ISM key rotation tooling** — CLI script or Owner-only endpoint to re-encrypt all `_enc` rows under a new SEK; deferred to Phase 21
+- **Logo URL wiring** — field saved but header/layout does not yet render it
+- **Brand Color wiring** — field saved but CSS variable system does not yet consume it
+- **Media upload settings (S3/GCS bucket URL, CDN prefix)** — Phase 19 scope
 
 ---
 
