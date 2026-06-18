@@ -9,7 +9,8 @@ import {
   FileText, ShoppingBag, Square, Rss,
   AlignLeft, AlignCenter, AlignRight,
 } from 'lucide-react';
-import api, { getErrorMessage } from '@/lib/api';
+import adminApi from '@/lib/adminApi';
+import { getErrorMessage } from '@/lib/api';
 import { getEditorExtensions } from './extensions';
 import { LinkModal } from './LinkModal';
 import { MediaGalleryField } from '@/components/widgets/MediaGallery/MediaGalleryField';
@@ -138,13 +139,13 @@ export function TipTapEditor({
       formData.append('file', file);
       if (imageAlt.trim()) formData.append('altText', imageAlt.trim());
 
-      const response = await api.post<{ id: string; file_path: string; filename: string }>(
+      const response = await adminApi.post<{ id: string; url: string; filename: string }>(
         '/media/upload',
         formData,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       );
 
-      const url = `/uploads/${response.data.file_path.split('/uploads/')[1]}`;
+      const url = response.data.url;
       editor.chain().focus().setImage({ src: url, alt: imageAlt.trim() || file.name }).run();
       setImageUrl('');
       setImageAlt('');
