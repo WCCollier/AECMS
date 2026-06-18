@@ -104,7 +104,7 @@ export class PaymentsController {
 
   @Post('verify/stripe')
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-  @RequiresCapability('system.configure')
+  @RequiresCapability('system.configure.payments')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify Stripe connection using stored credentials' })
   verifyStripe() {
@@ -113,7 +113,7 @@ export class PaymentsController {
 
   @Post('verify/paypal')
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-  @RequiresCapability('system.configure')
+  @RequiresCapability('system.configure.payments')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Verify PayPal connection using stored credentials' })
   verifyPayPal() {

@@ -10,7 +10,7 @@ import type { StorageProvider } from './storage.interface';
 @ApiTags('settings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-@RequiresCapability('system.configure')
+@RequiresCapability('system.configure.storage')
 @Controller('settings')
 export class StorageController {
   constructor(@Inject(STORAGE_PROVIDER) private readonly storage: StorageProvider) {}

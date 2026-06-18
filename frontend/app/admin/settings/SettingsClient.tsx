@@ -168,11 +168,32 @@ export function SettingsClient() {
 
   const f = (key: string) => fields[key] ?? '';
 
+  const TAB_ENDPOINT: Record<TabId, string> = {
+    general:  '/settings/general',
+    identity: '/settings/general',
+    email:    '/settings/email',
+    payment:  '/settings/payments',
+    storage:  '/settings/storage',
+  };
+
+  const TAB_PREFIXES: Record<TabId, string[]> = {
+    general:  ['general.', 'identity.'],
+    identity: ['general.', 'identity.'],
+    email:    ['email.'],
+    payment:  ['payment.'],
+    storage:  ['storage.'],
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
-      await adminApi.patch('/settings', { updates: fields });
+      const endpoint = TAB_ENDPOINT[activeTab];
+      const prefixes = TAB_PREFIXES[activeTab];
+      const updates = Object.fromEntries(
+        Object.entries(fields).filter(([k]) => prefixes.some((p) => k.startsWith(p))),
+      );
+      await adminApi.patch(endpoint, { updates });
       await mutate();
       setSaved(true);
       setDirty(false);

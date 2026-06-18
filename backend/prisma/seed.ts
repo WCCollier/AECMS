@@ -64,15 +64,18 @@ async function main() {
     { name: 'comment.delete',      category: 'content',   scope: 'backstage', description: 'Delete any comment' },
     { name: 'review.moderate',     category: 'ecommerce', scope: 'backstage', description: 'Moderate reviews' },
 
-    // System
-    { name: 'system.configure',    category: 'system',    scope: 'backstage', description: 'Configure system settings' },
+    // System — granular configure atoms (all Owner-only by default; designed to be delegatable)
+    { name: 'system.configure.general',  category: 'system', scope: 'backstage', description: 'Edit General and Site Identity settings (title, tagline, homepage, favicon, logo, brand colour)' },
+    { name: 'system.configure.email',    category: 'system', scope: 'backstage', description: 'Edit SMTP / email settings and send test emails' },
+    { name: 'system.configure.payments', category: 'system', scope: 'backstage', description: 'Edit payment provider credentials and verify Stripe/PayPal connections' },
+    { name: 'system.configure.storage',  category: 'system', scope: 'backstage', description: 'Edit file storage provider settings and run storage connection tests' },
     { name: 'system.view_audit',   category: 'system',    scope: 'backstage', description: 'View audit logs' },
     { name: 'system.export_data',  category: 'system',    scope: 'backstage', description: 'Export data (CSV)' },
 
     // Domain Management (Owner-only by default)
     { name: 'domain.manage',       category: 'system',    scope: 'backstage', description: 'Manage domain aliases' },
 
-    // System — Appearance (Owner-only by default; split from system.configure so it can be delegated)
+    // System — Appearance (Owner-only by default; split so it can be delegated to Admin)
     { name: 'system.appearance',   category: 'system',    scope: 'backstage', description: 'Change site visual theme (colour palette and typography)' },
 
     // Digital Delivery (Admin by default; separate from product editing)
@@ -102,6 +105,15 @@ async function main() {
   }
 
   console.log(`✓ Seeded ${capabilities.length} capabilities`);
+
+  // Remove legacy system.configure atom replaced by the four granular atoms above
+  const legacyCap = await prisma.capability.findUnique({ where: { name: 'system.configure' } });
+  if (legacyCap) {
+    await prisma.userCapability.deleteMany({ where: { capability_id: legacyCap.id } });
+    await prisma.roleCapability.deleteMany({ where: { capability_id: legacyCap.id } });
+    await prisma.capability.delete({ where: { id: legacyCap.id } });
+    console.log('✓ Removed legacy system.configure capability');
+  }
 
   // ============================================
   // SEED USERS

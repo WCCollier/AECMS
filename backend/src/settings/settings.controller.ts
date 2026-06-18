@@ -63,7 +63,6 @@ export class PublicSettingsController {
 @ApiTags('settings')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-@RequiresCapability('system.configure')
 @Controller('settings')
 export class SettingsController {
   constructor(
@@ -71,31 +70,36 @@ export class SettingsController {
     private testEmailService: TestEmailService,
   ) {}
 
+  // Any one of the four configure.* caps grants read access to all settings.
+  // Note: when caps are delegated (Phase 21+), this endpoint should filter
+  // returned keys to the caller's granted namespaces.
   @Get()
+  @RequiresCapability(
+    'system.configure.general',
+    'system.configure.email',
+    'system.configure.payments',
+    'system.configure.storage',
+  )
   @ApiOperation({ summary: 'Get all site settings (encrypted fields redacted)' })
   async getAll() {
     return this.settingsService.getAll();
   }
 
-  @Patch()
-  @ApiOperation({ summary: 'Update site settings' })
-  async update(@Body() dto: UpdateSettingsDto, @Request() req: any) {
-    await this.settingsService.set(dto.updates, req.user.id);
+  // ── General + Identity ─────────────────────────────────────────────────────
+
+  @Patch('general')
+  @RequiresCapability('system.configure.general')
+  @ApiOperation({ summary: 'Update general and site identity settings' })
+  async updateGeneral(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('general.') || k.startsWith('identity.')),
+    );
+    await this.settingsService.set(allowed, req.user.id);
     return { message: 'Settings saved' };
   }
 
-  @Patch('appearance')
-  @RequiresCapability('system.appearance')
-  @ApiOperation({ summary: 'Update appearance settings (theme key only) — requires system.appearance' })
-  async updateAppearance(@Body() dto: UpdateSettingsDto, @Request() req: any) {
-    const allowed = Object.fromEntries(
-      Object.entries(dto.updates).filter(([k]) => k === 'theme'),
-    );
-    await this.settingsService.set(allowed, req.user.id);
-    return { message: 'Appearance saved' };
-  }
-
   @Post('favicon')
+  @RequiresCapability('system.configure.general')
   @UseInterceptors(FileInterceptor('file'))
   @ApiOperation({ summary: 'Upload site favicon (ICO, PNG, JPG, or SVG)' })
   async uploadFavicon(
@@ -120,10 +124,62 @@ export class SettingsController {
     return { url };
   }
 
+  // ── Email / SMTP ───────────────────────────────────────────────────────────
+
+  @Patch('email')
+  @RequiresCapability('system.configure.email')
+  @ApiOperation({ summary: 'Update email / SMTP settings' })
+  async updateEmail(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('email.')),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'Settings saved' };
+  }
+
   @Post('test-email')
+  @RequiresCapability('system.configure.email')
   @ApiOperation({ summary: 'Send a test email using current SMTP config' })
   async testEmail(@Request() req: any) {
-    const result = await this.testEmailService.send(req.user.email);
-    return result;
+    return this.testEmailService.send(req.user.email);
+  }
+
+  // ── Payment Providers ──────────────────────────────────────────────────────
+
+  @Patch('payments')
+  @RequiresCapability('system.configure.payments')
+  @ApiOperation({ summary: 'Update payment provider settings' })
+  async updatePayments(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('payment.')),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'Settings saved' };
+  }
+
+  // ── File Storage ───────────────────────────────────────────────────────────
+
+  @Patch('storage')
+  @RequiresCapability('system.configure.storage')
+  @ApiOperation({ summary: 'Update file storage provider settings' })
+  async updateStorage(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('storage.')),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'Settings saved' };
+  }
+
+  // ── Appearance (separate capability — delegatable to Admin) ────────────────
+
+  @Patch('appearance')
+  @RequiresCapability('system.appearance')
+  @ApiOperation({ summary: 'Update appearance settings (theme key only) — requires system.appearance' })
+  async updateAppearance(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k === 'theme'),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'Appearance saved' };
   }
 }

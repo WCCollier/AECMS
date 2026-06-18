@@ -119,9 +119,20 @@ Backstage access is **capability-scoped, not role-hardcoded**:
 | `'backstage'` | Requires admin dashboard | `JwtAuthGuard → BackstageGuard → CapabilityGuard` |
 | `'customer'` | Available in customer-facing experience | `JwtAuthGuard → CapabilityGuard` (no BackstageGuard) |
 
-Current counts: **32 backstage** + **12 customer** = **44 total capabilities**.
+Current counts: **35 backstage** + **12 customer** = **47 total capabilities**.
 
 **Backstage additions (post-Phase 15):** `system.appearance` (Owner-only; gates `PATCH /settings/appearance`), `digital.deliver` (Admin+Owner; gates token extend/regenerate/admin-grant).
+
+**`system.configure` replaced by four granular atoms (all Owner-only):**
+
+| Capability | Gates |
+|---|---|
+| `system.configure.general` | `PATCH /settings/general` (general.* + identity.* keys), `POST /settings/favicon` |
+| `system.configure.email` | `PATCH /settings/email` (email.* keys), `POST /settings/test-email` |
+| `system.configure.payments` | `PATCH /settings/payments` (payment.* keys), `POST /payments/verify/stripe`, `POST /payments/verify/paypal` |
+| `system.configure.storage` | `PATCH /settings/storage` (storage.* keys), `POST /settings/test-storage` |
+
+`GET /settings` requires any one of the four. Each PATCH endpoint also filters the request body to its key namespace (server-side), so cross-domain writes are impossible even if the frontend sends extra keys. `system.appearance` remains a separate atom so it can be delegated to Admins independently.
 
 **Customer capabilities** (all scope: `'customer'`):
 
