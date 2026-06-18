@@ -102,14 +102,6 @@ export class PaymentsController {
     return this.paymentsService.reconcilePayPalOrders();
   }
 
-  @Post('test/simulate/:orderId')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Simulate payment completion (test mode only)' })
-  simulatePayment(@Param('orderId') orderId: string) {
-    return this.paymentsService.simulatePaymentCompletion(orderId);
-  }
-
   @Post('verify/stripe')
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
   @RequiresCapability('system.configure')

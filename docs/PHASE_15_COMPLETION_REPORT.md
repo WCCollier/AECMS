@@ -137,9 +137,10 @@ Both exposed via `POST /payments/verify/stripe` and `POST /payments/verify/paypa
 - "Send Test Email" button — calls `POST /settings/test-email`; shows status inline
 
 **Payment Providers tab**:
-- Stripe section: Secret Key (SecretInput), Publishable Key, Webhook Secret (SecretInput), Test Mode toggle (synced with `test_mode` setting); "Verify Connection" button
-- PayPal section: Client ID, Client Secret (SecretInput), Mode toggle (sandbox / live); "Verify Connection" button
+- Stripe section: Secret Key (SecretInput), Publishable Key, Webhook Secret (SecretInput); "Verify Connection" button
+- PayPal section: Client ID, Client Secret (SecretInput); "Verify Connection" button
 - Both verify buttons show a green ✅ / red ✗ badge after the check resolves
+- No test-mode toggle — payment mode is determined by which keys are configured (sandbox vs. live)
 
 **`SecretInput`** component — password-type input with an eye-icon toggle. Value sent to the server is the literal typed string; if the user leaves it empty or as `'••••••••'`, the existing secret is preserved (handled in `SettingsService.set()`).
 
@@ -216,6 +217,20 @@ All three service-provider consumers now read credentials from `SettingsService.
 | Favicon upload | `POST /settings/favicon` — accepts ICO/PNG/JPG/SVG; writes to `uploads/system-favicon-{ts}.{ext}`; saves URL to `identity.favicon_url`; no Save button needed |
 | Site Identity UI | Favicon field replaced with file picker + preview; Logo URL and Brand Color labelled "Not yet active" with help text |
 | Root layout | Fetches `/settings-public/identity`; injects `<link rel="icon">` when `favicon_url` is set |
+
+---
+
+## QA Verification (2026-06-18)
+
+Owner-verified against the live Codespaces testbed using ISM-stored credentials (migrated from `.env` via `scripts/migrate-env-to-ism.ts`):
+
+| Test | Result |
+|------|--------|
+| Admin Settings → Email tab → **Send Test Email** | ✅ Green ✓; email delivered to moriakul@gmail.com |
+| Admin Settings → Payment Providers → **Verify Stripe Connection** | ✅ Green ✓ Connected (sandbox `sk_test_...`) |
+| Admin Settings → Payment Providers → **Verify PayPal Connection** | ✅ Green ✓ Connected (sandbox credentials) |
+
+ISM consumer wiring confirmed working end-to-end: credentials read from `site_settings` DB at operation time, not from env vars or constructor state.
 
 ---
 

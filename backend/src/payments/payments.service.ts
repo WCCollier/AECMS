@@ -23,7 +23,6 @@ import { AuditLogService } from '../audit/audit.service';
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
   private providers: Map<string, PaymentProvider>;
-  private testMode: boolean;
 
   constructor(
     private prisma: PrismaService,
@@ -34,8 +33,6 @@ export class PaymentsService {
     private paypalProvider: PayPalProvider,
     private auditLog: AuditLogService,
   ) {
-    this.testMode = this.configService.get<string>('PAYMENT_TEST_MODE') === 'true';
-
     this.providers = new Map();
     this.providers.set('stripe', stripeProvider);
     this.providers.set('paypal', paypalProvider);
@@ -61,9 +58,6 @@ export class PaymentsService {
     if (unavailable.length > 0) {
       this.logger.warn(`Unavailable payment providers (not configured): ${unavailable.join(', ')}`);
     }
-    if (this.testMode) {
-      this.logger.warn('Payment test mode enabled - payments will be simulated');
-    }
   }
 
   /**
@@ -72,7 +66,7 @@ export class PaymentsService {
   getAvailableProviders(): string[] {
     const available: string[] = [];
     for (const [name, provider] of this.providers) {
-      if (provider.isAvailable() || this.testMode) {
+      if (provider.isAvailable()) {
         available.push(name);
       }
     }
@@ -106,40 +100,6 @@ export class PaymentsService {
     // Check if already paid
     if (order.payment_intent_id) {
       throw new BadRequestException('Order already has a payment intent');
-    }
-
-    // Test mode - return mock response
-    if (this.testMode) {
-      const mockPaymentId = `test_${dto.provider}_${Date.now()}`;
-
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: {
-          payment_method: dto.provider,
-          payment_intent_id: mockPaymentId,
-        },
-      });
-
-      let clientSecret: string;
-      switch (dto.provider) {
-        case 'stripe':
-          // Simulate Stripe Checkout session URL (redirects to order confirmation in test mode)
-          clientSecret = `/order-confirmation?order=${order.id}&test_mode=true`;
-          break;
-        case 'paypal':
-          clientSecret = `https://sandbox.paypal.com/checkoutnow?token=${mockPaymentId}`;
-          break;
-        default:
-          clientSecret = `/order-confirmation?order=${order.id}&test_mode=true`;
-      }
-
-      return {
-        payment_id: mockPaymentId,
-        client_secret: clientSecret,
-        provider: dto.provider,
-        status: 'requires_action',
-        test_mode: true,
-      };
     }
 
     // Get provider
@@ -206,22 +166,6 @@ export class PaymentsService {
       };
     }
 
-    // Test mode
-    if (this.testMode) {
-      await this.ordersService.markAsPaid(order.id, dto.paypal_order_id);
-      try {
-        await this.digitalProductsService.createDownloadTokensForOrder(order.id);
-      } catch (dlErr) {
-        this.logger.error(`Failed to create download tokens for order ${order.id}`, dlErr);
-      }
-      return {
-        success: true,
-        order_id: order.id,
-        payment_id: dto.paypal_order_id,
-        test_mode: true,
-      };
-    }
-
     const provider = this.providers.get('paypal') as PayPalProvider;
     if (!provider || !provider.isAvailable()) {
       throw new BadRequestException('PayPal is not available');
@@ -268,30 +212,6 @@ export class PaymentsService {
 
     if (order.status === 'cancelled') {
       throw new BadRequestException('Cannot refund cancelled order');
-    }
-
-    // Test mode
-    if (this.testMode) {
-      await this.prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'refunded' },
-      });
-
-      const testRefundId = `test_refund_${Date.now()}`;
-      const testAmount = dto.amount || Math.round(parseFloat(order.total.toString()) * 100);
-      await this.auditLog.log({
-        event_type: 'order.refund_initiated',
-        resource_type: 'order',
-        resource_id: orderId,
-        metadata: { amount: testAmount, gateway_refund_id: testRefundId, test_mode: true },
-      });
-
-      return {
-        success: true,
-        refund_id: testRefundId,
-        amount: testAmount,
-        test_mode: true,
-      };
     }
 
     const provider = this.providers.get(order.payment_method);
@@ -487,11 +407,6 @@ export class PaymentsService {
   async reconcilePayPalOrders(): Promise<{ checked: number; recovered: number; errors: number }> {
     this.logger.log('[paypal-reconcile] Starting reconciliation run');
 
-    if (this.testMode) {
-      this.logger.log('[paypal-reconcile] Test mode active — skipping live PayPal queries');
-      return { checked: 0, recovered: 0, errors: 0 };
-    }
-
     const provider = this.providers.get('paypal') as PayPalProvider;
     if (!provider?.isAvailable()) {
       this.logger.warn('[paypal-reconcile] PayPal not configured — skipping');
@@ -570,11 +485,7 @@ export class PaymentsService {
 
   async verifyStripe(): Promise<{ success: boolean; message: string }> {
     try {
-      if (!this.stripeProvider.isAvailable()) {
-        return { success: false, message: 'Stripe secret key is not configured' };
-      }
-      // Attempt a lightweight Stripe API call to verify the key is valid
-      await (this.stripeProvider as any).stripe.balance.retrieve();
+      await this.stripeProvider.verifyConnection();
       return { success: true, message: 'Stripe connection verified' };
     } catch (err: any) {
       const msg = err?.message ?? 'Stripe verification failed';
@@ -584,45 +495,11 @@ export class PaymentsService {
 
   async verifyPayPal(): Promise<{ success: boolean; message: string }> {
     try {
-      if (!this.paypalProvider.isAvailable()) {
-        return { success: false, message: 'PayPal credentials are not configured' };
-      }
-      // Attempt to fetch an access token as a connection test
       await (this.paypalProvider as any).getAccessToken();
       return { success: true, message: 'PayPal connection verified' };
     } catch (err: any) {
       const msg = err?.message ?? 'PayPal verification failed';
       return { success: false, message: msg };
     }
-  }
-
-  /**
-   * Simulate payment completion (test mode only)
-   */
-  async simulatePaymentCompletion(orderId: string) {
-    if (!this.testMode) {
-      throw new BadRequestException('This endpoint is only available in test mode');
-    }
-
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-    });
-
-    if (!order) {
-      throw new NotFoundException('Order not found');
-    }
-
-    await this.ordersService.markAsPaid(orderId, order.payment_intent_id || `test_${Date.now()}`);
-    try {
-      await this.digitalProductsService.createDownloadTokensForOrder(orderId);
-    } catch (dlErr) {
-      this.logger.error(`Failed to create download tokens for order ${orderId}`, dlErr);
-    }
-
-    return {
-      success: true,
-      message: 'Payment simulated successfully',
-      order_id: orderId,
-    };
   }
 }

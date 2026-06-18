@@ -41,6 +41,11 @@ export class StripeProvider implements PaymentProvider {
     return new Stripe(key);
   }
 
+  async verifyConnection(): Promise<void> {
+    const stripe = await this.getStripe();
+    await stripe.balance.retrieve();
+  }
+
   private async getWebhookSecret(): Promise<string> {
     return this.settingsService.getEffective('payment.stripe_webhook_secret_enc');
   }

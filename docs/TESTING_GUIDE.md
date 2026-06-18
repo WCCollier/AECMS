@@ -1482,24 +1482,20 @@ The SMTP provider now reads credentials from the ISM at send time. Fields here p
 
 ### Tab 4 — Payment Providers (UI)
 
-**Payment Mode toggle:**
-1. Confirm the radio is on **Test Mode**
-2. Click **Live Mode** — a browser `confirm()` dialog warns that real charges will be processed. Click **Cancel** — mode stays on Test Mode
-3. Optionally click Live Mode and confirm — a red warning banner appears. Switch back to Test Mode and save immediately
+There is no test-mode toggle. Payment mode is determined entirely by which API keys are configured — use `sk_test_...` / sandbox keys for sandbox testing, `sk_live_...` / production keys for live payments.
 
 **Stripe section:**
-1. Publishable Key field shows `pk_test_...` (pre-populated)
+1. Publishable Key field shows `pk_test_...` (pre-populated from ISM or env fallback)
 2. Secret Key and Webhook Secret show `•••••••` — eye icon reveals them
 3. Click **Verify Stripe Connection** — makes a live call to `stripe.balance.retrieve()`
    - Expected: green **✓ Connected** badge top-right of the Stripe card
-   - If red ✗: check `grep STRIPE_SECRET /workspaces/AECMS/backend/.env`
-4. Note: the Verify buttons bypass `PAYMENT_TEST_MODE` and always hit the real Stripe/PayPal APIs, so they work regardless of the mode toggle
+   - If red ✗: check ISM values via `GET /settings` (Owner backstage token) or env fallback `STRIPE_SECRET_KEY`
 
 **PayPal section:**
 1. Client ID shows the sandbox `AaBb...` value; Client Secret shows `•••••••`
 2. Click **Verify PayPal Connection** — fetches a PayPal OAuth access token as a connectivity test
    - Expected: green **✓ Connected** badge
-   - If red ✗: check `grep PAYPAL /workspaces/AECMS/backend/.env`
+   - If red ✗: check ISM values or env fallback `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET`
 
 **Dirty state:**
 1. Save Changes button should be disabled (nothing changed)
@@ -1563,15 +1559,71 @@ curl -s -X PATCH http://localhost:4000/settings/appearance \
 - [ ] `GET /settings-public/general` reflects the change without auth
 - [ ] Identity tab: logo URL renders a preview image inline
 - [ ] Email tab: fields pre-populated; password field has show/hide toggle
-- [ ] Send Test Email: green ✓ result and `messageId` in backend log
-- [ ] Payment tab: mode toggle shows Live Mode warning dialog on click
-- [ ] Stripe Verify Connection: green ✓ Connected
-- [ ] PayPal Verify Connection: green ✓ Connected
+- [x] Send Test Email: green ✓ result and `messageId` in backend log *(verified 2026-06-18)*
+- [x] Stripe Verify Connection: green ✓ Connected *(verified 2026-06-18)*
+- [x] PayPal Verify Connection: green ✓ Connected *(verified 2026-06-18)*
 - [ ] Save button disabled when no changes; re-enables on any edit
 - [ ] `GET /settings` requires Owner backstage token; encrypted fields shown as `***`
 - [ ] `PATCH /settings/appearance` accepted with Admin backstage token
 - [ ] `PATCH /settings/appearance` silently drops non-theme keys
 - [ ] Member customer token receives 401 (not 403) on all `/settings` endpoints
+
+---
+
+## File Storage Testing (ESM — External Storage Manager)
+
+Covers the File Storage tab added to Admin Settings and the `POST /settings/test-storage` round-trip endpoint. Navigate to `/admin/settings` → **File Storage** tab (requires backstage Owner session).
+
+The active storage provider is selected at startup via `STORAGE_PROVIDER_TYPE` in `.env`. Credentials for cloud providers are read lazily from the ISM, so changes in the UI take effect immediately without a restart. Switching the *provider type* itself requires a service restart.
+
+---
+
+### Tab 5 — File Storage (UI)
+
+**Local provider (default):**
+1. Confirm the **Provider** selector shows `local (filesystem)`
+2. Click **Test Storage Connection** — the backend performs a write/read/delete round-trip under `uploads/`
+   - Expected: green **✓ Storage working** badge showing provider name and a message
+   - If red ✗: check that `uploads/` directory exists and is writable
+
+**GCS provider (requires GCP credentials):**
+1. Switch **Provider** to `GCS (Google Cloud Storage / compatible)`
+2. Fill in: Media Bucket, Digital Bucket, Project ID
+3. Leave Service Account JSON empty to use Workload Identity (Cloud Run), or paste a JSON key
+4. Save, then click **Test Storage Connection**
+   - Expected: green badge confirming both bucket writes succeeded
+   - Requires real GCS buckets to be provisioned (see `docs/DEPLOYMENT.md → ESM Setup`)
+
+**S3 provider (AWS, R2, B2, Spaces, MinIO):**
+1. Switch **Provider** to `S3 (AWS / compatible)`
+2. Fill in: Media Bucket, Digital Bucket, Region, Access Key ID, Secret Access Key
+3. For non-AWS (Cloudflare R2, Backblaze B2, etc.) enter an **Endpoint URL**
+4. Save, then click **Test Storage Connection**
+
+**CDN Base URL (all cloud providers):**
+- Enter a CDN URL (e.g. `https://cdn.example.com`) — `getUrl()` will return `{cdn}/{key}` instead of a signed URL
+- Leave empty to use signed URLs (GCS) or default S3 bucket URLs
+
+### API verification
+
+```bash
+# Round-trip test — Owner backstage token required
+TOKEN=$(curl -s -X POST http://localhost:4000/auth/admin/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"owner@aecms.local","password":"Admin123!@#"}' | jq -r '.accessToken')
+
+curl -s -X POST http://localhost:4000/settings/test-storage \
+  -H "Authorization: Bearer $TOKEN" | jq .
+# Expected: { "success": true, "provider": "local", "message": "..." }
+```
+
+### Checklist
+- [ ] File Storage tab is visible in Admin Settings (Owner only)
+- [ ] Provider selector shows current `STORAGE_PROVIDER_TYPE`
+- [ ] Local: Test Storage Connection → green ✓ with provider = `local`
+- [ ] `POST /settings/test-storage` requires Owner backstage token; Member customer token returns 401
+- [ ] Media upload in Admin → Media still works end-to-end with local provider
+- [ ] Thumbnail is generated and stored alongside the original
 
 ---
 
