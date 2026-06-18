@@ -382,7 +382,7 @@ model ArticleMedia {
 
 model Product {
   id                  String      @id @default(uuid())
-  name                String
+  title               String
   slug                String      @unique
   description         String      @db.Text
   short_description   String?
@@ -821,7 +821,7 @@ model ProductVersion {
   id               String   @id @default(uuid())
   product_id       String
   version_number   Int
-  name             String
+  title            String
   description      String?  @db.Text
   price            Decimal  @db.Decimal(10, 2)
   compare_at_price Decimal? @db.Decimal(10, 2)

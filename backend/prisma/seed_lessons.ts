@@ -54,7 +54,7 @@ async function main() {
 
   const lessons = [
     {
-      name: 'American Shooter Lesson 1: Marksmanship',
+      title: 'American Shooter Lesson 1: Marksmanship',
       slug: 'american-shooter-lesson-1-marksmanship',
       sku: 'AS-L1-MARKS',
       price: 324.00,
@@ -82,7 +82,7 @@ async function main() {
       image: RIFLE,
     },
     {
-      name: 'American Shooter Lesson 2: Wing Shooting',
+      title: 'American Shooter Lesson 2: Wing Shooting',
       slug: 'american-shooter-lesson-2-wing-shooting',
       sku: 'AS-L2-WING',
       price: 225.00,
@@ -107,7 +107,7 @@ async function main() {
       image: SHOTGUN,
     },
     {
-      name: 'American Shooter Lesson 3: Defensive Shooting Basics',
+      title: 'American Shooter Lesson 3: Defensive Shooting Basics',
       slug: 'american-shooter-lesson-3-defensive-shooting-basics',
       sku: 'AS-L3-DEF-B',
       price: 425.00,
@@ -133,7 +133,7 @@ async function main() {
       image: PISTOL,
     },
     {
-      name: 'American Shooter Lesson 4: Defensive Shooting Additional Skills',
+      title: 'American Shooter Lesson 4: Defensive Shooting Additional Skills',
       slug: 'american-shooter-lesson-4-defensive-shooting-additional-skills',
       sku: 'AS-L4-DEF-A',
       price: 425.00,
@@ -162,7 +162,7 @@ async function main() {
       image: TACRIFLE,
     },
     {
-      name: 'American Shooter Supplemental: Traditional Static Shooting',
+      title: 'American Shooter Supplemental: Traditional Static Shooting',
       slug: 'american-shooter-supplemental-traditional-static-shooting',
       sku: 'AS-SUPP-TSS',
       price: 175.00,
@@ -184,7 +184,7 @@ async function main() {
       image: RIFLE,
     },
     {
-      name: 'American Shooter Supplemental: Traditional Dynamic Shooting',
+      title: 'American Shooter Supplemental: Traditional Dynamic Shooting',
       slug: 'american-shooter-supplemental-traditional-dynamic-shooting',
       sku: 'AS-SUPP-TDS',
       price: 175.00,
@@ -206,7 +206,7 @@ async function main() {
       image: SHOTGUN,
     },
     {
-      name: 'American Shooter Alternative: Direct to Defensive Shooting',
+      title: 'American Shooter Alternative: Direct to Defensive Shooting',
       slug: 'american-shooter-alternative-direct-to-defensive-shooting',
       sku: 'AS-ALT-DDS',
       price: 654.00,
@@ -227,7 +227,7 @@ async function main() {
       image: PISTOL,
     },
     {
-      name: 'American Shooter: Strategies for Personal Protection',
+      title: 'American Shooter: Strategies for Personal Protection',
       slug: 'american-shooter-strategies-for-personal-protection',
       sku: 'AS-STRAT-PP',
       price: 164.00,
@@ -238,7 +238,7 @@ async function main() {
       image: LOGO,
     },
     {
-      name: 'American Shooter: Community Training Seminar',
+      title: 'American Shooter: Community Training Seminar',
       slug: 'american-shooter-community-training-seminar',
       sku: 'AS-COMM-SEM',
       price: 0.00,
@@ -249,7 +249,7 @@ async function main() {
       image: LOGO,
     },
     {
-      name: 'NRA Basic Pistol',
+      title: 'NRA Basic Pistol',
       slug: 'nra-basic-pistol',
       sku: 'NRA-BP',
       price: 495.00,
@@ -258,7 +258,7 @@ async function main() {
       image: LOGO,
     },
     {
-      name: 'NRA Basic Rifle',
+      title: 'NRA Basic Rifle',
       slug: 'nra-basic-rifle',
       sku: 'NRA-BR',
       price: 495.00,
@@ -267,7 +267,7 @@ async function main() {
       image: LOGO,
     },
     {
-      name: 'NRA Personal Protection Inside the Home',
+      title: 'NRA Personal Protection Inside the Home',
       slug: 'nra-personal-protection-inside-the-home',
       sku: 'NRA-PPIH',
       price: 495.00,
@@ -276,7 +276,7 @@ async function main() {
       image: LOGO,
     },
     {
-      name: 'NRA Personal Protection Outside the Home',
+      title: 'NRA Personal Protection Outside the Home',
       slug: 'nra-personal-protection-outside-the-home',
       sku: 'NRA-PPOH',
       price: 495.00,
@@ -285,7 +285,7 @@ async function main() {
       image: LOGO,
     },
     {
-      name: 'American Shooter Supplemental: Classroom and Lab, Online',
+      title: 'American Shooter Supplemental: Classroom and Lab, Online',
       slug: 'american-shooter-supplemental-classroom-and-lab-online',
       sku: 'AS-SUPP-CAL-O',
       price: 224.00,
@@ -303,7 +303,7 @@ async function main() {
       image: LOGO,
     },
     {
-      name: 'American Shooter: Hourly Lessons',
+      title: 'American Shooter: Hourly Lessons',
       slug: 'american-shooter-hourly-lessons',
       sku: 'AS-HOURLY',
       price: 94.00,
@@ -319,13 +319,13 @@ async function main() {
   for (const lesson of lessons) {
     const existing = await prisma.product.findFirst({ where: { slug: lesson.slug } });
     if (existing) {
-      console.log(`Skipping existing: ${lesson.name}`);
+      console.log(`Skipping existing: ${lesson.title}`);
       continue;
     }
 
     const product = await prisma.product.create({
       data: {
-        name: lesson.name,
+        title: lesson.title,
         slug: lesson.slug,
         sku: lesson.sku ?? null,
         description: lesson.description,
@@ -349,7 +349,7 @@ async function main() {
         }),
       },
     });
-    console.log(`Created: ${product.name}`);
+    console.log(`Created: ${product.title}`);
   }
 
   console.log('\nDone.');

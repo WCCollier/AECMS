@@ -23,7 +23,7 @@ export class ProductsService {
    */
   async create(dto: CreateProductDto) {
     // Generate slug if not provided
-    const slug = dto.slug || this.generateSlug(dto.name);
+    const slug = dto.slug || this.generateSlug(dto.title);
 
     // Check if slug already exists among active (non-deleted) products
     const existingSlug = await this.prisma.product.findFirst({ where: { slug, deleted_at: null } });
@@ -82,7 +82,7 @@ export class ProductsService {
     // Create product with relationships
     const product = await this.prisma.product.create({
       data: {
-        name: dto.name,
+        title: dto.title,
         slug,
         description: dto.description,
         short_description: dto.short_description,
@@ -144,7 +144,7 @@ export class ProductsService {
       data: {
         product_id: product.id,
         version_number: (last?.version_number ?? 0) + 1,
-        name: product.name,
+        title: product.title,
         description: product.description ?? null,
         price: product.price,
         compare_at_price: product.compare_at_price ?? null,
@@ -273,7 +273,7 @@ export class ProductsService {
     // Search filter
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
+        { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
         { short_description: { contains: search, mode: 'insensitive' } },
         { sku: { contains: search, mode: 'insensitive' } },
@@ -414,7 +414,7 @@ export class ProductsService {
 
     // Prepare update data
     const updateData: Prisma.ProductUpdateInput = {
-      name: dto.name,
+      title: dto.title,
       slug: dto.slug,
       description: dto.description,
       short_description: dto.short_description,
@@ -539,7 +539,7 @@ export class ProductsService {
       event_type: 'product.deleted',
       resource_type: 'product',
       resource_id: id,
-      metadata: { name: product.name, slug: product.slug },
+      metadata: { title: product.title, slug: product.slug },
     });
   }
 
@@ -568,7 +568,7 @@ export class ProductsService {
       user_id: userId,
       resource_type: 'product',
       resource_id: id,
-      metadata: { name: product.name, action: 'restored_from_trash' },
+      metadata: { title: product.title, action: 'restored_from_trash' },
     });
   }
 
@@ -585,7 +585,7 @@ export class ProductsService {
         orderBy: { version_number: 'desc' },
         skip,
         take: limit,
-        select: { id: true, version_number: true, name: true, price: true, stock_status: true, change_summary: true, created_by: true, created_at: true },
+        select: { id: true, version_number: true, title: true, price: true, stock_status: true, change_summary: true, created_by: true, created_at: true },
       }),
       this.prisma.productVersion.count({ where: { product_id: productId } }),
     ]);
@@ -608,7 +608,7 @@ export class ProductsService {
     const restored = await this.prisma.product.update({
       where: { id: productId },
       data: {
-        name: version.name,
+        title: version.title,
         description: version.description ?? undefined,
         price: version.price,
         compare_at_price: version.compare_at_price ?? null,

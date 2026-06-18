@@ -16,11 +16,11 @@ import { Type } from 'class-transformer';
 import { ContentStatus, ContentVisibility, StockStatus, ProductType } from '@prisma/client';
 
 export class CreateProductDto {
-  @ApiProperty({ description: 'Product name', maxLength: 200 })
+  @ApiProperty({ description: 'Product title', maxLength: 200 })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
-  name: string;
+  title: string;
 
   @ApiPropertyOptional({ description: 'Product slug (auto-generated if not provided)' })
   @IsString()

@@ -52,7 +52,7 @@ interface MigratedArticle {
 }
 
 interface MigratedProduct {
-  name: string;
+  title: string;
   slug: string;
   description: string;
   short_description: string | null;
@@ -176,7 +176,7 @@ async function importProducts(): Promise<void> {
     if (!existing) {
       await prisma.product.create({
         data: {
-          name: product.name,
+          title: product.title,
           slug: product.slug,
           description: product.description,
           short_description: product.short_description,

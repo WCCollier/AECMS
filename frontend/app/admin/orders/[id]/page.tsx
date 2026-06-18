@@ -354,7 +354,7 @@ export default function AdminOrderDetailPage() {
             <tbody className="divide-y divide-border">
               {(order.items as any[]).map((item) => (
                 <tr key={item.id}>
-                  <td className="px-4 py-3 font-medium">{item.product_name ?? item.product?.name}</td>
+                  <td className="px-4 py-3 font-medium">{item.product_name ?? item.product?.title}</td>
                   <td className="px-4 py-3">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-foreground/10 text-foreground/60 capitalize">
                       {item.product?.product_type ?? '—'}

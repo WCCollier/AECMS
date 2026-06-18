@@ -331,7 +331,7 @@ export class CartService {
             product: {
               select: {
                 id: true,
-                name: true,
+                title: true,
                 product_type: true,
                 stock_quantity: true,
                 stock_status: true,
@@ -372,13 +372,13 @@ export class CartService {
       if (item.quantity > available) {
         if (available <= 0) {
           await this.prisma.cartItem.delete({ where: { id: item.id } });
-          changes.push({ product_name: product.name, action: 'removed', from: item.quantity, to: 0 });
+          changes.push({ product_name: product.title, action: 'removed', from: item.quantity, to: 0 });
         } else {
           await this.prisma.cartItem.update({
             where: { id: item.id },
             data: { quantity: available },
           });
-          changes.push({ product_name: product.name, action: 'reduced', from: item.quantity, to: available });
+          changes.push({ product_name: product.title, action: 'reduced', from: item.quantity, to: available });
         }
       }
     }
@@ -450,7 +450,7 @@ export class CartService {
         unit_price: unitPrice,
         product: {
           id: item.product.id,
-          name: item.product.name,
+          title: item.product.title,
           slug: item.product.slug,
           price: unitPrice,
           product_type: item.product.product_type,

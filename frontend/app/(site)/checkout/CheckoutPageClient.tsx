@@ -502,7 +502,7 @@ export function CheckoutPageClient() {
                 {items.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span className="text-foreground/70">
-                      {item.product.name} x {item.quantity}
+                      {item.product.title} x {item.quantity}
                       {item.product.product_type !== 'physical' && (
                         <span className="ml-1 text-foreground/40 text-xs capitalize">
                           ({item.product.product_type})

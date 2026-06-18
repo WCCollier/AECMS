@@ -86,7 +86,7 @@ export class QueryProductsDto {
 
   @ApiPropertyOptional({
     description: 'Sort field',
-    enum: ['created_at', 'updated_at', 'published_at', 'name', 'price'],
+    enum: ['created_at', 'updated_at', 'published_at', 'title', 'price'],
   })
   @IsString()
   @IsOptional()

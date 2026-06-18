@@ -124,7 +124,7 @@ export function CartPageClient() {
                       {item.product.featured_image_url ? (
                         <Image
                           src={item.product.featured_image_url}
-                          alt={item.product.name}
+                          alt={item.product.title}
                           fill
                           sizes="96px"
                           className="object-cover"
@@ -141,7 +141,7 @@ export function CartPageClient() {
                   <div className="flex-1 min-w-0">
                     <Link href={`/shop/${item.product.slug}`}>
                       <h3 className="font-semibold hover:text-foreground/70 truncate">
-                        {item.product.name}
+                        {item.product.title}
                       </h3>
                     </Link>
                     {item.product.product_type === 'physical' && (

@@ -324,12 +324,12 @@ export class KindleService {
       format === FileFormat.EPUB ? 'application/epub+zip' : 'application/pdf';
 
     // Send email with attachment
-    const filename = `${download.digital_file.product.name}.${format}`;
+    const filename = `${download.digital_file.product.title}.${format}`;
 
     const emailResult = await this.emailProvider.sendWithAttachment({
       to: kindleEmail,
-      subject: download.digital_file.product.name,
-      text: `Your purchased book: ${download.digital_file.product.name}`,
+      subject: download.digital_file.product.title,
+      text: `Your purchased book: ${download.digital_file.product.title}`,
       attachments: [
         {
           filename,
@@ -345,7 +345,7 @@ export class KindleService {
         success: false,
         message: `Failed to send: ${emailResult.error}`,
         kindleEmail,
-        productName: download.digital_file.product.name,
+        productName: download.digital_file.product.title,
         format,
       };
     }
@@ -374,9 +374,9 @@ export class KindleService {
 
     return {
       success: true,
-      message: `Successfully sent ${download.digital_file.product.name} to ${kindleEmail}`,
+      message: `Successfully sent ${download.digital_file.product.title} to ${kindleEmail}`,
       kindleEmail,
-      productName: download.digital_file.product.name,
+      productName: download.digital_file.product.title,
       format,
     };
   }

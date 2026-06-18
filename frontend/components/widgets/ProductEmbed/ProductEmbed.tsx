@@ -124,7 +124,7 @@ export function ProductEmbed({ productId, titleAttrs = DEFAULT_TITLE_ATTRS }: Pr
   }
 
   const { titleOverride, titleCase, titleAlign, titleLevel, titleHidden } = titleAttrs;
-  const displayTitle = titleOverride || product.name;
+  const displayTitle = titleOverride || product.title;
   const href = `/shop/${product.slug}`;
   const description = getProductDescription(product);
   const primaryImage = product.media?.find((m) => m.is_primary) ?? product.media?.[0];
@@ -139,7 +139,7 @@ export function ProductEmbed({ productId, titleAttrs = DEFAULT_TITLE_ATTRS }: Pr
         <Link href={href} className="flex-shrink-0">
           {imageUrl ? (
             <div className="relative w-16 h-16 rounded overflow-hidden bg-foreground/10">
-              <Image src={imageUrl} alt={product.name} fill className="object-cover" sizes="64px" />
+              <Image src={imageUrl} alt={product.title} fill className="object-cover" sizes="64px" />
             </div>
           ) : (
             <div className="w-16 h-16 rounded bg-foreground/10 flex items-center justify-center">
@@ -184,7 +184,7 @@ export function ProductEmbed({ productId, titleAttrs = DEFAULT_TITLE_ATTRS }: Pr
     <div className="border border-border rounded-lg overflow-hidden my-4">
       {imageUrl && (
         <div className="relative aspect-video bg-foreground/10">
-          <Image src={imageUrl} alt={product.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
+          <Image src={imageUrl} alt={product.title} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
         </div>
       )}
       <div className="p-4">

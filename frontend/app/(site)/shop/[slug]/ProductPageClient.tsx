@@ -131,7 +131,7 @@ export function ProductPageClient() {
 
         {/* Details */}
         <div>
-          <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+          <h1 className="text-3xl font-bold mb-2">{product.title}</h1>
 
           {/* Price */}
           <div className="flex items-center gap-3 mb-6">

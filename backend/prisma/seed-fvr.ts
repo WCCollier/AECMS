@@ -59,7 +59,7 @@ interface LessonEntry {
   slug: string;
   sku: string;
   price: number;
-  name: string;
+  title: string;
   short_description: string;
   description: string;
 }
@@ -105,7 +105,7 @@ function parseXml(): { articles: ArticleEntry[]; lessons: LessonEntry[] } {
         slug:              node.getAttribute('slug') ?? '',
         sku:               node.getAttribute('sku') ?? '',
         price:             parseFloat(node.getAttribute('price') ?? '0'),
-        name:              text(node as any, 'name'),
+        title:             text(node as any, 'title'),
         short_description: text(node as any, 'short_description'),
         description:       text(node as any, 'description'),
       });
@@ -270,7 +270,7 @@ async function main() {
 
     await prisma.product.create({
       data: {
-        name:              lesson.name,
+        title:             lesson.title,
         slug:              lesson.slug,
         sku:               lesson.sku || null,
         description:       lesson.description,
@@ -289,7 +289,7 @@ async function main() {
       },
     });
     lCreated++;
-    console.log(`  ✓ ${lesson.name}`);
+    console.log(`  ✓ ${lesson.title}`);
   }
   console.log(`  Lessons: ${lCreated} created, ${lSkipped} already existed`);
 

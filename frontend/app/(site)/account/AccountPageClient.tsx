@@ -267,7 +267,7 @@ export function AccountPageClient() {
                   const target = c.article
                     ? { href: `/articles/${c.article.slug}`, name: c.article.title }
                     : c.product
-                    ? { href: `/shop/${c.product.slug}`, name: c.product.name }
+                    ? { href: `/shop/${c.product.slug}`, name: c.product.title }
                     : null;
                   const commentHref = target ? `${target.href}#comment-${c.id}` : null;
 

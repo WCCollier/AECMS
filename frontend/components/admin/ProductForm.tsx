@@ -18,7 +18,7 @@ import { slugToSku } from '@/lib/sku';
 import type { MediaItem } from '@/types';
 
 interface ProductFormData {
-  name: string;
+  title: string;
   slug: string;
   description: string;
   short_description: string;
@@ -70,7 +70,7 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
     formState: { errors, isDirty },
   } = useForm<ProductFormData>({
     defaultValues: {
-      name: initialData?.name || '',
+      title: initialData?.title || '',
       slug: initialData?.slug || '',
       description: initialData?.description || '',
       short_description: initialData?.short_description || '',
@@ -88,7 +88,7 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
     },
   });
 
-  const name = watch('name');
+  const title = watch('title');
   const slug = watch('slug');
   const productType = watch('product_type');
   const currentStatus = watch('status');
@@ -103,16 +103,16 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
     }
   }, [canPublish, currentStatus, setValue]);
 
-  // Auto-derive slug from name on new products
+  // Auto-derive slug from title on new products
   useEffect(() => {
-    if (!productId && name) {
-      const derived = name
+    if (!productId && title) {
+      const derived = title
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
       setValue('slug', derived);
     }
-  }, [name, productId, setValue]);
+  }, [title, productId, setValue]);
 
   // Auto-derive SKU from slug + type on new products while not manually touched
   useEffect(() => {
@@ -130,7 +130,7 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
 
     try {
       const payload: Record<string, unknown> = {
-        name: data.name,
+        title: data.title,
         slug: data.slug,
         description,
         short_description: data.short_description,
@@ -193,14 +193,14 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Name *</label>
+                <label className="block text-sm font-medium mb-2">Title *</label>
                 <Input
-                  {...register('name', { required: 'Name is required' })}
-                  placeholder="Product name"
+                  {...register('title', { required: 'Title is required' })}
+                  placeholder="Product title"
                   className="w-full"
                 />
-                {errors.name && (
-                  <p className="text-red-500 text-sm mt-1">{errors.name.message}</p>
+                {errors.title && (
+                  <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>
                 )}
               </div>
 

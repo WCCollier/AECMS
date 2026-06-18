@@ -60,7 +60,7 @@ const ARTICLE_TAGS: Record<number, string[]> = {
 
 const PRODUCTS = [
   {
-    name: 'American Shooter: Safe Gun Ownership and Handling',
+    title: 'American Shooter: Safe Gun Ownership and Handling',
     slug: 'american-shooter-safe-gun-ownership',
     description: 'A comprehensive online course covering the fundamentals of safe gun ownership and handling. Includes classroom instruction and practical exercises.',
     short_description: 'Online course: Safe gun ownership fundamentals',
@@ -72,7 +72,7 @@ const PRODUCTS = [
     status: 'published' as const,
   },
   {
-    name: 'American Shooter Supplemental: Classroom and Lab',
+    title: 'American Shooter Supplemental: Classroom and Lab',
     slug: 'american-shooter-classroom-lab',
     description: 'Supplemental coursework for the American Shooter curriculum. Covers classroom instruction and hands-on lab exercises for safe firearm handling.',
     short_description: 'Supplemental classroom and lab curriculum',
@@ -84,7 +84,7 @@ const PRODUCTS = [
     status: 'published' as const,
   },
   {
-    name: 'American Shooter Alternative: Direct to Defensive Shooting',
+    title: 'American Shooter Alternative: Direct to Defensive Shooting',
     slug: 'american-shooter-defensive-shooting',
     description: 'An accelerated course taking students directly to defensive shooting techniques. Designed for those with prior firearm experience.',
     short_description: 'Accelerated defensive shooting curriculum',
@@ -4961,7 +4961,7 @@ async function main() {
 
     const product = await prisma.product.create({
       data: {
-        name: prod.name,
+        title: prod.title,
         slug: prod.slug,
         description: prod.description,
         short_description: prod.short_description,
@@ -4981,7 +4981,7 @@ async function main() {
     });
 
     productsCreated++;
-    console.log(`  ✓ Product: "${prod.name}" (${product.id})`);
+    console.log(`  ✓ Product: "${prod.title}" (${product.id})`);
   }
 
   console.log(`\nProducts: ${productsCreated} created, ${productsSkipped} already existed\n`);

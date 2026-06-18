@@ -61,7 +61,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           {product.featured_image_url ? (
             <Image
               src={product.featured_image_url}
-              alt={product.name}
+              alt={product.title}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
               priority={priority}
@@ -92,7 +92,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
         {/* Content */}
         <div className="p-4">
           <h3 className="font-semibold truncate group-hover:text-foreground/70 transition-colors">
-            {product.name}
+            {product.title}
           </h3>
           {product.short_description && (
             <p className="text-sm text-foreground/60 mt-1 line-clamp-2">

@@ -81,7 +81,7 @@ export class OrdersService {
       });
 
       if (!product || product.deleted_at) {
-        throw new BadRequestException(`Product ${item.product.name} is no longer available`);
+        throw new BadRequestException(`Product ${item.product.title} is no longer available`);
       }
 
       // When 'digital' is added to product_type, change to: product_type === 'physical'
@@ -92,7 +92,7 @@ export class OrdersService {
           (product.stock_quantity != null && product.stock_quantity < item.quantity && product.stock_status !== 'backorder')
         )
       ) {
-        throw new BadRequestException(`Insufficient stock for ${product.name}`);
+        throw new BadRequestException(`Insufficient stock for ${product.title}`);
       }
     }
 
@@ -530,7 +530,7 @@ export class OrdersService {
         const unitPrice = parseFloat(item.price.toString());
         return {
           ...item,
-          product_name: item.product?.name ?? '',
+          product_name: item.product?.title ?? '',
           product_sku: item.product?.sku ?? '',
           unit_price: unitPrice,
           total_price: unitPrice * item.quantity,

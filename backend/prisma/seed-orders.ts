@@ -60,7 +60,7 @@ async function main() {
     where: { slug: 'american-shooter-hat' },
     update: {},
     create: {
-      name: 'American Shooter Hat',
+      title: 'American Shooter Hat',
       slug: 'american-shooter-hat',
       description: '<p>Official American Shooter branded hat. One size fits most.</p>',
       price: 24.99,
@@ -92,7 +92,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`[seed-orders] Found hat: ${hat?.name ?? 'none'}`);
+  console.log(`[seed-orders] Found hat: ${hat?.title ?? 'none'}`);
   console.log(`[seed-orders] Found service products: ${serviceProducts.map(p => p!.slug).join(', ')}`);
 
   // ── Helper: create one order ───────────────────────────────────────────────

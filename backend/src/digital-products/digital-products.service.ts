@@ -383,7 +383,7 @@ export class DigitalProductsService {
       },
     });
 
-    const filename = `${download.digital_file.product.name}.${download.digital_file.format}`;
+    const filename = `${download.digital_file.product.title}.${download.digital_file.format}`;
     const contentType = this.getContentType(
       download.digital_file.format as FileFormat,
     );
@@ -474,7 +474,7 @@ export class DigitalProductsService {
       data: { personalization_tested: true },
     });
 
-    const productName = file.product?.name || 'document';
+    const productName = file.product?.title || 'document';
     const filename = `TEST-${productName}.${file.format}`;
     const contentType = this.getContentType(file.format as FileFormat);
 
@@ -604,7 +604,7 @@ export class DigitalProductsService {
       createdAt: download.created_at,
       lastDownloadedAt: download.last_downloaded_at,
       format: download.digital_file?.format || 'unknown',
-      productName: download.digital_file?.product?.name || 'Unknown Product',
+      productName: download.digital_file?.product?.title || 'Unknown Product',
     };
   }
 }

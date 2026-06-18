@@ -42,9 +42,9 @@ export function AdminProductsClient() {
   const products = data?.data ?? [];
   const totalPages = data?.meta?.total_pages ?? data?.total_pages ?? 0;
 
-  const handleDelete = async (id: string, name: string) => {
+  const handleDelete = async (id: string, title: string) => {
     const confirmed = confirm(
-      `Move "${name}" to trash?\n\nTip: For products you are discontinuing, consider setting the status to Discontinued instead — that keeps them hidden from customers but preserves their history.`,
+      `Move "${title}" to trash?\n\nTip: For products you are discontinuing, consider setting the status to Discontinued instead — that keeps them hidden from customers but preserves their history.`,
     );
     if (!confirmed) return;
     try {
@@ -55,8 +55,8 @@ export function AdminProductsClient() {
     }
   };
 
-  const handleRestore = async (id: string, name: string) => {
-    if (!confirm(`Restore "${name}"? It will be saved as a draft.`)) return;
+  const handleRestore = async (id: string, title: string) => {
+    if (!confirm(`Restore "${title}"? It will be saved as a draft.`)) return;
     try {
       await adminApi.post(`/products/${id}/restore`, {});
       mutate();
@@ -156,7 +156,7 @@ export function AdminProductsClient() {
                             <Package className="w-5 h-5 text-foreground/50" />
                           </div>
                           <div>
-                            <span className="font-medium block">{product.name}</span>
+                            <span className="font-medium block">{product.title}</span>
                             <span className="text-xs text-foreground/50 capitalize">{product.product_type}</span>
                             {showDeleted && (
                               <span className="ml-0 text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">
@@ -191,7 +191,7 @@ export function AdminProductsClient() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleRestore(product.id, product.name)}
+                              onClick={() => handleRestore(product.id, product.title)}
                               title="Restore product"
                             >
                               <RotateCcw className="w-4 h-4 text-green-500" />
@@ -206,7 +206,7 @@ export function AdminProductsClient() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDelete(product.id, product.name)}
+                                onClick={() => handleDelete(product.id, product.title)}
                               >
                                 <Trash2 className="w-4 h-4 text-red-500" />
                               </Button>

@@ -66,7 +66,7 @@ function InventoryTracker({ productId, productType }: { productId: string; produ
 
 interface Product {
   id: string;
-  name: string;
+  title: string;
   slug: string;
   description: string;
   short_description: string;

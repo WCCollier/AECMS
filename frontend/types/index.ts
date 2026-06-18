@@ -120,7 +120,7 @@ export interface Tag {
 // Product types
 export interface Product {
   id: string;
-  name: string;
+  title: string;
   slug: string;
   description: string | null;
   short_description: string | null;
@@ -319,7 +319,7 @@ export interface Comment {
   user: CommentAuthor | null;
   // Hydrated by commentInclude — present on all public endpoints
   article: { id: string; title: string; slug: string } | null;
-  product: { id: string; name: string; slug: string } | null;
+  product: { id: string; title: string; slug: string } | null;
   ratings: CommentRating[];
   replies: Comment[];
   created_at: string;

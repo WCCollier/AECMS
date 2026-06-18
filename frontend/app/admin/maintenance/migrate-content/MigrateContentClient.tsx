@@ -66,14 +66,14 @@ export function MigrateContentClient() {
       const products: any[] = productsRes.data?.data ?? [];
 
       for (const p of products) {
-        if (!p.description) { push({ id: p.id, title: p.name, type: 'product', status: 'skipped', note: 'No description' }); continue; }
-        if (isAlreadyJson(p.description)) { push({ id: p.id, title: p.name, type: 'product', status: 'skipped', note: 'Already JSON' }); continue; }
+        if (!p.description) { push({ id: p.id, title: p.title, type: 'product', status: 'skipped', note: 'No description' }); continue; }
+        if (isAlreadyJson(p.description)) { push({ id: p.id, title: p.title, type: 'product', status: 'skipped', note: 'Already JSON' }); continue; }
         try {
           const json = htmlToJson(p.description);
           await adminApi.patch(`/products/${p.id}`, { description: json });
-          push({ id: p.id, title: p.name, type: 'product', status: 'ok' });
+          push({ id: p.id, title: p.title, type: 'product', status: 'ok' });
         } catch (e) {
-          push({ id: p.id, title: p.name, type: 'product', status: 'error', note: getErrorMessage(e) });
+          push({ id: p.id, title: p.title, type: 'product', status: 'error', note: getErrorMessage(e) });
         }
       }
     } catch (e) {
