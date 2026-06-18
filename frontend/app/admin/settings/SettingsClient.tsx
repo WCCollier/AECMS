@@ -113,7 +113,7 @@ export function SettingsClient() {
 
   // Pages list for homepage picker
   const { data: pagesData } = useSWR<{ data: { id: string; title: string; slug: string }[] }>(
-    f('general.homepage_mode') === 'static_page' ? '/pages?limit=100&status=published' : null,
+    fields['general.homepage_mode'] === 'static_page' ? '/pages?limit=100&status=published' : null,
     fetcher,
   );
   const publishedPages = pagesData?.data ?? [];
