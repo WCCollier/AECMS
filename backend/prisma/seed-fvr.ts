@@ -131,6 +131,7 @@ async function main() {
     { name: 'Non-Fiction',   slug: 'non-fiction',   description: 'Essays, analysis, and non-fiction writing' },
     { name: 'Short Thoughts',slug: 'short-thoughts',description: 'Brief philosophical and political essays' },
     { name: 'Reviews',       slug: 'reviews',       description: 'Book, game, and gear reviews' },
+    { name: 'Promos',        slug: 'promos',        description: 'Upcoming books, games, and projects' },
     { name: 'Books',         slug: 'books',         description: 'Feature articles about books and writing' },
     { name: 'Reality',       slug: 'reality',       description: 'Reality-based articles' },
   ];
@@ -143,7 +144,7 @@ async function main() {
     });
     categoryMap[def.name] = cat.id;
   }
-  console.log(`  ✓ ${categoryDefs.length} categories ready`);
+  console.log(`  ✓ ${categoryDefs.length} categories ready (Long-form, Short Thoughts, Reviews, Promos, Books, Reality, Fiction)`);
 
   // ── Tags ─────────────────────────────────────────────────────────────────────
   console.log('\n[2/4] Ensuring tags…');
