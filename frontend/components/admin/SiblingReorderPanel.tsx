@@ -30,7 +30,14 @@ interface SiblingPage {
   parent_id: string | null;
 }
 
-function SortableRow({ page, isCurrentPage }: { page: SiblingPage; isCurrentPage: boolean }) {
+function SortableRow({ page, isCurrentPage, liveTitle, liveShowInNav }: {
+  page: SiblingPage;
+  isCurrentPage: boolean;
+  liveTitle?: string;
+  liveShowInNav?: boolean;
+}) {
+  const title = isCurrentPage && liveTitle !== undefined ? liveTitle : page.title;
+  const showInNav = isCurrentPage && liveShowInNav !== undefined ? liveShowInNav : page.show_in_nav;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: page.id });
 
   return (
@@ -56,7 +63,7 @@ function SortableRow({ page, isCurrentPage }: { page: SiblingPage; isCurrentPage
 
       {/* Title */}
       <span className={`text-sm flex-1 truncate ${isCurrentPage ? 'text-accent font-medium' : 'text-foreground/70'}`}>
-        {page.title}
+        {title}
       </span>
 
       {/* Badges */}
@@ -66,7 +73,7 @@ function SortableRow({ page, isCurrentPage }: { page: SiblingPage; isCurrentPage
             this page
           </span>
         )}
-        {!page.show_in_nav && (
+        {!showInNav && (
           <span className="text-foreground/30" title="Hidden from navigation">
             <EyeOff size={11} />
           </span>
@@ -79,17 +86,17 @@ function SortableRow({ page, isCurrentPage }: { page: SiblingPage; isCurrentPage
 interface Props {
   pageId: string;
   parentId: string | null;
+  currentTitle: string;
+  currentShowInNav: boolean;
+  onReorder: (pages: { id: string; nav_order: number }[]) => void;
 }
 
-type SaveState = 'idle' | 'saving' | 'saved' | 'error';
-
-export function SiblingReorderPanel({ pageId, parentId }: Props) {
+export function SiblingReorderPanel({ pageId, parentId, currentTitle, currentShowInNav, onReorder }: Props) {
   const [siblings, setSiblings] = useState<SiblingPage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saveState, setSaveState] = useState<SaveState>('idle');
-  const [saveTimer, setSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     adminApi.get('/pages?limit=100').then((res) => {
       const all: SiblingPage[] = res.data?.data ?? res.data ?? [];
       const sibs = all
@@ -104,7 +111,7 @@ export function SiblingReorderPanel({ pageId, parentId }: Props) {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -112,22 +119,7 @@ export function SiblingReorderPanel({ pageId, parentId }: Props) {
     const newIndex = siblings.findIndex((p) => p.id === over.id);
     const reordered = arrayMove(siblings, oldIndex, newIndex);
     setSiblings(reordered);
-
-    if (saveTimer) clearTimeout(saveTimer);
-    setSaveState('saving');
-    try {
-      await adminApi.patch('/pages/reorder', {
-        pages: reordered.map((p, i) => ({ id: p.id, nav_order: i })),
-      });
-      setSaveState('saved');
-      const t = setTimeout(() => setSaveState('idle'), 2000);
-      setSaveTimer(t);
-    } catch {
-      setSiblings(siblings); // revert
-      setSaveState('error');
-      const t = setTimeout(() => setSaveState('idle'), 3000);
-      setSaveTimer(t);
-    }
+    onReorder(reordered.map((p, i) => ({ id: p.id, nav_order: i })));
   };
 
   if (loading) {
@@ -140,18 +132,18 @@ export function SiblingReorderPanel({ pageId, parentId }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs text-foreground/40">Drag to reorder navigation</span>
-        {saveState === 'saving' && <span className="text-xs text-foreground/40">Saving…</span>}
-        {saveState === 'saved'  && <span className="text-xs text-accent">Saved ✓</span>}
-        {saveState === 'error'  && <span className="text-xs text-red-400">Save failed</span>}
-      </div>
-
+      <p className="text-xs text-foreground/40 mb-1.5">Drag to reorder — changes save with the page</p>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={siblings.map((p) => p.id)} strategy={verticalListSortingStrategy}>
           <div className="space-y-0.5">
             {siblings.map((p) => (
-              <SortableRow key={p.id} page={p} isCurrentPage={p.id === pageId} />
+              <SortableRow
+                key={p.id}
+                page={p}
+                isCurrentPage={p.id === pageId}
+                liveTitle={currentTitle}
+                liveShowInNav={currentShowInNav}
+              />
             ))}
           </div>
         </SortableContext>

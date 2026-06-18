@@ -30,6 +30,7 @@ interface ArticleFormData {
 interface ArticleFormProps {
   articleId?: string;
   initialData?: Partial<ArticleFormData & { media?: MediaItem[] }>;
+  onSaved?: () => void;
 }
 
 function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
@@ -39,19 +40,22 @@ function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
     .map((m) => ({ mediaId: m.id, url: m.url, isPrimary: m.is_primary }));
 }
 
-export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
+export function ArticleForm({ articleId, initialData, onSaved }: ArticleFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState(initialData?.content || '');
   const [gallery, setGallery] = useState<GalleryEntry[]>(() => toGalleryEntries(initialData?.media));
+  const [isDirtyExtra, setIsDirtyExtra] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const {
     register,
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    reset,
+    formState: { errors, isDirty },
   } = useForm<ArticleFormData>({
     defaultValues: {
       title: initialData?.title || '',
@@ -90,12 +94,16 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
 
       if (articleId) {
         await adminApi.patch(`/articles/${articleId}`, payload);
+        reset(data);
+        setIsDirtyExtra(false);
+        setSaved(true);
+        onSaved?.();
+        setTimeout(() => setSaved(false), 2500);
       } else {
         await adminApi.post('/articles', payload);
+        router.push('/admin/articles');
+        router.refresh();
       }
-
-      router.push('/admin/articles');
-      router.refresh();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -147,7 +155,7 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
                 <label className="block text-sm font-medium mb-2">Content *</label>
                 <TipTapEditor
                   content={content}
-                  onChange={setContent}
+                  onChange={(v) => { setContent(v); setIsDirtyExtra(true); }}
                   placeholder="Write your article content..."
                 />
               </div>
@@ -175,7 +183,7 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
               <p className="text-xs text-foreground/50 mb-3">
                 First image is used as the featured image on listing cards. Add more for a gallery on the article page.
               </p>
-              <MediaGalleryField value={gallery} onChange={setGallery} />
+              <MediaGalleryField value={gallery} onChange={(v) => { setGallery(v); setIsDirtyExtra(true); }} />
             </CardContent>
           </Card>
 
@@ -217,8 +225,12 @@ export function ArticleForm({ articleId, initialData }: ArticleFormProps) {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isLoading} className="flex-1">
-                  {isLoading ? 'Saving...' : articleId ? 'Update' : 'Create'}
+                <Button
+                  type="submit"
+                  disabled={isLoading || saved || (!!articleId && !isDirty && !isDirtyExtra)}
+                  className="flex-1"
+                >
+                  {isLoading ? 'Saving...' : saved ? 'Saved ✓' : articleId ? 'Save Changes' : 'Create'}
                 </Button>
               </div>
             </CardContent>

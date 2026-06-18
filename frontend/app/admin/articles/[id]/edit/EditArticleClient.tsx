@@ -30,6 +30,8 @@ export function EditArticleClient() {
   const [article, setArticle] = useState<Article | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [versionKey, setVersionKey] = useState(0);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     async function fetchArticle() {
@@ -89,10 +91,27 @@ export function EditArticleClient() {
         <h1 className="text-3xl font-bold">Edit Article</h1>
       </div>
 
-      <ArticleForm articleId={articleId} initialData={article} />
+      <ArticleForm
+        key={formKey}
+        articleId={articleId}
+        initialData={article}
+        onSaved={() => setVersionKey((k) => k + 1)}
+      />
 
       <div className="mt-6">
-        <VersionHistoryPanel resourceType="articles" resourceId={articleId} />
+        <VersionHistoryPanel
+          resourceType="articles"
+          resourceId={articleId}
+          refreshKey={versionKey}
+          onRestored={async () => {
+            try {
+              const res = await adminApi.get(`/articles/${articleId}`);
+              setArticle(res.data);
+              setFormKey((k) => k + 1);
+              setVersionKey((k) => k + 1);
+            } catch {}
+          }}
+        />
       </div>
     </div>
   );

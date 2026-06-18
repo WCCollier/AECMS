@@ -40,6 +40,7 @@ interface ProductFormProps {
   initialData?: Partial<ProductFormData & { media?: MediaItem[] }>;
   mainExtra?: React.ReactNode;
   digitalFileCount?: number;
+  onSaved?: () => void;
 }
 
 function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
@@ -49,12 +50,14 @@ function toGalleryEntries(media?: MediaItem[]): GalleryEntry[] {
     .map((m) => ({ mediaId: m.id, url: m.url, isPrimary: m.is_primary }));
 }
 
-export function ProductForm({ productId, initialData, mainExtra, digitalFileCount = 0 }: ProductFormProps) {
+export function ProductForm({ productId, initialData, mainExtra, digitalFileCount = 0, onSaved }: ProductFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState(initialData?.description || '');
   const [gallery, setGallery] = useState<GalleryEntry[]>(() => toGalleryEntries(initialData?.media));
+  const [isDirtyExtra, setIsDirtyExtra] = useState(false);
+  const [saved, setSaved] = useState(false);
   // Tracks whether the SKU is still auto-managed (false once user manually edits)
   const [skuIsAuto, setSkuIsAuto] = useState(!productId && !initialData?.sku);
 
@@ -63,7 +66,8 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
     handleSubmit,
     setValue,
     watch,
-    formState: { errors },
+    reset,
+    formState: { errors, isDirty },
   } = useForm<ProductFormData>({
     defaultValues: {
       name: initialData?.name || '',
@@ -152,15 +156,19 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
         if (res.data.warnings?.length) {
           alert(`Saved with notice:\n\n${(res.data.warnings as string[]).join('\n')}`);
         }
-        router.push('/admin/products');
+        reset(data);
+        setIsDirtyExtra(false);
+        setSaved(true);
+        onSaved?.();
+        setTimeout(() => setSaved(false), 2500);
       } else {
         const res = await adminApi.post('/products', payload);
         if (res.data.warnings?.length) {
           alert(`Product created with notice:\n\n${(res.data.warnings as string[]).join('\n')}`);
         }
         router.push(`/admin/products/${res.data.id}`);
+        router.refresh();
       }
-      router.refresh();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -212,7 +220,7 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
                 <label className="block text-sm font-medium mb-2">Description *</label>
                 <TipTapEditor
                   content={description}
-                  onChange={setDescription}
+                  onChange={(v) => { setDescription(v); setIsDirtyExtra(true); }}
                   placeholder="Describe your product..."
                 />
               </div>
@@ -242,7 +250,7 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
               <p className="text-xs text-foreground/50 mb-3">
                 First image is the primary listing image. Add more for a gallery on the product page.
               </p>
-              <MediaGalleryField value={gallery} onChange={setGallery} />
+              <MediaGalleryField value={gallery} onChange={(v) => { setGallery(v); setIsDirtyExtra(true); }} />
             </CardContent>
           </Card>
 
@@ -315,8 +323,12 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isLoading} className="flex-1">
-                  {isLoading ? 'Saving...' : productId ? 'Update' : 'Create'}
+                <Button
+                  type="submit"
+                  disabled={isLoading || saved || (!!productId && !isDirty && !isDirtyExtra)}
+                  className="flex-1"
+                >
+                  {isLoading ? 'Saving...' : saved ? 'Saved ✓' : productId ? 'Save Changes' : 'Create'}
                 </Button>
               </div>
             </CardContent>

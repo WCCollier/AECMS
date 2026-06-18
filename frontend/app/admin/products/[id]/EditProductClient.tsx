@@ -91,6 +91,8 @@ export function EditProductClient() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [digitalFileCount, setDigitalFileCount] = useState(0);
+  const [versionKey, setVersionKey] = useState(0);
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     async function fetchProduct() {
@@ -151,6 +153,7 @@ export function EditProductClient() {
       </div>
 
       <ProductForm
+        key={formKey}
         productId={productId}
         initialData={{
           ...product,
@@ -161,6 +164,7 @@ export function EditProductClient() {
             : (product.stock_status as 'in_stock' | 'out_of_stock' | 'back_ordered') ?? 'in_stock',
         }}
         digitalFileCount={digitalFileCount}
+        onSaved={() => setVersionKey((k) => k + 1)}
         mainExtra={
           product.product_type === 'digital'
             ? <DigitalFilesPanel productId={productId} onFileCountChange={setDigitalFileCount} />
@@ -171,7 +175,19 @@ export function EditProductClient() {
       />
 
       <div className="mt-6">
-        <VersionHistoryPanel resourceType="products" resourceId={productId} />
+        <VersionHistoryPanel
+          resourceType="products"
+          resourceId={productId}
+          refreshKey={versionKey}
+          onRestored={async () => {
+            try {
+              const res = await adminApi.get(`/products/${productId}`);
+              setProduct(res.data);
+              setFormKey((k) => k + 1);
+              setVersionKey((k) => k + 1);
+            } catch {}
+          }}
+        />
       </div>
     </div>
   );

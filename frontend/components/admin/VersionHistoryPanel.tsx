@@ -17,19 +17,21 @@ interface Version {
 interface Props {
   resourceType: 'articles' | 'products' | 'pages';
   resourceId: string;
+  refreshKey?: number;
   onRestored?: () => void;
 }
 
 const fetcher = (url: string) => adminApi.get(url).then((r) => r.data);
 
-export function VersionHistoryPanel({ resourceType, resourceId, onRestored }: Props) {
+export function VersionHistoryPanel({ resourceType, resourceId, refreshKey = 0, onRestored }: Props) {
   const [open, setOpen] = useState(false);
   const [restoring, setRestoring] = useState<number | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<number | null>(null);
 
   const { data, error, isLoading } = useSWR(
-    open && resourceId ? `/${resourceType}/${resourceId}/versions?limit=50` : null,
+    open && resourceId ? `/${resourceType}/${resourceId}/versions?limit=50&_r=${refreshKey}` : null,
     fetcher,
   );
 
@@ -37,12 +39,14 @@ export function VersionHistoryPanel({ resourceType, resourceId, onRestored }: Pr
 
   async function handleRestore(vnum: number) {
     setRestoring(vnum);
+    setRestoreError(null);
     try {
       await adminApi.post(`/${resourceType}/${resourceId}/versions/${vnum}/restore`);
       setConfirmRestore(null);
       onRestored?.();
-    } catch {
-      // silently ignore for now
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? err?.message ?? 'Restore failed';
+      setRestoreError(Array.isArray(msg) ? msg.join(', ') : msg);
     } finally {
       setRestoring(null);
     }
@@ -113,12 +117,17 @@ export function VersionHistoryPanel({ resourceType, resourceId, onRestored }: Pr
               </button>
             </div>
             <p className="text-sm text-foreground/70 mb-6">
-              This will create a new draft from version {confirmRestore}. The current content will be replaced. You can publish the new draft when ready.
+              The title and content will be replaced with version {confirmRestore}. Navigation settings, slug, and visibility are not affected. A new draft will be created — you can review and publish when ready.
             </p>
+            {restoreError && (
+              <p className="text-sm text-red-500 mb-4 bg-red-500/10 border border-red-500/30 rounded p-2">
+                {restoreError}
+              </p>
+            )}
             <div className="flex gap-3 justify-end">
               <button
                 type="button"
-                onClick={() => setConfirmRestore(null)}
+                onClick={() => { setConfirmRestore(null); setRestoreError(null); }}
                 className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-foreground/5"
               >
                 Cancel

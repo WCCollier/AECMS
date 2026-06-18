@@ -29,10 +29,47 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [zones, setZones] = useState<PageContent['zones']>({});
   const [showInNav, setShowInNav] = useState(true);
   const [parentId, setParentId] = useState<string | null>(null);
+  const handleParentChange = (newParentId: string | null) => {
+    setParentId(newParentId);
+    setPendingReorder(null);
+    setDirty(true);
+  };
+
+  const handleReorder = (pages: { id: string; nav_order: number }[]) => {
+    setPendingReorder(pages);
+    setDirty(true);
+  };
+
+  const handleRestored = async () => {
+    try {
+      const res = await adminApi.get<Page>(`/pages/${pageId}`);
+      const p = res.data;
+      setPage(p);
+      setTitle(p.title);
+      setSlug(p.slug);
+      setStatus(p.status);
+      setShowInNav((p as any).show_in_nav ?? true);
+      setParentId(p.parent_id ?? null);
+      const content = parsePageContent(p.content);
+      setLayout(content.layout);
+      setZones(content.zones);
+      setDirty(false);
+      setPendingReorder(null);
+      setVersionKey((k) => k + 1);
+      setZoneKey((k) => k + 1);
+    } catch {
+      // version list will still refresh via key increment from handleRestore
+    }
+  };
   const [allPages, setAllPages] = useState<Array<{ id: string; title: string }>>([]);
+  const [pendingReorder, setPendingReorder] = useState<{ id: string; nav_order: number }[] | null>(null);
   const [previewSmall, setPreviewSmall] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [versionKey, setVersionKey] = useState(0);
+  const [zoneKey, setZoneKey] = useState(0);
   const [layoutChangeWarning, setLayoutChangeWarning] = useState(false);
   const [pendingLayout, setPendingLayout] = useState<PageLayout | null>(null);
 
@@ -71,6 +108,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
     setLayout(pendingLayout);
     setPendingLayout(null);
     setLayoutChangeWarning(false);
+    setDirty(true);
   };
 
   const handleSave = async () => {
@@ -88,7 +126,14 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         show_in_nav: showInNav,
         parent_id: parentId,
       });
-      router.push('/admin/pages');
+      if (pendingReorder) {
+        await adminApi.patch('/pages/reorder', { pages: pendingReorder });
+      }
+      setDirty(false);
+      setPendingReorder(null);
+      setSaved(true);
+      setVersionKey((k) => k + 1);
+      setTimeout(() => setSaved(false), 2500);
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Save failed.';
       setError(Array.isArray(msg) ? msg.join(', ') : msg);
@@ -139,15 +184,15 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
           )}
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value as typeof status)}
+            onChange={(e) => { setStatus(e.target.value as typeof status); setDirty(true); }}
             className="text-sm px-3 py-1.5 border border-border rounded-lg bg-background"
           >
             <option value="draft">Draft</option>
             <option value="published">Published</option>
             <option value="archived">Archived</option>
           </select>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Changes'}
+          <Button onClick={handleSave} disabled={saving || saved || !dirty}>
+            {saving ? 'Saving…' : saved ? 'Saved ✓' : 'Save Changes'}
           </Button>
         </div>
       </div>
@@ -162,13 +207,13 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
       <div className="grid sm:grid-cols-2 gap-4 mb-4 p-4 bg-surface rounded-lg border border-border">
         <div>
           <label className="block text-sm font-medium mb-1">Title</label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input value={title} onChange={(e) => { setTitle(e.target.value); setDirty(true); }} />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Slug</label>
           <div className="flex items-center gap-2">
             <span className="text-foreground/40 text-sm">/</span>
-            <Input value={slug} onChange={(e) => setSlug(e.target.value)} />
+            <Input value={slug} onChange={(e) => { setSlug(e.target.value); setDirty(true); }} />
           </div>
         </div>
       </div>
@@ -180,7 +225,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
             <label className="block text-sm font-medium mb-1">Parent Page</label>
             <select
               value={parentId ?? ''}
-              onChange={(e) => setParentId(e.target.value || null)}
+              onChange={(e) => handleParentChange(e.target.value || null)}
               className="w-full text-sm px-3 py-1.5 border border-border rounded-lg bg-background"
             >
               <option value="">None (top-level)</option>
@@ -194,7 +239,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
               type="checkbox"
               id="show_in_nav"
               checked={showInNav}
-              onChange={(e) => setShowInNav(e.target.checked)}
+              onChange={(e) => { setShowInNav(e.target.checked); setDirty(true); }}
               className="accent-accent"
             />
             <label htmlFor="show_in_nav" className="text-sm font-medium cursor-pointer">Show in navigation</label>
@@ -211,7 +256,13 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         {/* Sibling reorder */}
         <div className="border-t border-border pt-3">
           <label className="block text-sm font-medium mb-2">Navigation Order</label>
-          <SiblingReorderPanel pageId={pageId} parentId={parentId} />
+          <SiblingReorderPanel
+            pageId={pageId}
+            parentId={parentId}
+            currentTitle={title}
+            currentShowInNav={showInNav}
+            onReorder={handleReorder}
+          />
         </div>
       </div>
 
@@ -252,14 +303,15 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
       )}
 
       <PageZoneEditor
+        key={zoneKey}
         layout={layout}
         zones={zones}
-        onChange={setZones}
+        onChange={(z) => { setZones(z); setDirty(true); }}
         previewSmall={previewSmall}
       />
 
       <div className="mt-6">
-        <VersionHistoryPanel resourceType="pages" resourceId={pageId} />
+        <VersionHistoryPanel resourceType="pages" resourceId={pageId} refreshKey={versionKey} onRestored={handleRestored} />
       </div>
     </div>
   );
