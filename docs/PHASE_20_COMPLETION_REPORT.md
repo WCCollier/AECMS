@@ -130,7 +130,8 @@ Both endpoints call `SettingsService.get()` internally and return only the speci
 **Save & Publish button**:
 - Disabled when no changes are pending (tracked via `dirty` state)
 - Calls `PATCH /settings` with `{ updates: { theme: JSON.stringify({ palette, fontPairing }) } }`
-- On success: re-fetches settings, clears dirty state, shows "Saved" label
+- On success: injects the new CSS variables directly into a `<style id="aecms-theme-live">` tag in `document.head` for instant visual feedback — no page reload required; SSR picks up the persisted value from DB on the next cold load
+- SWR fetch uses `adminApi` (not raw `fetch`) to avoid connection failures in Codespaces browser context
 
 **Live CSS preview** (collapsible `<details>`):
 - Shows the raw CSS output of `buildCssOverrides()` for the currently selected combination
@@ -152,8 +153,10 @@ Both endpoints call `SettingsService.get()` internally and return only the speci
 | `backend/src/settings/settings.controller.ts` | `PublicSettingsController` added |
 | `backend/src/settings/settings.module.ts` | `PublicSettingsController` registered |
 | `frontend/app/admin/settings/appearance/page.tsx` | New (server shell) |
-| `frontend/app/admin/settings/appearance/AppearanceClient.tsx` | New (palette grid + font list) |
+| `frontend/app/admin/settings/appearance/AppearanceClient.tsx` | New (palette grid + font list); updated for instant client-side apply |
 | `frontend/app/admin/layout.tsx` | Appearance nav item |
+| `frontend/app/globals.css` | Full rewrite — all hex → `var(--color-*)`, `.prose` token mapping, sentinel `@theme` values |
+| `start-dev.sh` | `export REDIS_URL` override before backend start |
 
 ---
 
@@ -178,6 +181,30 @@ Owner saves in /admin/settings/appearance
 ```
 
 For instant propagation (e.g. during a demo), the owner can trigger a cache bust by calling `GET /settings-public/theme` with a cache-busting query param, or by restarting the Next.js server.
+
+---
+
+---
+
+## Post-Completion Fixes (2026-06-18)
+
+### Pure CSS Variable Theme System
+
+All hardcoded hex values in `frontend/app/globals.css` were replaced with `var(--color-*)` references. Before this fix, prose content (`.prose-article`, `.ProseMirror`, Tailwind typography `.prose` classes) retained hardcoded Midnight palette hex values, so switching to a light palette left body text invisible.
+
+**Changes:**
+- `body`, scrollbar, selection, focus ring, `.ProseMirror`, `.prose-article`: all colour references converted to CSS custom properties
+- New `.prose` block maps Tailwind typography plugin's internal `--tw-prose-*` tokens to `--color-*` so the `prose prose-sm` class on product descriptions honours the active theme
+- `buildCssOverrides()` now emits 6 derived transparency tokens using `color-mix(in srgb, ...)` for blockquote backgrounds, selection highlight, and accent ghost states — these update automatically when the accent colour changes
+- `@theme` block sentinel values set to red-on-white (`#cc0000` / `#ffffff`) with explanatory comment: these values are never used at runtime (always overridden by `buildCssOverrides`) and the red-on-white state signals a broken SSR injection pipeline to any developer who encounters it
+
+### Instant Client-Side Theme Application
+
+Replaced `window.location.reload()` with direct DOM injection: on save, `AppearanceClient` creates or updates `<style id="aecms-theme-live">` in `document.head` with the current `buildCssOverrides()` output. The owner sees the theme change instantly without a cache issue from a standard reload.
+
+### `start-dev.sh` Redis Fix
+
+Added `export REDIS_URL=redis://localhost:6379` before the backend `nohup` call to override the Codespace secret `REDIS_URL=redis://redis:6379` (Docker Compose hostname not reachable from the host).
 
 ---
 

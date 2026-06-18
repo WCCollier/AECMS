@@ -32,8 +32,19 @@ export function AppearanceClient() {
           theme: JSON.stringify({ palette: selectedPalette, fontPairing: selectedFont }),
         },
       });
+      // Inject updated CSS variables immediately so the owner sees the change without a reload.
+      // Mirrors what RootLayout's <style dangerouslySetInnerHTML> does on the server.
+      let liveStyle = document.getElementById('aecms-theme-live') as HTMLStyleElement | null;
+      if (!liveStyle) {
+        liveStyle = document.createElement('style');
+        liveStyle.id = 'aecms-theme-live';
+        document.head.appendChild(liveStyle);
+      }
+      liveStyle.textContent = previewCss;
       setSaved(true);
       setDirty(false);
+    } catch {
+      // leave saving=true state on network error so the button re-enables
     } finally {
       setSaving(false);
     }

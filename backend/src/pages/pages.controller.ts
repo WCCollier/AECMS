@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PagesService } from './pages.service';
-import { CreatePageDto, UpdatePageDto, QueryPagesDto } from './dto';
+import { CreatePageDto, UpdatePageDto, QueryPagesDto, ReorderPagesDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
@@ -81,6 +81,16 @@ export class PagesController {
   findBySlug(@Param('slug') slug: string, @CurrentUser() user: any) {
     const isAdmin = user?.session_type === 'backstage';
     return this.pagesService.findBySlug(slug, user?.id, isAdmin);
+  }
+
+  @Patch('reorder')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('page.edit')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Batch-update nav_order for a sibling group' })
+  reorder(@Body() dto: ReorderPagesDto) {
+    return this.pagesService.reorder(dto);
   }
 
   @Patch(':id')

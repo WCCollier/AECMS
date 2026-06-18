@@ -108,11 +108,21 @@ This document describes content features for articles, but these apply equally t
 - Text styling: Bold, italic, underline, strikethrough
 - Headings: H1-H6
 - Lists: Ordered and unordered, nested
-- Links: Internal and external with title attributes
+- Links: Internal (pages, articles, products — selected via modal picker) and external URLs, with per-link "open in new tab" control
 - Code blocks: Syntax-highlighted code snippets (with language selection)
 - Tables: Basic table creation and editing
 - Block quotes
 - Horizontal rules
+
+**Link Insertion Modal**:
+
+Clicking the link toolbar button opens a modal dialog (Radix Dialog) with four tabs:
+- **Pages** — searchable list of all site pages; selecting one sets the href to `/<slug>`
+- **Articles** — searchable list of published articles; href becomes `/articles/<slug>`
+- **Products** — searchable list of published products; href becomes `/products/<slug>`
+- **URL** — manual text input for any external URL
+
+All tabs share an "Open in new tab" checkbox (sets `target="_blank" rel="noopener noreferrer"` on the mark). When opening the modal on an existing link, the UI pre-populates the current href and target, and a "Remove link" button is available in the footer. Implemented as `frontend/components/editor/LinkModal.tsx` using `adminApi` for item fetching (editor is backstage-only).
 
 **Text Coloring — Design Constraint and Future Roadmap**:
 

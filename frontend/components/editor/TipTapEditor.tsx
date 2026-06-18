@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import api, { getErrorMessage } from '@/lib/api';
 import { getEditorExtensions } from './extensions';
+import { LinkModal } from './LinkModal';
 import { MediaGalleryField } from '@/components/widgets/MediaGallery/MediaGalleryField';
 import type { GalleryEntry } from '@/components/widgets/MediaGallery/MediaGalleryField';
 import type { MediaItem } from '@/types';
@@ -59,6 +60,7 @@ export function TipTapEditor({
   className = '',
 }: TipTapEditorProps) {
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
 
   // Image insert state
   const [imageUrl, setImageUrl] = useState('');
@@ -104,14 +106,19 @@ export function TipTapEditor({
 
   const setLink = useCallback(() => {
     if (!editor) return;
-    const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('URL', previousUrl);
-    if (url === null) return;
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
-    }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    setLinkModalOpen(true);
+  }, [editor]);
+
+  const applyLink = useCallback((href: string, target: string) => {
+    if (!editor) return;
+    editor.chain().focus().extendMarkRange('link').setLink({ href, target: target || null }).run();
+    setLinkModalOpen(false);
+  }, [editor]);
+
+  const removeLink = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    setLinkModalOpen(false);
   }, [editor]);
 
   const insertImageFromUrl = useCallback(() => {
@@ -445,6 +452,16 @@ export function TipTapEditor({
 
       {/* Editor content */}
       <EditorContent editor={editor} />
+
+      {/* Link insertion modal */}
+      <LinkModal
+        isOpen={linkModalOpen}
+        initialHref={editor.getAttributes('link').href}
+        initialTarget={editor.getAttributes('link').target ?? ''}
+        onApply={applyLink}
+        onRemove={removeLink}
+        onClose={() => setLinkModalOpen(false)}
+      />
     </div>
   );
 }

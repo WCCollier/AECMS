@@ -41,10 +41,19 @@
 **Phase 18**: ✅ COMPLETE - RSS Feed widget: ExternalFeedsModule backend (Redis cache, SSRF validation), RssFeedWidget component, RssEmbed TipTap node (2026-06-17)
 **Phase 19**: 📋 PLANNED - First deployment: fantasyvreality.com on Google Cloud Run
 **Phase 20**: ✅ COMPLETE - Themes and templates: 8 curated palettes, 5 font pairings, CSS variable injection in root layout, /admin/settings/appearance backstage UI (2026-06-17)
+**Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
 **Phase 21**: 📋 PLANNED - Multi-owner deployability: setup wizard, SiteSettings, update strategy
 
+**Session 2026-06-18 improvements** (not phase-tracked):
+- TipTap link insertion modal (Pages/Articles/Products/URL tabs, new-tab toggle, inline search)
+- Nav header: hover-delay submenu fix, chevron pin/unpin, mobile handled separately
+- RSS widget: Cloudflare proxy fallback via rss2json.com, styled card with header + fade CTA
+- Page editor: drag-and-drop sibling nav reorder (PATCH /pages/reorder, @dnd-kit/sortable)
+- Digital Library: Kindle button now shown for PDF downloads (with warning label)
+- Backstage inactivity timeout: 30 min → 3 hours
+
 **Test Status**: 125 frontend + 190 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 135 total (Phase 16: +GET /pages/nav, +GET /pages/by-path)
+**API Endpoints**: 136 total (+PATCH /pages/reorder)
 
 ## API Endpoint Summary
 

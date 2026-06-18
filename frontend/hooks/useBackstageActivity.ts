@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearAdminSession } from '@/lib/api';
 
-const INACTIVITY_MS = 30 * 60 * 1000; // 30 minutes
+const INACTIVITY_MS = 3 * 60 * 60 * 1000; // 3 hours
 
 export function useBackstageActivity() {
   const router = useRouter();

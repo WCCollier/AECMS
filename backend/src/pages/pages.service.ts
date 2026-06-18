@@ -6,7 +6,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreatePageDto, UpdatePageDto, QueryPagesDto } from './dto';
+import { CreatePageDto, UpdatePageDto, QueryPagesDto, ReorderPagesDto } from './dto';
 import { Prisma, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
 
@@ -473,6 +473,30 @@ export class PagesService {
   /**
    * Delete page
    */
+  async reorder(dto: ReorderPagesDto): Promise<void> {
+    if (!dto.pages.length) return;
+
+    const records = await this.prisma.page.findMany({
+      where: { id: { in: dto.pages.map((p) => p.id) }, deleted_at: null },
+      select: { id: true, parent_id: true },
+    });
+
+    if (records.length !== dto.pages.length) {
+      throw new BadRequestException('One or more pages not found');
+    }
+
+    const parentIds = new Set(records.map((r) => r.parent_id));
+    if (parentIds.size > 1) {
+      throw new BadRequestException('All pages must share the same parent');
+    }
+
+    await this.prisma.$transaction(
+      dto.pages.map((p) =>
+        this.prisma.page.update({ where: { id: p.id }, data: { nav_order: p.nav_order } }),
+      ),
+    );
+  }
+
   async remove(id: string, userId: string, isAdmin = false) {
     const page = await this.prisma.page.findUnique({
       where: { id },

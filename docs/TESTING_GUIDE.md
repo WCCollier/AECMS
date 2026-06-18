@@ -61,7 +61,7 @@ cd /workspaces/AECMS/frontend && npm run test    # 125 frontend unit tests
 
 | Role | Email | Password | Notes |
 |------|-------|----------|-------|
-| Owner | owner@aecms.local | Admin123!@# | All permissions; owner of seeded content |
+| Owner | owner@aecms.local  | Admin123!@# | All permissions; owner of seeded content |
 | Admin | admin@aecms.local | Admin123!@# | Most backstage capabilities |
 | Member | member@aecms.local | Member123!@# | Customer-facing only |
 

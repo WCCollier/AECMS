@@ -108,12 +108,46 @@ export class ExternalFeedsService {
     }
   }
 
-  async preview(feedUrl: string, count = 3, specificItemUrl?: string): Promise<FeedPreview> {
+  private async fetchViaProxy(feedUrl: string, count: number): Promise<FeedPreview> {
+    // rss2json.com free tier doesn't support the count param — fetch all and slice
+    const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feedUrl)}`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MAX_FETCH_TIMEOUT_MS);
+    let json: any;
+    try {
+      const res = await fetch(proxyUrl, { signal: controller.signal });
+      if (!res.ok) throw new BadRequestException(`Proxy returned HTTP ${res.status}`);
+      json = await res.json();
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (json.status !== 'ok') throw new BadRequestException('Proxy could not fetch feed');
+    const items: FeedItem[] = (json.items ?? []).slice(0, Math.min(count, 10)).map((item: any) => ({
+      title: item.title ?? '',
+      url: item.link ?? '',
+      published_at: item.pubDate ? new Date(item.pubDate).toISOString() : null,
+      excerpt: stripHtml(item.description ?? item.content ?? '').slice(0, MAX_EXCERPT_LENGTH),
+      image_url: item.thumbnail || null,
+    }));
+    return {
+      feed_title: json.feed?.title ?? 'RSS Feed',
+      feed_url: json.feed?.link || json.feed?.url || feedUrl,
+      items,
+    };
+  }
+
+  async preview(feedUrl: string, count = 3, specificItemUrl?: string, useProxy = false): Promise<FeedPreview> {
     this.validateFeedUrl(feedUrl);
-    const cacheKey = `external_feed:${feedUrl}:${count}:${specificItemUrl ?? ''}`;
+    const cacheKey = `external_feed:${useProxy ? 'proxy:' : ''}${feedUrl}:${count}:${specificItemUrl ?? ''}`;
 
     const cached = await this.getCached(cacheKey);
     if (cached) return cached;
+
+    if (useProxy) {
+      const result = await this.fetchViaProxy(feedUrl, specificItemUrl ? 10 : count);
+      await this.setCached(cacheKey, result);
+      return result;
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), MAX_FETCH_TIMEOUT_MS);

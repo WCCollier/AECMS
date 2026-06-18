@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
 import { Button, Input } from '@/components/ui';
 import { ShoppingCart, User, Menu, X, LogIn, ChevronDown } from 'lucide-react';
-import { useState, useRef, useEffect, FormEvent } from 'react';
+import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
 import { getErrorMessage } from '@/lib/api';
 import useSWR from 'swr';
 import api from '@/lib/api';
@@ -33,14 +33,53 @@ function PageNavItem({ page, ancestors = [], navLink, onClose }: {
   onClose?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const href = buildPagePath(page, ancestors);
   const hasChildren = page.children && page.children.length > 0;
 
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+
+  const scheduleClose = useCallback(() => {
+    // Hover-based close is suppressed while the submenu is pinned open
+    closeTimer.current = setTimeout(() => setOpen((o) => (pinned ? o : false)), 100);
+  }, [pinned]);
+
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+
+  const handleChevronClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    if (pinned) {
+      // Unpin and close
+      setPinned(false);
+      setOpen(false);
+    } else {
+      // Pin open (menu was already open via hover; confirm/lock it)
+      setPinned(true);
+      setOpen(true);
+    }
+  }, [pinned]);
+
   return (
-    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div className="relative" onMouseEnter={() => { cancelClose(); setOpen(true); }} onMouseLeave={scheduleClose}>
       <div className="flex items-center gap-0.5">
         <Link href={href} className={navLink} onClick={onClose}>{page.title}</Link>
-        {hasChildren && <ChevronDown size={12} className="text-foreground/40" />}
+        {hasChildren && (
+          <button
+            type="button"
+            onClick={handleChevronClick}
+            className={`p-1 rounded transition-colors ${pinned ? 'bg-accent/20 text-accent' : 'hover:bg-foreground/10'}`}
+            aria-label={pinned ? 'Unpin submenu' : 'Pin submenu open'}
+            aria-pressed={pinned}
+          >
+            <ChevronDown
+              size={12}
+              className={`transition-transform ${open ? 'rotate-180' : ''} ${pinned ? 'text-accent' : 'text-foreground/40'}`}
+            />
+          </button>
+        )}
       </div>
       {hasChildren && open && (
         <div className="absolute top-full left-0 mt-1 w-48 bg-surface border border-border rounded-lg shadow-lg py-1 z-50">

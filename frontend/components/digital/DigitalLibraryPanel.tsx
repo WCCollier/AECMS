@@ -166,12 +166,18 @@ export function DigitalLibraryPanel() {
                               <Download className="w-3 h-3 mr-1" />
                               Download
                             </Button>
-                            {d.format === 'epub' && (
-                              <Button size="sm" variant="outline" onClick={() => setKindleTarget(d)}>
-                                <Send className="w-3 h-3 mr-1" />
-                                Kindle
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setKindleTarget(d)}
+                              title={d.format === 'pdf' ? 'PDF files are supported by Kindle but display as fixed-layout documents. EPUB is recommended for the best reading experience.' : undefined}
+                            >
+                              <Send className="w-3 h-3 mr-1" />
+                              Kindle
+                              {d.format === 'pdf' && (
+                                <span className="ml-1 text-[10px] text-orange-400 font-normal">(PDF)</span>
+                              )}
+                            </Button>
                           </>
                         )}
                       </div>

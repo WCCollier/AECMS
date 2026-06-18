@@ -27,6 +27,15 @@ const baseExtensions = [
   Link.configure({
     openOnClick: false,
     HTMLAttributes: { class: 'text-accent underline hover:text-accent-hover' },
+    // Allow target attribute so "open in new tab" is preserved in the stored JSON
+    defaultProtocol: 'https',
+  }).extend({
+    addAttributes() {
+      return {
+        ...this.parent?.(),
+        target: { default: null, parseHTML: (el) => el.getAttribute('target'), renderHTML: (attrs) => attrs.target ? { target: attrs.target, rel: 'noopener noreferrer' } : {} },
+      };
+    },
   }),
   Image.configure({
     inline: false,

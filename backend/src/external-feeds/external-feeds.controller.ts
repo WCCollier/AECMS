@@ -13,7 +13,8 @@ export class ExternalFeedsController {
     @Query('url') url: string,
     @Query('count') count?: string,
     @Query('item_url') itemUrl?: string,
+    @Query('use_proxy') useProxy?: string,
   ) {
-    return this.svc.preview(url, count ? parseInt(count, 10) : 3, itemUrl);
+    return this.svc.preview(url, count ? parseInt(count, 10) : 3, itemUrl, useProxy === 'true');
   }
 }

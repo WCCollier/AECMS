@@ -21,6 +21,7 @@ function RssEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeVi
             showImage: node.attrs.showImage ?? true,
             fadeHeight: node.attrs.fadeHeight ?? 220,
             ctaLabel: node.attrs.ctaLabel ?? 'Continue Reading',
+            useProxy: node.attrs.useProxy ?? false,
           }}
         />
       </NodeViewWrapper>
@@ -87,7 +88,9 @@ function RssEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeVi
             showImage: node.attrs.showImage ?? true,
             fadeHeight: node.attrs.fadeHeight ?? 220,
             ctaLabel: node.attrs.ctaLabel ?? 'Continue Reading',
+            useProxy: node.attrs.useProxy ?? false,
           }}
+          onEnableProxy={() => updateAttributes({ useProxy: true })}
         />
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
           <button
@@ -124,6 +127,7 @@ export const RssEmbedNode = Node.create({
       showImage: { default: true, parseHTML: (el) => el.getAttribute('data-show-image') !== 'false', renderHTML: (attrs) => ({ 'data-show-image': attrs.showImage }) },
       fadeHeight: { default: 220, parseHTML: (el) => parseInt(el.getAttribute('data-fade-height') || '220', 10), renderHTML: (attrs) => ({ 'data-fade-height': attrs.fadeHeight }) },
       ctaLabel: { default: 'Continue Reading', parseHTML: (el) => el.getAttribute('data-cta-label') || 'Continue Reading', renderHTML: (attrs) => ({ 'data-cta-label': attrs.ctaLabel }) },
+      useProxy: { default: false, parseHTML: (el) => el.getAttribute('data-use-proxy') === 'true', renderHTML: (attrs) => ({ 'data-use-proxy': attrs.useProxy }) },
     };
   },
 

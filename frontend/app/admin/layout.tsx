@@ -51,7 +51,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const isLoginRoute = pathname?.startsWith('/admin/login') ?? false;
 
-  // Inactivity auto-logout (30 min) — runs on all admin pages including login
+  // Inactivity auto-logout (3 hours) — runs on all admin pages including login
   useBackstageActivity();
 
   useEffect(() => {

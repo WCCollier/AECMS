@@ -8,6 +8,7 @@ import { Button, Input } from '@/components/ui';
 import adminApi from '@/lib/adminApi';
 import { PageZoneEditor } from '@/components/admin/PageZoneEditor';
 import { VersionHistoryPanel } from '@/components/admin/VersionHistoryPanel';
+import { SiblingReorderPanel } from '@/components/admin/SiblingReorderPanel';
 import { getZonesForLayout, parsePageContent, LAYOUT_LABELS } from '@/lib/pageContent';
 import type { Page, PageLayout, PageContent } from '@/types';
 
@@ -27,7 +28,6 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [layout, setLayout] = useState<PageLayout>('no_sidebar');
   const [zones, setZones] = useState<PageContent['zones']>({});
   const [showInNav, setShowInNav] = useState(true);
-  const [navOrder, setNavOrder] = useState(0);
   const [parentId, setParentId] = useState<string | null>(null);
   const [allPages, setAllPages] = useState<Array<{ id: string; title: string }>>([]);
   const [previewSmall, setPreviewSmall] = useState(false);
@@ -49,7 +49,6 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         setSlug(p.slug);
         setStatus(p.status);
         setShowInNav((p as any).show_in_nav ?? true);
-        setNavOrder((p as any).nav_order ?? 0);
         setParentId(p.parent_id ?? null);
         const content = parsePageContent(p.content);
         setLayout(content.layout);
@@ -87,7 +86,6 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         layout,
         status,
         show_in_nav: showInNav,
-        nav_order: navOrder,
         parent_id: parentId,
       });
       router.push('/admin/pages');
@@ -176,48 +174,44 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
       </div>
 
       {/* Navigation settings */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-6 p-4 bg-surface rounded-lg border border-border">
-        <div>
-          <label className="block text-sm font-medium mb-1">Parent Page</label>
-          <select
-            value={parentId ?? ''}
-            onChange={(e) => setParentId(e.target.value || null)}
-            className="w-full text-sm px-3 py-1.5 border border-border rounded-lg bg-background"
-          >
-            <option value="">None (top-level)</option>
-            {allPages.map((p) => (
-              <option key={p.id} value={p.id}>{p.title}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Nav Order</label>
-          <Input
-            type="number"
-            value={String(navOrder)}
-            onChange={(e) => setNavOrder(parseInt(e.target.value) || 0)}
-          />
-          <p className="text-xs text-foreground/40 mt-0.5">Lower = earlier in nav</p>
-        </div>
-        <div className="flex items-center gap-2 pt-5">
-          <input
-            type="checkbox"
-            id="show_in_nav"
-            checked={showInNav}
-            onChange={(e) => setShowInNav(e.target.checked)}
-            className="accent-accent"
-          />
-          <label htmlFor="show_in_nav" className="text-sm font-medium cursor-pointer">Show in navigation</label>
+      <div className="mb-6 p-4 bg-surface rounded-lg border border-border space-y-4">
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">Parent Page</label>
+            <select
+              value={parentId ?? ''}
+              onChange={(e) => setParentId(e.target.value || null)}
+              className="w-full text-sm px-3 py-1.5 border border-border rounded-lg bg-background"
+            >
+              <option value="">None (top-level)</option>
+              {allPages.map((p) => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2 pt-5">
+            <input
+              type="checkbox"
+              id="show_in_nav"
+              checked={showInNav}
+              onChange={(e) => setShowInNav(e.target.checked)}
+              className="accent-accent"
+            />
+            <label htmlFor="show_in_nav" className="text-sm font-medium cursor-pointer">Show in navigation</label>
+          </div>
         </div>
         {/* URL preview */}
-        <div className="sm:col-span-3">
-          <p className="text-xs text-foreground/40">
-            URL: <span className="font-mono text-foreground/60">
-              {parentId
-                ? `/${allPages.find((p) => p.id === parentId)?.title?.toLowerCase().replace(/\s+/g, '-') ?? '…'}/${slug}`
-                : `/${slug}`}
-            </span>
-          </p>
+        <p className="text-xs text-foreground/40">
+          URL: <span className="font-mono text-foreground/60">
+            {parentId
+              ? `/${allPages.find((p) => p.id === parentId)?.title?.toLowerCase().replace(/\s+/g, '-') ?? '…'}/${slug}`
+              : `/${slug}`}
+          </span>
+        </p>
+        {/* Sibling reorder */}
+        <div className="border-t border-border pt-3">
+          <label className="block text-sm font-medium mb-2">Navigation Order</label>
+          <SiblingReorderPanel pageId={pageId} parentId={parentId} />
         </div>
       </div>
 
