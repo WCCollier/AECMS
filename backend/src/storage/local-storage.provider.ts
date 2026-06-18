@@ -123,9 +123,7 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async getUrl(filePath: string, _expiresIn?: number): Promise<string> {
-    // For local storage, return a relative URL path
-    // The application should serve these files via a static route or controller
-    return `/files/${filePath}`;
+    return `/uploads/${filePath}`;
   }
 
   async getMetadata(filePath: string): Promise<FileMetadata> {

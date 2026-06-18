@@ -1,92 +1,78 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConfigService } from '@nestjs/config';
 import { AuditLogService } from '../audit/audit.service';
 import { Media } from '@prisma/client';
 import sharp from 'sharp';
-import * as fs from 'fs/promises';
 import * as path from 'path';
 import { UpdateMediaDto, QueryMediaDto } from './dto';
+import { STORAGE_PROVIDER } from '../storage';
+import type { StorageProvider } from '../storage';
 
 @Injectable()
 export class MediaService {
-  private readonly uploadsDir: string;
-  private readonly maxFileSize: number;
-  private readonly allowedMimeTypes: string[];
+  private readonly maxFileSize = 10 * 1024 * 1024; // 10 MB
+  private readonly allowedMimeTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/svg+xml',
+    'application/pdf',
+  ];
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
     private readonly auditLog: AuditLogService,
-  ) {
-    this.uploadsDir = path.join(process.cwd(), 'uploads');
-    this.maxFileSize = 10 * 1024 * 1024; // 10MB
-    this.allowedMimeTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'image/svg+xml',
-      'application/pdf',
-    ];
-  }
+    @Inject(STORAGE_PROVIDER) private readonly storageProvider: StorageProvider,
+  ) {}
 
-  /**
-   * Process and save uploaded file
-   */
   async upload(
     file: Express.Multer.File,
     userId: string,
     altText?: string,
     caption?: string,
   ): Promise<Media> {
-    // Validate file
     this.validateFile(file);
 
     try {
-      // Ensure uploads directory exists
-      await this.ensureUploadsDirExists();
-
-      // Generate unique filename
       const timestamp = Date.now();
       const sanitizedName = this.sanitizeFilename(file.originalname);
       const filename = `${timestamp}-${sanitizedName}`;
-      const filepath = path.join(this.uploadsDir, filename);
 
-      // Save original file
-      await fs.writeFile(filepath, file.buffer);
+      await this.storageProvider.upload(file.buffer, filename, {
+        contentType: file.mimetype,
+        metadata: { originalName: file.originalname, uploadedBy: userId },
+      });
 
-      // Process image if it's an image type
       let thumbnailPath: string | null = null;
       const isImage = file.mimetype.startsWith('image/');
 
       if (isImage && file.mimetype !== 'image/svg+xml') {
-        thumbnailPath = await this.generateThumbnail(filepath, filename);
+        thumbnailPath = await this.generateThumbnail(file.buffer, filename);
       }
 
-      // Get file metadata
-      const metadata = isImage ? await this.getImageMetadata(filepath) : null;
+      const dimensions = isImage ? await this.getImageDimensions(file.buffer) : null;
 
-      // Create database record
       const media = await this.prisma.media.create({
         data: {
           filename,
           original_name: file.originalname,
           mime_type: file.mimetype,
           size: file.size,
-          file_path: filepath,
+          file_path: filename,
           thumbnail_path: thumbnailPath,
           alt_text: altText || null,
           caption: caption || null,
           uploaded_by: userId,
-          width: metadata?.width,
-          height: metadata?.height,
+          width: dimensions?.width,
+          height: dimensions?.height,
         },
       });
 
@@ -100,19 +86,13 @@ export class MediaService {
 
       return this.transformMedia(media);
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to upload file: ${error.message}`,
-      );
+      throw new InternalServerErrorException(`Failed to upload file: ${error.message}`);
     }
   }
 
-  /**
-   * Find all media with pagination and search
-   */
   async findAll(query: QueryMediaDto) {
     const { page = 1, limit = 20, search } = query;
     const skip = (page - 1) * limit;
-
     const where = search
       ? {
           OR: [
@@ -125,19 +105,10 @@ export class MediaService {
 
     const [media, total] = await Promise.all([
       this.prisma.media.findMany({
-        where,
-        skip,
-        take: limit,
+        where, skip, take: limit,
         orderBy: { uploaded_at: 'desc' },
         include: {
-          uploader: {
-            select: {
-              id: true,
-              email: true,
-              first_name: true,
-              last_name: true,
-            },
-          },
+          uploader: { select: { id: true, email: true, first_name: true, last_name: true } },
         },
       }),
       this.prisma.media.count({ where }),
@@ -145,58 +116,23 @@ export class MediaService {
 
     return {
       data: media.map((m) => this.transformMedia(m)),
-      meta: {
-        total,
-        page,
-        limit,
-        total_pages: Math.ceil(total / limit),
-      },
+      meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
     };
   }
 
-  /**
-   * Find one media by ID
-   */
   async findOne(id: string): Promise<Media> {
     const media = await this.prisma.media.findUnique({
       where: { id },
       include: {
-        uploader: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-          },
-        },
+        uploader: { select: { id: true, email: true, first_name: true, last_name: true } },
       },
     });
-
-    if (!media) {
-      throw new NotFoundException('Media not found');
-    }
-
+    if (!media) throw new NotFoundException('Media not found');
     return this.transformMedia(media);
   }
 
-  private mediaUrl(filePath: string): string {
-    const rel = path.relative(process.cwd(), filePath);
-    return `/${rel}`;
-  }
-
-  private transformMedia(media: any) {
-    return {
-      ...media,
-      url: this.mediaUrl(media.file_path),
-    };
-  }
-
-  /**
-   * Update media metadata
-   */
   async update(id: string, dto: UpdateMediaDto): Promise<Media> {
     const media = await this.findOne(id);
-
     return this.prisma.media.update({
       where: { id },
       data: {
@@ -206,24 +142,14 @@ export class MediaService {
     });
   }
 
-  /**
-   * Delete media file and database record
-   */
   async remove(id: string): Promise<void> {
     const media = await this.findOne(id);
-
     try {
-      // Delete files from filesystem
-      await fs.unlink(media.file_path);
+      await this.storageProvider.delete(this.storagePath(media.file_path));
       if (media.thumbnail_path) {
-        await fs.unlink(media.thumbnail_path).catch(() => {
-          // Ignore if thumbnail doesn't exist
-        });
+        await this.storageProvider.delete(this.storagePath(media.thumbnail_path)).catch(() => {});
       }
-
-      // Delete database record
       await this.prisma.media.delete({ where: { id } });
-
       await this.auditLog.log({
         event_type: 'media.deleted',
         resource_type: 'media',
@@ -231,40 +157,64 @@ export class MediaService {
         metadata: { filename: media.original_name, mime_type: media.mime_type },
       });
     } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to delete media: ${error.message}`,
-      );
+      throw new InternalServerErrorException(`Failed to delete media: ${error.message}`);
     }
   }
 
-  /**
-   * Get file buffer for download
-   */
   async getFileBuffer(id: string): Promise<{ buffer: Buffer; media: Media }> {
     const media = await this.findOne(id);
-
     try {
-      const buffer = await fs.readFile(media.file_path);
+      const buffer = await this.storageProvider.download(this.storagePath(media.file_path));
       return { buffer, media };
-    } catch (error) {
-      throw new NotFoundException('Media file not found on disk');
+    } catch {
+      throw new NotFoundException('Media file not found in storage');
     }
   }
 
-  /**
-   * Validate uploaded file
-   */
-  private validateFile(file: Express.Multer.File): void {
-    if (!file) {
-      throw new BadRequestException('No file provided');
-    }
+  // ── Private helpers ──────────────────────────────────────────────────────────
 
+  /**
+   * Resolve a stored file_path to a storage key.
+   * Legacy records (before ESM) stored absolute filesystem paths; new records store
+   * the relative filename. The local provider serves both correctly since it
+   * computes its own basePath internally.
+   */
+  private storagePath(filePath: string): string {
+    if (path.isAbsolute(filePath)) {
+      return path.basename(filePath);
+    }
+    return filePath;
+  }
+
+  private mediaUrl(filePath: string): string {
+    const storagePath = this.storagePath(filePath);
+    // getUrl is async but transformMedia is sync — local provider URLs are
+    // deterministic so we compute them inline. Cloud providers store public URLs
+    // directly from upload() response, but for now we replicate the same logic.
+    // Full async URL resolution is available via storageProvider.getUrl(storagePath).
+    const providerType = this.storageProvider.getProviderType();
+    if (providerType === 'local') {
+      return `/uploads/${storagePath}`;
+    }
+    // For cloud providers, callers that need a full URL should call
+    // storageProvider.getUrl() directly. The stored file_path is the storage key.
+    return storagePath;
+  }
+
+  transformMedia(media: any) {
+    return {
+      ...media,
+      url: this.mediaUrl(media.file_path),
+    };
+  }
+
+  private validateFile(file: Express.Multer.File): void {
+    if (!file) throw new BadRequestException('No file provided');
     if (file.size > this.maxFileSize) {
       throw new BadRequestException(
         `File size exceeds maximum allowed size of ${this.maxFileSize / 1024 / 1024}MB`,
       );
     }
-
     if (!this.allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
         `File type not allowed. Allowed types: ${this.allowedMimeTypes.join(', ')}`,
@@ -272,9 +222,6 @@ export class MediaService {
     }
   }
 
-  /**
-   * Sanitize filename to prevent path traversal
-   */
   private sanitizeFilename(filename: string): string {
     return filename
       .replace(/[^a-zA-Z0-9.-]/g, '_')
@@ -282,57 +229,28 @@ export class MediaService {
       .substring(0, 200);
   }
 
-  /**
-   * Ensure uploads directory exists
-   */
-  private async ensureUploadsDirExists(): Promise<void> {
+  private async generateThumbnail(fileBuffer: Buffer, originalFilename: string): Promise<string | null> {
     try {
-      await fs.access(this.uploadsDir);
-    } catch {
-      await fs.mkdir(this.uploadsDir, { recursive: true });
-    }
-  }
-
-  /**
-   * Generate thumbnail for image
-   */
-  private async generateThumbnail(
-    filepath: string,
-    filename: string,
-  ): Promise<string | null> {
-    try {
-      const thumbnailFilename = `thumb-${filename}`;
-      const thumbnailPath = path.join(this.uploadsDir, thumbnailFilename);
-
-      await sharp(filepath)
-        .resize(300, 300, {
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
+      const thumbBuffer = await sharp(fileBuffer)
+        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
-        .toFile(thumbnailPath);
-
-      return thumbnailPath;
+        .toBuffer();
+      const thumbFilename = `thumb-${originalFilename.replace(/\.[^.]+$/, '.jpg')}`;
+      await this.storageProvider.upload(thumbBuffer, thumbFilename, { contentType: 'image/jpeg' });
+      return thumbFilename;
     } catch (error) {
-      // If thumbnail generation fails, return null (not critical)
       console.error('Thumbnail generation failed:', error);
       return null;
     }
   }
 
-  /**
-   * Get image metadata (dimensions)
-   */
-  private async getImageMetadata(
-    filepath: string,
+  private async getImageDimensions(
+    buffer: Buffer,
   ): Promise<{ width: number | undefined; height: number | undefined } | null> {
     try {
-      const metadata = await sharp(filepath).metadata();
-      return {
-        width: metadata.width,
-        height: metadata.height,
-      };
-    } catch (error) {
+      const meta = await sharp(buffer).metadata();
+      return { width: meta.width, height: meta.height };
+    } catch {
       return null;
     }
   }

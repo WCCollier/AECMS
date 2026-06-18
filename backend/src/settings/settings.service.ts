@@ -32,7 +32,21 @@ const ENV_KEY_MAP: Record<string, string> = {
   'payment.stripe_webhook_secret_enc':   'STRIPE_WEBHOOK_SECRET',
   'payment.paypal_client_id':            'PAYPAL_CLIENT_ID',
   'payment.paypal_client_secret_enc':    'PAYPAL_CLIENT_SECRET',
-  'payment.test_mode':                   'PAYMENT_TEST_MODE',
+  // ESM — External Storage Manager
+  'storage.provider_type':              'STORAGE_PROVIDER_TYPE',
+  'storage.local_path':                 'STORAGE_PATH',
+  'storage.gcs_project_id':            'GCS_PROJECT_ID',
+  'storage.gcs_bucket_media':          'GCS_BUCKET_MEDIA',
+  'storage.gcs_bucket_digital':        'GCS_BUCKET_DIGITAL',
+  'storage.gcs_endpoint':              'GCS_ENDPOINT',
+  'storage.gcs_credentials_json_enc':  'GCS_CREDENTIALS_JSON',
+  'storage.s3_region':                 'S3_REGION',
+  'storage.s3_endpoint':               'S3_ENDPOINT',
+  'storage.s3_bucket_media':           'S3_BUCKET_MEDIA',
+  'storage.s3_bucket_digital':         'S3_BUCKET_DIGITAL',
+  'storage.s3_access_key_id':          'S3_ACCESS_KEY_ID',
+  'storage.s3_secret_access_key_enc':  'S3_SECRET_ACCESS_KEY',
+  'storage.cdn_base_url':              'STORAGE_CDN_BASE_URL',
 };
 
 @Injectable()
