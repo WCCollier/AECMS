@@ -51,9 +51,13 @@
 - Page editor: drag-and-drop sibling nav reorder (PATCH /pages/reorder, @dnd-kit/sortable)
 - Digital Library: Kindle button now shown for PDF downloads (with warning label)
 - Backstage inactivity timeout: 30 min → 3 hours
+- ISM: consumer wiring (SMTP/Stripe/PayPal lazy reads), favicon upload, homepage mode toggle
+- ESM: GcsStorageProvider, S3StorageProvider, media.service migration, File Storage settings tab
+- Payment test mode removed entirely (was a dev stub; Stripe/PayPal sandbox replaces it)
+- Secrets migrated from .env to ISM via migration script
 
 **Test Status**: 125 frontend + 190 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 136 total (+PATCH /pages/reorder)
+**API Endpoints**: 138 total (+POST /settings/test-storage, +POST /settings/favicon)
 
 ## API Endpoint Summary
 
@@ -294,6 +298,29 @@ The ISM is the subsystem that encrypts, stores, retrieves, decrypts, and serves 
 **Key rotation** is prospective (Phase 21+): re-encrypt all `_enc` rows under a new SEK in a single DB transaction, then swap the SEK in external storage.
 
 Full design: `docs/prd/05-security.md` → "Internal Secrets Manager (ISM)" section.
+
+## External Storage Manager (ESM)
+
+The ESM is the subsystem that stores, retrieves, and deletes binary files (uploaded media, digital product source files, system assets) via a provider-agnostic `StorageProvider` interface. The active provider is selected by `STORAGE_PROVIDER_TYPE` at startup; provider credentials are read lazily from the ISM so changes via Admin Settings take effect without restart.
+
+**Providers:**
+- `LocalStorageProvider` — filesystem under `uploads/`; default for dev and single-server deployments
+- `GcsStorageProvider` — GCS protocol; covers Google Cloud Storage and any GCS-compatible endpoint; supports Workload Identity (Cloud Run) or service account JSON via ISM
+- `S3StorageProvider` — S3 protocol; covers AWS S3, Cloudflare R2, Backblaze B2, DigitalOcean Spaces, MinIO, and any other S3-compatible service
+
+**Two-bucket routing** (cloud providers): paths starting with `digital-products/` go to the private digital bucket (files always served through the backend, never directly); everything else goes to the public media bucket.
+
+**Key files:**
+| Component | Location |
+|---|---|
+| `StorageProvider` interface | `backend/src/storage/storage.interface.ts` |
+| `GcsStorageProvider` | `backend/src/storage/gcs-storage.provider.ts` |
+| `S3StorageProvider` | `backend/src/storage/s3-storage.provider.ts` |
+| `StorageModule` (factory) | `backend/src/storage/storage.module.ts` |
+| Test endpoint | `POST /settings/test-storage` (StorageController) |
+| Admin Settings UI | File Storage tab in `/admin/settings` |
+
+**ISM keys** (all under `storage.*` namespace; S3 secret and GCS credentials JSON are `_enc`-suffixed and encrypted at rest). Full key list: `docs/prd/05-security.md` → "External Storage Manager (ESM)" section.
 
 ## Phase 5: Payments Integration (✅ CONFIGURED)
 

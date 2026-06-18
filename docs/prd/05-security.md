@@ -821,6 +821,86 @@ Until rotation tooling exists: if the SEK is lost or compromised, all ISM-stored
 - *(future)* OpenAI API key
 - *(future)* OAuth provider client secrets (Google, Apple)
 
+---
+
+### External Storage Manager (ESM)
+
+The **External Storage Manager (ESM)** is the AECMS subsystem responsible for storing, retrieving, and deleting binary files (uploaded media, digital product files, system assets such as the favicon) via a provider-agnostic interface. Like the ISM, it is designed so that the rest of the application never references a specific vendor's SDK — only the `StorageProvider` interface.
+
+#### Architecture
+
+```
+Application code  →  StorageProvider interface  →  Active provider
+                                                     ├── LocalStorageProvider  (local/dev)
+                                                     ├── GcsStorageProvider    (GCS protocol)
+                                                     ├── S3StorageProvider     (S3 protocol)
+                                                     └── AzureBlobStorageProvider (future)
+```
+
+**Key files:**
+| Component | Location |
+|---|---|
+| `StorageProvider` interface | `backend/src/storage/storage.interface.ts` |
+| `LocalStorageProvider` | `backend/src/storage/local-storage.provider.ts` |
+| `GcsStorageProvider` | `backend/src/storage/gcs-storage.provider.ts` |
+| `S3StorageProvider` | `backend/src/storage/s3-storage.provider.ts` |
+| `StorageModule` (factory) | `backend/src/storage/storage.module.ts` |
+| `StorageController` | `backend/src/storage/storage.controller.ts` |
+
+**`STORAGE_PROVIDER_TYPE` env var** selects the active implementation at startup. Provider-specific credentials are read lazily from the ISM via `SettingsService.getEffective()` on every file operation — no restart needed after credential changes.
+
+#### Provider routing: two-bucket model
+
+Cloud providers route files to one of two buckets based on the storage path prefix:
+
+| Path prefix | Bucket | Access |
+|---|---|---|
+| `digital-products/**` | Digital bucket | Private — signed URLs only; files always streamed through backend for personalization |
+| Everything else | Media bucket | Public — permanent CDN-cacheable URLs |
+
+#### Protocol coverage
+
+| Owner's setup | Protocol | Provider |
+|---|---|---|
+| Local dev / single VPS | Filesystem | `LocalStorageProvider` |
+| Google Cloud | GCS | `GcsStorageProvider` |
+| AWS S3 | S3 | `S3StorageProvider` |
+| Cloudflare R2 | S3-compatible | `S3StorageProvider` + endpoint URL |
+| Backblaze B2 | S3-compatible | `S3StorageProvider` + endpoint URL |
+| DigitalOcean Spaces | S3-compatible | `S3StorageProvider` + endpoint URL |
+| MinIO (self-hosted) | S3-compatible | `S3StorageProvider` + endpoint URL |
+| Azure Blob Storage | Azure | `AzureBlobStorageProvider` *(future)* |
+
+#### ESM ISM keys
+
+All ESM credentials are stored and read through the ISM. `ENV_KEY_MAP` provides env-var fallbacks for deployments that pre-configure via environment.
+
+| ISM key | Env fallback | Description |
+|---|---|---|
+| `storage.provider_type` | `STORAGE_PROVIDER_TYPE` | Active provider (`local`/`gcs`/`s3`) |
+| `storage.gcs_project_id` | `GCS_PROJECT_ID` | GCS project ID (optional with Workload Identity) |
+| `storage.gcs_bucket_media` | `GCS_BUCKET_MEDIA` | GCS media bucket name |
+| `storage.gcs_bucket_digital` | `GCS_BUCKET_DIGITAL` | GCS digital files bucket name |
+| `storage.gcs_endpoint` | `GCS_ENDPOINT` | GCS-compatible endpoint override |
+| `storage.gcs_credentials_json_enc` | `GCS_CREDENTIALS_JSON` | Service account JSON *(encrypted)* |
+| `storage.s3_region` | `S3_REGION` | S3 region |
+| `storage.s3_endpoint` | `S3_ENDPOINT` | S3-compatible endpoint (R2, B2, etc.) |
+| `storage.s3_bucket_media` | `S3_BUCKET_MEDIA` | S3 media bucket name |
+| `storage.s3_bucket_digital` | `S3_BUCKET_DIGITAL` | S3 digital files bucket name |
+| `storage.s3_access_key_id` | `S3_ACCESS_KEY_ID` | S3 access key ID |
+| `storage.s3_secret_access_key_enc` | `S3_SECRET_ACCESS_KEY` | S3 secret access key *(encrypted)* |
+| `storage.cdn_base_url` | `STORAGE_CDN_BASE_URL` | CDN prefix for public media URLs |
+
+#### GCS authentication
+
+On **Cloud Run with Workload Identity**: leave `storage.gcs_credentials_json_enc` empty. The `@google-cloud/storage` SDK discovers credentials from the metadata server automatically — no key file needed.
+
+For **self-hosted or non-Cloud Run GCP**: set `storage.gcs_credentials_json_enc` to the full service account JSON (it is encrypted at rest by the ISM).
+
+#### Admin Settings UI
+
+The **File Storage** tab in Admin Settings (`/admin/settings`) surfaces all ESM configuration: provider selector, per-provider fields, CDN URL, and a **Test Storage Connection** button that runs a write/read/delete round-trip via `POST /settings/test-storage` and reports pass/fail inline.
+
 **Security Headers:**
 ```javascript
 // Example security headers
