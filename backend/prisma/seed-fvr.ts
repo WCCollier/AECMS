@@ -163,7 +163,7 @@ async function main() {
 
   // ── Articles ─────────────────────────────────────────────────────────────────
   console.log('\n[3/4] Upserting articles…');
-  let created = 0, skipped = 0;
+  let created = 0, updated = 0;
 
   for (const a of articles) {
     if (!a.slug || !a.title) continue;
@@ -171,7 +171,12 @@ async function main() {
     const existing = await prisma.article.findUnique({ where: { slug: a.slug }, select: { id: true } });
 
     if (existing) {
-      // Ensure category / tag associations are present even on skip
+      // Force-update title, content, excerpt from XML (fixes any stale plain-text from old seeds)
+      await prisma.article.update({
+        where: { id: existing.id },
+        data: { title: a.title, content: a.content, excerpt: a.excerpt || null },
+      });
+      // Ensure category / tag associations
       const catId = categoryMap[a.category];
       if (catId) {
         await prisma.articleCategory.upsert({
@@ -188,7 +193,7 @@ async function main() {
           }).catch(() => {});
         }
       }
-      skipped++;
+      updated++;
       continue;
     }
 
@@ -224,7 +229,7 @@ async function main() {
     created++;
     if (created <= 10 || created % 10 === 0) console.log(`  ✓ [${created}] ${a.title.slice(0,55)}`);
   }
-  console.log(`  Articles: ${created} created, ${skipped} already existed`);
+  console.log(`  Articles: ${created} created, ${updated} updated from XML`);
 
   // ── Lesson images ─────────────────────────────────────────────────────────────
   console.log('\n[4/4] Upserting lesson products…');
