@@ -118,6 +118,30 @@ export function SettingsClient() {
   );
   const publishedPages = pagesData?.data ?? [];
 
+  // Favicon upload state
+  const [faviconUploading, setFaviconUploading] = useState(false);
+  const [faviconError, setFaviconError] = useState<string | null>(null);
+
+  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFaviconUploading(true);
+    setFaviconError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await adminApi.post<{ url: string }>('/settings/favicon', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setFields((prev) => ({ ...prev, 'identity.favicon_url': res.data.url }));
+    } catch (err: any) {
+      setFaviconError(err?.response?.data?.message ?? 'Upload failed');
+    } finally {
+      setFaviconUploading(false);
+      e.target.value = '';
+    }
+  };
+
   // Email test state
   const [emailTesting, setEmailTesting] = useState(false);
   const [emailTestResult, setEmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -325,12 +349,26 @@ export function SettingsClient() {
               <img src={f('identity.logo_url')} alt="Logo preview" className="mt-2 h-12 object-contain rounded border border-neutral-700" />
             )}
           </FieldRow>
-          <FieldRow label="Favicon URL" help="32×32 icon shown in browser tabs">
-            <TextInput value={f('identity.favicon_url')} onChange={(v) => set('identity.favicon_url', v)} />
-            {f('identity.favicon_url') && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={f('identity.favicon_url')} alt="Favicon preview" className="mt-2 h-8 w-8 object-contain rounded border border-neutral-700" />
-            )}
+          <FieldRow label="Favicon" help="Icon shown in browser tabs (ICO, PNG, JPG, or SVG)">
+            <div className="flex items-center gap-4">
+              {f('identity.favicon_url') && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={f('identity.favicon_url')} alt="Current favicon" className="h-8 w-8 object-contain rounded border border-neutral-700 bg-neutral-800" />
+              )}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-neutral-200 text-sm px-3 py-1.5 rounded transition-colors">
+                  {faviconUploading ? 'Uploading…' : f('identity.favicon_url') ? 'Replace' : 'Upload file'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/x-icon,image/png,image/jpeg,image/svg+xml,.ico"
+                  onChange={handleFaviconUpload}
+                  disabled={faviconUploading}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+            {faviconError && <p className="mt-1 text-xs text-red-400">{faviconError}</p>}
           </FieldRow>
           <FieldRow label="Brand Color" help="Accent color used for buttons and links">
             <div className="flex items-center gap-3">

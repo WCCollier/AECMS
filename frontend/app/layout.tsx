@@ -18,16 +18,18 @@ export const metadata: Metadata = {
   keywords: ['cms', 'ecommerce', 'content management'],
 };
 
-async function getSiteTheme(): Promise<{ paletteId: string; fontPairingId: string; siteTitle: string }> {
+async function getSiteTheme(): Promise<{ paletteId: string; fontPairingId: string; siteTitle: string; faviconUrl: string | null }> {
   try {
     const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:4000';
-    const [themeRes, titleRes] = await Promise.allSettled([
+    const [themeRes, titleRes, identityRes] = await Promise.allSettled([
       fetch(`${backendUrl}/settings-public/theme`, { next: { revalidate: 300 } }),
       fetch(`${backendUrl}/settings-public/general`, { next: { revalidate: 300 } }),
+      fetch(`${backendUrl}/settings-public/identity`, { next: { revalidate: 300 } }),
     ]);
     let paletteId = 'midnight';
     let fontPairingId = 'default';
     let siteTitle = 'AECMS';
+    let faviconUrl: string | null = null;
 
     if (themeRes.status === 'fulfilled' && themeRes.value.ok) {
       const theme = await themeRes.value.json();
@@ -38,9 +40,13 @@ async function getSiteTheme(): Promise<{ paletteId: string; fontPairingId: strin
       const general = await titleRes.value.json();
       siteTitle = general.site_title ?? 'AECMS';
     }
-    return { paletteId, fontPairingId, siteTitle };
+    if (identityRes.status === 'fulfilled' && identityRes.value.ok) {
+      const identity = await identityRes.value.json();
+      faviconUrl = identity.favicon_url ?? null;
+    }
+    return { paletteId, fontPairingId, siteTitle, faviconUrl };
   } catch {
-    return { paletteId: 'midnight', fontPairingId: 'default', siteTitle: 'AECMS' };
+    return { paletteId: 'midnight', fontPairingId: 'default', siteTitle: 'AECMS', faviconUrl: null };
   }
 }
 
@@ -49,7 +55,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { paletteId, fontPairingId, siteTitle } = await getSiteTheme();
+  const { paletteId, fontPairingId, siteTitle, faviconUrl } = await getSiteTheme();
   const palette = getPaletteById(paletteId);
   const fontPairing = getFontPairingById(fontPairingId);
   const cssOverrides = buildCssOverrides(palette, fontPairing);
@@ -67,6 +73,8 @@ export default async function RootLayout({
         )}
         {/* Runtime theme override */}
         <style dangerouslySetInnerHTML={{ __html: cssOverrides }} />
+        {/* Favicon from settings */}
+        {faviconUrl && <link rel="icon" href={faviconUrl} />}
         {/* Site title from settings */}
         <title>{siteTitle}</title>
       </head>
