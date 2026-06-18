@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -29,7 +29,14 @@ interface AdminUser {
   role: string;
 }
 
-const navItems = [
+const CONFIGURE_CAPS = [
+  'system.configure.general',
+  'system.configure.email',
+  'system.configure.payments',
+  'system.configure.storage',
+] as const;
+
+const navItems: { href: string; label: string; icon: React.ElementType; requiredCap?: string | readonly string[] }[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/articles', label: 'Articles', icon: FileText },
@@ -37,8 +44,8 @@ const navItems = [
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, requiredCap: 'system.view_audit' },
   { href: '/admin/domains', label: 'Domains', icon: Globe, requiredCap: 'domain.manage' },
-  { href: '/admin/settings/appearance', label: 'Appearance', icon: Paintbrush, requiredCap: 'system.configure' },
-  { href: '/admin/settings', label: 'Settings', icon: Settings, requiredCap: 'system.configure' },
+  { href: '/admin/settings/appearance', label: 'Appearance', icon: Paintbrush, requiredCap: 'system.appearance' },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, requiredCap: CONFIGURE_CAPS },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -128,7 +135,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
               {navItems
-                .filter(item => !item.requiredCap || userCaps.includes(item.requiredCap))
+                .filter(item => {
+                  if (!item.requiredCap) return true;
+                  const caps = Array.isArray(item.requiredCap) ? item.requiredCap : [item.requiredCap];
+                  return caps.some(c => userCaps.includes(c));
+                })
                 .map(item => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
