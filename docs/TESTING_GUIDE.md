@@ -1424,108 +1424,140 @@ curl -sI "http://localhost:4000/digital-products/download/$DL_TOKEN"
 
 ## Admin Settings Testing (Phase 15)
 
-Covers SiteSettings DB table, AES-256-GCM KeyProvider, and the settings UI tabs (General / Identity / Email / Payment). **Owner** role has `system.configure` (full read/write). **Admin** role has `system.appearance` only (can update the `theme` key via `PATCH /settings/appearance`).
+Covers SiteSettings DB table, AES-256-GCM KeyProvider, and the settings UI tabs (General / Site Identity / Email / Payment Providers). Navigate to `/admin/settings` — requires backstage login + 2FA as Owner.
 
-### Public settings (no auth required)
+**Access levels**: Owner has `system.configure` (full read/write on all tabs). Admin has `system.appearance` only (can update the theme key via `PATCH /settings/appearance` but cannot reach the main settings page).
+
+---
+
+### Tab 1 — General (UI)
+
+1. Change **Site Title** to something temporary (e.g. "Test Site Title") and **Tagline**
+2. Click **Save Changes** — "Unsaved changes" label disappears, "Saved" appears
+3. Open a new tab to `http://localhost:3000` — title change should be reflected
+4. Verify via API (no auth required):
+   ```bash
+   curl -s http://localhost:4000/settings-public/general | jq .
+   ```
+5. Change **Homepage** to **Static Page** — a Page ID input appears. Switch back to **Latest Articles** and save
+6. Revert site title to its original value and save
+
+---
+
+### Tab 2 — Site Identity (UI)
+
+1. Enter any image URL in **Logo URL** — a small preview renders below the field immediately
+2. Enter a URL in **Favicon URL** — 32×32 preview appears
+3. Use the color picker to change **Brand Color** — hex input and picker stay in sync
+4. Save — confirm no error (logo/favicon wiring is production-only; visual effect comes at deployment)
+
+---
+
+### Tab 3 — Email / SMTP (UI)
+
+The fields should already be populated from the working Gmail SMTP config (`smtp.gmail.com`, port 587, STARTTLS, `moriakul@gmail.com`).
+
+1. Confirm all fields are pre-populated
+2. The password field shows `•••••••` — click the eye icon to reveal/hide
+3. **Do not change any values** — you don't want to overwrite the working SMTP config
+4. Click **Send Test Email** — spinner appears, then green ✓ or red ✗ with message
+5. Confirm delivery:
+   ```bash
+   grep -i "messageId\|test email" /tmp/backend.log | tail -3
+   ```
+6. Check inbox at moriakul@gmail.com for the test email
+
+---
+
+### Tab 4 — Payment Providers (UI)
+
+**Payment Mode toggle:**
+1. Confirm the radio is on **Test Mode**
+2. Click **Live Mode** — a browser `confirm()` dialog warns that real charges will be processed. Click **Cancel** — mode stays on Test Mode
+3. Optionally click Live Mode and confirm — a red warning banner appears. Switch back to Test Mode and save immediately
+
+**Stripe section:**
+1. Publishable Key field shows `pk_test_...` (pre-populated)
+2. Secret Key and Webhook Secret show `•••••••` — eye icon reveals them
+3. Click **Verify Stripe Connection** — makes a live call to `stripe.balance.retrieve()`
+   - Expected: green **✓ Connected** badge top-right of the Stripe card
+   - If red ✗: check `grep STRIPE_SECRET /workspaces/AECMS/backend/.env`
+4. Note: the Verify buttons bypass `PAYMENT_TEST_MODE` and always hit the real Stripe/PayPal APIs, so they work regardless of the mode toggle
+
+**PayPal section:**
+1. Client ID shows the sandbox `AaBb...` value; Client Secret shows `•••••••`
+2. Click **Verify PayPal Connection** — fetches a PayPal OAuth access token as a connectivity test
+   - Expected: green **✓ Connected** badge
+   - If red ✗: check `grep PAYPAL /workspaces/AECMS/backend/.env`
+
+**Dirty state:**
+1. Save Changes button should be disabled (nothing changed)
+2. Edit any field, then undo the change — Save re-enables on any keystroke
+3. Save — completes cleanly, button disables again
+
+---
+
+### API verification
 
 ```bash
-# Theme — used by root layout for CSS variable injection
+# Public endpoints — no auth
 curl -s http://localhost:4000/settings-public/theme | jq .
 # Returns: { "palette": "midnight", "fontPairing": "default" }
 
-# General — site title and tagline
 curl -s http://localhost:4000/settings-public/general | jq .
-# Returns: { "site_title": "AECMS", "tagline": "..." }
-```
+# Returns: { "site_title": "...", "tagline": "..." }
 
-### Full settings read (Owner only — requires `system.configure`)
-
-```bash
-# Backstage Owner token required
+# Full settings read — Owner backstage token required
 curl -s http://localhost:4000/settings \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq 'keys'
-# Encrypted fields (SMTP password, API keys) are returned as "***"
-```
+# Encrypted fields (SMTP password, API keys) returned as "***"
 
-### Update general settings (Owner only)
-
-```bash
-curl -s -X PATCH http://localhost:4000/settings \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "updates": {
-      "general.site_title": "My Site",
-      "general.tagline": "Powered by AECMS"
-    }
-  }' | jq .
-
-# Verify via public endpoint
-curl -s http://localhost:4000/settings-public/general | jq .
-# Should return updated values immediately
-```
-
-### Appearance update (`system.appearance` — Admin and Owner)
-
-```bash
-# Admin backstage token can update the theme key
+# Appearance update — Admin backstage token accepted
 curl -s -X PATCH http://localhost:4000/settings/appearance \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "updates": {
-      "theme": "{\"palette\":\"forest\",\"fontPairing\":\"serif-classic\"}"
-    }
-  }' | jq .
+  -d '{"updates":{"theme":"{\"palette\":\"forest\",\"fontPairing\":\"serif-classic\"}"}}' | jq .
 
-# Only the "theme" key is accepted — other keys are silently dropped
+# Non-theme keys silently dropped — confirm original value unchanged
 curl -s -X PATCH http://localhost:4000/settings/appearance \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"updates":{"general.site_title":"Hack"}}' | jq .
-# Returns { "message": "Appearance saved" } but the setting is NOT changed
-
-# Confirm original value unchanged
 curl -s http://localhost:4000/settings-public/general | jq .site_title
-```
-
-### Test email (Owner only)
-
-```bash
-curl -s -X POST http://localhost:4000/settings/test-email \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
-# Sends a test email to the logged-in owner's email address
-
-# Confirm delivery in backend log
-grep -i "test email\|messageId" /tmp/backend.log | tail -3
+# Should still be the original value
 ```
 
 ### Access control
 
 ```bash
+# Customer-session token (not backstage) — must return 401, not 403
 MEMBER_TOKEN=$(curl -s -X POST http://localhost:4000/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"member@aecms.local","password":"Member123!@#"}' | jq -r '.accessToken')
 
-# Customer-session token cannot reach any /settings endpoints
 curl -s http://localhost:4000/settings \
-  -H "Authorization: Bearer $MEMBER_TOKEN" | jq .
-# Expected: 401 (no backstage session)
+  -H "Authorization: Bearer $MEMBER_TOKEN" | jq .statusCode
+# Expected: 401
 
 curl -s -X PATCH http://localhost:4000/settings/appearance \
-  -H "Authorization: Bearer $MEMBER_TOKEN" | jq .
+  -H "Authorization: Bearer $MEMBER_TOKEN" | jq .statusCode
 # Expected: 401
 ```
 
 ### Checklist
-- [ ] `GET /settings-public/theme` returns palette and fontPairing without auth
-- [ ] `GET /settings-public/general` returns site_title and tagline without auth
-- [ ] `GET /settings` requires Owner backstage token; encrypted fields shown as "***"
-- [ ] `PATCH /settings` updates general settings; verified via public endpoint
+- [ ] General tab: site title change saves and appears on `http://localhost:3000`
+- [ ] `GET /settings-public/general` reflects the change without auth
+- [ ] Identity tab: logo URL renders a preview image inline
+- [ ] Email tab: fields pre-populated; password field has show/hide toggle
+- [ ] Send Test Email: green ✓ result and `messageId` in backend log
+- [ ] Payment tab: mode toggle shows Live Mode warning dialog on click
+- [ ] Stripe Verify Connection: green ✓ Connected
+- [ ] PayPal Verify Connection: green ✓ Connected
+- [ ] Save button disabled when no changes; re-enables on any edit
+- [ ] `GET /settings` requires Owner backstage token; encrypted fields shown as `***`
 - [ ] `PATCH /settings/appearance` accepted with Admin backstage token
-- [ ] `PATCH /settings/appearance` ignores non-theme keys silently
-- [ ] `POST /settings/test-email` sends and logs a messageId
-- [ ] Member and guest tokens receive 401 on all `/settings` endpoints
+- [ ] `PATCH /settings/appearance` silently drops non-theme keys
+- [ ] Member customer token receives 401 (not 403) on all `/settings` endpoints
 
 ---
 
