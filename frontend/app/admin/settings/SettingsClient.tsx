@@ -23,7 +23,7 @@ const TIMEZONES = [
   'Asia/Tokyo', 'Asia/Shanghai', 'Australia/Sydney', 'Pacific/Auckland',
 ];
 
-function FieldRow({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
+function FieldRow({ label, help, children }: { label: React.ReactNode; help?: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-neutral-800 last:border-0">
       <div>
@@ -342,7 +342,10 @@ export function SettingsClient() {
       {/* ─── Site Identity ─── */}
       {activeTab === 'identity' && (
         <div>
-          <FieldRow label="Logo URL" help="Full URL or /uploads/... path to your logo image">
+          <FieldRow
+            label={<span className="flex items-center gap-2">Logo URL <span className="text-xs font-normal px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">Not yet active</span></span>}
+            help="Saved but not yet displayed — header logo rendering is a planned feature"
+          >
             <TextInput value={f('identity.logo_url')} onChange={(v) => set('identity.logo_url', v)} />
             {f('identity.logo_url') && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -370,7 +373,10 @@ export function SettingsClient() {
             </div>
             {faviconError && <p className="mt-1 text-xs text-red-400">{faviconError}</p>}
           </FieldRow>
-          <FieldRow label="Brand Color" help="Accent color used for buttons and links">
+          <FieldRow
+            label={<span className="flex items-center gap-2">Brand Color <span className="text-xs font-normal px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">Not yet active</span></span>}
+            help="Saved but not yet applied — use the Appearance tab to set your theme colours for now"
+          >
             <div className="flex items-center gap-3">
               <input
                 type="color"
