@@ -736,76 +736,90 @@ services:
 - TypeScript strict mode
 - Regular code reviews
 
-**Secrets Management:**
+### Internal Secrets Manager (ISM)
 
-**Hosting Provider Secrets Support:**
-| Provider | Secrets Management | Notes |
-|----------|-------------------|-------|
-| Railway | Environment variables | Encrypted at rest, accessible via CLI/UI |
-| Oracle Cloud | OCI Vault | Full secrets manager with rotation, versioning |
-| Vercel | Environment variables | Encrypted, supports preview/production separation |
-| Cloudflare Pages | Environment variables | Encrypted, KV storage available |
-| Supabase | Environment variables | Encrypted, managed in dashboard |
+The **Internal Secrets Manager (ISM)** is the AECMS subsystem responsible for securely storing, retrieving, and serving the credentials and API keys needed by application components such as the SMTP email provider, Stripe payment provider, and PayPal payment provider. It is distinct from — and can sit alongside — external secrets managers such as Google Cloud Secret Manager or AWS Secrets Manager, which are used to protect the ISM's own master key (the SEK).
 
-**Strategy:**
-1. **MVP**: Use environment variables provided by hosting platform
-   - All free-tier hosts provide encrypted environment variables
-   - Sufficient for low-traffic sites
-   - No additional cost
+#### Architecture
 
-2. **Production/Scaling**: Consider dedicated secrets manager
-   - Oracle Cloud OCI Vault (free tier available)
-   - HashiCorp Vault (self-hosted, adds complexity)
-   - AWS Secrets Manager (~$0.40/secret/month + API calls)
-
-**Implementation:**
-- Never commit secrets to version control (.env in .gitignore)
-- Use `.env.example` with placeholder values
-- Store secrets in hosting provider's environment variables
-- For API keys that must be stored in database (user-configurable integrations):
-  - Encrypt using AES-256-GCM
-  - Store encryption key in environment variable (not in database)
-  - Use `@nestjs/crypto` or `crypto` module
-- Rotate secrets regularly (90-day recommendation)
-
-**Example: Encrypting API Keys in Database**
-```typescript
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
-
-const ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY // 32 bytes
-const ALGORITHM = 'aes-256-gcm'
-
-function encryptApiKey(apiKey: string): string {
-  const iv = randomBytes(16)
-  const cipher = createCipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), iv)
-  let encrypted = cipher.update(apiKey, 'utf8', 'hex')
-  encrypted += cipher.final('hex')
-  const authTag = cipher.getAuthTag()
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`
-}
-
-function decryptApiKey(encryptedKey: string): string {
-  const [ivHex, authTagHex, encrypted] = encryptedKey.split(':')
-  const decipher = createDecipheriv(ALGORITHM, Buffer.from(ENCRYPTION_KEY, 'hex'), Buffer.from(ivHex, 'hex'))
-  decipher.setAuthTag(Buffer.from(authTagHex, 'hex'))
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8')
-  decrypted += decipher.final('utf8')
-  return decrypted
-}
+```
+External secret storage (env var / platform secrets manager / KMS)
+  └─ SETTINGS_ENCRYPTION_KEY (the SEK — 32-byte AES key, hex-encoded)
+       └─ LocalKeyProvider (in-memory; implements KeyProvider interface)
+            └─ SettingsService (orchestrates encrypt/decrypt/upsert/fetch)
+                 └─ SiteSettings table (stores ciphertexts in PostgreSQL)
+                      └─ Consumer components (SMTP, Stripe, PayPal, …)
 ```
 
-**Secrets to Manage:**
-- JWT signing secret
-- Refresh token secret
-- Database connection string
-- Redis connection string
-- Stripe API keys (secret key, webhook secret)
-- PayPal API keys (client ID, secret)
-- Amazon Pay API keys
-- SMTP credentials
-- OAuth client secrets (Google, Apple)
-- OpenAI API key (for comment moderation)
-- Encryption key for database-stored API keys
+**`SiteSettings` DB table** — key/value store with dot-namespaced keys (e.g. `payment.stripe_secret_key_enc`). Values are either plaintext strings or AES-256-GCM ciphertexts stored as base64. The table records `updated_at` and `updated_by` for audit purposes.
+
+**`KeyProvider` interface** — defines two async methods: `encrypt(plaintext): Promise<string>` and `decrypt(ciphertext): Promise<string>`. Implementing this interface is the extension point for adding new key backends (Cloud KMS, AWS KMS, HashiCorp Vault) without changing any other part of the system.
+
+**`LocalKeyProvider`** — the current production implementation. Holds the SEK as an in-memory `Buffer`. Encryption uses AES-256-GCM with a fresh random 12-byte IV per call; the serialised format is `base64(iv[12] ‖ authTag[16] ‖ ciphertext[n])`. Fails fast at startup if the SEK is absent or malformed.
+
+**`SettingsService`** — the central orchestrator. Provides:
+- `set(updates, userId)` — upserts key/value pairs; auto-encrypts keys ending in `_enc`; skips blank or redacted values for encrypted keys; writes an audit log entry for every change
+- `get(key)` — returns the decrypted plaintext for a single key, or `null` if not set
+- `getEffective(key)` — returns the decrypted DB value if set, otherwise falls back to the mapped environment variable; used by consumer components
+- `getAll()` — returns all settings with `_enc` values redacted to `••••••••`; used by the admin settings UI
+
+**`ENV_KEY_MAP`** — a static map from ISM key names to fallback environment variable names. Consumers call `getEffective()` only — they never read `process.env` directly. This means env-var-based deployments continue to work without any DB configuration.
+
+#### Key-naming convention
+
+Encrypted keys use the `_enc` suffix:
+- `email.smtp_pass_enc` — SMTP password
+- `payment.stripe_secret_key_enc` — Stripe secret key
+- `payment.stripe_webhook_secret_enc` — Stripe webhook signing secret
+- `payment.paypal_client_secret_enc` — PayPal client secret
+
+Non-secret keys (host names, port numbers, public keys, mode flags) use plain names with no suffix.
+
+#### Consumer components
+
+All consumer components call `SettingsService.getEffective()` lazily at the time of each operation — no constructor-time credential reads. This means configuration changes in the admin settings UI take effect on the next request, without a service restart. The env var fallback is always available, so existing `.env`-configured deployments continue to work.
+
+| Consumer | ISM keys consumed |
+|---|---|
+| `SmtpEmailProvider` | `email.smtp_host`, `email.smtp_port`, `email.smtp_security`, `email.smtp_user`, `email.smtp_pass_enc`, `email.from_address`, `email.from_name`, `email.kindle_from` |
+| `StripeProvider` | `payment.stripe_secret_key_enc`, `payment.stripe_webhook_secret_enc`, `payment.test_mode` |
+| `PayPalProvider` | `payment.paypal_client_id`, `payment.paypal_client_secret_enc`, `payment.test_mode` |
+| *(future)* `OpenAIProvider` | `ai.openai_api_key_enc` |
+| *(future)* `OAuthProvider` | `oauth.google_client_secret_enc`, `oauth.apple_private_key_enc` |
+
+#### The Settings Encryption Key (SEK) and external secret storage
+
+The SEK never enters the database. It is injected into the process as `SETTINGS_ENCRYPTION_KEY` and held only in memory by `LocalKeyProvider`. The security of all ISM-stored secrets depends entirely on the confidentiality of the SEK.
+
+Recommended storage by deployment profile:
+
+| Deployment | SEK storage |
+|---|---|
+| Google Cloud Run | Google Cloud Secret Manager → injected as env var at container startup |
+| Railway / Render / Fly.io | Platform environment variable vault (encrypted at rest) |
+| VPS / Docker Compose | `.env` file owned by app user, `chmod 600`; or systemd `EnvironmentFile` |
+| Home server | `.env` file with tight filesystem permissions |
+
+`SETTINGS_KMS_PROVIDER` selects the `KeyProvider` implementation (default: `'local'`). A `GcpKeyProvider` would delegate to Cloud KMS envelope encryption so the SEK never exists as plaintext anywhere — appropriate for high-security deployments.
+
+#### Prospective: key rotation
+
+Key rotation is required when the SEK is suspected compromised, on platform migration, or as scheduled policy. It is **not part of MVP**.
+
+When implemented, the process:
+1. Generate a new SEK
+2. For every `_enc` row in `SiteSettings`: decrypt with old SEK, re-encrypt with new SEK, write back — within a single DB transaction
+3. Replace the old SEK in external secret storage
+4. Restart the service; write a rotation entry to the audit log
+
+Until rotation tooling exists: if the SEK is lost or compromised, all ISM-stored secrets must be re-entered manually through the Admin Settings UI.
+
+**Secrets inventory managed by the ISM:**
+- Stripe secret key and webhook signing secret
+- PayPal client secret
+- SMTP password
+- *(future)* OpenAI API key
+- *(future)* OAuth provider client secrets (Google, Apple)
 
 **Security Headers:**
 ```javascript

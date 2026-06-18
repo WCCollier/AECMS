@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { OrdersModule } from '../orders/orders.module';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import { DigitalProductsModule } from '../digital-products/digital-products.module';
+import { SettingsModule } from '../settings/settings.module';
 import { StripeProvider } from './providers/stripe.provider';
 import { PayPalProvider } from './providers/paypal.provider';
 
@@ -15,7 +16,7 @@ import { PayPalProvider } from './providers/paypal.provider';
 // browser/country supports it.
 
 @Module({
-  imports: [PrismaModule, OrdersModule, CapabilitiesModule, DigitalProductsModule, ScheduleModule.forRoot()],
+  imports: [PrismaModule, OrdersModule, CapabilitiesModule, DigitalProductsModule, SettingsModule, ScheduleModule.forRoot()],
   controllers: [PaymentsController],
   providers: [PaymentsService, StripeProvider, PayPalProvider],
   exports: [PaymentsService],

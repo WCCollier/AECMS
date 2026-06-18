@@ -35,7 +35,7 @@
 **Phase 14**: ✅ COMPLETE - Digital item delivery: personalization, downloads, Kindle wizard (2026-06-16)
 **Phase 14 QA fixes** (2026-06-17): order status badge normalization, digital product UX polish, cart 403 fix, SKU/slug uniqueness hardening
 **Phase 14 QA fixes, session 2** (2026-06-17): name field implementation — username at registration, first+last required at checkout
-**Phase 15**: ✅ COMPLETE - Admin Settings: SiteSettings DB table, pluggable KeyProvider (AES-256-GCM), settings UI (General/Identity/Email/Payment tabs), audit logging (2026-06-17)
+**Phase 15**: ✅ COMPLETE - Admin Settings: SiteSettings DB table, Internal Secrets Manager (ISM) with pluggable KeyProvider (AES-256-GCM), settings UI (General/Identity/Email/Payment tabs), audit logging (2026-06-17)
 **Phase 16**: ✅ COMPLETE - Navigation menus: /latest→/articles rename, dynamic header nav from DB, catch-all [...slug] route, page hierarchy, admin nav fields (2026-06-17)
 **Phase 17**: ✅ COMPLETE - Alternate domain capture: Next.js middleware 301 redirects from secondary domains; alias_type field for future proxy support (2026-06-17)
 **Phase 18**: ✅ COMPLETE - RSS Feed widget: ExternalFeedsModule backend (Redis cache, SSRF validation), RssFeedWidget component, RssEmbed TipTap node (2026-06-17)
@@ -250,7 +250,7 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_12_COMPLETION_REPORT.md` - Phase 12 implementation details
 - `docs/PHASE_13_COMPLETION_REPORT.md` - Phase 13 QA results, capability refactor, bug fixes
 - `docs/PHASE_14_COMPLETION_REPORT.md` - Phase 14 digital delivery, Kindle wizard, name fields
-- `docs/PHASE_15_COMPLETION_REPORT.md` - Phase 15 admin settings: SiteSettings, KeyProvider, settings UI
+- `docs/PHASE_15_COMPLETION_REPORT.md` - Phase 15 admin settings: SiteSettings, ISM (KeyProvider/LocalKeyProvider), settings UI
 - `docs/PHASE_16_COMPLETION_REPORT.md` - Phase 16 nav menus: articles route, dynamic header, catch-all pages
 - `docs/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
 - `docs/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
@@ -270,6 +270,30 @@ rm -rf backend/dist frontend/.next
 - Run tests after changes: `npm run test && npm run build`
 - Commit incrementally with descriptive messages
 - **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
+
+## Internal Secrets Manager (ISM)
+
+The ISM is the subsystem that encrypts, stores, retrieves, decrypts, and serves the API keys and credentials needed by application components. Fully implemented as of Phase 15.
+
+**Components:**
+- `SiteSettings` DB table — key/value store; values are plaintext or AES-256-GCM ciphertexts (base64)
+- `KeyProvider` interface — `encrypt(plaintext)` / `decrypt(ciphertext)`; extension point for Cloud KMS etc.
+- `LocalKeyProvider` — current implementation; holds SEK in memory from `SETTINGS_ENCRYPTION_KEY` env var
+- `SettingsService` — orchestrator: `set()`, `get()`, `getEffective()` (DB-over-env-var fallback), `getAll()` (redacts `_enc` values)
+- `ENV_KEY_MAP` — maps ISM key names to fallback env var names
+
+**Key-naming convention:** keys ending in `_enc` are automatically encrypted at rest.
+
+**Consumer components** (call `getEffective()` lazily — no constructor-time reads):
+- `SmtpEmailProvider` — reads all `email.*` keys
+- `StripeProvider` — reads `payment.stripe_secret_key_enc`, `payment.stripe_webhook_secret_enc`
+- `PayPalProvider` — reads `payment.paypal_client_id`, `payment.paypal_client_secret_enc`
+
+**The SEK** (`SETTINGS_ENCRYPTION_KEY`) never enters the DB. Store it in your platform's secrets manager (Cloud Secret Manager, Railway/Render vault, etc.) or a `chmod 600` `.env` file. Losing it makes all ISM-stored secrets permanently unreadable.
+
+**Key rotation** is prospective (Phase 21+): re-encrypt all `_enc` rows under a new SEK in a single DB transaction, then swap the SEK in external storage.
+
+Full design: `docs/prd/05-security.md` → "Internal Secrets Manager (ISM)" section.
 
 ## Phase 5: Payments Integration (✅ CONFIGURED)
 

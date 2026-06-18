@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
@@ -24,7 +24,7 @@ const keyProviderFactory = {
 };
 
 @Module({
-  imports: [PrismaModule, AuditModule, CapabilitiesModule, EmailModule],
+  imports: [PrismaModule, AuditModule, CapabilitiesModule, forwardRef(() => EmailModule)],
   controllers: [SettingsController, PublicSettingsController],
   providers: [keyProviderFactory, SettingsService, TestEmailService],
   exports: [SettingsService],

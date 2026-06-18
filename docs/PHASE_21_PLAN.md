@@ -95,27 +95,18 @@ On startup, `AppModule` checks if any `User` with `role = 'owner'` exists. If no
 - Review summary
 - Click "Launch My Site" → creates Owner account, saves all settings to `SiteSettings`, clears `SETUP_REQUIRED` flag
 
-### B3 — SiteSettings table
+### B3 — SiteSettings table and ISM
 
-The setup wizard writes to a `SiteSettings` table (key-value with encryption for sensitive values):
+**Already implemented as of Phase 15.** The `SiteSettings` table and `SettingsService` (the Internal Secrets Manager / ISM) are fully built. The setup wizard will write to them using the existing `SettingsService.set()` API.
 
-```prisma
-model SiteSetting {
-  key        String   @id
-  value      String   @db.Text   // JSON-encoded; sensitive values encrypted with SETTINGS_ENCRYPTION_KEY
-  is_secret  Boolean  @default(false)
-  updated_at DateTime @updatedAt
-  @@map("site_settings")
-}
-```
+The ISM stores secrets under `_enc`-suffixed keys (e.g. `payment.stripe_secret_key_enc`), automatically encrypting them with AES-256-GCM via `LocalKeyProvider`. The `SettingsService.getEffective()` method provides DB-over-env-var fallback for all keys.
 
-**The one secret that cannot be stored in `SiteSettings`**: the `SETTINGS_ENCRYPTION_KEY` env var used to encrypt the other secrets. This is the only thing the deployer must set in the hosting environment (one env var, vs. the current 10+). Everything else flows through the backstage.
+**The one secret that cannot be stored in `SiteSettings`**: the `SETTINGS_ENCRYPTION_KEY` env var (the SEK) used by the ISM to encrypt all other secrets. This is the only thing the deployer must set in the hosting environment (one env var, vs. the current 10+). Everything else flows through the backstage Admin Settings UI.
 
-The backend `SiteSettingsService` provides:
-- `get(key: string): Promise<string>` — decrypt if `is_secret`
-- `set(key: string, value: string, isSecret?: boolean): Promise<void>` — encrypt if `is_secret`
-- `getAll(): Promise<Record<string, string>>` — for the backstage settings panel (secrets return masked values: `••••••••`)
-- On startup: load all settings into memory (or a short TTL cache) so individual endpoint handlers don't hit the DB per-request for common settings
+See `docs/prd/05-security.md` → "Internal Secrets Manager (ISM)" for the full design.
+
+Phase 21 adds to the ISM:
+- Key rotation tooling: a CLI script or Owner-only backstage endpoint that re-encrypts all `_enc` rows under a new SEK within a single DB transaction
 
 ---
 

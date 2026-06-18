@@ -1,5 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import {
   EmailProvider,
@@ -8,98 +7,73 @@ import {
   EmailResult,
   EmailProviderType,
 } from './email.interface';
+import { SettingsService } from '../settings/settings.service';
 
-/**
- * SMTP Email Provider
- *
- * Production provider that sends emails via SMTP.
- * Compatible with any SMTP server (Gmail, SendGrid, Mailgun, SES, etc.)
- *
- * Configuration:
- *   SMTP_HOST=smtp.example.com
- *   SMTP_PORT=587
- *   SMTP_SECURE=false (true for port 465)
- *   SMTP_USER=username
- *   SMTP_PASS=password
- *   SMTP_FROM=noreply@example.com
- */
 @Injectable()
 export class SmtpEmailProvider implements EmailProvider {
   private readonly logger = new Logger(SmtpEmailProvider.name);
-  private transporter: nodemailer.Transporter | null = null;
-  private readonly defaultFrom: string;
 
-  constructor(private configService: ConfigService) {
-    this.defaultFrom = this.configService.get<string>(
-      'SMTP_FROM',
-      'noreply@aecms.local',
-    );
-    this.initializeTransporter();
-  }
+  constructor(@Optional() private settingsService?: SettingsService) {}
 
-  private initializeTransporter(): void {
-    const host = this.configService.get<string>('SMTP_HOST');
-    const port = this.configService.get<number>('SMTP_PORT', 587);
-    // env values are always strings — explicit parse to avoid 'false' being truthy
-    const secure = this.configService.get<string>('SMTP_SECURE', 'false') === 'true';
-    const user = this.configService.get<string>('SMTP_USER');
-    const pass = this.configService.get<string>('SMTP_PASS');
-
+  private async buildTransporter(): Promise<{ transporter: nodemailer.Transporter; from: string } | null> {
+    const host = await this.getEffective('email.smtp_host', 'SMTP_HOST');
     if (!host) {
-      this.logger.warn('SMTP_HOST not configured, email sending will fail');
-      return;
+      this.logger.warn('SMTP host not configured');
+      return null;
     }
 
-    this.transporter = nodemailer.createTransport({
+    const portStr = await this.getEffective('email.smtp_port', 'SMTP_PORT');
+    const port = parseInt(portStr || '587', 10);
+    const security = await this.getEffective('email.smtp_security', 'SMTP_SECURITY');
+    const secure = security === 'ssl' || process.env.SMTP_SECURE === 'true';
+    const user = await this.getEffective('email.smtp_user', 'SMTP_USER');
+    const pass = await this.getEffective('email.smtp_pass_enc', 'SMTP_PASS');
+    const from = await this.getEffective('email.from_address', 'SMTP_FROM') || 'noreply@aecms.local';
+
+    const transporter = nodemailer.createTransport({
       host,
       port,
       secure,
       auth: user && pass ? { user, pass } : undefined,
     });
 
-    this.logger.log(`SMTP transporter initialized: ${host}:${port}`);
+    return { transporter, from };
+  }
+
+  private async getEffective(ismKey: string, envFallback: string): Promise<string> {
+    if (this.settingsService) {
+      return this.settingsService.getEffective(ismKey);
+    }
+    return process.env[envFallback] ?? '';
   }
 
   async send(options: EmailOptions): Promise<EmailResult> {
-    if (!this.transporter) {
-      return {
-        success: false,
-        error: 'SMTP transporter not configured',
-      };
+    const config = await this.buildTransporter();
+    if (!config) {
+      return { success: false, error: 'SMTP not configured' };
     }
 
     try {
-      const result = await this.transporter.sendMail({
-        from: options.from || this.defaultFrom,
+      const result = await config.transporter.sendMail({
+        from: options.from || config.from,
         to: options.to,
         subject: options.subject,
         text: options.text,
         html: options.html,
         replyTo: options.replyTo,
       });
-
       this.logger.debug(`Email sent: ${result.messageId}`);
-      return {
-        success: true,
-        messageId: result.messageId,
-      };
+      return { success: true, messageId: result.messageId };
     } catch (error) {
       this.logger.error(`Failed to send email: ${error}`);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
-  async sendWithAttachment(
-    options: EmailWithAttachmentOptions,
-  ): Promise<EmailResult> {
-    if (!this.transporter) {
-      return {
-        success: false,
-        error: 'SMTP transporter not configured',
-      };
+  async sendWithAttachment(options: EmailWithAttachmentOptions): Promise<EmailResult> {
+    const config = await this.buildTransporter();
+    if (!config) {
+      return { success: false, error: 'SMTP not configured' };
     }
 
     try {
@@ -109,8 +83,8 @@ export class SmtpEmailProvider implements EmailProvider {
         contentType: att.contentType,
       }));
 
-      const result = await this.transporter.sendMail({
-        from: options.from || this.defaultFrom,
+      const result = await config.transporter.sendMail({
+        from: options.from || config.from,
         to: options.to,
         subject: options.subject,
         text: options.text,
@@ -119,29 +93,19 @@ export class SmtpEmailProvider implements EmailProvider {
         attachments,
       });
 
-      this.logger.debug(
-        `Email with ${attachments.length} attachment(s) sent: ${result.messageId}`,
-      );
-      return {
-        success: true,
-        messageId: result.messageId,
-      };
+      this.logger.debug(`Email with ${attachments.length} attachment(s) sent: ${result.messageId}`);
+      return { success: true, messageId: result.messageId };
     } catch (error) {
       this.logger.error(`Failed to send email with attachment: ${error}`);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 
   async verify(): Promise<boolean> {
-    if (!this.transporter) {
-      return false;
-    }
-
+    const config = await this.buildTransporter();
+    if (!config) return false;
     try {
-      await this.transporter.verify();
+      await config.transporter.verify();
       this.logger.log('SMTP connection verified');
       return true;
     } catch (error) {

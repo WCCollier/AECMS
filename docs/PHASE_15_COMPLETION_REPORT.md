@@ -37,7 +37,7 @@ Migration: `20260617123732_add_site_settings`
 - `homepage_mode` = "articles"
 - `test_mode` = "false"
 
-### Area 15-B: KeyProvider Abstraction
+### Area 15-B: Internal Secrets Manager (ISM) — KeyProvider Layer
 
 **Interface** (`backend/src/settings/key-provider.interface.ts`)
 

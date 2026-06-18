@@ -10,30 +10,39 @@ import {
   CreatePaymentParams,
   WebhookEvent,
 } from './payment-provider.interface';
+import { SettingsService } from '../../settings/settings.service';
 
 @Injectable()
 export class StripeProvider implements PaymentProvider {
   readonly name = 'stripe' as const;
   private readonly logger = new Logger(StripeProvider.name);
-  private stripe: Stripe | null = null;
-  private webhookSecret: string | null = null;
 
-  constructor(private configService: ConfigService) {
-    const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY') || process.env.STRIPE_SECRET_KEY;
-    // Read webhook secret directly from process.env so that dotenv overrides of
-    // Codespaces-injected secrets (e.g. PLACEHOLDER) take effect at startup.
-    this.webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || this.configService.get<string>('STRIPE_WEBHOOK_SECRET') || null;
-
-    if (secretKey) {
-      this.stripe = new Stripe(secretKey);
-      this.logger.log('Stripe provider initialized');
+  constructor(
+    private configService: ConfigService,
+    private settingsService: SettingsService,
+  ) {
+    const envKey = process.env.STRIPE_SECRET_KEY || this.configService.get<string>('STRIPE_SECRET_KEY');
+    if (envKey) {
+      this.logger.log('Stripe provider ready (env key present; ISM takes precedence at runtime)');
     } else {
-      this.logger.warn('Stripe provider not configured - STRIPE_SECRET_KEY missing');
+      this.logger.warn('Stripe secret key not found in env — must be configured via Admin Settings');
     }
   }
 
   isAvailable(): boolean {
-    return this.stripe !== null;
+    // Optimistic: env var present, or assume ISM may have it. Actual availability
+    // is confirmed when getStripe() succeeds on first real operation.
+    return !!(process.env.STRIPE_SECRET_KEY || this.configService.get<string>('STRIPE_SECRET_KEY'));
+  }
+
+  private async getStripe(): Promise<Stripe> {
+    const key = await this.settingsService.getEffective('payment.stripe_secret_key_enc');
+    if (!key) throw new Error('Stripe secret key is not configured');
+    return new Stripe(key);
+  }
+
+  private async getWebhookSecret(): Promise<string> {
+    return this.settingsService.getEffective('payment.stripe_webhook_secret_enc');
   }
 
   private getFrontendUrl(): string {
@@ -48,14 +57,11 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async createPayment(params: CreatePaymentParams): Promise<PaymentIntent> {
-    if (!this.stripe) {
-      throw new Error('Stripe is not configured');
-    }
-
+    const stripe = await this.getStripe();
     const frontendUrl = this.getFrontendUrl();
     // Use Stripe Checkout (hosted page). Apple Pay, Google Pay, and Amazon Pay
     // are automatically enabled by Stripe for eligible customers — no extra work needed.
-    const session = await this.stripe.checkout.sessions.create({
+    const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: params.customerEmail,
       line_items: [
@@ -95,19 +101,13 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
-    if (!this.stripe) {
-      throw new Error('Stripe is not configured');
-    }
-
-    const paymentIntent = await this.stripe.paymentIntents.retrieve(paymentId);
+    const stripe = await this.getStripe();
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentId);
     return this.mapStripeStatus(paymentIntent.status);
   }
 
   async refund(paymentId: string, amount?: number): Promise<RefundResult> {
-    if (!this.stripe) {
-      throw new Error('Stripe is not configured');
-    }
-
+    const stripe = await this.getStripe();
     const refundParams: Stripe.RefundCreateParams = {
       payment_intent: paymentId,
     };
@@ -116,7 +116,7 @@ export class StripeProvider implements PaymentProvider {
       refundParams.amount = amount;
     }
 
-    const refund = await this.stripe.refunds.create(refundParams);
+    const refund = await stripe.refunds.create(refundParams);
 
     return {
       id: refund.id,
@@ -128,18 +128,16 @@ export class StripeProvider implements PaymentProvider {
   }
 
   async verifyWebhook(payload: string | Buffer, signature: string): Promise<WebhookEvent> {
-    if (!this.stripe) {
-      throw new Error('Stripe is not configured');
-    }
-
-    if (!this.webhookSecret) {
+    const stripe = await this.getStripe();
+    const webhookSecret = await this.getWebhookSecret();
+    if (!webhookSecret) {
       throw new Error('Stripe webhook secret is not configured');
     }
 
-    const event = this.stripe.webhooks.constructEvent(
+    const event = stripe.webhooks.constructEvent(
       payload,
       signature,
-      this.webhookSecret,
+      webhookSecret,
     );
 
     return {

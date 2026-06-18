@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { SettingsService } from '../../settings/settings.service';
 import {
   PaymentProvider,
   PaymentIntent,
@@ -19,24 +20,26 @@ interface PayPalAccessToken {
 export class PayPalProvider implements PaymentProvider {
   readonly name = 'paypal' as const;
   private readonly logger = new Logger(PayPalProvider.name);
-  private clientId: string | null = null;
-  private clientSecret: string | null = null;
-  private baseUrl: string;
+  private readonly baseUrl: string;
   private accessToken: PayPalAccessToken | null = null;
 
-  constructor(private configService: ConfigService) {
-    this.clientId = this.configService.get<string>('PAYPAL_CLIENT_ID') || null;
-    this.clientSecret = this.configService.get<string>('PAYPAL_CLIENT_SECRET') || null;
+  constructor(
+    private configService: ConfigService,
+    private settingsService: SettingsService,
+  ) {
     const mode = this.configService.get<string>('PAYPAL_MODE') || 'sandbox';
-
     this.baseUrl = mode === 'live'
       ? 'https://api-m.paypal.com'
       : 'https://api-m.sandbox.paypal.com';
 
-    if (this.clientId && this.clientSecret) {
-      this.logger.log(`PayPal provider initialized (${mode} mode)`);
+    const hasEnvCreds = !!(
+      this.configService.get<string>('PAYPAL_CLIENT_ID') &&
+      this.configService.get<string>('PAYPAL_CLIENT_SECRET')
+    );
+    if (hasEnvCreds) {
+      this.logger.log(`PayPal provider ready (${mode} mode; ISM takes precedence at runtime)`);
     } else {
-      this.logger.warn('PayPal provider not configured - credentials missing');
+      this.logger.warn('PayPal credentials not found in env — must be configured via Admin Settings');
     }
   }
 
@@ -50,7 +53,20 @@ export class PayPalProvider implements PaymentProvider {
   }
 
   isAvailable(): boolean {
-    return this.clientId !== null && this.clientSecret !== null;
+    return !!(
+      this.configService.get<string>('PAYPAL_CLIENT_ID') &&
+      this.configService.get<string>('PAYPAL_CLIENT_SECRET')
+    );
+  }
+
+  private async getCredentials(): Promise<{ clientId: string; clientSecret: string }> {
+    const clientId = await this.settingsService.getEffective('payment.paypal_client_id');
+    const clientSecret = await this.settingsService.getEffective('payment.paypal_client_secret_enc');
+    if (!clientId || !clientSecret) {
+      throw new Error('PayPal credentials are not configured');
+    }
+    this.accessToken = null; // Invalidate cached token when re-reading credentials
+    return { clientId, clientSecret };
   }
 
   async createPayment(params: CreatePaymentParams): Promise<PaymentIntent> {
@@ -300,7 +316,8 @@ export class PayPalProvider implements PaymentProvider {
       return this.accessToken.access_token;
     }
 
-    const auth = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64');
+    const { clientId, clientSecret } = await this.getCredentials();
+    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
     const response = await fetch(`${this.baseUrl}/v1/oauth2/token`, {
       method: 'POST',
