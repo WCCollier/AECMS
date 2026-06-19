@@ -540,6 +540,17 @@ export function SettingsClient() {
             </div>
             <div className="space-y-3">
               <div>
+                <label className="text-xs text-neutral-400 mb-1 block">Mode</label>
+                <select
+                  value={f('payment.paypal_mode') || 'sandbox'}
+                  onChange={(e) => set('payment.paypal_mode', e.target.value)}
+                  className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-neutral-500"
+                >
+                  <option value="sandbox">Sandbox (testing)</option>
+                  <option value="live">Live (real payments)</option>
+                </select>
+              </div>
+              <div>
                 <label className="text-xs text-neutral-400 mb-1 block">Client ID</label>
                 <TextInput value={f('payment.paypal_client_id')} onChange={(v) => set('payment.paypal_client_id', v)} placeholder="AaBbCc..." />
               </div>

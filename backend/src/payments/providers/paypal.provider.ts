@@ -20,27 +20,22 @@ interface PayPalAccessToken {
 export class PayPalProvider implements PaymentProvider {
   readonly name = 'paypal' as const;
   private readonly logger = new Logger(PayPalProvider.name);
-  private readonly baseUrl: string;
   private accessToken: PayPalAccessToken | null = null;
 
   constructor(
     private configService: ConfigService,
     private settingsService: SettingsService,
   ) {
-    const mode = this.configService.get<string>('PAYPAL_MODE') || 'sandbox';
-    this.baseUrl = mode === 'live'
+    this.logger.log('PayPal provider initialised — mode and credentials read lazily from ISM');
+  }
+
+  private async getBaseUrl(): Promise<string> {
+    const mode = await this.settingsService.getEffective('payment.paypal_mode')
+      ?? this.configService.get<string>('PAYPAL_MODE')
+      ?? 'sandbox';
+    return mode === 'live'
       ? 'https://api-m.paypal.com'
       : 'https://api-m.sandbox.paypal.com';
-
-    const hasEnvCreds = !!(
-      this.configService.get<string>('PAYPAL_CLIENT_ID') &&
-      this.configService.get<string>('PAYPAL_CLIENT_SECRET')
-    );
-    if (hasEnvCreds) {
-      this.logger.log(`PayPal provider ready (${mode} mode; ISM takes precedence at runtime)`);
-    } else {
-      this.logger.warn('PayPal credentials not found in env — must be configured via Admin Settings');
-    }
   }
 
   private getFrontendUrl(): string {
@@ -76,7 +71,7 @@ export class PayPalProvider implements PaymentProvider {
 
     const accessToken = await this.getAccessToken();
 
-    const response = await fetch(`${this.baseUrl}/v2/checkout/orders`, {
+    const response = await fetch(`${await this.getBaseUrl()}/v2/checkout/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -140,7 +135,7 @@ export class PayPalProvider implements PaymentProvider {
     const accessToken = await this.getAccessToken();
 
     const response = await fetch(
-      `${this.baseUrl}/v2/checkout/orders/${paymentId}/capture`,
+      `${await this.getBaseUrl()}/v2/checkout/orders/${paymentId}/capture`,
       {
         method: 'POST',
         headers: {
@@ -195,7 +190,7 @@ export class PayPalProvider implements PaymentProvider {
   async getOrderRawStatus(paypalOrderId: string): Promise<{ rawStatus: string; captureId?: string }> {
     if (!this.isAvailable()) throw new Error('PayPal is not configured');
     const accessToken = await this.getAccessToken();
-    const response = await fetch(`${this.baseUrl}/v2/checkout/orders/${paypalOrderId}`, {
+    const response = await fetch(`${await this.getBaseUrl()}/v2/checkout/orders/${paypalOrderId}`, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
     });
     if (!response.ok) throw new Error(`PayPal order fetch failed: ${response.status}`);
@@ -212,7 +207,7 @@ export class PayPalProvider implements PaymentProvider {
     const accessToken = await this.getAccessToken();
 
     const response = await fetch(
-      `${this.baseUrl}/v2/checkout/orders/${paymentId}`,
+      `${await this.getBaseUrl()}/v2/checkout/orders/${paymentId}`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -237,7 +232,7 @@ export class PayPalProvider implements PaymentProvider {
 
     // First, get the capture ID from the order
     const orderResponse = await fetch(
-      `${this.baseUrl}/v2/checkout/orders/${paymentId}`,
+      `${await this.getBaseUrl()}/v2/checkout/orders/${paymentId}`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
@@ -262,7 +257,7 @@ export class PayPalProvider implements PaymentProvider {
     }
 
     const response = await fetch(
-      `${this.baseUrl}/v2/payments/captures/${captureId}/refund`,
+      `${await this.getBaseUrl()}/v2/payments/captures/${captureId}/refund`,
       {
         method: 'POST',
         headers: {
@@ -319,7 +314,7 @@ export class PayPalProvider implements PaymentProvider {
     const { clientId, clientSecret } = await this.getCredentials();
     const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-    const response = await fetch(`${this.baseUrl}/v1/oauth2/token`, {
+    const response = await fetch(`${await this.getBaseUrl()}/v1/oauth2/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
