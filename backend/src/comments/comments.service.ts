@@ -32,7 +32,7 @@ export class CommentsService {
       ratings: { orderBy: { title: 'asc' as const } },
       article: { select: { id: true, title: true, slug: true } },
       ...(includeProduct && {
-        product: { select: { id: true, name: true, slug: true } },
+        product: { select: { id: true, title: true, slug: true } },
       }),
     };
   }
