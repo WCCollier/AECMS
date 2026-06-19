@@ -30,6 +30,7 @@ const ENV_KEY_MAP: Record<string, string> = {
   'payment.stripe_publishable_key':      'STRIPE_PUBLISHABLE_KEY',
   'payment.stripe_secret_key_enc':       'STRIPE_SECRET_KEY',
   'payment.stripe_webhook_secret_enc':   'STRIPE_WEBHOOK_SECRET',
+  'payment.paypal_mode':                 'PAYPAL_MODE',
   'payment.paypal_client_id':            'PAYPAL_CLIENT_ID',
   'payment.paypal_client_secret_enc':    'PAYPAL_CLIENT_SECRET',
   // ESM — External Storage Manager
