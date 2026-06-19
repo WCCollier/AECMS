@@ -7,6 +7,7 @@ on:
 
 env:
   GCP_PROJECT: "983307563767"
+  GCP_PROJECT_ID: "fantasyvreality"
   REGION: us-central1
   REGISTRY: us-central1-docker.pkg.dev
 
@@ -81,7 +82,7 @@ jobs:
             --image "${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/backend:${{ github.sha }}" \
             --region ${{ env.REGION }} \
             --project ${{ env.GCP_PROJECT }} \
-            --service-account "aecms-backend@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com" \
+            --service-account "aecms-backend@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
             --add-cloudsql-instances "${{ env.GCP_PROJECT }}:${{ env.REGION }}:aecms-db" \
             --set-secrets "DATABASE_URL=aecms-database-url:latest,JWT_SECRET=aecms-jwt-secret:latest,REDIS_URL=aecms-redis-url:latest" \
             --set-env-vars "NODE_ENV=production,PORT=4000,SETTINGS_KMS_PROVIDER=gcp,GCP_PROJECT_ID=${{ env.GCP_PROJECT }},SETTINGS_KMS_SECRET_ID=aecms-sek,STORAGE_PROVIDER_TYPE=gcs,APP_URL=https://fantasyvreality.com,FRONTEND_URL=https://fantasyvreality.com,EMAIL_PROVIDER_TYPE=smtp" \

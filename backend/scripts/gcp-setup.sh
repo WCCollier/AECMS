@@ -20,8 +20,11 @@ SQL_USER="aecms"
 MEDIA_BUCKET="fantasyvreality-media"
 DIGITAL_BUCKET="fantasyvreality-digital"
 
+# Derive project ID from project number (iam commands require ID, not number)
+PROJECT_ID=$(gcloud projects describe "$PROJECT" --format='value(projectId)')
+
 echo "=== AECMS GCP Setup ==="
-echo "Project: $PROJECT | Region: $REGION"
+echo "Project: $PROJECT ($PROJECT_ID) | Region: $REGION"
 echo ""
 
 # ── 1. Enable required APIs ────────────────────────────────────────────────
@@ -47,13 +50,13 @@ gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
 # ── 3. Backend service account ─────────────────────────────────────────────
 echo "[3/8] Creating backend service account..."
-BACKEND_SA_EMAIL="${BACKEND_SA}@${PROJECT}.iam.gserviceaccount.com"
-if gcloud iam service-accounts describe "$BACKEND_SA_EMAIL" --project "$PROJECT" &>/dev/null; then
+BACKEND_SA_EMAIL="${BACKEND_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
+if gcloud iam service-accounts describe "$BACKEND_SA_EMAIL" --project "$PROJECT_ID" &>/dev/null; then
   echo "  (already exists)"
 else
   gcloud iam service-accounts create "$BACKEND_SA" \
     --display-name="AECMS Backend" \
-    --project "$PROJECT"
+    --project "$PROJECT_ID"
 fi
 
 for ROLE in \
@@ -70,13 +73,13 @@ echo "  Backend SA: $BACKEND_SA_EMAIL"
 
 # ── 4. GitHub CI service account ──────────────────────────────────────────
 echo "[4/8] Creating GitHub CI service account..."
-CI_SA_EMAIL="${CI_SA}@${PROJECT}.iam.gserviceaccount.com"
-if gcloud iam service-accounts describe "$CI_SA_EMAIL" --project "$PROJECT" &>/dev/null; then
+CI_SA_EMAIL="${CI_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
+if gcloud iam service-accounts describe "$CI_SA_EMAIL" --project "$PROJECT_ID" &>/dev/null; then
   echo "  (already exists)"
 else
   gcloud iam service-accounts create "$CI_SA" \
     --display-name="GitHub Actions CI" \
-    --project "$PROJECT"
+    --project "$PROJECT_ID"
 fi
 
 for ROLE in \
@@ -195,7 +198,7 @@ echo "[8/8] Exporting GitHub CI service account key..."
 KEY_FILE="/tmp/github-ci-key.json"
 gcloud iam service-accounts keys create "$KEY_FILE" \
   --iam-account="$CI_SA_EMAIL" \
-  --project "$PROJECT"
+  --project "$PROJECT_ID"
 
 echo ""
 echo "================================================================"
