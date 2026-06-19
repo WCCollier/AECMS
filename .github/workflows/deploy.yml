@@ -1,0 +1,132 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  GCP_PROJECT: "983307563767"
+  REGION: us-central1
+  REGISTRY: us-central1-docker.pkg.dev
+
+jobs:
+  # ── Tests ──────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Backend — install & test
+        working-directory: backend
+        run: npm ci && npm test
+
+      - name: Frontend — install & test
+        working-directory: frontend
+        run: npm ci && npm test
+
+  # ── Build & Deploy ─────────────────────────────────────────────────────────
+  build-and-deploy:
+    name: Build & Deploy
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # ── Build images ───────────────────────────────────────────────────────
+
+      - name: Build and push backend image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/backend"
+          docker build --target production -t "${IMAGE}:${{ github.sha }}" -t "${IMAGE}:latest" ./backend
+          docker push "${IMAGE}:${{ github.sha }}"
+          docker push "${IMAGE}:latest"
+
+      - name: Build and push frontend image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/frontend"
+          docker build --target production -t "${IMAGE}:${{ github.sha }}" -t "${IMAGE}:latest" ./frontend
+          docker push "${IMAGE}:${{ github.sha }}"
+          docker push "${IMAGE}:latest"
+
+      # ── Deploy backend ─────────────────────────────────────────────────────
+
+      - name: Deploy backend
+        run: |
+          gcloud run deploy aecms-backend \
+            --image "${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/backend:${{ github.sha }}" \
+            --region ${{ env.REGION }} \
+            --project ${{ env.GCP_PROJECT }} \
+            --service-account "aecms-backend@${{ env.GCP_PROJECT }}.iam.gserviceaccount.com" \
+            --add-cloudsql-instances "${{ env.GCP_PROJECT }}:${{ env.REGION }}:aecms-db" \
+            --set-secrets "DATABASE_URL=aecms-database-url:latest,JWT_SECRET=aecms-jwt-secret:latest,REDIS_URL=aecms-redis-url:latest" \
+            --set-env-vars "NODE_ENV=production,PORT=4000,SETTINGS_KMS_PROVIDER=gcp,GCP_PROJECT_ID=${{ env.GCP_PROJECT }},SETTINGS_KMS_SECRET_ID=aecms-sek,STORAGE_PROVIDER_TYPE=gcs,APP_URL=https://fantasyvreality.com,FRONTEND_URL=https://fantasyvreality.com,EMAIL_PROVIDER_TYPE=smtp" \
+            --platform managed \
+            --allow-unauthenticated \
+            --min-instances 0 \
+            --max-instances 2 \
+            --memory 512Mi \
+            --cpu 1 \
+            --port 4000 \
+            --timeout 60
+
+      - name: Get backend Cloud Run URL
+        id: backend
+        run: |
+          URL=$(gcloud run services describe aecms-backend \
+            --region ${{ env.REGION }} \
+            --project ${{ env.GCP_PROJECT }} \
+            --format 'value(status.url)')
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Backend URL: $URL"
+
+      # ── Deploy frontend ────────────────────────────────────────────────────
+
+      - name: Deploy frontend
+        run: |
+          gcloud run deploy aecms-frontend \
+            --image "${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/frontend:${{ github.sha }}" \
+            --region ${{ env.REGION }} \
+            --project ${{ env.GCP_PROJECT }} \
+            --set-env-vars "NODE_ENV=production,BACKEND_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_API_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_BASE_DOMAIN=fantasyvreality.com,NEXT_PUBLIC_KINDLE_SENDER_EMAIL=moriakul@gmail.com" \
+            --platform managed \
+            --allow-unauthenticated \
+            --min-instances 0 \
+            --max-instances 2 \
+            --memory 512Mi \
+            --cpu 1 \
+            --port 3000 \
+            --timeout 60
+
+      - name: Print service URLs
+        run: |
+          FRONTEND_URL=$(gcloud run services describe aecms-frontend \
+            --region ${{ env.REGION }} \
+            --project ${{ env.GCP_PROJECT }} \
+            --format 'value(status.url)')
+          echo "Backend:  ${{ steps.backend.outputs.url }}"
+          echo "Frontend: $FRONTEND_URL"
