@@ -10,7 +10,7 @@ FROM node:20-alpine AS development
 WORKDIR /app
 
 # Install dependencies first (better layer caching)
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 
 # Copy application code
@@ -30,7 +30,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 # Install dependencies
-COPY package*.json ./
+COPY package*.json .npmrc ./
 RUN npm ci
 
 # -----------------------------------------------------------------------------
