@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   useDomainAliases,
   createDomainAlias,
@@ -244,7 +243,6 @@ function DeleteConfirmModal({ domain, onClose, onConfirm, isDeleting }: DeleteCo
 }
 
 export function AdminDomainsClient() {
-  const { user } = useAuth();
   const { domainAliases, isLoading, mutate } = useDomainAliases();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -257,21 +255,6 @@ export function AdminDomainsClient() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  if (!user) {
-    return (
-      <div className="p-6">
-        <Card>
-          <CardContent className="p-12 text-center">
-            <AlertCircle className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
-            <p className="text-foreground/60">
-              You do not have permission to manage domain aliases.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   const handleCreate = async (domain: string, targetRoute: string) => {
     setCreateError(null);
