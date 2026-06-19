@@ -48,7 +48,7 @@ docker compose version
 1. **Stripe** (https://stripe.com) - Payment processing
 2. **PayPal Developer** (https://developer.paypal.com) - Alternative payments
 3. **OpenAI** (https://platform.openai.com) - AI moderation
-4. **SMTP Provider** - Email delivery (SendGrid, Mailgun, or similar)
+4. **SMTP Provider** - Email delivery. Recommended: **Resend** (https://resend.com) — free tier (3,000 emails/month, 100/day), requires a verified custom domain, standard SMTP credentials. Alternatives: Mailgun, SendGrid. HostGator/cPanel SMTP works as a starting point but has lower deliverability for transactional email.
 
 ---
 
@@ -251,6 +251,15 @@ You have two options:
 #### Option A — Enter via Admin Settings panel (recommended for fresh deployments)
 
 Log into the backstage at `/admin`, navigate to **Settings → Email** and **Settings → Payment Providers**, enter your credentials, and save. The values are encrypted by the ISM before being written to the database.
+
+**Resend SMTP settings** (recommended email provider — free tier):
+- Host: `smtp.resend.com`
+- Port: `587`
+- Username: `resend`
+- Password: your Resend API key
+- From: `noreply@yourdomain.com` (must be a verified domain in Resend)
+
+To migrate from HostGator/cPanel to Resend: add the DNS records Resend provides to verify your domain, then update these four fields in Admin Settings → Email. No code changes or redeploy required.
 
 #### Option B — Migrate from an existing `.env` (for deployments that already have env-var secrets)
 

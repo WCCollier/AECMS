@@ -447,7 +447,10 @@ Once the production instance is running and the setup wizard is complete:
 
 4. **Configure via Admin Settings** (post-login in backstage):
    - General: site name = "Fantasy v Reality", tagline, favicon
-   - Email: SMTP credentials (Gmail app password)
+   - Email: SMTP credentials. Options in order of preference:
+     1. **Resend** (recommended) — free tier, excellent deliverability, requires domain verification. Host: `smtp.resend.com`, Port: 587, User: `resend`, Pass: API key. Verify `fantasyvreality.com` at resend.com first, then update DNS (SPF/DKIM records provided by Resend).
+     2. **HostGator SMTP** (`mail.fantasyvreality.com`) — works immediately, no extra signup, but lower deliverability for transactional email.
+     3. **Gmail app password** — dev/testing only, not suitable for production (`noreply@` addresses can't be sent from Gmail).
    - Payments: Stripe live keys, PayPal live keys
    - Storage: already set to GCS via env vars on Cloud Run; verify Test Connection ✓
 
