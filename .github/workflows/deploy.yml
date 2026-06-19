@@ -30,7 +30,7 @@ jobs:
 
       - name: Backend — install & test
         working-directory: backend
-        run: npm ci && npm test
+        run: npm ci && npx prisma generate && npm test
 
       - name: Frontend — install & test
         working-directory: frontend
