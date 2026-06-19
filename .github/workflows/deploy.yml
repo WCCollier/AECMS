@@ -67,14 +67,7 @@ jobs:
           docker push "${IMAGE}:${{ github.sha }}"
           docker push "${IMAGE}:latest"
 
-      - name: Build and push frontend image
-        run: |
-          IMAGE="${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/frontend"
-          docker build --target production -t "${IMAGE}:${{ github.sha }}" -t "${IMAGE}:latest" ./frontend
-          docker push "${IMAGE}:${{ github.sha }}"
-          docker push "${IMAGE}:latest"
-
-      # ── Deploy backend ─────────────────────────────────────────────────────
+      # ── Deploy backend first so we have its URL for the frontend build ─────
 
       - name: Deploy backend
         run: |
@@ -104,6 +97,19 @@ jobs:
             --format 'value(status.url)')
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Backend URL: $URL"
+
+      # ── Build frontend now that backend URL is known ───────────────────────
+
+      - name: Build and push frontend image
+        run: |
+          IMAGE="${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/frontend"
+          BACKEND_URL="${{ steps.backend.outputs.url }}"
+          docker build --target production \
+            --build-arg BACKEND_URL="$BACKEND_URL" \
+            --build-arg NEXT_PUBLIC_API_URL="$BACKEND_URL" \
+            -t "${IMAGE}:${{ github.sha }}" -t "${IMAGE}:latest" ./frontend
+          docker push "${IMAGE}:${{ github.sha }}"
+          docker push "${IMAGE}:latest"
 
       # ── Deploy frontend ────────────────────────────────────────────────────
 

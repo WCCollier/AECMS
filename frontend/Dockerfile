@@ -46,6 +46,12 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy source code
 COPY . .
 
+# Build-time backend URL (must be known at next build time for rewrites + NEXT_PUBLIC_ vars)
+ARG BACKEND_URL=http://localhost:4000
+ARG NEXT_PUBLIC_API_URL=http://localhost:4000
+ENV BACKEND_URL=$BACKEND_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build application
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
