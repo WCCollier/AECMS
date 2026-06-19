@@ -47,11 +47,14 @@ gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
 # ── 3. Backend service account ─────────────────────────────────────────────
 echo "[3/8] Creating backend service account..."
-gcloud iam service-accounts create "$BACKEND_SA" \
-  --display-name="AECMS Backend" \
-  --project "$PROJECT" 2>/dev/null || echo "  (already exists)"
-
 BACKEND_SA_EMAIL="${BACKEND_SA}@${PROJECT}.iam.gserviceaccount.com"
+if gcloud iam service-accounts describe "$BACKEND_SA_EMAIL" --project "$PROJECT" &>/dev/null; then
+  echo "  (already exists)"
+else
+  gcloud iam service-accounts create "$BACKEND_SA" \
+    --display-name="AECMS Backend" \
+    --project "$PROJECT"
+fi
 
 for ROLE in \
   roles/secretmanager.secretAccessor \
@@ -67,11 +70,14 @@ echo "  Backend SA: $BACKEND_SA_EMAIL"
 
 # ── 4. GitHub CI service account ──────────────────────────────────────────
 echo "[4/8] Creating GitHub CI service account..."
-gcloud iam service-accounts create "$CI_SA" \
-  --display-name="GitHub Actions CI" \
-  --project "$PROJECT" 2>/dev/null || echo "  (already exists)"
-
 CI_SA_EMAIL="${CI_SA}@${PROJECT}.iam.gserviceaccount.com"
+if gcloud iam service-accounts describe "$CI_SA_EMAIL" --project "$PROJECT" &>/dev/null; then
+  echo "  (already exists)"
+else
+  gcloud iam service-accounts create "$CI_SA" \
+    --display-name="GitHub Actions CI" \
+    --project "$PROJECT"
+fi
 
 for ROLE in \
   roles/run.developer \
