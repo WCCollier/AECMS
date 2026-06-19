@@ -85,7 +85,7 @@ jobs:
             --service-account "aecms-backend@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
             --add-cloudsql-instances "${{ env.GCP_PROJECT }}:${{ env.REGION }}:aecms-db" \
             --set-secrets "DATABASE_URL=aecms-database-url:latest,JWT_SECRET=aecms-jwt-secret:latest,REDIS_URL=aecms-redis-url:latest" \
-            --set-env-vars "NODE_ENV=production,SETTINGS_KMS_PROVIDER=gcp,GCP_PROJECT_ID=${{ env.GCP_PROJECT }},SETTINGS_KMS_SECRET_ID=aecms-sek,STORAGE_PROVIDER_TYPE=gcs,APP_URL=https://fantasyvreality.com,FRONTEND_URL=https://fantasyvreality.com,EMAIL_PROVIDER_TYPE=smtp" \
+            --set-env-vars "NODE_ENV=production,SETTINGS_KMS_PROVIDER=gcp,GCP_PROJECT_ID=${{ env.GCP_PROJECT }},SETTINGS_KMS_SECRET_ID=aecms-sek,STORAGE_PROVIDER_TYPE=gcs,APP_URL=https://fantasyvreality.com,FRONTEND_URL=https://fantasyvreality.com,API_URL=https://fantasyvreality.com,FRONTEND_ADMIN_URL=https://fantasyvreality.com/admin,EMAIL_PROVIDER_TYPE=smtp,JWT_EXPIRATION=15m,REFRESH_TOKEN_EXPIRATION=7d" \
             --platform managed \
             --allow-unauthenticated \
             --min-instances 0 \
