@@ -20,7 +20,7 @@ SQL_USER="aecms"
 MEDIA_BUCKET="fantasyvreality-media"
 DIGITAL_BUCKET="fantasyvreality-digital"
 
-# Derive project ID from project number (iam commands require ID, not number)
+# Derive project ID — most gcloud commands require the ID string, not the number
 PROJECT_ID=$(gcloud projects describe "$PROJECT" --format='value(projectId)')
 
 echo "=== AECMS GCP Setup ==="
@@ -37,14 +37,18 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   storage.googleapis.com \
   cloudresourcemanager.googleapis.com \
-  --project "$PROJECT"
+  --project "$PROJECT_ID"
 
 # ── 2. Artifact Registry ───────────────────────────────────────────────────
 echo "[2/8] Creating Artifact Registry repository..."
-gcloud artifacts repositories create "$REPO" \
-  --repository-format=docker \
-  --location="$REGION" \
-  --project "$PROJECT" 2>/dev/null || echo "  (already exists)"
+if gcloud artifacts repositories describe "$REPO" --location="$REGION" --project "$PROJECT_ID" &>/dev/null; then
+  echo "  (already exists)"
+else
+  gcloud artifacts repositories create "$REPO" \
+    --repository-format=docker \
+    --location="$REGION" \
+    --project "$PROJECT_ID"
+fi
 
 gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
@@ -64,7 +68,7 @@ for ROLE in \
   roles/cloudsql.client \
   roles/storage.objectAdmin \
   roles/storage.admin; do
-  gcloud projects add-iam-policy-binding "$PROJECT" \
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${BACKEND_SA_EMAIL}" \
     --role="$ROLE" \
     --quiet
@@ -87,7 +91,7 @@ for ROLE in \
   roles/artifactregistry.writer \
   roles/iam.serviceAccountUser \
   roles/secretmanager.secretAccessor; do
-  gcloud projects add-iam-policy-binding "$PROJECT" \
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${CI_SA_EMAIL}" \
     --role="$ROLE" \
     --quiet
@@ -96,60 +100,62 @@ echo "  CI SA: $CI_SA_EMAIL"
 
 # ── 5. Cloud SQL ───────────────────────────────────────────────────────────
 echo "[5/8] Creating Cloud SQL instance (this takes 3-5 minutes)..."
-if ! gcloud sql instances describe "$SQL_INSTANCE" --project "$PROJECT" &>/dev/null; then
+if gcloud sql instances describe "$SQL_INSTANCE" --project "$PROJECT_ID" &>/dev/null; then
+  echo "  (already exists)"
+else
   gcloud sql instances create "$SQL_INSTANCE" \
     --database-version=POSTGRES_15 \
     --tier=db-f1-micro \
     --region="$REGION" \
     --backup-start-time=03:00 \
     --retained-backups-count=7 \
-    --project "$PROJECT"
+    --project "$PROJECT_ID"
   echo "  Instance created."
-else
-  echo "  (already exists)"
 fi
 
 # Create database and user
-gcloud sql databases create "$SQL_DB" --instance="$SQL_INSTANCE" --project "$PROJECT" 2>/dev/null || echo "  DB (already exists)"
+gcloud sql databases create "$SQL_DB" --instance="$SQL_INSTANCE" --project "$PROJECT_ID" 2>/dev/null \
+  || echo "  DB (already exists)"
 
 SQL_PASSWORD=$(openssl rand -base64 24)
 gcloud sql users create "$SQL_USER" \
   --instance="$SQL_INSTANCE" \
   --password="$SQL_PASSWORD" \
-  --project "$PROJECT" 2>/dev/null || echo "  User (already exists — password not changed)"
+  --project "$PROJECT_ID" 2>/dev/null \
+  || echo "  User (already exists — password not changed)"
 
-CONNECTION_NAME="${PROJECT}:${REGION}:${SQL_INSTANCE}"
+CONNECTION_NAME="${PROJECT_ID}:${REGION}:${SQL_INSTANCE}"
 DATABASE_URL="postgresql://${SQL_USER}:${SQL_PASSWORD}@/${SQL_DB}?host=/cloudsql/${CONNECTION_NAME}"
 echo "  Connection name: $CONNECTION_NAME"
 
 # Allow backend SA to connect
-gcloud projects add-iam-policy-binding "$PROJECT" \
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${BACKEND_SA_EMAIL}" \
   --role="roles/cloudsql.instanceUser" \
   --quiet 2>/dev/null || true
 
 # ── 6. GCS Buckets ────────────────────────────────────────────────────────
 echo "[6/8] Creating GCS buckets..."
-if ! gcloud storage buckets describe "gs://$MEDIA_BUCKET" &>/dev/null; then
+if gcloud storage buckets describe "gs://$MEDIA_BUCKET" --project "$PROJECT_ID" &>/dev/null; then
+  echo "  Media bucket (already exists)"
+else
   gcloud storage buckets create "gs://$MEDIA_BUCKET" \
     --location="$REGION" \
     --uniform-bucket-level-access \
-    --project "$PROJECT"
+    --project "$PROJECT_ID"
   gcloud storage buckets add-iam-policy-binding "gs://$MEDIA_BUCKET" \
     --member=allUsers --role=roles/storage.objectViewer
   echo "  Created public media bucket: $MEDIA_BUCKET"
-else
-  echo "  Media bucket (already exists)"
 fi
 
-if ! gcloud storage buckets describe "gs://$DIGITAL_BUCKET" &>/dev/null; then
+if gcloud storage buckets describe "gs://$DIGITAL_BUCKET" --project "$PROJECT_ID" &>/dev/null; then
+  echo "  Digital bucket (already exists)"
+else
   gcloud storage buckets create "gs://$DIGITAL_BUCKET" \
     --location="$REGION" \
     --uniform-bucket-level-access \
-    --project "$PROJECT"
+    --project "$PROJECT_ID"
   echo "  Created private digital bucket: $DIGITAL_BUCKET"
-else
-  echo "  Digital bucket (already exists)"
 fi
 
 # ── 7. Secret Manager ─────────────────────────────────────────────────────
@@ -158,14 +164,14 @@ echo "[7/8] Creating Secret Manager secrets..."
 create_secret() {
   local NAME="$1"
   local VALUE="$2"
-  if gcloud secrets describe "$NAME" --project "$PROJECT" &>/dev/null; then
+  if gcloud secrets describe "$NAME" --project "$PROJECT_ID" &>/dev/null; then
     echo "  $NAME (already exists — skipping)"
   else
-    echo -n "$VALUE" | gcloud secrets create "$NAME" --data-file=- --project "$PROJECT"
+    echo -n "$VALUE" | gcloud secrets create "$NAME" --data-file=- --project "$PROJECT_ID"
     gcloud secrets add-iam-policy-binding "$NAME" \
       --member="serviceAccount:${BACKEND_SA_EMAIL}" \
       --role="roles/secretmanager.secretAccessor" \
-      --project "$PROJECT" --quiet
+      --project "$PROJECT_ID" --quiet
     echo "  Created: $NAME"
   fi
 }
@@ -177,20 +183,22 @@ create_secret "aecms-sek" "$SEK"
 # Database URL with Cloud SQL unix socket path
 create_secret "aecms-database-url" "$DATABASE_URL"
 
-# JWT secrets
+# JWT signing key
 create_secret "aecms-jwt-secret" "$(openssl rand -hex 32)"
+
+# Redis URL — placeholder until Upstash is set up
 create_secret "aecms-redis-url" "PLACEHOLDER_SET_THIS_TO_YOUR_UPSTASH_URL"
 
 echo ""
 echo "  NOTE: Update aecms-redis-url with your Upstash Redis URL:"
-echo "    echo -n 'rediss://...' | gcloud secrets versions add aecms-redis-url --data-file=- --project $PROJECT"
+echo "    echo -n 'rediss://...' | gcloud secrets versions add aecms-redis-url --data-file=- --project $PROJECT_ID"
 
-# Also grant CI SA access to secrets (needed if CI runs migrations that need DB)
+# Grant CI SA access to secrets
 for SECRET in aecms-sek aecms-database-url aecms-jwt-secret aecms-redis-url; do
   gcloud secrets add-iam-policy-binding "$SECRET" \
     --member="serviceAccount:${CI_SA_EMAIL}" \
     --role="roles/secretmanager.secretAccessor" \
-    --project "$PROJECT" --quiet 2>/dev/null || true
+    --project "$PROJECT_ID" --quiet 2>/dev/null || true
 done
 
 # ── 8. GitHub CI key ──────────────────────────────────────────────────────
@@ -209,7 +217,7 @@ echo "NEXT STEPS:"
 echo ""
 echo "1. Add Upstash Redis URL to Secret Manager:"
 echo "   Sign up at https://upstash.com → create a Redis DB → copy the rediss:// URL"
-echo "   echo -n 'rediss://...' | gcloud secrets versions add aecms-redis-url --data-file=- --project $PROJECT"
+echo "   echo -n 'rediss://...' | gcloud secrets versions add aecms-redis-url --data-file=- --project $PROJECT_ID"
 echo ""
 echo "2. Add GCP_SA_KEY to GitHub repository secrets:"
 echo "   Go to: https://github.com/WCCollier/AECMS/settings/secrets/actions"
@@ -219,12 +227,12 @@ echo ""
 echo "3. DELETE the local key file:"
 echo "   rm $KEY_FILE"
 echo ""
-echo "4. Push to main to trigger the first deployment."
+echo "4. Merge main → deploy to trigger the first deployment."
 echo ""
 echo "5. After first deploy, map custom domains:"
-echo "   gcloud run domain-mappings create --service aecms-frontend --domain fantasyvreality.com --region $REGION --project $PROJECT"
-echo "   gcloud run domain-mappings create --service aecms-frontend --domain www.fantasyvreality.com --region $REGION --project $PROJECT"
-echo "   gcloud run domain-mappings create --service aecms-frontend --domain wccollier.com --region $REGION --project $PROJECT"
+echo "   gcloud run domain-mappings create --service aecms-frontend --domain fantasyvreality.com --region $REGION --project $PROJECT_ID"
+echo "   gcloud run domain-mappings create --service aecms-frontend --domain www.fantasyvreality.com --region $REGION --project $PROJECT_ID"
+echo "   gcloud run domain-mappings create --service aecms-frontend --domain wccollier.com --region $REGION --project $PROJECT_ID"
 echo ""
 echo "6. After first deploy, log in to backstage and configure:"
 echo "   - Admin Settings → File Storage: set GCS bucket names:"
@@ -233,6 +241,6 @@ echo "       Digital bucket: $DIGITAL_BUCKET"
 echo "   - Admin Settings → Email: SMTP credentials"
 echo "   - Admin Settings → Payments: Stripe + PayPal keys"
 echo ""
-echo "Secrets Encryption Key (SEK) — store this securely, you'll never see it again:"
+echo "Secrets Encryption Key (SEK) — store this securely, you will never see it again:"
 echo "  $SEK"
 echo ""
