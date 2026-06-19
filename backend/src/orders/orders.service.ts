@@ -490,7 +490,7 @@ export class OrdersService {
           product: {
             select: {
               id: true,
-              name: true,
+              title: true,
               slug: true,
               product_type: true,
             },
