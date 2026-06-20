@@ -204,11 +204,21 @@ export function SettingsClient() {
     }
   };
 
+  const emailFieldsFilled = Boolean(
+    f('email.smtp_host') && f('email.smtp_port') && f('email.smtp_user') && f('email.from_address'),
+  );
+
   const handleTestEmail = async () => {
     setEmailTesting(true);
     setEmailTestResult(null);
     try {
-      const res = await adminApi.post('/settings/test-email');
+      const config: Record<string, string> = {};
+      for (const key of ['email.smtp_host', 'email.smtp_port', 'email.smtp_security',
+                          'email.smtp_user', 'email.smtp_pass_enc',
+                          'email.from_address', 'email.from_name']) {
+        if (f(key)) config[key] = f(key);
+      }
+      const res = await adminApi.post('/settings/test-email-preview', config);
       setEmailTestResult(res.data);
     } catch (err: any) {
       setEmailTestResult({ success: false, message: err?.response?.data?.message ?? 'Request failed' });
@@ -474,21 +484,28 @@ export function SettingsClient() {
             <TextInput value={f('email.kindle_from')} onChange={(v) => set('email.kindle_from', v)} placeholder="you@gmail.com" type="email" />
           </FieldRow>
 
-          <div className="pt-4 flex items-center gap-4">
-            <button
-              onClick={handleTestEmail}
-              disabled={emailTesting}
-              className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white text-sm px-4 py-2 rounded"
-            >
-              {emailTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              {emailTesting ? 'Sending…' : 'Send Test Email'}
-            </button>
-            {emailTestResult && (
-              <span className={`flex items-center gap-1 text-sm ${emailTestResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                {emailTestResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                {emailTestResult.message}
-              </span>
-            )}
+          <div className="pt-4 space-y-2">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleTestEmail}
+                disabled={emailTesting || !emailFieldsFilled}
+                className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white text-sm px-4 py-2 rounded"
+              >
+                {emailTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {emailTesting ? 'Sending…' : 'Send Test Email'}
+              </button>
+              {emailTestResult && (
+                <span className={`flex items-center gap-1 text-sm ${emailTestResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                  {emailTestResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                  {emailTestResult.message}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-neutral-500">
+              {emailFieldsFilled
+                ? 'Test uses the values currently entered above. Save after a successful test.'
+                : 'Fill in Host, Port, Username, and From Address to enable the test.'}
+            </p>
           </div>
 
           <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />

@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, PasswordInput } from '@/components/ui';
 import { ShoppingCart, User, Menu, X, LogIn, ChevronDown } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, FormEvent } from 'react';
 import { getErrorMessage } from '@/lib/api';
@@ -232,8 +232,7 @@ export function Header() {
                         autoComplete="email"
                         autoFocus
                       />
-                      <Input
-                        type="password"
+                      <PasswordInput
                         name="password"
                         id="header-login-password"
                         placeholder="Password"

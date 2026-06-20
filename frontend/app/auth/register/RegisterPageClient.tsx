@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
+import { Button, Input, PasswordInput, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 
 export function RegisterPageClient() {
   const router = useRouter();
   const { register } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmTouched, setConfirmTouched] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -27,6 +28,11 @@ export function RegisterPageClient() {
     }));
     setError('');
   };
+
+  const passwordMismatch =
+    confirmTouched &&
+    formData.confirmPassword.length > 0 &&
+    formData.password !== formData.confirmPassword;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,9 +131,8 @@ export function RegisterPageClient() {
               />
             </div>
 
-            <Input
+            <PasswordInput
               label="Password"
-              type="password"
               name="password"
               placeholder="Create a password"
               value={formData.password}
@@ -137,15 +142,16 @@ export function RegisterPageClient() {
               hint="At least 8 characters"
             />
 
-            <Input
+            <PasswordInput
               label="Confirm Password"
-              type="password"
               name="confirmPassword"
               placeholder="Confirm your password"
               value={formData.confirmPassword}
               onChange={handleChange}
+              onBlur={() => setConfirmTouched(true)}
               required
               autoComplete="new-password"
+              error={passwordMismatch ? 'Passwords do not match' : undefined}
             />
 
             <label className="flex items-start gap-2 text-sm">

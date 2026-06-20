@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
-import { Button, Input } from '@/components/ui';
+import { Button, Input, PasswordInput } from '@/components/ui';
 import api, { getErrorMessage } from '@/lib/api';
 import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin } from 'lucide-react';
 import useSWR from 'swr';
@@ -65,6 +65,7 @@ export function AccountPageClient() {
   const [pwLoading, setPwLoading] = useState(false);
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
+  const [pwConfirmTouched, setPwConfirmTouched] = useState(false);
 
   // Delete account state
   const [deletePassword, setDeletePassword] = useState('');
@@ -430,32 +431,35 @@ export function AccountPageClient() {
             <form onSubmit={handlePasswordChange} className="space-y-3">
               {pwError && <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{pwError}</p>}
               {pwSuccess && <p className="text-sm text-green-600 bg-green-500/10 border border-green-500/20 rounded px-3 py-2">{pwSuccess} Redirecting…</p>}
-              <Input
+              <PasswordInput
                 label="Current password"
-                type="password"
                 name="currentPassword"
                 value={pwForm.currentPassword}
                 onChange={(e) => setPwForm((f) => ({ ...f, currentPassword: e.target.value }))}
                 required
                 autoComplete="current-password"
               />
-              <Input
+              <PasswordInput
                 label="New password"
-                type="password"
                 name="newPassword"
                 value={pwForm.newPassword}
                 onChange={(e) => setPwForm((f) => ({ ...f, newPassword: e.target.value }))}
                 required
                 autoComplete="new-password"
               />
-              <Input
+              <PasswordInput
                 label="Confirm new password"
-                type="password"
                 name="confirm"
                 value={pwForm.confirm}
                 onChange={(e) => setPwForm((f) => ({ ...f, confirm: e.target.value }))}
+                onBlur={() => setPwConfirmTouched(true)}
                 required
                 autoComplete="new-password"
+                error={
+                  pwConfirmTouched && pwForm.confirm.length > 0 && pwForm.newPassword !== pwForm.confirm
+                    ? 'Passwords do not match'
+                    : undefined
+                }
               />
               <Button type="submit" size="sm" isLoading={pwLoading}>Update Password</Button>
             </form>
@@ -483,9 +487,8 @@ export function AccountPageClient() {
             </p>
             <form onSubmit={handleDeleteAccount} className="space-y-3">
               {deleteError && <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{deleteError}</p>}
-              <Input
+              <PasswordInput
                 label="Password"
-                type="password"
                 name="deletePassword"
                 value={deletePassword}
                 onChange={(e) => setDeletePassword(e.target.value)}

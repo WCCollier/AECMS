@@ -73,6 +73,10 @@ COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/prisma.config.ts ./
 
+# Copy startup scripts
+COPY --from=builder --chown=nestjs:nodejs /app/scripts ./scripts
+RUN chmod +x /app/scripts/docker-start.sh
+
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown nestjs:nodejs /app/uploads
 
@@ -86,5 +90,5 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Run migrations then start (migrate deploy is idempotent — safe on every startup)
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+# Run migrations, seed capabilities if fresh DB, then start app
+CMD ["sh", "/app/scripts/docker-start.sh"]

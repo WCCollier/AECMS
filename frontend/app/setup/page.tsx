@@ -50,6 +50,22 @@ function PasswordStrength({ password }: { password: string }) {
   );
 }
 
+const EyeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+  </svg>
+);
+const EyeOffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+    <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+    <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+    <line x1="2" x2="22" y1="2" y2="22" />
+  </svg>
+);
+
 export default function SetupPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
@@ -57,6 +73,9 @@ export default function SetupPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [showPwd, setShowPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
+  const [confirmTouched, setConfirmTouched] = useState(false);
 
   useEffect(() => {
     // If setup is already complete, redirect home
@@ -178,7 +197,7 @@ export default function SetupPage() {
                   type="text"
                   value={data.site_name}
                   onChange={set('site_name')}
-                  placeholder="Fantasy v Reality"
+                  placeholder="My Awesome Site"
                   className="w-full px-3 py-2.5 border border-foreground/20 rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   autoFocus
                 />
@@ -190,7 +209,7 @@ export default function SetupPage() {
                   type="text"
                   value={data.site_tagline}
                   onChange={set('site_tagline')}
-                  placeholder="Ideas worth fighting for"
+                  placeholder="Welcome to my corner of the internet"
                   className="w-full px-3 py-2.5 border border-foreground/20 rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 />
               </div>
@@ -205,7 +224,7 @@ export default function SetupPage() {
                     type="text"
                     value={data.first_name}
                     onChange={set('first_name')}
-                    placeholder="William"
+                    placeholder="Jane"
                     className="w-full px-3 py-2.5 border border-foreground/20 rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   />
                 </div>
@@ -215,7 +234,7 @@ export default function SetupPage() {
                     type="text"
                     value={data.last_name}
                     onChange={set('last_name')}
-                    placeholder="Collier"
+                    placeholder="Smith"
                     className="w-full px-3 py-2.5 border border-foreground/20 rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   />
                 </div>
@@ -251,25 +270,47 @@ export default function SetupPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-1.5">Password *</label>
-                <input
-                  type="password"
-                  value={data.password}
-                  onChange={set('password')}
-                  placeholder="12+ characters"
-                  className="w-full px-3 py-2.5 border border-foreground/20 rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
+                <div className="relative">
+                  <input
+                    type={showPwd ? 'text' : 'password'}
+                    value={data.password}
+                    onChange={set('password')}
+                    placeholder="12+ characters"
+                    className="w-full px-3 py-2.5 pr-10 border border-foreground/20 rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                  />
+                  <button type="button" tabIndex={-1} aria-label={showPwd ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowPwd((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70 transition-colors focus:outline-none">
+                    {showPwd ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
                 <PasswordStrength password={data.password} />
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-1.5">Confirm Password *</label>
-                <input
-                  type="password"
-                  value={data.confirm_password}
-                  onChange={set('confirm_password')}
-                  placeholder="Repeat password"
-                  className="w-full px-3 py-2.5 border border-foreground/20 rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirmPwd ? 'text' : 'password'}
+                    value={data.confirm_password}
+                    onChange={set('confirm_password')}
+                    onBlur={() => setConfirmTouched(true)}
+                    placeholder="Repeat password"
+                    className={`w-full px-3 py-2.5 pr-10 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 ${
+                      confirmTouched && data.confirm_password.length > 0 && data.password !== data.confirm_password
+                        ? 'border-red-500'
+                        : 'border-foreground/20'
+                    }`}
+                  />
+                  <button type="button" tabIndex={-1} aria-label={showConfirmPwd ? 'Hide password' : 'Show password'}
+                    onClick={() => setShowConfirmPwd((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground/70 transition-colors focus:outline-none">
+                    {showConfirmPwd ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
+                {confirmTouched && data.confirm_password.length > 0 && data.password !== data.confirm_password && (
+                  <p className="mt-1 text-xs text-red-500">Passwords do not match</p>
+                )}
               </div>
 
               <div className="flex gap-3 mt-2">
