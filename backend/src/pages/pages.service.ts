@@ -514,6 +514,11 @@ export class PagesService {
       throw new NotFoundException('Page not found');
     }
 
+    // The _home_ page is a system fallback — it must not be deleted via API
+    if (page.slug === '_home_') {
+      throw new ForbiddenException('The system homepage page (_home_) cannot be deleted.');
+    }
+
     // Check delete permissions
     this.checkDeleteAccess(page, userId, isAdmin);
 

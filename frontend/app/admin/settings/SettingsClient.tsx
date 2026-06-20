@@ -384,6 +384,29 @@ export function SettingsClient() {
                       </p>
                     ) : null;
                   })()}
+                  {/* Warning when no effective published homepage exists */}
+                  {(() => {
+                    const designatedId = f('general.homepage_page_id');
+                    const designatedPublished = designatedId && publishedPages.some((p) => p.id === designatedId);
+                    const homePagePublished = publishedPages.some((p) => p.slug === '_home_');
+                    if (designatedId && !designatedPublished) {
+                      return (
+                        <p className="text-xs text-amber-400 flex items-start gap-1.5">
+                          <span className="mt-0.5">⚠</span>
+                          The selected page is not currently published. Your site will fall back to the _home_ page{homePagePublished ? '' : ' — which is also not published'}. Visitors will be redirected to /articles.
+                        </p>
+                      );
+                    }
+                    if (!designatedId && !homePagePublished) {
+                      return (
+                        <p className="text-xs text-amber-400 flex items-start gap-1.5">
+                          <span className="mt-0.5">⚠</span>
+                          No published homepage found. Visitors will be redirected to /articles until you publish a page here or publish the built-in _home_ page.
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </div>

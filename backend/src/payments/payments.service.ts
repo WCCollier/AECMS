@@ -224,7 +224,12 @@ export class PaymentsService {
     if (refund.status === 'succeeded') {
       await this.prisma.order.update({
         where: { id: orderId },
-        data: { status: 'refunded' },
+        data: {
+          status: 'refunded',
+          refunded_at: new Date(),
+          refund_id: refund.id ?? null,
+          refund_amount: dto.amount != null ? dto.amount / 100 : null,
+        },
       });
     }
 

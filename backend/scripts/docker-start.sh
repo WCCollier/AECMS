@@ -23,6 +23,8 @@ p.capability.count()
 if [ "$CAPS" = "0" ]; then
   echo "[startup] Capabilities table empty — seeding minimal defaults..."
   node scripts/seed-minimal.js
+  echo "[startup] Seeding sample draft content..."
+  node scripts/seed-sample-content.js
 else
   echo "[startup] Capabilities already seeded (count=${CAPS}) — skipping seed."
 fi

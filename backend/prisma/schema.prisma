@@ -604,6 +604,11 @@ model Order {
   shipping_zip      String?
   shipping_country  String?
 
+  // Refund details (populated by PaymentsService.refund())
+  refunded_at       DateTime?
+  refund_amount     Decimal?  @db.Decimal(10, 2) // null = full order total
+  refund_id         String?   // gateway refund reference
+
   // Fulfillment tracking (physical orders)
   tracking_number   String?
   tracking_carrier  String?
@@ -637,11 +642,12 @@ enum OrderStatus {
 }
 
 model OrderItem {
-  id         String  @id @default(uuid())
-  order_id   String
-  product_id String
-  quantity   Int
-  price      Decimal @db.Decimal(10, 2) // Price at time of purchase
+  id            String  @id @default(uuid())
+  order_id      String
+  product_id    String
+  product_title String  @default("") // Snapshot of title at time of purchase
+  quantity      Int
+  price         Decimal @db.Decimal(10, 2) // Price at time of purchase
 
   order   Order   @relation(fields: [order_id], references: [id], onDelete: Cascade)
   product Product @relation(fields: [product_id], references: [id])

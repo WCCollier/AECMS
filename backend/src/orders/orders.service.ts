@@ -132,6 +132,7 @@ export class OrdersService {
         items: {
           create: cart.items.map((item: any) => ({
             product_id: item.product_id,
+            product_title: item.product.title ?? '',
             quantity: item.quantity,
             price: item.product.price,
           })),
@@ -537,5 +538,99 @@ export class OrdersService {
         };
       }),
     };
+  }
+
+  async exportCsv(from: Date, to: Date): Promise<string> {
+    // Include day boundary on 'to' date
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        created_at: { gte: from, lte: toEnd },
+        status: { not: 'pending' },
+      },
+      include: {
+        items: {
+          include: { product: { select: { title: true } } },
+        },
+      },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const rows: string[] = [
+      [
+        'date', 'type', 'order_number', 'customer_email', 'customer_name',
+        'payment_method', 'payment_reference', 'items',
+        'subtotal', 'tax', 'shipping', 'total', 'status', 'notes',
+      ].join(','),
+    ];
+
+    const csvVal = (v: string | number | null | undefined) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n')
+        ? `"${s.replace(/"/g, '""')}"`
+        : s;
+    };
+
+    const formatMoney = (d: any) =>
+      d != null ? parseFloat(d.toString()).toFixed(2) : '0.00';
+
+    for (const order of orders) {
+      const itemsStr = order.items
+        .map((i: any) => {
+          const title = (i.product_title && i.product_title.length > 0)
+            ? i.product_title
+            : (i.product?.title ?? i.product_id);
+          return `${title} × ${i.quantity}`;
+        })
+        .join('; ');
+
+      // Sale row
+      rows.push([
+        csvVal(order.paid_at ? order.paid_at.toISOString() : order.created_at.toISOString()),
+        csvVal('sale'),
+        csvVal(order.order_number),
+        csvVal(order.email),
+        csvVal(order.customer_name ?? ''),
+        csvVal(order.payment_method),
+        csvVal(order.payment_intent_id ?? ''),
+        csvVal(itemsStr),
+        csvVal(formatMoney(order.subtotal)),
+        csvVal(formatMoney(order.tax)),
+        csvVal(formatMoney(order.shipping)),
+        csvVal(formatMoney(order.total)),
+        csvVal(order.status),
+        csvVal(''),
+      ].join(','));
+
+      // Refund row (if applicable)
+      if (order.status === 'refunded') {
+        const refundDate = order.refunded_at ?? order.updated_at;
+        const refundTotal = order.refund_amount != null
+          ? `-${parseFloat(order.refund_amount.toString()).toFixed(2)}`
+          : `-${formatMoney(order.total)}`;
+        const notes = order.refunded_at ? '' : 'refunded_at unavailable — using updated_at';
+
+        rows.push([
+          csvVal(refundDate.toISOString()),
+          csvVal('refund'),
+          csvVal(order.order_number),
+          csvVal(order.email),
+          csvVal(order.customer_name ?? ''),
+          csvVal(order.payment_method),
+          csvVal(order.refund_id ?? order.payment_intent_id ?? ''),
+          csvVal(itemsStr),
+          csvVal(`-${formatMoney(order.subtotal)}`),
+          csvVal(`-${formatMoney(order.tax)}`),
+          csvVal(`-${formatMoney(order.shipping)}`),
+          csvVal(refundTotal),
+          csvVal('refunded'),
+          csvVal(notes),
+        ].join(','));
+      }
+    }
+
+    return rows.join('\n');
   }
 }
