@@ -218,15 +218,76 @@ Clicking Export calls `adminApi.get('/orders/export', { params, responseType: 't
 
 ---
 
-## Items Not Implemented
+## Item J — New Owner Experience ✅
 
-**Item H** (File Storage tab improvements — reflect env vars, automate bucket creation, lock pre-install decisions, fix test flow) was deferred. It requires design decisions about install scenarios (Scenario A/B/C as described in the plan) before implementation is appropriate. The issues are documented in `docs/PHASE_22_PLAN.md` Section H for a future phase or follow-up session.
+### J.1 — deploy.yml Parameterized
+Replaced 7 hardcoded FvR-specific values with GitHub Variables (`vars.GCP_PROJECT_NUMBER`, `vars.GCP_PROJECT_ID`, `vars.APP_DOMAIN`, `vars.GCS_MEDIA_BUCKET`, `vars.GCS_DIGITAL_BUCKET`, `vars.SETTINGS_KMS_SECRET_ID`, `vars.KINDLE_FROM_EMAIL`). New owners set these 7 values in GitHub repo Settings → Variables; no file editing required. Also added `GCS_BUCKET_MEDIA` and `GCS_BUCKET_DIGITAL` to backend `set-env-vars` so the `getAll()` env fallback populates File Storage tab correctly on Cloud Run.
+
+### H.2-A — GCS Bucket Automation
+Added idempotent bucket creation step to `deploy.yml`, after GCP auth and before backend deploy. Creates media bucket (with `allUsers objectViewer` IAM binding) and digital bucket. Existing buckets are silently skipped. No manual `gcloud` commands needed on new GCP deployments.
+
+### J.4 / H.1 — Deployment Profile Endpoint + getAll() Env Merge
+- `SettingsService.getAll()` now merges `ENV_KEY_MAP` env var fallbacks for keys not present in the DB. File Storage (and all other settings tabs) now show actively configured values even when set exclusively via environment variables.
+- `SettingsService.getEnvSourcedKeys()` returns which keys are env-sourced.
+- `GET /setup/profile` (public, no auth) returns `storageProvider`, `emailProvider`, `kmsProvider`, `appUrl`, `isFirstRun`, `envKeys[]`. Consumed by the wizard and settings panel.
+
+### H.4 — Storage Test Preview Endpoint
+`POST /settings/test-storage-preview` accepts provider config in the request body. Instantiates a temporary provider via duck-typed settings adapter (same pattern as Item F email preview). Frontend sends current form values; Test button disabled until required bucket/credential fields are filled.
+
+### J.5 / J.6 / J.7 — Wizard and Settings Panel Personalization
+**Wizard**: fetches profile on load. Step 3 (success screen) is now context-aware — shows storage warning if GCS/S3 is active, email dev-mode warning if `EMAIL_PROVIDER_TYPE=console`, and contextual next-step cards instead of a generic paragraph.
+
+**Settings panel** (File Storage tab):
+- Env-sourced fields show an `env var` badge and are rendered read-only with a "Set via environment variable" note.
+- Provider type shown as a read-only active-provider badge (with "requires redeployment" note) when `STORAGE_PROVIDER_TYPE` is env-sourced.
+- Service account JSON field hidden on Cloud Run (`kmsProvider=gcp`) — replaced with "Workload Identity active" note.
+- Storage Test button uses `test-storage-preview` with current form values; disabled until required fields are populated.
+
+### J.2 / J.3 — Platform Starter Files
+New `deploy/` directory at repo root:
+
+| File | Purpose |
+|---|---|
+| `deploy/env.reference.md` | Full reference for all AECMS env vars |
+| `deploy/railway/env.example` | Railway variable template |
+| `deploy/coolify/env.example` | Coolify/VPS variable template |
+| `deploy/coolify/docker-compose.production.yml` | Production Compose for Coolify |
+| `deploy/cloud-run/env.example` | GitHub Variables + Secrets reference for Cloud Run |
+
+### J.8 — Owner's Manual HTML Site
+`docs/owners-manual/` — a self-contained HTML site (no CDN dependencies, works locally):
+
+| File | Content |
+|---|---|
+| `index.html` | Overview, quick-start paths, what you need |
+| `style.css` | Shared styles — sidebar, callouts, step lists, platform cards |
+| `ch01-infrastructure.html` | Full guide: hosting, database, storage, email, Redis decisions |
+| `ch02-platform-setup/index.html` | Platform comparison with links |
+| `ch02-platform-setup/railway.html` | Full Railway setup guide |
+| `ch02-platform-setup/coolify.html` | Full Coolify + VPS setup guide |
+| `ch02-platform-setup/cloud-run.html` | Full Cloud Run setup guide |
+| `ch02-platform-setup/render.html` + `fly.html` | Stub guides with key notes |
+| `ch03-aecms-config.html` | Env var config reference, platform file index |
+| `ch04-first-launch.html` | Wizard walkthrough, post-wizard checklist |
+| `ch05-admin-settings.html` | Settings tab reference |
+| `ch06-going-live.html` | Domain mapping per platform, pre-launch checklist |
+| `ch07-maintenance.html` | Updates, backups, cost monitoring |
+
+---
+
+## Test Results
+
+| Suite | Before | After |
+|-------|--------|-------|
+| Backend unit tests | 190/190 | 190/190 ✅ |
+| Frontend unit tests | 125/125 | 125/125 ✅ |
 
 ---
 
 ## Git Log
 
 ```
+b7545c8 Phase 22 Item J: new owner experience, platform config helpers, Owner's Manual
 b86727b Phase 22 items A/B: TipTap version alignment, Node.js 22 upgrade
 3ecea7c Phase 22 items G/I: sample content seed, _home_ guard, homepage warning, CSV export
 013f777 Phase 22 items C/D/E/F: wizard placeholders, password toggles, capability seed, email test
@@ -236,8 +297,7 @@ b86727b Phase 22 items A/B: TipTap version alignment, Node.js 22 upgrade
 
 ## Next Steps
 
-- **Deploy**: Merge `main → deploy` and push to trigger the GitHub Actions pipeline
+- **Deploy**: Merge `main → deploy` and push to trigger the GitHub Actions pipeline (update GitHub Variables first: GCP_PROJECT_NUMBER, GCP_PROJECT_ID, APP_DOMAIN, GCS_MEDIA_BUCKET, GCS_DIGITAL_BUCKET, SETTINGS_KMS_SECRET_ID, KINDLE_FROM_EMAIL)
 - **Phase 21 remaining**: FvR content migration (`seed-fvr.ts` against production DB via Cloud SQL proxy) + Phase 21 completion report
 - **Phase 23**: Owner knows what goes here
 - **Phase 24**: Sales tax infrastructure (activation trigger: $1k revenue or Texas Comptroller registration)
-- **Item H**: File Storage tab UX improvements (deferred — needs design discussion)
