@@ -1018,9 +1018,48 @@ The intentional absence of file operations here is a security boundary, not an o
 
 ---
 
+## Item N — User Management: Role Assignment UI
+
+**Priority**: High  
+**Added**: 2026-06-21
+
+### Problem
+
+Owners have no backstage UI to view registered accounts or change their roles. The only way to promote a Member to Admin (or demote an Admin to Member) was a direct SQL query. Self-signup works correctly — `POST /auth/register` creates a `member` account that is gated until email verification — but there was no subsequent promotion pathway.
+
+### Capability atom
+
+`user.assign_role` (already in seed, `scope: 'backstage'`, Owner-only). No new capability needed.
+
+### Fix
+
+**Backend** (`auth.controller.ts` + `auth.service.ts`):
+- `GET /auth/admin/users` — paginated user list (select: id, email, username, first/last name, role, email_verified, created_at); gated by `JwtAuthGuard → BackstageGuard → CapabilityGuard(user.assign_role)`
+- `PATCH /auth/admin/users/:id/role` — change role (member/admin/owner); same guard chain
+- Service: `listUsers()` with search (email/username/name), pagination; `updateUserRole()` blocks self-change, writes audit log `user.role_changed`
+- New DTO: `UpdateUserRoleDto` with `@IsIn(['member','admin','owner'])`
+
+**Frontend** (`/admin/users`):
+- Table: email (with "(you)" label), name + @username, role dropdown (non-editable for self), joined date, verified badge
+- Role dropdown opens confirmation modal; Owner-promotion path shows amber warning about full system access
+- Sidebar nav item "Users" gated by `user.assign_role` capability (hidden from Admin)
+- Pagination + debounced search
+
+### Status: ✅ COMPLETE (2026-06-21)
+
+Files changed:
+- `backend/src/auth/dto/update-user-role.dto.ts` — new
+- `backend/src/auth/auth.service.ts` — `listUsers()` + `updateUserRole()`
+- `backend/src/auth/auth.controller.ts` — 2 new endpoints + guard imports
+- `frontend/app/admin/users/page.tsx` — new
+- `frontend/app/admin/users/UsersClient.tsx` — new
+- `frontend/app/admin/layout.tsx` — Users nav item
+
+---
+
 ## Adding New Items
 
-As live testing surfaces additional new issues, append them here as **Item N**, **Item O**, etc. following the same format:
+As live testing surfaces additional new issues, append them here as **Item O**, **Item P**, etc. following the same format:
 - Problem description
 - Risk / urgency
 - Concrete fix steps
