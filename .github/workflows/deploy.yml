@@ -10,8 +10,6 @@ name: Deploy to Cloud Run
 #
 # Optional variables (defaults shown):
 #   SETTINGS_KMS_SECRET_ID   Secret Manager ID for SEK   default: aecms-sek
-#   KINDLE_FROM_EMAIL        Kindle sender address        default: (empty)
-#
 # Required GitHub Secret:
 #   GCP_SA_KEY   Service account JSON key with Cloud Run, Artifact Registry,
 #                Cloud SQL, and Secret Manager access
@@ -168,7 +166,7 @@ jobs:
             --image "${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/frontend:${{ github.sha }}" \
             --region ${{ env.REGION }} \
             --project ${{ env.GCP_PROJECT }} \
-            --set-env-vars "NODE_ENV=production,BACKEND_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_API_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_BASE_DOMAIN=${{ vars.APP_DOMAIN }},NEXT_PUBLIC_KINDLE_SENDER_EMAIL=${{ vars.KINDLE_FROM_EMAIL }}" \
+            --set-env-vars "NODE_ENV=production,BACKEND_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_API_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_BASE_DOMAIN=${{ vars.APP_DOMAIN }}" \
             --platform managed \
             --allow-unauthenticated \
             --min-instances 0 \

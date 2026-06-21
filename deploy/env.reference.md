@@ -34,11 +34,13 @@ All variables consumed by the backend container. Frontend variables are marked (
 | `S3_SECRET_ACCESS_KEY` | — | S3 secret access key |
 | `STORAGE_CDN_BASE_URL` | — | Optional CDN prefix for media URLs |
 
-## Email
+## Email (configure post-launch via Admin Settings → Email)
+
+Email credentials do not need to be set before first launch. Configure them in **Admin Settings → Email** after the site is live and the setup wizard is complete.
 
 | Variable | Default | Description |
 |---|---|---|
-| `EMAIL_PROVIDER_TYPE` | `smtp` | `smtp` or `console` (console = dev mode, no emails sent) |
+| `EMAIL_PROVIDER_TYPE` | `smtp` | `smtp` or `console` (console = dev/test mode, no emails sent) |
 | `SMTP_HOST` | — | SMTP server hostname |
 | `SMTP_PORT` | `587` | SMTP port |
 | `SMTP_SECURITY` | `starttls` | `starttls` or `ssl` |
@@ -46,7 +48,7 @@ All variables consumed by the backend container. Frontend variables are marked (
 | `SMTP_PASS` | — | SMTP password |
 | `SMTP_FROM` | — | From address (e.g. `hello@myblog.com`) |
 | `EMAIL_FROM_NAME` | — | From display name |
-| `KINDLE_FROM_ADDRESS` | — | Address approved in recipient's Kindle settings |
+| `KINDLE_FROM_ADDRESS` | — | Kindle delivery sender (defaults to `SMTP_FROM` if unset) |
 
 ## Payments
 
@@ -82,4 +84,4 @@ All variables consumed by the backend container. Frontend variables are marked (
 | `BACKEND_URL` | Backend container URL (internal or public) |
 | `NEXT_PUBLIC_API_URL` | Backend URL visible to the browser |
 | `NEXT_PUBLIC_BASE_DOMAIN` | Your domain (no https://) |
-| `NEXT_PUBLIC_KINDLE_SENDER_EMAIL` | Shown to users in Kindle wizard |
+| `NEXT_PUBLIC_BASE_DOMAIN` | Your domain without `https://` |

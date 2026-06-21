@@ -23,10 +23,13 @@ export class SetupService {
     appUrl: string;
     isFirstRun: boolean;
     envKeys: string[];
+    kindleFromEmail: string;
   }> {
-    const [isFirstRun, envKeys] = await Promise.all([
+    const [isFirstRun, envKeys, kindleFrom, fromAddress] = await Promise.all([
       this.isSetupRequired(),
       this.settings.getEnvSourcedKeys(),
+      this.settings.getEffective('email.kindle_from'),
+      this.settings.getEffective('email.from_address'),
     ]);
     return {
       storageProvider: process.env.STORAGE_PROVIDER_TYPE ?? 'local',
@@ -35,6 +38,7 @@ export class SetupService {
       appUrl: process.env.APP_URL ?? '',
       isFirstRun,
       envKeys,
+      kindleFromEmail: kindleFrom || fromAddress || '',
     };
   }
 

@@ -60,8 +60,8 @@
       <ul>
         <li>A <a href="https://github.com" target="_blank">GitHub account</a> with the AECMS repository forked to your account</li>
         <li>A <a href="https://railway.app" target="_blank">Railway account</a> (sign up with GitHub — free)</li>
-        <li>A file storage provider if you want cloud storage: <a href="https://www.cloudflare.com/developer-platform/r2/" target="_blank">Cloudflare R2</a> (10 GB free) is recommended</li>
-        <li>An SMTP provider: <a href="https://resend.com" target="_blank">Resend</a> (3,000 emails/month free) is recommended</li>
+        <li>A file storage provider if you want cloud storage: <a href="https://www.cloudflare.com/developer-platform/r2/" target="_blank">Cloudflare R2</a> (10 GB free) is recommended — or start with local storage and switch later</li>
+        <li>An SMTP provider (optional at launch): <a href="https://resend.com" target="_blank">Resend</a> (3,000 emails/month free) is recommended — configure in Admin Settings → Email after install</li>
       </ul>
 
       <h2>Step 1 — Fork the Repository</h2>
@@ -110,7 +110,7 @@ SETTINGS_ENCRYPTION_KEY=YOUR_32_BYTE_HEX_KEY
 JWT_EXPIRATION=15m
 REFRESH_TOKEN_EXPIRATION=7d
 SETTINGS_KMS_PROVIDER=local
-EMAIL_PROVIDER_TYPE=smtp
+# Email — configure in Admin Settings → Email after launch
 
 # Set to your Railway app URL for now; update to your custom domain later
 APP_URL=https://YOUR-APP.up.railway.app

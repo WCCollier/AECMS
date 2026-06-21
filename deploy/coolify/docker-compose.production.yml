@@ -87,7 +87,6 @@ services:
       BACKEND_URL: http://backend:4000
       NEXT_PUBLIC_API_URL: https://${APP_DOMAIN}
       NEXT_PUBLIC_BASE_DOMAIN: ${APP_DOMAIN}
-      NEXT_PUBLIC_KINDLE_SENDER_EMAIL: ${KINDLE_FROM_EMAIL:-}
     ports:
       - '3000'
 
