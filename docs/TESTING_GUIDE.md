@@ -1,8 +1,8 @@
 # AECMS Comprehensive Testing Guide
 
-**Version**: 2.5  
-**Last Updated**: 2026-06-18  
-**Status**: Phases 14–20 complete — digital delivery, settings UI, dynamic nav, alternate domain redirects, RSS feed widget, and themes all verified; Digital Library panel on account page; two security bugs fixed (capability info disclosure, appearance endpoint auth)
+**Version**: 2.6  
+**Last Updated**: 2026-06-21  
+**Status**: Phases 14–20 verified. Phase 23 Part 1 built, awaiting testbed QA. Phase 26 deployed to FvR, awaiting live verification.
 
 ---
 
@@ -53,7 +53,9 @@ cd /workspaces/AECMS/frontend && npm run test    # 125 frontend unit tests
 20. [Alternate Domain Redirect Testing](#alternate-domain-redirect-testing-phase-17)
 21. [RSS Feed Widget Testing](#rss-feed-widget-testing-phase-18)
 22. [Themes & Appearance Testing](#themes--appearance-testing-phase-20)
-23. [Production Checklist](#production-checklist)
+23. [Section Page Editor Testing (Phase 23)](#section-page-editor-testing-phase-23)
+24. [SEO Toolkit Testing (Phase 26)](#seo-toolkit-testing-phase-26)
+25. [Production Checklist](#production-checklist)
 
 ---
 
@@ -1921,6 +1923,183 @@ curl -s -X PATCH http://localhost:4000/settings/appearance \
 
 ---
 
+## Section Page Editor Testing (Phase 23)
+
+**Branch**: `feature/phase-23` (not yet merged to main)  
+**Test environment**: Local dev server — `bash start-dev.sh` then open `http://localhost:3000`  
+**Prerequisite**: Log in to backstage as Owner at `http://localhost:3000/admin/login`
+
+Phase 23 Part 1 introduces a new `type: 'sections'` page content schema alongside the existing flat zone model, a `SectionsPageEditor` UI with per-section backgrounds and column spans, a `SectionsLayout` renderer for the customer-facing side, and a lossless "Upgrade to Section Layout" action for existing pages. The legacy zone editor continues to work unchanged for pages that have not been upgraded.
+
+### A — New page defaults to section layout
+
+1. Go to **Admin → Pages → New Page**
+2. Enter a title and save
+3. **Expected**: The editor opens in section mode, not legacy zone mode. The "Section Layout" badge is visible; no legacy layout buttons are shown.
+4. Confirm the default is a single Full Width section with one empty zone
+
+### B — Section editor controls
+
+With a new section-layout page open:
+
+1. **Add a section** — click the "Add Section" button. A new section appears below.
+2. **Template picker** — click the template button on a section header. Options should include: Full Width (1 col), Two Column (1+1), Feature Left (2+1), Feature Right (1+2), Feature Centre (1+2+1), Three Column (1+1+1).
+3. **Column span drag** — on a multi-column template, hover between zones to reveal the gutter drag handle. Drag left/right. Confirm the span diagram updates (e.g. 1+2 → 2+1).
+4. **Section background** — open the background flyout on a section. Set a solid colour. Confirm the section preview reflects it.
+5. **Height selector** — set a minimum height (e.g. 400px). Save and preview — section should be at least that tall.
+6. **Section reorder** — with two or more sections, drag the handle on a section header to reorder. Confirm order persists after save.
+7. **Add content to a zone** — open a TipTap editor in one zone. Add text, an image, a heading. Save.
+
+### C — Customer-facing render
+
+1. Publish the page (set status → Published)
+2. Navigate to the page URL on the customer-facing site
+3. **Expected**: Sections render as a vertical stack; each section uses CSS grid matching its column count; zone content is rendered correctly; background colour is applied; minimum height is respected.
+4. Check a two-column section — left and right zones should sit side by side at desktop width.
+
+### D — Legacy pages unchanged
+
+1. Open an existing page that was created before Phase 23 (any seeded page will do)
+2. **Expected**: The legacy flat zone editor appears, not the section editor. The "Upgrade to Section Layout" button is visible at the bottom of the layout selector.
+3. Edit zone content and save — confirm it still works normally.
+4. Navigate to the page on the customer-facing side — confirms it still renders via the legacy path.
+
+### E — "Upgrade to Section Layout" action
+
+1. On a legacy page, click **Upgrade to Section Layout**
+2. A confirm dialog appears — accept
+3. **Expected**: The editor switches to section mode. The content from the main/left zone is preserved in the first section's zone. No content is lost.
+4. Save and verify the customer-facing render uses the new section layout.
+5. Open version history — confirm a version was saved before the upgrade.
+
+### F — Backend span validation
+
+1. Using curl or Insomnia, send a `PATCH /pages/:id` with a `content` body where zone spans don't sum to the section's column count (e.g. two zones with span 2 each in a 3-column section).
+2. **Expected**: 400 Bad Request with a message about span validation.
+
+### Phase 23 acceptance criteria
+
+- [ ] New pages default to section layout
+- [ ] Template picker offers all 6 templates; span diagram updates live
+- [ ] Gutter drag changes column spans and persists on save
+- [ ] Section background colour applies on both editor and customer-facing render
+- [ ] Section reorder via drag-and-drop persists
+- [ ] Zone content (TipTap) saves and renders correctly in section layout
+- [ ] Legacy pages open in legacy editor with no regressions
+- [ ] "Upgrade to Section Layout" converts losslessly
+- [ ] Version history captures state before upgrade
+- [ ] Backend rejects invalid span sums with 400
+
+---
+
+## SEO Toolkit Testing (Phase 26)
+
+**Branch**: `main` (deployed to live FvR site)  
+**Test environment**: Live site at `https://fantasyvreality.com` — and local if preferred  
+**Prerequisite**: Owner backstage session
+
+Phase 26 adds `generateMetadata()` + Open Graph tags to all site routes, JSON-LD structured data (Book, Article, Person, WebSite, BreadcrumbList), a dynamic `/sitemap.xml`, `/robots.txt`, an SEO settings tab, per-content SEO panels with snippet preview, and a Book Details panel on products.
+
+### A — Sitemap and robots.txt
+
+1. Visit `https://fantasyvreality.com/sitemap.xml`
+   - **Expected**: Valid XML sitemap listing published articles, products, and pages. Each entry has `<loc>`, `<lastmod>`, and `<priority>`.
+   - Verify the homepage, `/articles`, and `/shop` are present.
+   - Verify unpublished or admin-only content is absent.
+2. Visit `https://fantasyvreality.com/robots.txt`
+   - **Expected**: `Disallow: /admin`, `Disallow: /api`, `Disallow: /checkout`. Sitemap URL present.
+
+### B — Page metadata (view source)
+
+1. Open any published article page. View source (`Ctrl+U` / `Cmd+U`).
+   - **Expected**: `<title>` matches the article title (or meta_title if set)
+   - `<meta name="description">` is present
+   - `og:title`, `og:description`, `og:image`, `og:type` (should be `article`), `og:site_name` are all present
+   - `twitter:card` is `summary_large_image`
+   - `<link rel="canonical">` points to the correct URL
+2. Repeat for a product page and a custom page — confirm `og:type` is `website` on those.
+
+### C — JSON-LD structured data
+
+1. On an article page, view source and search for `application/ld+json`.
+   - **Expected**: A `BlogPosting` block with `headline`, `datePublished`, `author`, `publisher`, and `mainEntityOfPage`.
+   - A `BreadcrumbList` block with Home → Articles → article title.
+2. On the homepage, view source.
+   - **Expected**: A `WebSite` block with `name`, `url`, and `potentialAction` (search). If SEO settings have `author_name` set, a `Person` block is also present.
+3. Validate a page using [Google Rich Results Test](https://search.google.com/test/rich-results) — enter the article URL. Should show a valid Article result with no errors.
+
+### D — Admin Settings → SEO tab
+
+1. Go to **Admin → Settings → SEO**
+   - **Expected**: New SEO tab is present alongside General / Site Identity / Email / Payment / Storage
+2. Fill in:
+   - Site Name: `Fantasy V Reality`
+   - Site Description: a short sentence
+   - Author Name: `W. C. Collier`
+   - Author Page URL: `https://fantasyvreality.com`
+   - Canonical Domain: `https://fantasyvreality.com`
+3. Click **Save Changes**
+4. Reload the homepage and check view source — `og:site_name` and the `WebSite` JSON-LD `name` should reflect the saved site name.
+
+### E — SEO panel on article edit form
+
+1. Open any article in **Admin → Articles → [article] → Edit**
+2. Scroll to the **SEO** card in the sidebar
+   - **Expected**: Google snippet preview is visible, showing resolved fallbacks (article title, excerpt)
+   - Meta Title and Meta Description have character counters (60 and 160 respectively)
+   - Counter turns red if limit is exceeded
+   - OG Image URL field is present
+3. Enter a custom Meta Title (different from the article title). Save.
+4. Visit the article page and view source — `<title>` and `og:title` should use the custom value.
+5. Clear the Meta Title and save — title reverts to the article title.
+
+### F — SEO panel on page edit form
+
+1. Open any custom page in **Admin → Pages → [page] → Edit**
+2. Scroll to the **SEO** section at the bottom (below the zone editor)
+   - **Expected**: Snippet preview, Meta Title (with counter), Meta Description (with counter), OG Image URL
+3. Enter a meta description and save. Verify in page source.
+
+### G — Book Details panel on product edit form
+
+1. Go to **Admin → Products → New Product** (or open an existing one)
+2. Scroll to the **Book Details** card in the sidebar
+   - **Expected**: Fields for ISBN, Format (dropdown), Page Count, Publisher, Amazon URL, Goodreads URL
+3. Fill in:
+   - Format: `EBook`
+   - ISBN: `9781647198855`
+   - Amazon URL: the Outsiders Vol. I Amazon listing URL
+4. Save the product.
+5. Visit the product page and view source — search for `application/ld+json`.
+   - **Expected**: A `Book` block with `@type: "Book"`, `isbn`, `bookFormat: "https://schema.org/EBook"`, `sameAs` pointing to the Amazon URL, and an `offers` block with price.
+6. Run the product URL through Google Rich Results Test — should show a valid result.
+
+### H — Fallback chain verification
+
+1. Create a product with no meta_title, no og_image_url, and no cover image. Visit the product page.
+   - **Expected**: `og:image` falls back to `seo.og_default_image` from settings (if set), otherwise omitted.
+2. Set a cover image on the product (via the Images panel). Visit again.
+   - **Expected**: `og:image` now uses the product cover image.
+3. Set an explicit `og_image_url` override in the SEO panel. Visit again.
+   - **Expected**: `og_image_url` takes priority over the cover image.
+
+### Phase 26 acceptance criteria
+
+- [ ] `/sitemap.xml` lists all published articles, products, and non-admin pages
+- [ ] `/robots.txt` disallows `/admin`, `/api`, `/checkout`
+- [ ] All site pages have `<title>`, `<meta name="description">`, full OG tags, `<link rel="canonical">`
+- [ ] Article pages emit valid `BlogPosting` + `BreadcrumbList` JSON-LD
+- [ ] Product pages with ISBN/format emit valid `Book` JSON-LD with `sameAs`
+- [ ] Service products emit `Service` JSON-LD
+- [ ] Homepage emits `WebSite` JSON-LD; `Person` JSON-LD when author name is set in SEO settings
+- [ ] Google Rich Results Test passes on article and book product pages
+- [ ] Admin Settings → SEO tab saves and the values appear in rendered metadata
+- [ ] SEO panel on articles/products/pages has snippet preview, character counters, OG image override
+- [ ] Book Details panel saves ISBN, format, page count, publisher, Amazon URL, Goodreads URL
+- [ ] Meta title/description fallback chain works: explicit override → content fields → site defaults
+
+---
+
 ## Quick Reference: API Endpoints (135 total)
 
 | Module | Endpoints | Backstage Required |
@@ -1947,4 +2126,4 @@ curl -s -X PATCH http://localhost:4000/settings/appearance \
 
 ---
 
-*Updated for AECMS Phases 14–20 — 2026-06-18*
+*Updated for AECMS Phases 14–20, 23, 26 — 2026-06-21*
