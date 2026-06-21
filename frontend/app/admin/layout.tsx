@@ -17,6 +17,7 @@ import {
   ClipboardList,
   Paintbrush,
   Images,
+  Users,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import adminApi from '@/lib/adminApi';
@@ -44,6 +45,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; required
   { href: '/admin/pages', label: 'Pages', icon: LayoutTemplate },
   { href: '/admin/media', label: 'Media', icon: Images, requiredCap: 'media.upload' },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { href: '/admin/users', label: 'Users', icon: Users, requiredCap: 'user.assign_role' },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, requiredCap: 'system.view_audit' },
   { href: '/admin/domains', label: 'Domains', icon: Globe, requiredCap: 'domain.manage' },
   { href: '/admin/settings/appearance', label: 'Appearance', icon: Paintbrush, requiredCap: 'system.appearance' },

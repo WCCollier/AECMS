@@ -775,4 +775,62 @@ export class AuthService {
         throw new Error(`Unsupported duration unit: ${unit}`);
     }
   }
+
+  // ── User Management (Owner-only) ──────────────────────────────────────────
+
+  async listUsers(page: number, limit: number, search?: string) {
+    const where: Record<string, unknown> = { deleted_at: null };
+    if (search) {
+      where.OR = [
+        { email: { contains: search, mode: 'insensitive' } },
+        { username: { contains: search, mode: 'insensitive' } },
+        { first_name: { contains: search, mode: 'insensitive' } },
+        { last_name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          first_name: true,
+          last_name: true,
+          role: true,
+          email_verified: true,
+          created_at: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return { data: users, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
+  async updateUserRole(actorId: string, targetId: string, newRole: UserRole): Promise<{ message: string }> {
+    if (actorId === targetId) {
+      throw new ForbiddenException('Cannot change your own role');
+    }
+
+    const target = await this.prisma.user.findFirst({
+      where: { id: targetId, deleted_at: null },
+    });
+    if (!target) throw new NotFoundException('User not found');
+
+    const oldRole = target.role;
+    await this.prisma.user.update({ where: { id: targetId }, data: { role: newRole } });
+
+    await this.auditLog.log({
+      event_type: 'user.role_changed',
+      user_id: actorId,
+      metadata: { target_id: targetId, target_email: target.email, from: oldRole, to: newRole },
+    });
+
+    return { message: `Role changed from ${oldRole} to ${newRole}` };
+  }
 }
