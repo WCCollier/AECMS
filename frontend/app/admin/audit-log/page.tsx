@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { AuditLogClient } from './AuditLogClient';
 
 export const metadata = { title: 'Audit Log — Admin' };

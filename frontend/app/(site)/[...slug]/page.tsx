@@ -18,9 +18,9 @@ async function getPageByPath(segments: string[]): Promise<Page | null> {
   }
 }
 
-export default async function DynamicPage({ params }: { params: { slug: string[] } }) {
-  const segments = params.slug ?? [];
-  const page = await getPageByPath(segments);
+export default async function DynamicPage({ params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params;
+  const page = await getPageByPath(slug ?? []);
 
   if (!page || page.status !== 'published' || page.visibility === 'admin_only') {
     notFound();

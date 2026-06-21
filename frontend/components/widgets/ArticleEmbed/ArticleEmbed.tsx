@@ -36,7 +36,7 @@ function TitleEl({
   titleAlign: TitleAttrs['titleAlign'];
   className?: string;
 }) {
-  const Tag = (level === 'body' ? 'p' : level) as keyof JSX.IntrinsicElements;
+  const Tag = (level === 'body' ? 'p' : level) as keyof React.JSX.IntrinsicElements;
   const sizeClass  = LEVEL_CLASSES[level];
   const caseClass  = titleCase === 'uppercase' ? 'uppercase' : '';
   const alignClass = titleAlign === 'center' ? 'text-center' : titleAlign === 'right' ? 'text-right' : '';

@@ -2,6 +2,7 @@ import { PreviewPageClient } from './PreviewPageClient';
 
 export const dynamic = 'force-dynamic';
 
-export default function PreviewPage({ params }: { params: { id: string } }) {
-  return <PreviewPageClient pageId={params.id} />;
+export default async function PreviewPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  return <PreviewPageClient pageId={id} />;
 }

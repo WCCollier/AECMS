@@ -646,9 +646,53 @@ H therefore reduces to two items: bucket automation (H.2) and the storage test-p
 
 ---
 
+## Item K — Next.js Security Upgrade (14.0.4 → 15.3.9) ✅
+
+**Priority**: High — 14 published CVEs (DoS, request smuggling, cache poisoning, XSS)  
+**Discovered**: 2026-06-21, via GitHub Actions npm audit warning during deploy
+
+### Problem
+
+`next@14.0.4` carries 14 published CVEs. npm audit's `fixAvailable` points to `16.2.9` but that version has an unfixed `/_global-error` prerender bug (`useContext null` in `__next_viewport_boundary__`). `15.3.9` resolves most CVEs, is stable, and works with React 18.
+
+### Changes
+
+- Upgraded `next` from `14.0.4` → `15.3.9`
+- Migrated `next.config.mjs`: removed deprecated `eslint` block, removed `webpack()` chunk-split function (Turbopack handles it), added `turbopack: {}`, added `Viewport` export to root layout
+- Async params migration: `app/(site)/[...slug]/page.tsx`, `app/admin/pages/[id]/edit/page.tsx`, `app/admin/pages/[id]/preview/page.tsx`
+- Added `export const dynamic = 'force-dynamic'` to all pages that use dynamic client APIs without it
+- Refactored `'use client'` pages that failed Next.js 15 prerender to server component wrappers:
+  - `app/setup/page.tsx` → thin server wrapper; wizard content moved to `SetupWizard.tsx`
+  - `app/admin/orders/[id]/page.tsx` → server wrapper; logic moved to `AdminOrderDetailClient.tsx`
+  - `app/admin/maintenance/migrate-content/page.tsx` → direct server wrapper rendering client component
+- Restored `pages/_document.tsx` and `pages/_error.tsx` (still required by Next.js 15 for Pages Router 404 fallback)
+- `app/global-error.tsx`: added `<head>` with charset/viewport/title (required in Next.js 15+)
+- `JSX.IntrinsicElements` → `React.JSX.IntrinsicElements` in `ArticleEmbed.tsx` and `ProductEmbed.tsx` (namespace moved in newer @types/react)
+- Added `export const dynamic = 'force-dynamic'` to checkout cancel and success pages
+
+**Note**: Next.js 16 upgrade deferred — `16.2.9` has an unfixed prerender bug in `/_global-error` with Turbopack + React 19. Plan as a separate phase once `16.3.x` stabilizes.
+
+---
+
+## Item L — GCS Bucket Creation Permission for github-ci SA ✅
+
+**Priority**: Medium — H.2-A bucket automation was silently failing on every deploy  
+**Discovered**: 2026-06-21, via GitHub Actions log audit
+
+### Problem
+
+The `github-ci` service account was not granted `roles/storage.admin`. The H.2-A idempotent bucket creation step (`gcloud storage buckets create ...`) in `deploy.yml` was throwing 403 errors on every deploy. Buckets already existed for FvR so the deploy succeeded, but the step was meaningless noise, and a new owner's first deploy would fail.
+
+### Changes
+
+- Granted `roles/storage.admin` to `github-ci@fantasyvreality.iam.gserviceaccount.com` on the FvR GCP project (immediate fix)
+- Added `roles/storage.admin` to the CI SA role list in `backend/scripts/gcp-setup.sh` so new owners who run the setup script get the correct permissions automatically
+
+---
+
 ## Adding New Items
 
-As live testing surfaces additional new issues, append them here as **Item K**, **Item L**, etc. following the same format:
+As live testing surfaces additional new issues, append them here as **Item M**, **Item N**, etc. following the same format:
 - Problem description
 - Risk / urgency
 - Concrete fix steps
