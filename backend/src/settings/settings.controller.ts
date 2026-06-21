@@ -144,6 +144,13 @@ export class SettingsController {
     return this.testEmailService.send(req.user.email);
   }
 
+  @Post('test-email-preview')
+  @RequiresCapability('system.configure.email')
+  @ApiOperation({ summary: 'Send a test email using config values from the request body (not saved config)' })
+  async testEmailPreview(@Body() body: Record<string, string>, @Request() req: any) {
+    return this.testEmailService.sendWithConfig(req.user.email, body);
+  }
+
   // ── Payment Providers ──────────────────────────────────────────────────────
 
   @Patch('payments')

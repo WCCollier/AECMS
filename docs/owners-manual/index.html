@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="index.html">
+        <div class="product">AECMS</div>
+        <div class="title">Owner's Manual</div>
+      </a>
+    </div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html" class="active">Overview</a>
+        <a href="ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Running Your Site</div>
+        <a href="ch05-admin-settings.html">Ch 5 — Admin Settings</a>
+        <a href="ch06-going-live.html">Ch 6 — Going Live</a>
+        <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="ch02-platform-setup/railway.html">Railway</a>
+        <a href="ch02-platform-setup/coolify.html">Coolify + VPS</a>
+        <a href="ch02-platform-setup/cloud-run.html">Google Cloud Run</a>
+        <a href="ch02-platform-setup/render.html">Render</a>
+        <a href="ch02-platform-setup/fly.html">Fly.io</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Reference</div>
+        <a href="../PHASE_22_PLAN.md">Phase 22 Plan</a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main">
+    <div class="content">
+
+      <div class="hero">
+        <h1>AECMS Owner's Manual</h1>
+        <p>Everything you need to deploy, configure, and run your own CMS and online store — from choosing a host to publishing your first article.</p>
+      </div>
+
+      <h2>What is AECMS?</h2>
+      <p>AECMS (Advanced Ecommerce Content Management System) is a self-hosted CMS and ecommerce platform. You own the code, the database, and the data. There is no monthly SaaS subscription — you pay only for the hosting services you choose.</p>
+      <p>It is designed for personal websites and small online stores with low to moderate traffic. It runs in Docker containers, so it can be deployed to almost any hosting provider.</p>
+
+      <h2>How This Manual Is Organized</h2>
+      <p>Setup happens in four stages. Each stage has its own chapter.</p>
+
+      <div class="platform-grid">
+        <a href="ch01-infrastructure.html" class="platform-card">
+          <div class="name">1 — Choose Infrastructure</div>
+          <div class="desc">Pick a hosting platform, database, file storage provider, and email service before you install anything.</div>
+        </a>
+        <a href="ch02-platform-setup/index.html" class="platform-card">
+          <div class="name">2 — Platform Setup</div>
+          <div class="desc">Step-by-step instructions for your chosen host: Railway, Coolify, Cloud Run, Render, or Fly.io.</div>
+        </a>
+        <a href="ch03-aecms-config.html" class="platform-card">
+          <div class="name">3 — Configure AECMS</div>
+          <div class="desc">Set the environment variables that tell AECMS which services to use before you deploy.</div>
+        </a>
+        <a href="ch04-first-launch.html" class="platform-card">
+          <div class="name">4 — First Launch</div>
+          <div class="desc">Run the setup wizard, confirm your storage and email connections, and connect your domain.</div>
+        </a>
+      </div>
+
+      <h2>Quick-Start Paths</h2>
+      <p>Not sure where to begin? Pick the path that matches your situation:</p>
+
+      <h3>I want the cheapest possible option</h3>
+      <p>→ <a href="ch02-platform-setup/coolify.html"><strong>Coolify on a $5/month VPS</strong></a>. Coolify is free software that runs on a virtual server you rent from Hetzner, DigitalOcean, or Linode. You get PostgreSQL, Redis, and file storage all on the same server. Total cost: ~$5–6/month.</p>
+
+      <h3>I want the easiest possible setup with no command line</h3>
+      <p>→ <a href="ch02-platform-setup/railway.html"><strong>Railway</strong></a>. Connect your GitHub account, import the repo, and Railway handles builds, database, Redis, and deployments entirely through a web UI. Starting at $5/month for a hobby plan.</p>
+
+      <h3>I want production-grade infrastructure that can scale</h3>
+      <p>→ <a href="ch02-platform-setup/cloud-run.html"><strong>Google Cloud Run</strong></a>. Containerized, serverless, auto-scaling. PostgreSQL via Cloud SQL, Redis via Upstash, files on Google Cloud Storage. More setup steps, but the most robust option. ~$10–12/month at low traffic.</p>
+
+      <h2>What You Will Need</h2>
+      <ul>
+        <li>A GitHub account (to fork the repository)</li>
+        <li>An account on your chosen hosting platform</li>
+        <li>A domain name (optional for testing, required for a live site)</li>
+        <li>Approximately 1–2 hours for a first-time install</li>
+      </ul>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ No programming required</div>
+        <p>You do not need to write any code to install AECMS. You will copy-paste some configuration values and click buttons in web dashboards. The platform guides in Chapter 2 walk through every step.</p>
+      </div>
+
+      <h2>Before You Start</h2>
+      <p>Read <a href="ch01-infrastructure.html">Chapter 1</a> before doing anything else. It will help you decide which hosting platform and supporting services to use. Making these decisions upfront takes 10 minutes and saves you from having to redo the install.</p>
+
+      <p style="margin-top: 2rem;">
+        <a href="ch01-infrastructure.html" style="display: inline-block; background: #2563eb; color: #fff; padding: 0.6rem 1.25rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.95rem;">Start with Chapter 1 →</a>
+      </p>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

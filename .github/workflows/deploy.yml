@@ -1,13 +1,27 @@
 name: Deploy to Cloud Run
 
+# ── Required GitHub Variables (Settings → Variables → Repository variables) ──
+#
+#   GCP_PROJECT_NUMBER   Numeric GCP project ID   e.g. 983307563767
+#   GCP_PROJECT_ID       Text GCP project ID       e.g. my-project
+#   APP_DOMAIN           Your domain (no https://) e.g. myblog.com
+#   GCS_MEDIA_BUCKET     Public media bucket name  e.g. my-project-media
+#   GCS_DIGITAL_BUCKET   Private digital bucket    e.g. my-project-digital
+#
+# Optional variables (defaults shown):
+#   SETTINGS_KMS_SECRET_ID   Secret Manager ID for SEK   default: aecms-sek
+# Required GitHub Secret:
+#   GCP_SA_KEY   Service account JSON key with Cloud Run, Artifact Registry,
+#                Cloud SQL, and Secret Manager access
+
 on:
   push:
     branches: [deploy]
   workflow_dispatch:
 
 env:
-  GCP_PROJECT: "983307563767"
-  GCP_PROJECT_ID: "fantasyvreality"
+  GCP_PROJECT: ${{ vars.GCP_PROJECT_NUMBER }}
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
   REGION: us-central1
   REGISTRY: us-central1-docker.pkg.dev
 
@@ -17,12 +31,12 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4.4.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: |
             backend/package-lock.json
@@ -43,20 +57,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
 
       - name: Authenticate with GCP
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v2.1.8
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v2.1.4
         with:
           project_id: ${{ env.GCP_PROJECT }}
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      # ── Provision GCS buckets (idempotent — safe to run on every deploy) ──
+
+      - name: Create GCS buckets if they don't exist
+        run: |
+          MEDIA_BUCKET="${{ vars.GCS_MEDIA_BUCKET }}"
+          DIGITAL_BUCKET="${{ vars.GCS_DIGITAL_BUCKET }}"
+          PROJECT="${{ vars.GCP_PROJECT_ID }}"
+          REGION="${{ env.REGION }}"
+
+          # Create media bucket (public) — ignore "already exists" error
+          if gcloud storage buckets create "gs://${MEDIA_BUCKET}" \
+              --project="${PROJECT}" \
+              --location="${REGION}" \
+              --uniform-bucket-level-access 2>&1 | grep -v "already exists"; then
+            echo "Created media bucket: ${MEDIA_BUCKET}"
+            # Allow public read on media bucket
+            gcloud storage buckets add-iam-policy-binding "gs://${MEDIA_BUCKET}" \
+              --member=allUsers \
+              --role=roles/storage.objectViewer || echo "IAM binding already set"
+          else
+            echo "Media bucket already exists: ${MEDIA_BUCKET}"
+          fi
+
+          # Create digital bucket (private — no public access)
+          if gcloud storage buckets create "gs://${DIGITAL_BUCKET}" \
+              --project="${PROJECT}" \
+              --location="${REGION}" \
+              --uniform-bucket-level-access 2>&1 | grep -v "already exists"; then
+            echo "Created digital bucket: ${DIGITAL_BUCKET}"
+          else
+            echo "Digital bucket already exists: ${DIGITAL_BUCKET}"
+          fi
 
       # ── Build images ───────────────────────────────────────────────────────
 
@@ -76,9 +123,9 @@ jobs:
             --region ${{ env.REGION }} \
             --project ${{ env.GCP_PROJECT }} \
             --service-account "aecms-backend@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
-            --add-cloudsql-instances "${{ env.GCP_PROJECT }}:${{ env.REGION }}:aecms-db" \
+            --add-cloudsql-instances "${{ env.GCP_PROJECT_ID }}:${{ env.REGION }}:aecms-db" \
             --set-secrets "DATABASE_URL=aecms-database-url:latest,JWT_SECRET=aecms-jwt-secret:latest,REDIS_URL=aecms-redis-url:latest" \
-            --set-env-vars "NODE_ENV=production,SETTINGS_KMS_PROVIDER=gcp,GCP_PROJECT_ID=${{ env.GCP_PROJECT }},SETTINGS_KMS_SECRET_ID=aecms-sek,STORAGE_PROVIDER_TYPE=gcs,APP_URL=https://fantasyvreality.com,FRONTEND_URL=https://fantasyvreality.com,API_URL=https://fantasyvreality.com,FRONTEND_ADMIN_URL=https://fantasyvreality.com/admin,EMAIL_PROVIDER_TYPE=smtp,JWT_EXPIRATION=15m,REFRESH_TOKEN_EXPIRATION=7d" \
+            --set-env-vars "NODE_ENV=production,SETTINGS_KMS_PROVIDER=gcp,GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }},SETTINGS_KMS_SECRET_ID=${{ vars.SETTINGS_KMS_SECRET_ID || 'aecms-sek' }},STORAGE_PROVIDER_TYPE=gcs,GCS_BUCKET_MEDIA=${{ vars.GCS_MEDIA_BUCKET }},GCS_BUCKET_DIGITAL=${{ vars.GCS_DIGITAL_BUCKET }},APP_URL=https://${{ vars.APP_DOMAIN }},FRONTEND_URL=https://${{ vars.APP_DOMAIN }},API_URL=https://${{ vars.APP_DOMAIN }},FRONTEND_ADMIN_URL=https://${{ vars.APP_DOMAIN }}/admin,EMAIL_PROVIDER_TYPE=smtp,JWT_EXPIRATION=15m,REFRESH_TOKEN_EXPIRATION=7d" \
             --platform managed \
             --allow-unauthenticated \
             --min-instances 0 \
@@ -119,7 +166,7 @@ jobs:
             --image "${{ env.REGISTRY }}/${{ env.GCP_PROJECT }}/aecms/frontend:${{ github.sha }}" \
             --region ${{ env.REGION }} \
             --project ${{ env.GCP_PROJECT }} \
-            --set-env-vars "NODE_ENV=production,BACKEND_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_API_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_BASE_DOMAIN=fantasyvreality.com,NEXT_PUBLIC_KINDLE_SENDER_EMAIL=moriakul@gmail.com" \
+            --set-env-vars "NODE_ENV=production,BACKEND_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_API_URL=${{ steps.backend.outputs.url }},NEXT_PUBLIC_BASE_DOMAIN=${{ vars.APP_DOMAIN }}" \
             --platform managed \
             --allow-unauthenticated \
             --min-instances 0 \
@@ -137,3 +184,4 @@ jobs:
             --format 'value(status.url)')
           echo "Backend:  ${{ steps.backend.outputs.url }}"
           echo "Frontend: $FRONTEND_URL"
+          echo "Site:     https://${{ vars.APP_DOMAIN }}"

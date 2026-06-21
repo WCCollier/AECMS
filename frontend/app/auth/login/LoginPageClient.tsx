@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
+import { Button, Input, PasswordInput, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 
 export function LoginPageClient() {
   const router = useRouter();
@@ -71,9 +71,8 @@ export function LoginPageClient() {
               autoComplete="email"
             />
 
-            <Input
+            <PasswordInput
               label="Password"
-              type="password"
               name="password"
               placeholder="Enter your password"
               value={formData.password}

@@ -43,6 +43,8 @@
 **Phase 20**: ✅ COMPLETE - Themes and templates: 8 curated palettes, 5 font pairings, CSS variable injection in root layout, /admin/settings/appearance backstage UI (2026-06-17)
 **Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
 **Phase 21**: 🚧 IN PROGRESS - Deployability + first live deployment (merged with Phase 19): SEED_PROFILE system, setup wizard, GcpKeyProvider, Dockerfiles, GitHub Actions CI/CD, Cloud Run, FvR content migration
+**Phase 22**: ✅ COMPLETE - Dependency upgrades & live-testing fixes: Items A–G, I (2026-06-20); Item J (new owner experience: platform config helpers, deploy.yml parameterization, GET /setup/profile, wizard context-aware success, settings panel env-sourced badges, Owner's Manual HTML site, deploy/ platform files) + H.2-A/H.4 (GCS bucket automation in workflow, test-storage-preview endpoint) (2026-06-21)
+**Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
 
 **Session 2026-06-18 improvements** (not phase-tracked):
 - TipTap link insertion modal (Pages/Articles/Products/URL tabs, new-tab toggle, inline search)
@@ -273,6 +275,7 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_19_PLAN.md` - ♻️ Merged into Phase 21 (redirect doc)
 - `docs/PHASE_20_PLAN.md` - Themes and templates: color palettes, typography, backgrounds
 - `docs/PHASE_21_PLAN.md` - ⭐ CURRENT PHASE: Deployability + FvR live deployment (merged 19+21)
+- `docs/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
 - `docs/prd/` - 12 PRD documents with full specifications
 
 ## Notes for Claude
@@ -285,6 +288,7 @@ rm -rf backend/dist frontend/.next
 - Run tests after changes: `npm run test && npm run build`
 - Commit incrementally with descriptive messages
 - **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
+- **IMPORTANT**: During theoretical or design discussions (architecture choices, platform comparisons, technology options, ecosystem questions), always use the WebSearch tool to verify information is current before answering. Don't rely solely on training data for fast-moving topics like hosting pricing, library versions, or ecosystem trends.
 
 ## Internal Secrets Manager (ISM)
 

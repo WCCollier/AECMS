@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
 import type { EmailProvider } from '../email/email.interface';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 import { SettingsService } from './settings.service';
@@ -33,6 +34,48 @@ export class TestEmailService {
       }
     } catch (err: any) {
       this.logger.error('Test email failed', err);
+      return { success: false, message: err?.message ?? 'Unknown error' };
+    }
+  }
+
+  // Send a test email using config values from the request body (not saved ISM config).
+  // Builds a temporary transporter so the user can test before saving.
+  async sendWithConfig(
+    recipientEmail: string,
+    config: Record<string, string>,
+  ): Promise<{ success: boolean; message: string }> {
+    const host = config['email.smtp_host'] || config['smtp_host'];
+    if (!host) {
+      return { success: false, message: 'SMTP host is required' };
+    }
+
+    const port    = parseInt(config['email.smtp_port'] || config['smtp_port'] || '587', 10);
+    const secure  = (config['email.smtp_security'] || config['smtp_security']) === 'ssl';
+    const user    = config['email.smtp_user'] || config['smtp_user'];
+    const pass    = config['email.smtp_pass_enc'] || config['smtp_pass'];
+    const from    = config['email.from_address'] || config['from_address'] || 'noreply@aecms.local';
+    const fromName = config['email.from_name'] || config['from_name'] || 'AECMS';
+
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: user && pass ? { user, pass } : undefined,
+      });
+
+      const result = await transporter.sendMail({
+        from: `${fromName} <${from}>`,
+        to: recipientEmail,
+        subject: `SMTP test from AECMS`,
+        text: `SMTP is configured correctly. Host: ${host}:${port}`,
+        html: `<p>SMTP is configured correctly.</p><p>Host: <strong>${host}:${port}</strong></p>`,
+      });
+
+      this.logger.log(`Preview test email sent: ${result.messageId}`);
+      return { success: true, message: `Test email sent to ${recipientEmail}` };
+    } catch (err: any) {
+      this.logger.error('Preview test email failed', err);
       return { success: false, message: err?.message ?? 'Unknown error' };
     }
   }

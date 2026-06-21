@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 1 — Choose Your Infrastructure | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="index.html">
+        <div class="product">AECMS</div>
+        <div class="title">Owner's Manual</div>
+      </a>
+    </div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html">Overview</a>
+        <a href="ch01-infrastructure.html" class="active">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Running Your Site</div>
+        <a href="ch05-admin-settings.html">Ch 5 — Admin Settings</a>
+        <a href="ch06-going-live.html">Ch 6 — Going Live</a>
+        <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="ch02-platform-setup/railway.html">Railway</a>
+        <a href="ch02-platform-setup/coolify.html">Coolify + VPS</a>
+        <a href="ch02-platform-setup/cloud-run.html">Google Cloud Run</a>
+        <a href="ch02-platform-setup/render.html">Render</a>
+        <a href="ch02-platform-setup/fly.html">Fly.io</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+
+      <div class="breadcrumb">
+        <a href="index.html">Owner's Manual</a>
+        <span>›</span>
+        Chapter 1
+      </div>
+
+      <div class="page-header">
+        <h1>Chapter 1 — Choose Your Infrastructure</h1>
+        <p class="subtitle">Four decisions to make before you install anything.</p>
+        <p class="meta">Read time: ~10 minutes</p>
+      </div>
+
+      <p>AECMS needs four types of services to run. You can mix and match providers freely. This chapter explains each one and recommends the best option for a low-traffic personal site on a budget.</p>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ Make these decisions now</div>
+        <p>The choices you make here determine which configuration values you will set in Chapter 3. Getting this right upfront takes 10 minutes and prevents you from having to reinstall.</p>
+      </div>
+
+      <h2>Decision 1 — Hosting Platform</h2>
+      <p>This is where your AECMS application (backend + frontend) actually runs. AECMS runs in Docker containers, so any platform that can run a Docker image will work.</p>
+
+      <div class="platform-grid">
+        <a href="ch02-platform-setup/railway.html" class="platform-card">
+          <div class="name">Railway</div>
+          <span class="badge free">$5/mo</span>
+          <div class="desc">Easiest setup. Connect GitHub, deploy. PostgreSQL and Redis built in. Best for non-technical owners who want it done.</div>
+        </a>
+        <a href="ch02-platform-setup/coolify.html" class="platform-card">
+          <div class="name">Coolify + VPS</div>
+          <span class="badge selfhost">$5–6/mo</span>
+          <div class="desc">Best value. Run everything on a $5/month server. Free software. More steps to set up, but you own everything and there are no per-service fees.</div>
+        </a>
+        <a href="ch02-platform-setup/cloud-run.html" class="platform-card">
+          <div class="name">Google Cloud Run</div>
+          <span class="badge paid">~$10–12/mo</span>
+          <div class="desc">Most scalable and production-grade. More complex setup. Good if you are already using GCP or want automatic scaling to zero.</div>
+        </a>
+        <a href="ch02-platform-setup/render.html" class="platform-card">
+          <div class="name">Render</div>
+          <span class="badge paid">~$14+/mo</span>
+          <div class="desc">Similar to Railway. Good UI, managed database. Slightly more expensive. Free tier sleeps after inactivity — not ideal for a live site.</div>
+        </a>
+        <a href="ch02-platform-setup/fly.html" class="platform-card">
+          <div class="name">Fly.io</div>
+          <span class="badge free">~$0–10/mo</span>
+          <div class="desc">Generous free tier. Requires using the Fly CLI. Better for technically confident owners. Good global edge performance.</div>
+        </a>
+      </div>
+
+      <h3>Recommendation</h3>
+      <p>If you are not technical and want the simplest possible experience: <strong>Railway</strong>.<br>
+      If you want the best price and don't mind a one-time server setup: <strong>Coolify on a Hetzner or DigitalOcean VPS</strong>.<br>
+      If you are already comfortable with cloud infrastructure: <strong>Google Cloud Run</strong>.</p>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
+
+      <h2>Decision 2 — Database (PostgreSQL)</h2>
+      <p>AECMS requires PostgreSQL 15 or later. Most hosting platforms can provide this directly.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Free Tier</th>
+            <th>Cost After</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Built into Railway</strong></td>
+            <td>Included</td>
+            <td>~$5–7/mo</td>
+            <td>Simplest. No setup needed — Railway creates it automatically.</td>
+          </tr>
+          <tr>
+            <td><strong>Built into Coolify</strong></td>
+            <td>Free (VPS cost only)</td>
+            <td>VPS cost</td>
+            <td>Runs in Docker on same server. Best value by far.</td>
+          </tr>
+          <tr>
+            <td><strong>Neon</strong></td>
+            <td>512 MB, 1 project</td>
+            <td>$19/mo (pro)</td>
+            <td>Scales to zero — first query after idle may be slow. Good free option.</td>
+          </tr>
+          <tr>
+            <td><strong>Supabase</strong></td>
+            <td>500 MB, 2 projects</td>
+            <td>$25/mo</td>
+            <td>⚠️ Free projects pause after 1 week of inactivity. Bad for a live site.</td>
+          </tr>
+          <tr>
+            <td><strong>Cloud SQL (GCP)</strong></td>
+            <td>None</td>
+            <td>~$7–9/mo</td>
+            <td>Used with Cloud Run. Reliable but not free.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Supabase free tier caveat</div>
+        <p>Supabase is the most marketed free database option, but its free projects pause after 7 days of inactivity. A personal site that goes quiet for a week will become unavailable until you manually unpause it. Use Neon or a paid option instead.</p>
+      </div>
+
+      <h3>Recommendation</h3>
+      <p>Use whatever your hosting platform provides natively (Railway or Coolify). If you need a standalone managed database, <strong>Neon</strong> is the best free option (just be aware of the scale-to-zero cold start on the first query after idle). For Cloud Run, use <strong>Cloud SQL</strong>.</p>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
+
+      <h2>Decision 3 — File Storage</h2>
+      <p>AECMS stores two types of files: public media (images, videos uploaded to articles and products) and private digital product files (PDFs, EPUBs, downloadable files). You need a place to put both.</p>
+
+      <h3>Option A — Local filesystem (simplest)</h3>
+      <p>Files are stored directly on the server running AECMS. Works out of the box with no extra accounts or configuration. Good for Coolify/VPS deployments where the server has a persistent disk.</p>
+      <ul>
+        <li><strong>Cost</strong>: $0 (included in VPS/server cost)</li>
+        <li><strong>Downside</strong>: Files are tied to the server. You need to handle backups manually. Does not work on platforms with ephemeral containers (Cloud Run).</li>
+        <li><strong>Best for</strong>: Coolify, single-server VPS deployments</li>
+      </ul>
+
+      <h3>Option B — Cloudflare R2 (best cloud option)</h3>
+      <p>S3-compatible object storage with <strong>zero egress fees</strong>. 10 GB free, then $0.015/GB. Works with the S3 storage provider built into AECMS.</p>
+      <ul>
+        <li><strong>Cost</strong>: Free for 10 GB, then very cheap</li>
+        <li><strong>Setup</strong>: Create a Cloudflare account → R2 → Create two buckets → Generate API token</li>
+        <li><strong>Best for</strong>: Railway, Render, Fly.io — any platform without persistent disk</li>
+      </ul>
+
+      <h3>Option C — Backblaze B2</h3>
+      <p>10 GB free, then $0.006/GB. S3-compatible. Very popular in self-hosting communities. Egress fees apply (unlike R2), but very cheap at low traffic.</p>
+
+      <h3>Option D — Google Cloud Storage (GCS)</h3>
+      <p>Required for Cloud Run deployments that use Workload Identity for authentication. The GitHub Actions workflow creates buckets automatically.</p>
+
+      <h3>Recommendation</h3>
+      <ul>
+        <li>On <strong>Coolify/VPS</strong>: start with local storage. Add R2 later if you outgrow the disk.</li>
+        <li>On <strong>Railway/Render/Fly</strong>: use <strong>Cloudflare R2</strong> (zero egress, generous free tier).</li>
+        <li>On <strong>Cloud Run</strong>: use <strong>Google Cloud Storage</strong> (automated by the deployment workflow).</li>
+      </ul>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
+
+      <h2>Decision 4 — Email / SMTP</h2>
+      <p>AECMS sends transactional emails: account verification, order receipts, password resets, and digital file delivery. You need an SMTP provider to send these.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>Free Tier</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Resend</strong></td>
+            <td>3,000 emails/month</td>
+            <td>Developer-friendly, easy setup, excellent deliverability. Recommended.</td>
+          </tr>
+          <tr>
+            <td><strong>Brevo (formerly Sendinblue)</strong></td>
+            <td>300 emails/day</td>
+            <td>Good free tier. Slightly more setup. Good EU alternative.</td>
+          </tr>
+          <tr>
+            <td><strong>Mailgun</strong></td>
+            <td>100 emails/day (trial)</td>
+            <td>Solid deliverability. Requires domain verification.</td>
+          </tr>
+          <tr>
+            <td><strong>Gmail SMTP</strong></td>
+            <td>Free</td>
+            <td>Works, but requires an App Password and has sending limits. Not recommended for production.</td>
+          </tr>
+          <tr>
+            <td><strong>Your hosting provider</strong></td>
+            <td>Often included</td>
+            <td>Check if your domain registrar or host provides SMTP. Often the simplest option.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Recommendation</h3>
+      <p><strong>Resend</strong> is the easiest to set up and has the best deliverability for the free tier. Sign up at resend.com, verify your domain, and copy the API key — that is your SMTP password.</p>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ You can configure email after install</div>
+        <p>Email configuration is done in the Admin Settings panel after the setup wizard runs. You do not need to have it ready before deploying — you can test email delivery later. Just note that verification emails and order receipts will not work until email is configured.</p>
+      </div>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
+
+      <h2>Decision 5 — Redis (Session Cache)</h2>
+      <p>AECMS uses Redis for session token caching, rate limiting, and RSS feed caching. For most platforms, this is handled automatically.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Cost</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Built into Railway</strong></td>
+            <td>Included</td>
+            <td>Add a Redis plugin to your Railway project. No setup needed.</td>
+          </tr>
+          <tr>
+            <td><strong>Built into Coolify</strong></td>
+            <td>Free (VPS cost)</td>
+            <td>One-click Redis service in Coolify. Included in docker-compose.production.yml.</td>
+          </tr>
+          <tr>
+            <td><strong>Upstash</strong></td>
+            <td>Free (10K req/day)</td>
+            <td>Serverless Redis. Free tier is sufficient for low-traffic sites. Used with Cloud Run.</td>
+          </tr>
+          <tr>
+            <td><strong>Redis Cloud</strong></td>
+            <td>Free (30 MB)</td>
+            <td>30 MB is very tight. Only if other options aren't available.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Recommendation</h3>
+      <p>Use whatever your hosting platform provides. On Cloud Run, use <strong>Upstash</strong> (free tier is more than enough for a personal site).</p>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
+
+      <h2>Summary — Fill In Your Choices</h2>
+      <p>Write down your choices before moving to Chapter 2. You will need them when setting up your platform and configuring AECMS.</p>
+
+      <table>
+        <thead>
+          <tr><th>Service</th><th>Your choice</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Hosting platform</td><td><em>(Railway / Coolify / Cloud Run / Render / Fly.io)</em></td></tr>
+          <tr><td>Database</td><td><em>(built-in / Neon / Cloud SQL / other)</em></td></tr>
+          <tr><td>File storage</td><td><em>(local / Cloudflare R2 / Backblaze B2 / GCS / other)</em></td></tr>
+          <tr><td>Email/SMTP</td><td><em>(Resend / Brevo / Mailgun / Gmail / other)</em></td></tr>
+          <tr><td>Redis</td><td><em>(built-in / Upstash / other)</em></td></tr>
+        </tbody>
+      </table>
+
+      <p style="margin-top: 2rem;">
+        <a href="ch02-platform-setup/index.html" style="display: inline-block; background: #2563eb; color: #fff; padding: 0.6rem 1.25rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.95rem;">Chapter 2 — Platform Setup →</a>
+      </p>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

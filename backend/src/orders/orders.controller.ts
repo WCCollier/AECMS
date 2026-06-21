@@ -8,11 +8,14 @@ import {
   Query,
   Headers,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { OptionalJwtAuthGuard } from '../auth/guards/optional-jwt-auth.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
@@ -50,6 +53,25 @@ export class OrdersController {
   @ApiOperation({ summary: 'Get current user orders' })
   findMyOrders(@CurrentUser() user: any, @Query() query: QueryOrdersDto) {
     return this.ordersService.findUserOrders(user.id, query);
+  }
+
+  @Get('export')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('order.view.all')
+  @ApiOperation({ summary: 'Download transaction history as CSV' })
+  async exportCsv(
+    @Query('from') fromStr: string,
+    @Query('to') toStr: string,
+    @Res() res: Response,
+  ) {
+    const from = fromStr ? new Date(fromStr) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const to   = toStr   ? new Date(toStr)   : new Date();
+    const csv  = await this.ordersService.exportCsv(from, to);
+    const fromLabel = from.toISOString().slice(0, 10);
+    const toLabel   = to.toISOString().slice(0, 10);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="transactions-${fromLabel}-${toLabel}.csv"`);
+    res.send(csv);
   }
 
   @Get(':id')
@@ -104,4 +126,5 @@ export class OrdersController {
     const isAdmin = user?.session_type === 'backstage';
     return this.ordersService.cancel(id, user?.id, isAdmin);
   }
+
 }

@@ -5,13 +5,25 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { adminFetcher } from '@/lib/swr';
 import { Button, Card, CardContent, Input } from '@/components/ui';
-import { Search, Eye, ShoppingCart } from 'lucide-react';
+import { Search, Eye, ShoppingCart, Download } from 'lucide-react';
 import type { Order, PaginatedResponse } from '@/types';
 import { orderStatusClass } from '@/lib/orderStatus';
+import adminApi from '@/lib/adminApi';
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+function firstOfMonthStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
 
 export function AdminOrdersClient() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [exportFrom, setExportFrom] = useState(firstOfMonthStr());
+  const [exportTo, setExportTo] = useState(todayStr());
+  const [exporting, setExporting] = useState(false);
 
   const { data, isLoading } = useSWR<PaginatedResponse<Order>>(
     `/orders?page=${page}&limit=10${search ? `&search=${search}` : ''}`,
@@ -38,10 +50,59 @@ export function AdminOrdersClient() {
     }).format(price);
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const res = await adminApi.get('/orders/export', {
+        params: { from: exportFrom, to: exportTo },
+        responseType: 'text',
+      });
+      const blob = new Blob([res.data as string], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions-${exportFrom}-${exportTo}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">Orders</h1>
+        {/* CSV export */}
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={exportFrom}
+            onChange={(e) => setExportFrom(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-foreground/20 rounded bg-background"
+            title="Export from"
+          />
+          <span className="text-sm text-foreground/50">to</span>
+          <input
+            type="date"
+            value={exportTo}
+            onChange={(e) => setExportTo(e.target.value)}
+            className="px-2 py-1.5 text-sm border border-foreground/20 rounded bg-background"
+            title="Export to"
+          />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExport}
+            isLoading={exporting}
+            className="flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {/* Search */}

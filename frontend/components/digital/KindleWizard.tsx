@@ -162,14 +162,13 @@ interface Props {
   onClose: () => void;
 }
 
-// The sending email address shown to the user — update in .env or hard-code for your store
-const STORE_KINDLE_EMAIL = process.env.NEXT_PUBLIC_KINDLE_SENDER_EMAIL ?? 'books@yourstore.com';
-
 export function KindleWizard({ download, onClose }: Props) {
   const { data: devices, isLoading: devicesLoading } = useSWR<KindleDevice[]>(
     '/kindle/devices',
     fetcher,
   );
+  const { data: profile } = useSWR<{ kindleFromEmail: string }>('/setup/profile', fetcher);
+  const storeKindleEmail = profile?.kindleFromEmail || 'books@yourstore.com';
 
   const [state, setState] = useState<WizardState | null>(null);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -462,11 +461,11 @@ export function KindleWizard({ download, onClose }: Props) {
         </ol>
         <div className="flex items-center gap-2 mb-2">
           <code className="bg-foreground/10 text-sm px-3 py-1.5 rounded-lg font-mono select-all">
-            {STORE_KINDLE_EMAIL}
+            {storeKindleEmail}
           </code>
           <button
             className="text-xs text-accent hover:underline"
-            onClick={() => navigator.clipboard.writeText(STORE_KINDLE_EMAIL)}
+            onClick={() => navigator.clipboard.writeText(storeKindleEmail)}
           >
             Copy
           </button>

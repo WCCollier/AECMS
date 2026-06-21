@@ -16,6 +16,32 @@ export class SetupService {
     return owner === null;
   }
 
+  async getProfile(): Promise<{
+    storageProvider: string;
+    emailProvider: string;
+    kmsProvider: string;
+    appUrl: string;
+    isFirstRun: boolean;
+    envKeys: string[];
+    kindleFromEmail: string;
+  }> {
+    const [isFirstRun, envKeys, kindleFrom, fromAddress] = await Promise.all([
+      this.isSetupRequired(),
+      this.settings.getEnvSourcedKeys(),
+      this.settings.getEffective('email.kindle_from'),
+      this.settings.getEffective('email.from_address'),
+    ]);
+    return {
+      storageProvider: process.env.STORAGE_PROVIDER_TYPE ?? 'local',
+      emailProvider: process.env.EMAIL_PROVIDER_TYPE ?? 'smtp',
+      kmsProvider: process.env.SETTINGS_KMS_PROVIDER ?? 'local',
+      appUrl: process.env.APP_URL ?? '',
+      isFirstRun,
+      envKeys,
+      kindleFromEmail: kindleFrom || fromAddress || '',
+    };
+  }
+
   async completeSetup(dto: CompleteSetupDto): Promise<void> {
     const required = await this.isSetupRequired();
     if (!required) {

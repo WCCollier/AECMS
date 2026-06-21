@@ -22,4 +22,10 @@ export class SetupController {
     await this.setupService.completeSetup(dto);
     return { message: 'Setup complete. You can now log in to the backstage.' };
   }
+
+  @Get('profile')
+  @ApiOperation({ summary: 'Get deployment profile — active providers, app URL, env-sourced setting keys' })
+  async getProfile() {
+    return this.setupService.getProfile();
+  }
 }

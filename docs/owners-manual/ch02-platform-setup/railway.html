@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Railway Setup | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="../index.html">
+        <div class="product">AECMS</div>
+        <div class="title">Owner's Manual</div>
+      </a>
+    </div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="../index.html">Overview</a>
+        <a href="../ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="index.html">Ch 2 — Platform Setup</a>
+        <a href="../ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="../ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="railway.html" class="active">Railway</a>
+        <a href="coolify.html">Coolify + VPS</a>
+        <a href="cloud-run.html">Google Cloud Run</a>
+        <a href="render.html">Render</a>
+        <a href="fly.html">Fly.io</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+
+      <div class="breadcrumb">
+        <a href="../index.html">Owner's Manual</a> <span>›</span>
+        <a href="index.html">Chapter 2</a> <span>›</span>
+        Railway
+      </div>
+
+      <div class="page-header">
+        <h1>Deploying to Railway</h1>
+        <p class="subtitle">The easiest path: no command line required.</p>
+        <p class="meta">Estimated time: 30–45 minutes &nbsp;·&nbsp; Cost: ~$5/month hobby plan</p>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ What Railway provides</div>
+        <p>Railway manages your containers, builds from GitHub, and hosts managed PostgreSQL and Redis — all in one dashboard. You do not need to configure servers or install Docker yourself.</p>
+      </div>
+
+      <h2>Before You Start</h2>
+      <ul>
+        <li>A <a href="https://github.com" target="_blank">GitHub account</a> with the AECMS repository forked to your account</li>
+        <li>A <a href="https://railway.app" target="_blank">Railway account</a> (sign up with GitHub — free)</li>
+        <li>A file storage provider if you want cloud storage: <a href="https://www.cloudflare.com/developer-platform/r2/" target="_blank">Cloudflare R2</a> (10 GB free) is recommended — or start with local storage and switch later</li>
+        <li>An SMTP provider (optional at launch): <a href="https://resend.com" target="_blank">Resend</a> (3,000 emails/month free) is recommended — configure in Admin Settings → Email after install</li>
+      </ul>
+
+      <h2>Step 1 — Fork the Repository</h2>
+      <p>Go to the AECMS repository on GitHub and click <strong>Fork</strong>. This creates your own copy that Railway will deploy from.</p>
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Why fork?</div>
+        <p>Forking gives you your own copy of the code. Railway deploys from your fork, so you can update AECMS by pulling changes from the original repo into your fork and redeploying.</p>
+      </div>
+
+      <h2>Step 2 — Create a Railway Project</h2>
+      <ol class="steps">
+        <li><strong>Log in to Railway</strong> and click <strong>New Project</strong>.</li>
+        <li><strong>Choose "Deploy from GitHub repo"</strong> and select your forked AECMS repository.</li>
+        <li>Railway will detect the Dockerfile and offer to deploy. <strong>Click "Add service"</strong> but do <em>not</em> deploy yet — you need to add the database and Redis first.</li>
+      </ol>
+
+      <h2>Step 3 — Add PostgreSQL</h2>
+      <ol class="steps">
+        <li>In your Railway project, click <strong>New</strong> → <strong>Database</strong> → <strong>PostgreSQL</strong>.</li>
+        <li>Railway creates a managed PostgreSQL database. Click it to see the connection details.</li>
+        <li>Copy the <code>DATABASE_URL</code> value — you will need it in Step 6.</li>
+      </ol>
+      <div class="callout tip">
+        <div class="callout-title">✅ Railway auto-connects services</div>
+        <p>If you reference <code>${{Postgres.DATABASE_URL}}</code> in your service's environment variables, Railway automatically injects the database URL. You can use this instead of copying the value manually.</p>
+      </div>
+
+      <h2>Step 4 — Add Redis</h2>
+      <ol class="steps">
+        <li>In your Railway project, click <strong>New</strong> → <strong>Database</strong> → <strong>Redis</strong>.</li>
+        <li>Railway creates a managed Redis instance.</li>
+        <li>Copy the <code>REDIS_URL</code> value (or use <code>${{Redis.REDIS_URL}}</code> in env vars).</li>
+      </ol>
+
+      <h2>Step 5 — Configure the Backend Service</h2>
+      <p>Click on your AECMS service (the one from GitHub) → <strong>Variables</strong>. Add each of the following:</p>
+      <pre><code>NODE_ENV=production
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+
+# Generate these with: openssl rand -hex 64
+JWT_SECRET=YOUR_LONG_RANDOM_STRING
+# Generate with: openssl rand -hex 32
+SETTINGS_ENCRYPTION_KEY=YOUR_32_BYTE_HEX_KEY
+
+JWT_EXPIRATION=15m
+REFRESH_TOKEN_EXPIRATION=7d
+SETTINGS_KMS_PROVIDER=local
+# Email — configure in Admin Settings → Email after launch
+
+# Set to your Railway app URL for now; update to your custom domain later
+APP_URL=https://YOUR-APP.up.railway.app
+FRONTEND_URL=https://YOUR-APP.up.railway.app
+API_URL=https://YOUR-APP.up.railway.app
+FRONTEND_ADMIN_URL=https://YOUR-APP.up.railway.app/admin
+
+# Storage — start with local, configure cloud storage later in Admin Settings
+STORAGE_PROVIDER_TYPE=local
+STORAGE_PATH=/app/uploads</code></pre>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Generate real random values</div>
+        <p>Do not use placeholder text for <code>JWT_SECRET</code> or <code>SETTINGS_ENCRYPTION_KEY</code>. Run these commands in a terminal to generate secure values:</p>
+        <pre><code>openssl rand -hex 64   # for JWT_SECRET
+openssl rand -hex 32   # for SETTINGS_ENCRYPTION_KEY</code></pre>
+        <p>Store <code>SETTINGS_ENCRYPTION_KEY</code> somewhere safe. Losing it makes all secrets stored in Admin Settings permanently unreadable.</p>
+      </div>
+
+      <h2>Step 6 — Deploy</h2>
+      <ol class="steps">
+        <li>Click <strong>Deploy</strong> on the AECMS service. Railway will build the Docker image from your fork and start the container.</li>
+        <li>Watch the build logs. A successful deploy ends with <code>NestJS application listening on port 4000</code>.</li>
+        <li>Railway assigns a URL like <code>your-project.up.railway.app</code>. Open it — you should see the AECMS site or the setup wizard.</li>
+      </ol>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Frontend and backend</div>
+        <p>AECMS runs the frontend (Next.js) and backend (NestJS) as separate services. If Railway deploys only one, add a second service from the same repo and set its root directory to <code>/frontend</code>. Set the frontend's <code>BACKEND_URL</code> variable to the backend's Railway URL.</p>
+      </div>
+
+      <h2>Step 7 — Set Up File Storage (Optional)</h2>
+      <p>Local storage works on Railway if you add a persistent volume. For cloud storage with Cloudflare R2:</p>
+      <ol class="steps">
+        <li>Create a Cloudflare account and go to <strong>R2 Object Storage</strong>.</li>
+        <li>Create two buckets: <code>my-site-media</code> (public) and <code>my-site-digital</code> (private).</li>
+        <li>Go to R2 → <strong>Manage R2 API Tokens</strong> → Create Token with "Object Read &amp; Write" permission.</li>
+        <li>In Railway, add these variables to your backend service:<br>
+          <code>STORAGE_PROVIDER_TYPE=s3</code><br>
+          <code>S3_ENDPOINT=https://ACCOUNT_ID.r2.cloudflarestorage.com</code><br>
+          <code>S3_REGION=auto</code><br>
+          Then add bucket names and credentials via <strong>Admin Settings → File Storage</strong> after the wizard runs.
+        </li>
+      </ol>
+
+      <h2>Step 8 — Map Your Custom Domain</h2>
+      <p>Railway's default URL works immediately. To use your own domain:</p>
+      <ol class="steps">
+        <li>In Railway, open your service → <strong>Settings</strong> → <strong>Networking</strong> → <strong>Custom Domain</strong>.</li>
+        <li>Enter your domain (e.g. <code>myblog.com</code>). Railway shows you a CNAME record to add.</li>
+        <li>Go to your domain registrar's DNS settings and add the CNAME record pointing to Railway's provided target.</li>
+        <li>DNS propagation takes 15 minutes to 24 hours. Railway provides SSL automatically via Let's Encrypt once DNS is active.</li>
+        <li>Once DNS is live, update <code>APP_URL</code>, <code>FRONTEND_URL</code>, <code>API_URL</code>, and <code>FRONTEND_ADMIN_URL</code> to your custom domain and redeploy.</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ Run the wizard now, update URL later</div>
+        <p>You can run the setup wizard on the <code>*.railway.app</code> URL while DNS propagates. Just remember to update the <code>APP_URL</code> environment variables to your final domain and redeploy once DNS is live.</p>
+      </div>
+
+      <h2>Next Steps</h2>
+      <p>Your site is deployed. Now:</p>
+      <ul>
+        <li><a href="../ch03-aecms-config.html">Chapter 3</a> — Review your configuration</li>
+        <li><a href="../ch04-first-launch.html">Chapter 4</a> — Run the setup wizard</li>
+      </ul>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

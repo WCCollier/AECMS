@@ -6,8 +6,17 @@ import { Save, Send, CheckCircle, XCircle, Loader2, Eye, EyeOff } from 'lucide-r
 import adminApi from '@/lib/adminApi';
 
 const fetcher = (url: string) => adminApi.get(url).then((r) => r.data);
+const publicFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type TabId = 'general' | 'identity' | 'email' | 'payment' | 'storage';
+
+interface DeployProfile {
+  storageProvider: string;
+  emailProvider: string;
+  kmsProvider: string;
+  appUrl: string;
+  envKeys: string[];
+}
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'general', label: 'General' },
@@ -102,9 +111,33 @@ function SaveBar({ onSave, saving, saved, dirty }: { onSave: () => void; saving:
   );
 }
 
+function EnvBadge() {
+  return (
+    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium bg-blue-900/40 text-blue-300 border border-blue-700/50 rounded">
+      env var
+    </span>
+  );
+}
+
+function EnvReadOnlyInput({ value, placeholder }: { value: string; placeholder?: string }) {
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        readOnly
+        placeholder={placeholder}
+        className="w-full bg-neutral-950 border border-neutral-700 border-dashed rounded px-3 py-2 text-sm text-neutral-400 cursor-default focus:outline-none"
+      />
+    </div>
+  );
+}
+
 export function SettingsClient() {
   const [activeTab, setActiveTab] = useState<TabId>('general');
   const { data: allSettings, mutate } = useSWR<Record<string, string>>('/settings', fetcher);
+  const { data: profile } = useSWR<DeployProfile>('/api-proxy/setup/profile', publicFetcher);
+  const envKeys = new Set(profile?.envKeys ?? []);
 
   const [fields, setFields] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
@@ -204,11 +237,21 @@ export function SettingsClient() {
     }
   };
 
+  const emailFieldsFilled = Boolean(
+    f('email.smtp_host') && f('email.smtp_port') && f('email.smtp_user') && f('email.from_address'),
+  );
+
   const handleTestEmail = async () => {
     setEmailTesting(true);
     setEmailTestResult(null);
     try {
-      const res = await adminApi.post('/settings/test-email');
+      const config: Record<string, string> = {};
+      for (const key of ['email.smtp_host', 'email.smtp_port', 'email.smtp_security',
+                          'email.smtp_user', 'email.smtp_pass_enc',
+                          'email.from_address', 'email.from_name']) {
+        if (f(key)) config[key] = f(key);
+      }
+      const res = await adminApi.post('/settings/test-email-preview', config);
       setEmailTestResult(res.data);
     } catch (err: any) {
       setEmailTestResult({ success: false, message: err?.response?.data?.message ?? 'Request failed' });
@@ -244,11 +287,32 @@ export function SettingsClient() {
   const [storageStatus, setStorageStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [storageMessage, setStorageMessage] = useState('');
 
+  const storageFieldsFilled = (() => {
+    const pType = f('storage.provider_type') || profile?.storageProvider || 'local';
+    if (pType === 'local') return true;
+    if (pType === 'gcs') return Boolean(f('storage.gcs_bucket_media') && f('storage.gcs_bucket_digital'));
+    if (pType === 's3') return Boolean(f('storage.s3_bucket_media') && f('storage.s3_bucket_digital') && f('storage.s3_access_key_id'));
+    return false;
+  })();
+
   const handleTestStorage = async () => {
     setStorageStatus('checking');
     setStorageMessage('');
     try {
-      const res = await adminApi.post<{ success: boolean; provider: string; message: string }>('/settings/test-storage');
+      const config: Record<string, string> = {};
+      const storageKeys = [
+        'storage.provider_type', 'storage.gcs_bucket_media', 'storage.gcs_bucket_digital',
+        'storage.gcs_project_id', 'storage.gcs_credentials_json_enc', 'storage.gcs_endpoint',
+        'storage.s3_bucket_media', 'storage.s3_bucket_digital', 'storage.s3_region',
+        'storage.s3_endpoint', 'storage.s3_access_key_id', 'storage.s3_secret_access_key_enc',
+      ];
+      for (const key of storageKeys) {
+        if (f(key)) config[key] = f(key);
+      }
+      const res = await adminApi.post<{ success: boolean; provider: string; message: string }>(
+        '/settings/test-storage-preview',
+        config,
+      );
       if (res.data.success) {
         setStorageStatus('ok');
         setStorageMessage(res.data.message);
@@ -374,6 +438,29 @@ export function SettingsClient() {
                       </p>
                     ) : null;
                   })()}
+                  {/* Warning when no effective published homepage exists */}
+                  {(() => {
+                    const designatedId = f('general.homepage_page_id');
+                    const designatedPublished = designatedId && publishedPages.some((p) => p.id === designatedId);
+                    const homePagePublished = publishedPages.some((p) => p.slug === '_home_');
+                    if (designatedId && !designatedPublished) {
+                      return (
+                        <p className="text-xs text-amber-400 flex items-start gap-1.5">
+                          <span className="mt-0.5">⚠</span>
+                          The selected page is not currently published. Your site will fall back to the _home_ page{homePagePublished ? '.' : ' — which is also not published. Visitors will be redirected to /articles.'}
+                        </p>
+                      );
+                    }
+                    if (!designatedId && !homePagePublished) {
+                      return (
+                        <p className="text-xs text-amber-400 flex items-start gap-1.5">
+                          <span className="mt-0.5">⚠</span>
+                          No published homepage found. Visitors will be redirected to /articles until you publish a page here or publish the built-in _home_ page.
+                        </p>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </div>
@@ -474,21 +561,28 @@ export function SettingsClient() {
             <TextInput value={f('email.kindle_from')} onChange={(v) => set('email.kindle_from', v)} placeholder="you@gmail.com" type="email" />
           </FieldRow>
 
-          <div className="pt-4 flex items-center gap-4">
-            <button
-              onClick={handleTestEmail}
-              disabled={emailTesting}
-              className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white text-sm px-4 py-2 rounded"
-            >
-              {emailTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              {emailTesting ? 'Sending…' : 'Send Test Email'}
-            </button>
-            {emailTestResult && (
-              <span className={`flex items-center gap-1 text-sm ${emailTestResult.success ? 'text-green-400' : 'text-red-400'}`}>
-                {emailTestResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
-                {emailTestResult.message}
-              </span>
-            )}
+          <div className="pt-4 space-y-2">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleTestEmail}
+                disabled={emailTesting || !emailFieldsFilled}
+                className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white text-sm px-4 py-2 rounded"
+              >
+                {emailTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {emailTesting ? 'Sending…' : 'Send Test Email'}
+              </button>
+              {emailTestResult && (
+                <span className={`flex items-center gap-1 text-sm ${emailTestResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                  {emailTestResult.success ? <CheckCircle size={14} /> : <XCircle size={14} />}
+                  {emailTestResult.message}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-neutral-500">
+              {emailFieldsFilled
+                ? 'Test uses the values currently entered above. Save after a successful test.'
+                : 'Fill in Host, Port, Username, and From Address to enable the test.'}
+            </p>
           </div>
 
           <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />
@@ -576,20 +670,42 @@ export function SettingsClient() {
       {/* ─── File Storage (ESM) ─── */}
       {activeTab === 'storage' && (
         <div className="space-y-8">
-          {/* Provider selector */}
-          <FieldRow label="Storage Provider" help="Where uploaded media and digital product files are stored">
-            <Select
-              value={f('storage.provider_type') || 'local'}
-              onChange={(v) => set('storage.provider_type', v)}
-              options={[
-                { value: 'local', label: 'Local filesystem (default — dev / single-server)' },
-                { value: 'gcs', label: 'Google Cloud Storage (GCS)' },
-                { value: 's3', label: 'S3-compatible (AWS, Cloudflare R2, Backblaze B2, etc.)' },
-              ]}
-            />
-            <p className="text-xs text-neutral-500 mt-1">
-              Changing this requires restarting the backend. Credentials are read lazily — no restart needed after saving keys.
-            </p>
+          {/* Provider selector — read-only when set via env var */}
+          <FieldRow
+            label={<>Storage Provider{envKeys.has('storage.provider_type') && <EnvBadge />}</>}
+            help="Where uploaded media and digital product files are stored"
+          >
+            {envKeys.has('storage.provider_type') ? (
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-2.5 py-1 bg-neutral-800 border border-neutral-700 rounded text-sm text-neutral-200 font-medium">
+                    {profile?.storageProvider === 'gcs' && 'Google Cloud Storage (GCS)'}
+                    {profile?.storageProvider === 's3' && 'S3-compatible storage'}
+                    {(!profile?.storageProvider || profile.storageProvider === 'local') && 'Local filesystem'}
+                  </span>
+                  <span className="text-xs text-blue-400">Active provider</span>
+                </div>
+                <p className="text-xs text-neutral-500 mt-1.5">
+                  Set via <code className="text-neutral-400">STORAGE_PROVIDER_TYPE</code> environment variable.
+                  To change provider, update the env var and redeploy.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <Select
+                  value={f('storage.provider_type') || 'local'}
+                  onChange={(v) => set('storage.provider_type', v)}
+                  options={[
+                    { value: 'local', label: 'Local filesystem (default — dev / single-server)' },
+                    { value: 'gcs', label: 'Google Cloud Storage (GCS)' },
+                    { value: 's3', label: 'S3-compatible (AWS, Cloudflare R2, Backblaze B2, etc.)' },
+                  ]}
+                />
+                <p className="text-xs text-neutral-500 mt-1">
+                  Changing provider requires restarting the backend with the new <code className="text-neutral-400">STORAGE_PROVIDER_TYPE</code> env var.
+                </p>
+              </div>
+            )}
           </FieldRow>
 
           {/* CDN Base URL — applies to any cloud provider */}
@@ -600,24 +716,46 @@ export function SettingsClient() {
           )}
 
           {/* GCS config */}
-          {f('storage.provider_type') === 'gcs' && (
+          {(f('storage.provider_type') === 'gcs' || (envKeys.has('storage.provider_type') && profile?.storageProvider === 'gcs')) && (
             <div className="border border-neutral-800 rounded-lg p-4 space-y-3">
               <h3 className="text-sm font-semibold text-neutral-200 mb-2">Google Cloud Storage</h3>
               <div>
-                <label className="text-xs text-neutral-400 mb-1 block">Media Bucket <span className="text-neutral-500">(public images, uploaded media)</span></label>
-                <TextInput value={f('storage.gcs_bucket_media')} onChange={(v) => set('storage.gcs_bucket_media', v)} placeholder="my-site-media" />
+                <label className="text-xs text-neutral-400 mb-1 block">
+                  Media Bucket <span className="text-neutral-500">(public images, uploaded media)</span>
+                  {envKeys.has('storage.gcs_bucket_media') && <EnvBadge />}
+                </label>
+                {envKeys.has('storage.gcs_bucket_media')
+                  ? <EnvReadOnlyInput value={f('storage.gcs_bucket_media')} placeholder="my-site-media" />
+                  : <TextInput value={f('storage.gcs_bucket_media')} onChange={(v) => set('storage.gcs_bucket_media', v)} placeholder="my-site-media" />}
               </div>
               <div>
-                <label className="text-xs text-neutral-400 mb-1 block">Digital Files Bucket <span className="text-neutral-500">(private — EPUBs, PDFs, downloads)</span></label>
-                <TextInput value={f('storage.gcs_bucket_digital')} onChange={(v) => set('storage.gcs_bucket_digital', v)} placeholder="my-site-digital" />
+                <label className="text-xs text-neutral-400 mb-1 block">
+                  Digital Files Bucket <span className="text-neutral-500">(private — EPUBs, PDFs, downloads)</span>
+                  {envKeys.has('storage.gcs_bucket_digital') && <EnvBadge />}
+                </label>
+                {envKeys.has('storage.gcs_bucket_digital')
+                  ? <EnvReadOnlyInput value={f('storage.gcs_bucket_digital')} placeholder="my-site-digital" />
+                  : <TextInput value={f('storage.gcs_bucket_digital')} onChange={(v) => set('storage.gcs_bucket_digital', v)} placeholder="my-site-digital" />}
               </div>
               <div>
-                <label className="text-xs text-neutral-400 mb-1 block">GCP Project ID <span className="text-neutral-500">(optional if using Workload Identity)</span></label>
-                <TextInput value={f('storage.gcs_project_id')} onChange={(v) => set('storage.gcs_project_id', v)} placeholder="my-gcp-project" />
+                <label className="text-xs text-neutral-400 mb-1 block">
+                  GCP Project ID <span className="text-neutral-500">(optional if using Workload Identity)</span>
+                  {envKeys.has('storage.gcs_project_id') && <EnvBadge />}
+                </label>
+                {envKeys.has('storage.gcs_project_id')
+                  ? <EnvReadOnlyInput value={f('storage.gcs_project_id')} placeholder="my-gcp-project" />
+                  : <TextInput value={f('storage.gcs_project_id')} onChange={(v) => set('storage.gcs_project_id', v)} placeholder="my-gcp-project" />}
               </div>
               <div>
-                <label className="text-xs text-neutral-400 mb-1 block">Service Account JSON <span className="text-neutral-500">(leave blank on Cloud Run — uses Workload Identity automatically)</span></label>
-                <SecretInput value={f('storage.gcs_credentials_json_enc')} onChange={(v) => set('storage.gcs_credentials_json_enc', v)} placeholder='{"type":"service_account",...}' />
+                <label className="text-xs text-neutral-400 mb-1 block">
+                  Service Account JSON
+                  {profile?.kmsProvider === 'gcp'
+                    ? <span className="ml-2 text-neutral-500 font-normal">— not needed on Cloud Run (Workload Identity active)</span>
+                    : <span className="text-neutral-500"> (leave blank on Cloud Run — uses Workload Identity automatically)</span>}
+                </label>
+                {profile?.kmsProvider === 'gcp'
+                  ? <p className="text-xs text-neutral-500 italic">Cloud Run service account is used automatically.</p>
+                  : <SecretInput value={f('storage.gcs_credentials_json_enc')} onChange={(v) => set('storage.gcs_credentials_json_enc', v)} placeholder='{"type":"service_account",...}' />}
               </div>
             </div>
           )}
@@ -660,11 +798,15 @@ export function SettingsClient() {
               {storageStatus === 'ok' && <span className="flex items-center gap-1 text-xs text-green-400"><CheckCircle size={12} /> {storageMessage}</span>}
               {storageStatus === 'error' && <span className="flex items-center gap-1 text-xs text-red-400"><XCircle size={12} /> {storageMessage}</span>}
             </div>
-            <p className="text-xs text-neutral-500 mb-3">Save your settings first, then click Test to verify a write/read/delete round-trip against the active provider.</p>
+            <p className="text-xs text-neutral-500 mb-3">
+              {storageFieldsFilled
+                ? 'Test uses the values currently shown above. Save after a successful test.'
+                : 'Fill in bucket names and credentials above to enable the test.'}
+            </p>
             <button
               onClick={handleTestStorage}
-              disabled={storageStatus === 'checking'}
-              className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 text-white text-xs px-3 py-1.5 rounded"
+              disabled={storageStatus === 'checking' || !storageFieldsFilled}
+              className="flex items-center gap-2 bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs px-3 py-1.5 rounded"
             >
               {storageStatus === 'checking' ? <Loader2 size={12} className="animate-spin" /> : null}
               Test Storage Connection

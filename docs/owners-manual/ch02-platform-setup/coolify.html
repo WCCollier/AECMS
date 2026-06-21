@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coolify + VPS Setup | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="../index.html">
+        <div class="product">AECMS</div>
+        <div class="title">Owner's Manual</div>
+      </a>
+    </div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="../index.html">Overview</a>
+        <a href="../ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="index.html">Ch 2 — Platform Setup</a>
+        <a href="../ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="../ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="railway.html">Railway</a>
+        <a href="coolify.html" class="active">Coolify + VPS</a>
+        <a href="cloud-run.html">Google Cloud Run</a>
+        <a href="render.html">Render</a>
+        <a href="fly.html">Fly.io</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+
+      <div class="breadcrumb">
+        <a href="../index.html">Owner's Manual</a> <span>›</span>
+        <a href="index.html">Chapter 2</a> <span>›</span>
+        Coolify + VPS
+      </div>
+
+      <div class="page-header">
+        <h1>Deploying with Coolify on a VPS</h1>
+        <p class="subtitle">Best value: everything on one $5/month server, managed through a dashboard.</p>
+        <p class="meta">Estimated time: 45–60 minutes &nbsp;·&nbsp; Cost: $4–6/month (VPS only)</p>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ What you get</div>
+        <p>Coolify is free, open-source software that runs on your own server and gives you a Heroku-like dashboard for deploying Docker apps. PostgreSQL, Redis, AECMS backend, and AECMS frontend all run on the same server. No per-service fees.</p>
+      </div>
+
+      <h2>Before You Start</h2>
+      <ul>
+        <li>A <a href="https://github.com" target="_blank">GitHub account</a> with the AECMS repository forked to your account</li>
+        <li>An account with a VPS provider (recommended: <a href="https://hetzner.com" target="_blank">Hetzner</a>, <a href="https://digitalocean.com" target="_blank">DigitalOcean</a>, or <a href="https://linode.com" target="_blank">Linode/Akamai</a>)</li>
+        <li>A domain name with access to its DNS settings</li>
+      </ul>
+
+      <h2>Step 1 — Create a VPS</h2>
+      <ol class="steps">
+        <li><strong>Log in to your VPS provider</strong> and create a new server (called a "Droplet" on DigitalOcean, a "Linode" on Linode, or a "Server" on Hetzner).</li>
+        <li><strong>Choose these settings:</strong>
+          <ul>
+            <li>OS: <strong>Ubuntu 24.04 LTS</strong></li>
+            <li>Size: <strong>2 GB RAM / 2 vCPU minimum</strong> (this is the $6/month tier on most providers)</li>
+            <li>Region: closest to where your visitors are located</li>
+          </ul>
+        </li>
+        <li><strong>Add your SSH key</strong> if prompted, or note the root password provided.</li>
+        <li><strong>Create the server</strong> and note its IP address.</li>
+      </ol>
+
+      <h2>Step 2 — Point Your Domain at the Server</h2>
+      <p>Do this now, while Coolify installs, so DNS has time to propagate.</p>
+      <ol class="steps">
+        <li>In your domain registrar's DNS settings, find the <strong>A record</strong> for your root domain (<code>@</code> or blank).</li>
+        <li>Change its value to your VPS's IP address.</li>
+        <li>Also add an A record for <code>www</code> pointing to the same IP.</li>
+        <li>If you use DNS TTL, set it to 300 (5 minutes) to speed up propagation.</li>
+      </ol>
+      <p>DNS changes can take up to 24 hours to propagate worldwide, but usually take 15–30 minutes.</p>
+
+      <h2>Step 3 — Install Coolify</h2>
+      <ol class="steps">
+        <li><strong>SSH into your server:</strong>
+          <pre><code>ssh root@YOUR_SERVER_IP</code></pre>
+        </li>
+        <li><strong>Run the Coolify installer:</strong>
+          <pre><code>curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash</code></pre>
+          This installs Docker and Coolify. It takes about 2–3 minutes.
+        </li>
+        <li><strong>Open Coolify</strong> in your browser at <code>http://YOUR_SERVER_IP:8000</code>. Create your Coolify admin account when prompted.</li>
+      </ol>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Coolify runs on port 8000</div>
+        <p>Your AECMS site will eventually run on ports 80 and 443 (standard HTTP/HTTPS). Coolify itself runs on port 8000. Coolify manages Traefik, a reverse proxy that handles routing and SSL for your apps.</p>
+      </div>
+
+      <h2>Step 4 — Add Your Server to Coolify</h2>
+      <ol class="steps">
+        <li>In Coolify, go to <strong>Servers</strong> → <strong>Add Server</strong>.</li>
+        <li>Select <strong>Localhost</strong> (the server Coolify is already installed on). Coolify will validate it automatically.</li>
+      </ol>
+
+      <h2>Step 5 — Create a PostgreSQL Database</h2>
+      <ol class="steps">
+        <li>Go to <strong>Databases</strong> → <strong>New Database</strong> → <strong>PostgreSQL</strong>.</li>
+        <li>Set a name (e.g. <code>aecms-postgres</code>), choose your server, set a strong password.</li>
+        <li>Click <strong>Start Database</strong>. Coolify starts a PostgreSQL container and shows you a connection string.</li>
+        <li>Copy the <strong>Internal Connection String</strong> — it starts with <code>postgresql://</code>. You'll need this for AECMS.</li>
+      </ol>
+
+      <h2>Step 6 — Create a Redis Instance</h2>
+      <ol class="steps">
+        <li>Go to <strong>Databases</strong> → <strong>New Database</strong> → <strong>Redis</strong>.</li>
+        <li>Set a name and password, choose your server, then <strong>Start Database</strong>.</li>
+        <li>Copy the <strong>Internal Connection String</strong> (starts with <code>redis://</code>).</li>
+      </ol>
+
+      <h2>Step 7 — Deploy AECMS from GitHub</h2>
+      <ol class="steps">
+        <li>Go to <strong>Projects</strong> → <strong>New Project</strong> → give it a name like <code>aecms</code>.</li>
+        <li>Click <strong>New Resource</strong> → <strong>Application</strong> → <strong>GitHub</strong>.</li>
+        <li>Connect your GitHub account and select your forked AECMS repository.</li>
+        <li>Set the <strong>Base Directory</strong> to <code>/backend</code> and the <strong>Dockerfile</strong> location to <code>Dockerfile</code>. Click <strong>Continue</strong>.</li>
+        <li>Set the <strong>Port</strong> to <code>4000</code>.</li>
+        <li>Under <strong>Domains</strong>, add your API subdomain, e.g. <code>api.yourdomain.com</code> — or use the same domain as the frontend with Coolify's path-based routing.</li>
+        <li>Save and repeat for the frontend: create another Application, set Base Directory to <code>/frontend</code>, Port to <code>3000</code>, Domain to <code>yourdomain.com</code>.</li>
+      </ol>
+
+      <h2>Step 8 — Set Environment Variables</h2>
+      <p>In Coolify, click your <strong>backend</strong> application → <strong>Environment Variables</strong>. Add:</p>
+      <pre><code>NODE_ENV=production
+DATABASE_URL=postgresql://aecms:YOUR_DB_PASS@YOUR_DB_HOST:5432/aecms
+REDIS_URL=redis://default:YOUR_REDIS_PASS@YOUR_REDIS_HOST:6379
+
+JWT_SECRET=YOUR_64_CHAR_RANDOM_STRING
+SETTINGS_ENCRYPTION_KEY=YOUR_32_CHAR_HEX_KEY
+JWT_EXPIRATION=15m
+REFRESH_TOKEN_EXPIRATION=7d
+SETTINGS_KMS_PROVIDER=local
+
+STORAGE_PROVIDER_TYPE=local
+STORAGE_PATH=/app/uploads
+
+APP_URL=https://yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+API_URL=https://yourdomain.com
+FRONTEND_ADMIN_URL=https://yourdomain.com/admin
+# Email — configure in Admin Settings → Email after launch</code></pre>
+
+      <p>For the <strong>frontend</strong> application, add:</p>
+      <pre><code>NODE_ENV=production
+BACKEND_URL=http://aecms-backend:4000
+NEXT_PUBLIC_API_URL=https://yourdomain.com
+NEXT_PUBLIC_BASE_DOMAIN=yourdomain.com</code></pre>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Internal vs external URLs</div>
+        <p>Within Coolify, containers communicate using internal Docker network names (e.g. <code>http://aecms-backend:4000</code>). The <code>NEXT_PUBLIC_API_URL</code> is the public URL that browsers use — it should be your domain.</p>
+      </div>
+
+      <h2>Step 9 — Deploy</h2>
+      <ol class="steps">
+        <li>Click <strong>Deploy</strong> on the backend application. Watch the build logs.</li>
+        <li>Once the backend is healthy, deploy the frontend.</li>
+        <li>Coolify automatically provisions SSL certificates via Let's Encrypt once your domain's DNS has propagated.</li>
+        <li>Visit <code>https://yourdomain.com</code> — you should see the AECMS site or the setup wizard.</li>
+      </ol>
+
+      <h2>Step 10 — Add a Persistent Volume for Uploads</h2>
+      <p>If you are using local file storage, you need a persistent volume so uploaded files survive container restarts.</p>
+      <ol class="steps">
+        <li>In Coolify, go to your backend application → <strong>Storage</strong>.</li>
+        <li>Add a volume: source <code>/data/aecms/uploads</code> (on the server), destination <code>/app/uploads</code> (in the container).</li>
+        <li>Redeploy the backend.</li>
+      </ol>
+
+      <h2>Domain Setup — Already Done</h2>
+      <p>Because you pointed your domain to the server's IP in Step 2, and Coolify uses Traefik with automatic SSL, your domain mapping is handled automatically once DNS propagates. No additional configuration needed.</p>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ Best time to run the setup wizard</div>
+        <p>You can run the wizard as soon as the backend is deployed and healthy. Use the server's IP address (<code>http://YOUR_IP:3000</code>) if your domain's DNS hasn't propagated yet.</p>
+      </div>
+
+      <h2>Next Steps</h2>
+      <ul>
+        <li><a href="../ch03-aecms-config.html">Chapter 3</a> — Review your configuration</li>
+        <li><a href="../ch04-first-launch.html">Chapter 4</a> — Run the setup wizard</li>
+      </ul>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

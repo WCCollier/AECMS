@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 7 — Maintenance | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html"><div class="product">AECMS</div><div class="title">Owner's Manual</div></a></div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html">Overview</a>
+        <a href="ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Running Your Site</div>
+        <a href="ch05-admin-settings.html">Ch 5 — Admin Settings</a>
+        <a href="ch06-going-live.html">Ch 6 — Going Live</a>
+        <a href="ch07-maintenance.html" class="active">Ch 7 — Maintenance</a>
+      </div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="content">
+      <div class="breadcrumb"><a href="index.html">Owner's Manual</a> <span>›</span> Chapter 7</div>
+      <div class="page-header">
+        <h1>Chapter 7 — Maintenance</h1>
+        <p class="subtitle">Backups, updates, monitoring, and cost management.</p>
+        <p class="meta">Full guide coming soon — key guidance documented below.</p>
+      </div>
+
+      <h2>Updating AECMS</h2>
+      <p>To update to a newer version of AECMS:</p>
+      <ol>
+        <li>Pull the latest changes from the upstream repository into your fork on GitHub.</li>
+        <li>For Cloud Run: push to the <code>deploy</code> branch — GitHub Actions handles the rest.</li>
+        <li>For Railway/Render: Railway/Render automatically redeploys when you push to your connected branch.</li>
+        <li>For Coolify: click <strong>Redeploy</strong> in the Coolify dashboard.</li>
+      </ol>
+      <p>AECMS runs database migrations automatically on startup (<code>prisma migrate deploy</code>), so schema changes are applied without manual steps.</p>
+
+      <h2>Backups</h2>
+      <h3>Database</h3>
+      <ul>
+        <li><strong>Railway</strong>: Database backups are available in the Railway dashboard under your PostgreSQL plugin.</li>
+        <li><strong>Coolify/VPS</strong>: Set up automated <code>pg_dump</code> backups. Store dumps in Backblaze B2 or another off-server location.</li>
+        <li><strong>Cloud SQL</strong>: Enable automated backups in the Cloud SQL console. Backups are stored in Google Cloud Storage.</li>
+      </ul>
+
+      <h3>File Storage</h3>
+      <ul>
+        <li><strong>Local storage</strong>: Back up the <code>/app/uploads</code> volume regularly. Consider mirroring to Backblaze B2.</li>
+        <li><strong>Cloud storage (R2/B2/GCS)</strong>: These services provide redundancy automatically. Enable versioning if you need point-in-time recovery.</li>
+      </ul>
+
+      <h2>Transaction Export</h2>
+      <p>Go to <strong>Admin → Orders</strong> and use the <strong>Export CSV</strong> button to download a transaction history. Select a date range (defaults to the current calendar month). The CSV is suitable for import into accounting software (QuickBooks, Wave) or AI-assisted bookkeeping.</p>
+
+      <h2>Monitoring Costs</h2>
+      <p>For Cloud Run deployments, check <a href="https://console.cloud.google.com/billing" target="_blank">GCP Billing</a> monthly. The largest cost item is Cloud SQL (~$7–9/month for the smallest instance). Cloud Run itself is nearly free at low traffic (pay per request).</p>
+      <p>For Railway/Render/Coolify, your monthly bill is fixed (subscription) rather than usage-based.</p>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

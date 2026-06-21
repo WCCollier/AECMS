@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Render Setup | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="../index.html"><div class="product">AECMS</div><div class="title">Owner's Manual</div></a></div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="../index.html">Overview</a>
+        <a href="../ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="index.html">Ch 2 — Platform Setup</a>
+        <a href="../ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="../ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="railway.html">Railway</a>
+        <a href="coolify.html">Coolify + VPS</a>
+        <a href="cloud-run.html">Google Cloud Run</a>
+        <a href="render.html" class="active">Render</a>
+        <a href="fly.html">Fly.io</a>
+      </div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="content">
+      <div class="breadcrumb"><a href="../index.html">Owner's Manual</a> <span>›</span> <a href="index.html">Chapter 2</a> <span>›</span> Render</div>
+      <div class="page-header">
+        <h1>Deploying to Render</h1>
+        <p class="subtitle">Similar to Railway — good UI, managed database.</p>
+        <p class="meta">Cost: ~$14+/month (two web services + database)</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Guide coming soon</div>
+        <p>The full Render setup guide is in progress. In the meantime, Render's setup is similar to Railway:</p>
+        <ol>
+          <li>Fork the AECMS repository to your GitHub account</li>
+          <li>Create a new Web Service in Render, connected to your GitHub fork</li>
+          <li>Add a PostgreSQL database via Render's database panel</li>
+          <li>Add a Redis instance (Render offers managed Redis)</li>
+          <li>Set environment variables using the values from <a href="../../deploy/render/env.example"><code>deploy/render/env.example</code></a></li>
+          <li>Deploy. Render builds from the Dockerfile automatically.</li>
+          <li>Add your custom domain in Service Settings → Custom Domains</li>
+        </ol>
+        <p>Key difference from Railway: Render's free tier for web services <strong>sleeps after 15 minutes of inactivity</strong>. Use the paid tier ($7/service/month) for a live site.</p>
+      </div>
+
+      <p><a href="index.html">← Back to platform list</a></p>
+    </div>
+  </main>
+</div>
+</body>
+</html>
