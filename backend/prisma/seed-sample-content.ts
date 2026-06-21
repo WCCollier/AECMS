@@ -84,16 +84,14 @@ function ol(...items: string[]) {
 // ── Content definitions ──────────────────────────────────────────────────────
 
 const HOME_CONTENT = pageDoc(
-  h1('Your homepage goes here'),
-  p('This is the ', bold('_home_'), ' system page — it acts as a fallback homepage when no other page is designated.'),
-  p('To use a custom homepage:'),
-  ol(
-    'Edit this page (or create a new one) and publish it.',
-    'In Admin → Settings → General, set Homepage Mode to "Static Page" and select your published page.',
-  ),
-  p('As long as _home_ is published, it silently catches any gap if your designated homepage becomes unavailable. See the "About Pages" page in your library for a full explanation.'),
+  h1('Welcome'),
+  p('This is your homepage. Edit it from Admin → Pages → _home_ whenever you are ready to build your real homepage.'),
   p(''),
-  p('You can freely edit the content above. This placeholder will be replaced with whatever you publish here.'),
+  h2('Latest Writing'),
+  p('Essays, commentary, and analysis — browse the full archive to find what interests you.'),
+  p(''),
+  h2('The Shop'),
+  p('Books, courses, and digital products available in the shop.'),
 );
 
 const ABOUT_PAGES_CONTENT = pageDoc(
@@ -195,7 +193,7 @@ async function seedSampleContent() {
         title: 'Home',
         slug: '_home_',
         content: HOME_CONTENT,
-        status: 'draft',
+        status: 'published',
         visibility: 'public',
         template: 'full-width',
         show_in_nav: false,
@@ -204,7 +202,7 @@ async function seedSampleContent() {
         admin_can_delete: false,
       },
     });
-    console.log('[seed-sample-content] ✓ Created _home_ page (draft)');
+    console.log('[seed-sample-content] ✓ Created _home_ page (published)');
   }
 
   // ── Page: about-pages ────────────────────────────────────────────────────
