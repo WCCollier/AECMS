@@ -59,6 +59,7 @@ Specific rules:
 **Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
 **Phase 21**: ✅ COMPLETE - Deployability + first live deployment (merged with Phase 19): SEED_PROFILE system, setup wizard, GcpKeyProvider, Dockerfiles, GitHub Actions CI/CD, Cloud Run, content migration, generic distribution prep (2026-06-21)
 **Phase 22**: ✅ COMPLETE - All items A–M (2026-06-21). Key additions: TipTap alignment, Node 22, Next.js 15.3.9 security upgrade, new-owner wizard/Owner's Manual, CSV export, MediaSyncService (TipTap→join table), PageMedia join table, bulk upload/replace/delete, /admin/media (Media Library + Digital Files tabs)
+**Phase 23**: 📋 PLANNED - Mul Converter: AI-driven backstage tool that ingests a target webpage and emits a custom color palette + page layout scaffold (PRD: docs/prd/13-mul-converter.md)
 **Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
 
 **Session 2026-06-18 improvements** (not phase-tracked):
@@ -292,7 +293,9 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_21_PLAN.md` - Deployability + live deployment plan (merged 19+21)
 - `docs/PHASE_21_COMPLETION_REPORT.md` - Phase 21 completion: wizard, CI/CD, Cloud Run, content migration, distribution prep
 - `docs/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
-- `docs/prd/` - 12 PRD documents with full specifications
+- `docs/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
+- `docs/prd/13-mul-converter.md` - Mul Converter PRD: full design spec (access control, data flow, AI provider abstraction, system prompt, custom palette system)
+- `docs/prd/` - 13 PRD documents with full specifications
 
 ## Notes for Claude
 
