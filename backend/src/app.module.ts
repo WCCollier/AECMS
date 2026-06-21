@@ -27,6 +27,7 @@ import { AuditModule } from './audit/audit.module';
 import { SettingsModule } from './settings/settings.module';
 import { ExternalFeedsModule } from './external-feeds/external-feeds.module';
 import { SetupModule } from './setup/setup.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { SetupModule } from './setup/setup.module';
     SettingsModule,
     ExternalFeedsModule,
     SetupModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

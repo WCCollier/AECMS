@@ -120,7 +120,7 @@ export function UsersClient() {
     try {
       const params = new URLSearchParams({ page: String(currentPage), limit: '20' });
       if (debouncedSearch) params.set('search', debouncedSearch);
-      const res = await adminApi.get(`/auth/admin/users?${params}`);
+      const res = await adminApi.get(`/users?${params}`);
       setPage(res.data as Page);
     } catch {
       setError('Failed to load users.');
@@ -136,7 +136,7 @@ export function UsersClient() {
 
   async function applyRoleChange(user: UserRow, newRole: UserRole) {
     try {
-      await adminApi.patch(`/auth/admin/users/${user.id}/role`, { role: newRole });
+      await adminApi.patch(`/users/${user.id}/role`, { role: newRole });
       await load();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Role change failed.';
