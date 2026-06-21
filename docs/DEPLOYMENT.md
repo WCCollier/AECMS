@@ -2,6 +2,33 @@
 
 This guide covers deploying AECMS to a production environment using Docker Compose.
 
+---
+
+## ⚠️ Live Deployment Compatibility Policy
+
+AECMS has live deployments in the wild. Every change merged to the `deploy` branch must be **live-patchable** and **backward compatible**:
+
+- **Live-patchable**: the running instance continues to function correctly immediately after the new image is deployed, without manual intervention or downtime.
+- **Backward compatible**: the old code (still running during a rolling deploy) must be able to read and write the database successfully after the migration runs.
+
+### Rules for database migrations
+
+| Change type | Safe to ship in one deploy? |
+|---|---|
+| Add nullable column | ✅ Yes |
+| Add column with default | ✅ Yes |
+| Add new table | ✅ Yes |
+| Add index | ✅ Yes (build online) |
+| Rename column | ❌ No — split: add new + dual-write → remove old |
+| Drop column | ❌ No — remove code reads first, then drop |
+| Add NOT NULL without default | ❌ No — backfill first, then add constraint |
+| Remove an enum value | ❌ No — confirm no live rows use it first |
+| Change ISM key names | ❌ No — maintain old key as alias during transition |
+
+If a breaking change is unavoidable, schedule a coordinated maintenance window and document it explicitly in the PR before merging to `deploy`.
+
+---
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)

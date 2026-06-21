@@ -14,6 +14,21 @@
 - **Auth**: JWT + OAuth (Google, Apple) + 2FA for admin
 - **Deployment**: Docker Compose (portable)
 
+## ⚠️ Live Deployment Policy
+
+**As of 2026-06-21, AECMS has at least one live deployment in the wild.**
+
+Every merge to the `deploy` branch must be:
+- **Live-patchable** — the running instance must continue to function correctly immediately after deploy, without requiring manual intervention, data fixes, or downtime.
+- **Backward compatible** — database migrations must be additive only (new columns/tables with defaults or nullable); no column renames, drops, or constraint changes that break the currently-deployed code before it is replaced.
+
+Specific rules:
+- Never rename or remove a DB column in the same migration that changes code that reads it. Split into two deploys: (1) add new column + write to both, (2) remove old column after code no longer reads it.
+- Never add a NOT NULL column without a default or a preceding backfill migration.
+- Never change an enum by removing a value that live data may contain.
+- ISM keys and environment variable names must be treated as a stable API — rename only with a transition period.
+- If a migration cannot be made backward compatible, it requires a coordinated maintenance window and must be called out explicitly before merging to `deploy`.
+
 ## Current Project Status
 
 **Phase 0**: ✅ COMPLETE - Project foundation, Docker, NestJS/Next.js initialized
