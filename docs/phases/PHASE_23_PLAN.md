@@ -1,6 +1,6 @@
 # Phase 23 Plan: Mul Converter
 
-**Status**: 📋 PLANNED  
+**Status**: 🚧 IN PROGRESS — Part 1 built (2026-06-21), pending testbed QA before Part 1 deploy  
 **PRD**: `docs/prd/13-mul-converter.md`  
 **Dependencies**: Phase 20 (Appearance/themes), Phase 15 (ISM), Phase 11 (Page zone-layout)
 
@@ -32,7 +32,7 @@ Any hotfixes to `main` during development must be rebased into `feature/phase-23
 
 ## Part 1: Page Schema Evolution
 
-### A — Section-Based Content Model (Backend)
+### ✅ A — Section-Based Content Model (Backend)
 
 Implement the `SectionsPageContent` schema alongside the existing `ZonePageContent` format:
 
@@ -51,7 +51,7 @@ Implement the `SectionsPageContent` schema alongside the existing `ZonePageConte
 
 ---
 
-### B — Section Editor UI
+### ✅ B — Section Editor UI
 
 Extend the Page editor in `/admin/pages/[id]` to handle `type: 'sections'` content. Full UX spec in PRD §Section Editor UI.
 
@@ -74,7 +74,7 @@ Extend the Page editor in `/admin/pages/[id]` to handle `type: 'sections'` conte
 
 ---
 
-### C — Page Background (Section-Level)
+### ✅ C — Page Background (Section-Level)
 
 Implement the `background` field on each section:
 
@@ -87,6 +87,23 @@ Implement the `background` field on each section:
 - **Editor UI**: background picker in the section header bar — type radio (None / Color / Image), color swatch input for 'color', Media Library picker for 'image', attachment selector (Scroll / Fixed / Parallax)
 
 **Files**: Section renderer, `SectionEditor` background picker, `frontend/lib/pageContent.ts` (background type definitions)
+
+---
+
+### Part 1 Implementation Notes (commit dabf7b4, 2026-06-21)
+
+**Files added/modified:**
+- `frontend/types/index.ts` — added `SectionBackground`, `PageZone`, `PageSection`, `SectionsPageContent`, `AnyPageContent`
+- `frontend/lib/pageContent.ts` — added `isSectionsContent()`, `parseAnyPageContent()`, `legacyToSections()`, `defaultSectionsContent()`; `parsePageContent()` remains backward-compatible
+- `frontend/components/pages/layouts/SectionsLayout.tsx` — new renderer; sections as vertical CSS grid stack with background + minHeight
+- `frontend/components/pages/PageRenderer.tsx` — branches on `isSectionsContent()` before legacy layout switch
+- `frontend/components/admin/SectionEditor.tsx` — per-section editor: template picker (7 canonical templates), span diagram with pointer-capture gutter drag, add zone, background flyout (color/image/attachment), height selector, delete, split-zone action, TipTap zone editors in CSS grid
+- `frontend/components/admin/SectionsPageEditor.tsx` — manages sections array; dnd-kit vertical reorder; Add Section button
+- `frontend/app/admin/pages/[id]/edit/EditPageClient.tsx` — detects content mode on load; sections mode uses SectionsPageEditor; legacy mode retains PageZoneEditor + "Upgrade to Section Layout" conversion button
+- `frontend/app/admin/pages/new/NewPageClient.tsx` — simplified; new pages default to `defaultSectionsContent()` (single Full Width section); legacy layout picker removed
+- `backend/src/pages/pages.service.ts` — `validateSectionsContent()` called in `create()` and `update()`; rejects spans-≠-columns
+
+**Status:** Built and type-checked. 125 frontend + 190 backend unit tests passing. Awaiting testbed QA before Part 1 deploy to `main → deploy`.
 
 ---
 
@@ -242,7 +259,7 @@ Implement the `background` field on each section:
 
 ## Acceptance Criteria
 
-### Part 1 — Page Schema (deploy gate before Part 2 begins)
+### Part 1 — Page Schema (deploy gate before Part 2 begins) — awaiting testbed QA
 1. New pages default to `type: 'sections'` with a single Full Width section
 2. Section editor: owner can add/remove/reorder sections; add/remove/reorder zones within a section; drag gutters to redistribute spans; set min-height; set background (color/image/attachment); choose from 7 canonical layout templates
 3. `columns` is never shown as a raw input — derived silently from sum of spans
