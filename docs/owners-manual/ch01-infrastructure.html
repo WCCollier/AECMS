@@ -53,11 +53,11 @@
 
       <div class="page-header">
         <h1>Chapter 1 — Choose Your Infrastructure</h1>
-        <p class="subtitle">Four decisions to make before you install anything.</p>
-        <p class="meta">Read time: ~10 minutes</p>
+        <p class="subtitle">Five decisions to make before you install anything — and how to make them cheaply.</p>
+        <p class="meta">Read time: ~12 minutes</p>
       </div>
 
-      <p>AECMS needs four types of services to run. You can mix and match providers freely. This chapter explains each one and recommends the best option for a low-traffic personal site on a budget.</p>
+      <p>AECMS needs five types of services to run. You can mix and match providers freely. This chapter explains each one and recommends the best option for a low-traffic personal site on a budget — including how to get very close to $0/month if you choose carefully.</p>
 
       <div class="callout tip">
         <div class="callout-title">✅ Make these decisions now</div>
@@ -70,35 +70,42 @@
       <div class="platform-grid">
         <a href="ch02-platform-setup/railway.html" class="platform-card">
           <div class="name">Railway</div>
-          <span class="badge free">$5/mo</span>
-          <div class="desc">Easiest setup. Connect GitHub, deploy. PostgreSQL and Redis built in. Best for non-technical owners who want it done.</div>
+          <span class="badge free">$5/mo base</span>
+          <div class="desc">Easiest setup. Connect GitHub, deploy. PostgreSQL and Redis built in. Best for non-technical owners who want it done fast. <strong>No free tier as of 2026</strong> — $5/mo Hobby plan required, then usage-based on top. Expect $10–15/mo with Postgres + Redis.</div>
         </a>
         <a href="ch02-platform-setup/coolify.html" class="platform-card">
           <div class="name">Coolify + VPS</div>
-          <span class="badge selfhost">$5–6/mo</span>
-          <div class="desc">Best value. Run everything on a $5/month server. Free software. More steps to set up, but you own everything and there are no per-service fees.</div>
+          <span class="badge selfhost">~€4.50/mo</span>
+          <div class="desc">Best value. Run everything on a Hetzner CX22 (€4.49/mo). Coolify software is free. PostgreSQL, Redis, backend, and frontend all on one server. More steps to set up, but you own everything and there are no per-service fees.</div>
         </a>
         <a href="ch02-platform-setup/cloud-run.html" class="platform-card">
           <div class="name">Google Cloud Run</div>
-          <span class="badge paid">~$10–12/mo</span>
-          <div class="desc">Most scalable and production-grade. More complex setup. Good if you are already using GCP or want automatic scaling to zero.</div>
+          <span class="badge paid">$0–12/mo</span>
+          <div class="desc">Most scalable. Containers scale to zero at idle — you pay only for actual requests. At low traffic, compute is essentially free. The main cost is Cloud SQL (~$10/mo). Can be configured for near-zero cost with Neon Postgres instead. More complex to set up.</div>
         </a>
         <a href="ch02-platform-setup/render.html" class="platform-card">
           <div class="name">Render</div>
           <span class="badge paid">~$14+/mo</span>
-          <div class="desc">Similar to Railway. Good UI, managed database. Slightly more expensive. Free tier sleeps after inactivity — not ideal for a live site.</div>
+          <div class="desc">Similar to Railway. Good UI. Free tier sleeps services after 15 minutes of inactivity (30–50 second cold start) — not suitable for a live site. Minimum usable paid setup is $7/mo per service.</div>
         </a>
         <a href="ch02-platform-setup/fly.html" class="platform-card">
           <div class="name">Fly.io</div>
-          <span class="badge free">~$0–10/mo</span>
-          <div class="desc">Generous free tier. Requires using the Fly CLI. Better for technically confident owners. Good global edge performance.</div>
+          <span class="badge paid">~$5–15/mo</span>
+          <div class="desc">Good global edge performance. Requires the Fly CLI. Free tier is now just a 2-hour trial. For a running app, expect $5–15/mo depending on resources. Better for technically confident owners.</div>
         </a>
       </div>
 
       <h3>Recommendation</h3>
-      <p>If you are not technical and want the simplest possible experience: <strong>Railway</strong>.<br>
-      If you want the best price and don't mind a one-time server setup: <strong>Coolify on a Hetzner or DigitalOcean VPS</strong>.<br>
-      If you are already comfortable with cloud infrastructure: <strong>Google Cloud Run</strong>.</p>
+      <p>
+        <strong>Simplest experience:</strong> <a href="ch02-platform-setup/railway.html">Railway</a> — one dashboard, no server management, $10–15/mo all-in.<br>
+        <strong>Best value:</strong> <a href="ch02-platform-setup/coolify.html">Coolify on Hetzner</a> — everything for ~€4.50/mo (~$5), one-time setup.<br>
+        <strong>Near-zero for the technically comfortable:</strong> <a href="ch02-platform-setup/cloud-run.html">Google Cloud Run</a> with Neon Postgres — $0–2/mo at low traffic after free tiers.
+      </p>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ How Cloud Run can be near-free</div>
+        <p>Cloud Run's free tier is generous: <strong>2 million requests/month</strong>, <strong>360,000 vCPU-seconds</strong>, and <strong>180,000 GiB-seconds</strong> of memory — all free, every month, no expiry. A personal site with a few hundred visitors per day will never exceed this. The trick is pairing Cloud Run with <strong>Neon Postgres</strong> (free tier, 0.5 GB) and <strong>Upstash Redis</strong> (free tier, 500K commands/month) instead of Cloud SQL. Compute costs: essentially $0. Storage costs a few cents per GB on GCS. This is how the reference deployment at fantasyvreality.com runs for close to nothing in compute.</p>
+      </div>
 
       <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
 
@@ -117,9 +124,9 @@
         <tbody>
           <tr>
             <td><strong>Built into Railway</strong></td>
-            <td>Included</td>
-            <td>~$5–7/mo</td>
-            <td>Simplest. No setup needed — Railway creates it automatically.</td>
+            <td>Included in Hobby plan</td>
+            <td>Usage-based (~$5–10/mo)</td>
+            <td>Simplest. Railway creates it automatically. Counts toward your usage credits.</td>
           </tr>
           <tr>
             <td><strong>Built into Coolify</strong></td>
@@ -129,71 +136,73 @@
           </tr>
           <tr>
             <td><strong>Neon</strong></td>
-            <td>512 MB, 1 project</td>
+            <td>✅ 0.5 GB, genuinely free, no card needed</td>
             <td>$19/mo (pro)</td>
-            <td>Scales to zero — first query after idle may be slow. Good free option.</td>
+            <td>Scales to zero after 5 min idle (first query after idle adds ~1–3s). 10,000 pooled connections via built-in PgBouncer. <strong>The best free database option for Cloud Run.</strong></td>
           </tr>
           <tr>
             <td><strong>Supabase</strong></td>
-            <td>500 MB, 2 projects</td>
+            <td>⚠️ 500 MB — but pauses after 7 days inactive</td>
             <td>$25/mo</td>
-            <td>⚠️ Free projects pause after 1 week of inactivity. Bad for a live site.</td>
+            <td>Free projects pause after a week of no traffic. A personal site that goes quiet for a week becomes unavailable. Avoid for production.</td>
           </tr>
           <tr>
             <td><strong>Cloud SQL (GCP)</strong></td>
-            <td>None</td>
-            <td>~$7–9/mo</td>
-            <td>Used with Cloud Run. Reliable but not free.</td>
+            <td>❌ No free tier</td>
+            <td>~$10/mo minimum</td>
+            <td>db-f1-micro + 10 GB SSD costs ~$7–10/mo. The public IPv4 address alone adds $9.57/mo. Main cost driver of a Cloud Run deployment. Can be replaced with Neon to save ~$10/mo.</td>
           </tr>
         </tbody>
       </table>
 
       <div class="callout warning">
-        <div class="callout-title">⚠️ Supabase free tier caveat</div>
-        <p>Supabase is the most marketed free database option, but its free projects pause after 7 days of inactivity. A personal site that goes quiet for a week will become unavailable until you manually unpause it. Use Neon or a paid option instead.</p>
+        <div class="callout-title">⚠️ Supabase free tier pauses projects</div>
+        <p>Supabase is heavily marketed but its free projects pause after 7 days of inactivity and require a manual unpause. A personal site that goes quiet for a week will become unavailable. Use Neon instead — it also scales to zero, but resumes automatically on the next query (a 1–3 second delay on the first request after idle, then instant).</p>
       </div>
 
       <h3>Recommendation</h3>
-      <p>Use whatever your hosting platform provides natively (Railway or Coolify). If you need a standalone managed database, <strong>Neon</strong> is the best free option (just be aware of the scale-to-zero cold start on the first query after idle). For Cloud Run, use <strong>Cloud SQL</strong>.</p>
+      <p>Use whatever your hosting platform provides natively (Railway or Coolify). If you need a standalone managed database, <strong>Neon</strong> is the best free option — 0.5 GB is plenty for a personal site's content database (articles, products, users, orders), and the auto-resume cold start is barely noticeable. For Cloud Run, <strong>Neon is now the preferred choice over Cloud SQL</strong> if you want to minimise cost; see the <a href="ch02-platform-setup/cloud-run.html">Cloud Run guide</a> for details.</p>
 
       <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
 
       <h2>Decision 3 — File Storage</h2>
-      <p>AECMS stores two types of files: public media (images, videos uploaded to articles and products) and private digital product files (PDFs, EPUBs, downloadable files). You need a place to put both.</p>
+      <p>AECMS stores two types of files: public media (images uploaded to articles and products) and private digital product files (PDFs, EPUBs, etc.). You need a place to put both.</p>
 
       <h3>Option A — Local filesystem (simplest)</h3>
-      <p>Files are stored directly on the server running AECMS. Works out of the box with no extra accounts or configuration. Good for Coolify/VPS deployments where the server has a persistent disk.</p>
+      <p>Files are stored directly on the server running AECMS. Works out of the box with no extra accounts. Good for Coolify/VPS deployments where the server has a persistent disk.</p>
       <ul>
-        <li><strong>Cost</strong>: $0 (included in VPS/server cost)</li>
-        <li><strong>Downside</strong>: Files are tied to the server. You need to handle backups manually. Does not work on platforms with ephemeral containers (Cloud Run).</li>
+        <li><strong>Cost</strong>: $0 (included in VPS cost)</li>
+        <li><strong>Downside</strong>: Files are tied to the server. You must handle backups. Does not work on platforms with ephemeral containers (Cloud Run, Render).</li>
         <li><strong>Best for</strong>: Coolify, single-server VPS deployments</li>
       </ul>
 
-      <h3>Option B — Cloudflare R2 (best cloud option)</h3>
-      <p>S3-compatible object storage with <strong>zero egress fees</strong>. 10 GB free, then $0.015/GB. Works with the S3 storage provider built into AECMS.</p>
+      <h3>Option B — Cloudflare R2 ★ Recommended for cloud deployments</h3>
+      <p>S3-compatible object storage with <strong>permanently zero egress fees</strong>. Unlike AWS S3 and Google Cloud Storage, you never pay for data going out to visitors.</p>
       <ul>
-        <li><strong>Cost</strong>: Free for 10 GB, then very cheap</li>
-        <li><strong>Setup</strong>: Create a Cloudflare account → R2 → Create two buckets → Generate API token</li>
-        <li><strong>Best for</strong>: Railway, Render, Fly.io — any platform without persistent disk</li>
+        <li><strong>Free tier</strong>: 10 GB storage, 1 million write operations/month, 10 million read operations/month — permanently free, no 12-month limit</li>
+        <li><strong>After free tier</strong>: $0.015/GB storage, $4.50 per million writes, $0.36 per million reads — still very cheap</li>
+        <li><strong>Setup</strong>: Cloudflare account → R2 → two buckets → API token. Takes about 10 minutes.</li>
+        <li><strong>Reality check</strong>: A personal site with 500 uploaded images averaging 500 KB each uses about 250 MB — well within the free 10 GB. You could upload tens of thousands of images before paying a cent.</li>
+        <li><strong>Best for</strong>: Railway, Cloud Run, Render, Fly.io — any platform without persistent disk</li>
       </ul>
 
       <h3>Option C — Backblaze B2</h3>
-      <p>10 GB free, then $0.006/GB. S3-compatible. Very popular in self-hosting communities. Egress fees apply (unlike R2), but very cheap at low traffic.</p>
+      <p>10 GB free, then $0.006/GB storage. S3-compatible. Very popular in self-hosting communities. Unlike R2, egress fees apply (first 1 GB/day free, then $0.01/GB) — but at low traffic this is negligible.</p>
 
       <h3>Option D — Google Cloud Storage (GCS)</h3>
-      <p>Required for Cloud Run deployments that use Workload Identity for authentication. The GitHub Actions workflow creates buckets automatically.</p>
+      <p>Required for Cloud Run deployments using Workload Identity authentication. Two buckets are created automatically by the deployment workflow. First 5 GB free, then $0.020/GB. At a few hundred MB, the cost is pennies per month.</p>
 
       <h3>Recommendation</h3>
       <ul>
-        <li>On <strong>Coolify/VPS</strong>: start with local storage. Add R2 later if you outgrow the disk.</li>
-        <li>On <strong>Railway/Render/Fly</strong>: use <strong>Cloudflare R2</strong> (zero egress, generous free tier).</li>
-        <li>On <strong>Cloud Run</strong>: use <strong>Google Cloud Storage</strong> (automated by the deployment workflow).</li>
+        <li>On <strong>Coolify/VPS</strong>: start with local storage. Add R2 if you outgrow the disk.</li>
+        <li>On <strong>Railway/Render/Fly</strong>: use <strong>Cloudflare R2</strong> — zero egress, generous permanent free tier.</li>
+        <li>On <strong>Cloud Run</strong>: use <strong>Google Cloud Storage</strong> (automated) — a few cents per month at low traffic.</li>
       </ul>
 
       <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
 
       <h2>Decision 4 — Email / SMTP</h2>
-      <p>AECMS sends transactional emails: account verification, order receipts, password resets, and digital file delivery. You need an SMTP provider to send these.</p>
+      <p>AECMS sends transactional emails: account verification, order receipts, password resets, and digital file delivery. You need an SMTP provider.</p>
 
       <table>
         <thead>
@@ -205,45 +214,45 @@
         </thead>
         <tbody>
           <tr>
-            <td><strong>Resend</strong></td>
-            <td>3,000 emails/month</td>
-            <td>Developer-friendly, easy setup, excellent deliverability. Recommended.</td>
+            <td><strong>Resend</strong> ★</td>
+            <td>3,000 emails/month, 100/day</td>
+            <td>Developer-friendly, API key works as SMTP password, excellent deliverability. Easiest setup. <strong>Recommended.</strong></td>
           </tr>
           <tr>
             <td><strong>Brevo (formerly Sendinblue)</strong></td>
             <td>300 emails/day</td>
-            <td>Good free tier. Slightly more setup. Good EU alternative.</td>
+            <td>Good free tier. Slightly more setup. Good EU alternative to Resend.</td>
           </tr>
           <tr>
             <td><strong>Mailgun</strong></td>
-            <td>100 emails/day (trial)</td>
-            <td>Solid deliverability. Requires domain verification.</td>
+            <td>100 emails/day (trial period)</td>
+            <td>Solid deliverability. Requires domain verification. Trial emails expire after 3 months without a paid plan.</td>
           </tr>
           <tr>
             <td><strong>Gmail SMTP</strong></td>
             <td>Free</td>
-            <td>Works, but requires an App Password and has sending limits. Not recommended for production.</td>
+            <td>Works, but requires an App Password and has sending limits (500/day). Not recommended for production — deliverability is lower.</td>
           </tr>
           <tr>
             <td><strong>Your hosting provider</strong></td>
             <td>Often included</td>
-            <td>Check if your domain registrar or host provides SMTP. Often the simplest option.</td>
+            <td>Check if your domain registrar or host provides SMTP. Often the simplest and cheapest option.</td>
           </tr>
         </tbody>
       </table>
 
       <h3>Recommendation</h3>
-      <p><strong>Resend</strong> is the easiest to set up and has the best deliverability for the free tier. Sign up at resend.com, verify your domain, and copy the API key — that is your SMTP password.</p>
+      <p><strong>Resend</strong> is the easiest to set up and has the best deliverability on the free tier. Sign up at resend.com, verify your domain, copy the API key — that is your SMTP password in AECMS settings. 3,000 emails/month is more than enough for a personal site.</p>
 
       <div class="callout note">
-        <div class="callout-title">ℹ️ You can configure email after install</div>
-        <p>Email configuration is done in the Admin Settings panel after the setup wizard runs. You do not need to have it ready before deploying — you can test email delivery later. Just note that verification emails and order receipts will not work until email is configured.</p>
+        <div class="callout-title">ℹ️ Configure email after install</div>
+        <p>Email is configured in Admin Settings → Email after the setup wizard runs. You can deploy without it and get email working later. Just be aware that verification emails, order receipts, and digital file delivery won't work until it's configured.</p>
       </div>
 
       <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
 
-      <h2>Decision 5 — Redis (Session Cache)</h2>
-      <p>AECMS uses Redis for session token caching, rate limiting, and RSS feed caching. For most platforms, this is handled automatically.</p>
+      <h2>Decision 5 — Redis (Cache)</h2>
+      <p>AECMS uses Redis for session token caching, rate limiting, and RSS feed caching. For most platforms this is handled automatically; it is a small workload.</p>
 
       <table>
         <thead>
@@ -256,29 +265,99 @@
         <tbody>
           <tr>
             <td><strong>Built into Railway</strong></td>
-            <td>Included</td>
+            <td>Usage-based (minimal)</td>
             <td>Add a Redis plugin to your Railway project. No setup needed.</td>
           </tr>
           <tr>
             <td><strong>Built into Coolify</strong></td>
-            <td>Free (VPS cost)</td>
-            <td>One-click Redis service in Coolify. Included in docker-compose.production.yml.</td>
+            <td>Free (VPS cost only)</td>
+            <td>One-click Redis service. Included in docker-compose.production.yml.</td>
           </tr>
           <tr>
-            <td><strong>Upstash</strong></td>
-            <td>Free (10K req/day)</td>
-            <td>Serverless Redis. Free tier is sufficient for low-traffic sites. Used with Cloud Run.</td>
+            <td><strong>Upstash</strong> ★</td>
+            <td>✅ Free: 500K commands/month, 256 MB</td>
+            <td>Serverless Redis. <strong>The free tier increased significantly in 2026</strong> — previously 10K/day, now 500K/month. For a personal site making a few thousand cache reads per day, this is effectively free forever. Used with Cloud Run.</td>
           </tr>
           <tr>
             <td><strong>Redis Cloud</strong></td>
             <td>Free (30 MB)</td>
-            <td>30 MB is very tight. Only if other options aren't available.</td>
+            <td>30 MB is tight. Only if other options aren't available.</td>
           </tr>
         </tbody>
       </table>
 
       <h3>Recommendation</h3>
-      <p>Use whatever your hosting platform provides. On Cloud Run, use <strong>Upstash</strong> (free tier is more than enough for a personal site).</p>
+      <p>Use whatever your hosting platform provides. On Cloud Run, use <strong>Upstash</strong> — the free tier (500K commands/month) comfortably covers a personal site's Redis usage with room to spare.</p>
+
+      <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
+
+      <h2>What Will This Actually Cost?</h2>
+      <p>Here are realistic total monthly estimates for each platform combination, assuming a low-traffic personal site (a few hundred visitors per day, ~10,000 page views/month).</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Setup</th>
+            <th>Compute</th>
+            <th>Database</th>
+            <th>Storage</th>
+            <th>Redis</th>
+            <th>Email</th>
+            <th><strong>Total</strong></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Cloud Run + Neon + Upstash + R2</strong></td>
+            <td>~$0</td>
+            <td>$0 (Neon free)</td>
+            <td>$0 (R2 free)</td>
+            <td>$0 (Upstash free)</td>
+            <td>$0 (Resend free)</td>
+            <td><strong>~$0–2/mo</strong> ✨</td>
+          </tr>
+          <tr>
+            <td><strong>Cloud Run + Cloud SQL + Upstash + GCS</strong></td>
+            <td>~$0</td>
+            <td>~$10 (Cloud SQL)</td>
+            <td>~$0.05 (GCS)</td>
+            <td>$0 (Upstash free)</td>
+            <td>$0 (Resend free)</td>
+            <td><strong>~$10–12/mo</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Coolify + Hetzner CX22</strong></td>
+            <td colspan="5">Everything included in one VPS</td>
+            <td><strong>~€4.50/mo (~$5)</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Railway (Hobby + Postgres + Redis)</strong></td>
+            <td colspan="5">All services bundled</td>
+            <td><strong>~$10–15/mo</strong></td>
+          </tr>
+          <tr>
+            <td><strong>Render (Starter)</strong></td>
+            <td colspan="5">Per-service pricing</td>
+            <td><strong>~$14–21/mo</strong></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ The near-zero path</div>
+        <p>Cloud Run + Neon + Upstash + Cloudflare R2 + Resend is the cheapest possible production-grade deployment. All five services have generous free tiers that a personal site will comfortably stay within. The catch: this requires modifying the Cloud Run GitHub Actions workflow to use Neon instead of Cloud SQL (the default). If you are comfortable editing a YAML file and a few environment variables, this is worth it. The Cloud Run guide explains both paths.</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Cloud Run free tier specifics (as of 2026)</div>
+        <p>Google Cloud Run's free tier is <strong>per billing account, every month, with no expiry</strong>:</p>
+        <ul>
+          <li><strong>2 million requests/month</strong> free — a 10,000 page view/month site generates maybe 30,000–50,000 backend requests. You have 40× headroom before paying.</li>
+          <li><strong>360,000 vCPU-seconds/month</strong> free — that is 100 hours of CPU time. Even with fast requests averaging 10ms each, 2 million requests uses only ~5,500 vCPU-seconds.</li>
+          <li><strong>180,000 GiB-seconds/month</strong> free — roughly 200 hours for a 512 MB container.</li>
+        </ul>
+        <p>At low traffic, Cloud Run compute is effectively free. The FvR deployment has run at essentially $0 in compute costs since launch.</p>
+      </div>
 
       <hr style="border: none; border-top: 1px solid var(--border); margin: 2rem 0;" />
 
@@ -290,7 +369,7 @@
           <tr><th>Service</th><th>Your choice</th></tr>
         </thead>
         <tbody>
-          <tr><td>Hosting platform</td><td><em>(Railway / Coolify / Cloud Run / Render / Fly.io)</em></td></tr>
+          <tr><td>Hosting platform</td><td><em>(Railway / Coolify+Hetzner / Cloud Run / Render / Fly.io)</em></td></tr>
           <tr><td>Database</td><td><em>(built-in / Neon / Cloud SQL / other)</em></td></tr>
           <tr><td>File storage</td><td><em>(local / Cloudflare R2 / Backblaze B2 / GCS / other)</em></td></tr>
           <tr><td>Email/SMTP</td><td><em>(Resend / Brevo / Mailgun / Gmail / other)</em></td></tr>

@@ -105,15 +105,19 @@ In `payments.service.ts` handler for `checkout.session.completed`, extract `sess
 
 ## Part D — PayPal Tax Handling
 
-PayPal has no automatic tax service equivalent to Stripe Tax. Options:
+PayPal has **no automatic tax calculation service** equivalent to Stripe Tax. This is a confirmed limitation as of 2026. PayPal's built-in tax system only allows manually-configured flat rates per state, set through your PayPal Business dashboard — it cannot determine the correct rate automatically and cannot be driven by an API. It also supports only one rate per state (no ZIP-code-level precision) and doesn't adapt as tax law changes.
 
-**Option A (recommended for now)**: Apply a pre-calculated flat Texas rate (8.25%) to orders from Texas customers and add it to the PayPal order amount. Requires collecting state from the customer before initiating PayPal checkout — already collected for physical goods (shipping address); for digital goods, add a lightweight "billing state" field to the PayPal checkout flow.
+**Confirmed options:**
 
-**Option B**: Use Stripe Tax's API (not Checkout) to calculate the tax amount for a given address and product, then pass the result to PayPal. More accurate but more complex.
+**Option A — Manual flat rate (recommended for now)**: Store a configurable flat tax rate per state in AECMS tax settings (Part E). Apply it to PayPal orders based on the shipping state (physical) or billing state (digital, collected at checkout). The PayPal Orders API v2 supports explicit `tax_total` in line items — set it to the pre-calculated amount. Accurate enough for Texas-only nexus and single-state situations.
 
-**Option C**: Don't collect tax via PayPal at this stage. Route customers who need tax-compliant receipts through Stripe. Document this limitation.
+**Option B — TaxJar integration**: [TaxJar](https://taxjar.com) ($19–99/mo depending on volume) provides an API that calculates the precise rate for any US address and product type, handles economic nexus tracking, and offers a PayPal integration. Worth it if PayPal volume is significant and multi-state nexus becomes a concern. Overkill at current scale.
 
-Decision to be made at implementation time based on PayPal transaction volume.
+**Option C — Stripe Tax API for PayPal orders**: Use Stripe Tax's calculation API (not Checkout) to compute the correct tax for a given address + product, then pass the result to PayPal. More accurate than flat rates and reuses existing Stripe Tax configuration. Additional complexity: requires a Stripe API call before every PayPal checkout initiation.
+
+**Option D — No PayPal tax collection**: Route PayPal checkout users through Stripe for tax-compliant receipts, and document the limitation. Acceptable at current PayPal transaction volume.
+
+**Recommendation**: Implement Option A first (flat rate per state, configurable in Tax Settings). If PayPal volume grows or multi-state nexus is triggered, evaluate TaxJar (Option B). The architecture should make the tax calculation step injectable so the provider can be swapped without rewriting the checkout flow.
 
 ---
 

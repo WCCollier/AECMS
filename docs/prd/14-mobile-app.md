@@ -172,14 +172,15 @@ The existing REST API handles everything else without modification.
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Framework | React Native + Expo | Shares React knowledge with the Next.js frontend; Expo simplifies native build infra; OTA updates via Expo Updates |
+| Framework | React Native + Expo | Shares React knowledge with the Next.js frontend; Expo simplifies native build infra; OTA updates via Expo Updates. **Flutter holds ~46% cross-platform market share vs RN's ~35–42% in 2026** but Flutter's Dart requirement and pixel-perfection focus are overkill for a content/commerce reader app. JS/TS skills transfer directly with RN. |
 | Navigation | Expo Router (file-based, mirrors Next.js App Router) | Familiar pattern; deep links work out of the box |
 | State | Zustand + SWR (same as web) | Minimal new dependencies |
-| Payments | @stripe/stripe-react-native | Native payment sheet; Apple/Google Pay natively |
+| Payments | None (reader app — no in-app purchasing) | Physical and digital goods purchased on website; app is consumption-only. No @stripe/stripe-react-native needed. |
 | Secure storage | expo-secure-store | JWT tokens in device keychain |
 | Fonts | @expo-google-fonts/* | Exact same fonts as web |
 | Rich text | react-native-render-html (v1) | Fast to ship; upgrade to native renderer in v2 |
 | Images | expo-image | Caching, blurhash placeholders |
+| Build/OTA | Expo EAS | Free tier (30 builds/mo, 1K MAU OTA) sufficient for single-site white-label at launch |
 
 ---
 
@@ -191,13 +192,56 @@ The single-site white-label path also means a motivated site owner could submit 
 
 ---
 
+## Platform store policy (confirmed, 2026)
+
+### iOS — Apple App Store
+
+**The IAP question is answered: use the reader app model, no IAP.**
+
+Apple's rules distinguish between "reader apps" (apps that let users consume content purchased elsewhere) and apps that sell digital goods directly. The reader app model — used by Kindle, Netflix, and Spotify — is fully permitted and requires no IAP. The key rules:
+
+- You may **not** include a "Buy" button, price, or checkout flow inside the app for digital goods
+- You **may** include a "Buy on our website" link that opens a browser (post–Epic v. Apple ruling, US storefront)
+- Users who have purchased on the web can access their content in the app
+- No Apple commission on purchases made outside the app
+
+For AECMS's product mix — articles (free or subscription via web), digital downloads, and physical goods — the reader app model works cleanly:
+- **Articles**: display for free, reader app
+- **Digital products**: purchased on the website, accessed in the app (download button, Kindle delivery)
+- **Physical products**: the app shows the product, taps open the site in Safari for checkout — no IAP needed since physical goods are always exempt
+- **No subscription flow in app**: if the owner adds paid subscriptions, they're managed on the website
+
+External payment links in US apps are now permitted (Apple must allow them post-ruling), but Apple still charges **27%** on purchases made via external links in the US (down from 30% but still significant). The reader app model sidesteps this entirely.
+
+**Bottom line**: Build AECMS's iOS app as a consumption-first reader app. No IAP, no 27% cut, no compliance complexity.
+
+### Android — Google Play
+
+Google Play is significantly more developer-friendly in 2026 following the Epic v. Google settlement:
+
+- Standard commission dropped from **30% to 20%** for new installs (subscriptions from 15% to 10% after year 1)
+- External billing program (link-out to website): fee drops to approximately **9%** on transactions within 24 hours of the link-out
+- Regional rollout: US, EU, UK effective June 30, 2026; global by September 2027
+
+For AECMS's Android app, the same reader app model applies and works well. Physical goods are exempt (always have been). Digital goods sold via the website within 24 hours of an in-app link carry ~9% — much more reasonable than Apple's 27%.
+
+### Expo EAS pricing (2026)
+
+- **Free plan**: 30 cloud builds/month, 1,000 MAUs for OTA updates, 100 GiB bandwidth — sufficient for a single-site white-label app at small publisher scale
+- **Starter ($19/mo)**: 3,000 MAUs for OTA — needed once the app has a modest user base
+- **OTA updates at scale**: 100K MAU costs ~$1,326/mo (plan + overage). Not a concern for Phase 31; worth noting when audience grows
+
+For a single-site white-label app at low traffic, the **free Expo EAS tier is sufficient indefinitely**.
+
+---
+
 ## Open questions (to resolve when active)
 
-- **Store distribution strategy**: Maintain a single "AECMS Reader" app + publish instructions for white-label? Or only white-label and no shared reader app?
-- **Expo vs bare React Native**: Expo managed workflow is faster but limits some native modules. Given the feature set above, managed workflow is probably sufficient.
-- **In-app purchases**: Apple takes 30% of digital goods sold in iOS apps. This is a real constraint — the App Store rules may require routing digital product purchases through IAP rather than Stripe, which is a significant compliance and margin issue. Needs legal/policy review before committing to iOS ecommerce.
-- **Section layout rendering**: The new SectionsPageContent schema (Phase 23) adds a CSS grid layout system. A native equivalent for the Home tab's page rendering would need a native flexbox/grid approximation.
-- **Minimum AECMS version targeting**: The app will need to know what API version it's talking to. The manifest should include an `api_version` field for compatibility gating.
+- **Store distribution strategy**: Maintain a single "AECMS Reader" app + publish instructions for white-label? Or only white-label and no shared reader app? (Leaning: white-label only — the reader app model is cleaner for a branded app.)
+- **Expo managed vs bare workflow**: Managed workflow's CNG prebuild adds time and can push cloud builds past the free tier's 45-minute timeout. Bare workflow skips this. For a lean app without unusual native modules, managed workflow is probably fine for v1.
+- **Section layout rendering**: The new SectionsPageContent schema (Phase 23) uses CSS grid per section. A native equivalent would need flexbox rows approximating the column widths. Simple 1-, 2-, and 3-column layouts are straightforward; the 4-column Feature Centre layout needs care.
+- **Minimum AECMS version targeting**: The manifest should include an `api_version` field so older AECMS instances can gracefully tell the app which features are available.
+- **Subscription support**: If the owner adds paid article subscriptions in a future phase, the reader app model requires those be purchased and managed entirely on the web. The app would check subscription status via the customer API and gate content accordingly.
 
 ---
 

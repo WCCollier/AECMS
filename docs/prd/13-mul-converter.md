@@ -325,6 +325,10 @@ The backend does not use Puppeteer or a screenshot service in v1. Instead:
 
 This text-only extraction approach makes the AI task well-defined and avoids vision-model costs for users who prefer lighter/cheaper models.
 
+**Limitation**: This approach only captures colors from inline `<style>` tags and `style=""` attributes in the initial HTML. It does not fetch external CSS files (`<link rel="stylesheet">`) or execute JavaScript. For sites that load styles dynamically (e.g. CSS-in-JS, React-rendered pages), the color extraction will be incomplete.
+
+**v2 enhancement path — Firecrawl**: [Firecrawl](https://firecrawl.dev) is a purpose-built web scraping API that handles JS rendering, bot protection, and clean content extraction. It returns LLM-ready markdown + full rendered HTML after JavaScript execution. Using Firecrawl as the ingest layer in v2 would solve the JS-rendered page problem and produce cleaner text content for layout analysis. Firecrawl has a free tier (500 credits) suitable for a low-usage backstage tool, or can be self-hosted. The extraction pipeline would remain the same; only the HTML source changes from a raw `fetch()` to a Firecrawl API call returning the post-JS-execution DOM.
+
 ### AI Provider Abstraction
 
 ```typescript
@@ -460,6 +464,8 @@ The system prompt is assembled in `MulConverterService.buildSystemPrompt()` and 
 
 - **Anthropic**: Use tool use / `tool_choice: { type: 'tool', name: 'emit_result' }` with the JSON schema as the tool input schema. This guarantees well-formed JSON that matches the schema.
 - **OpenAI**: Use `response_format: { type: 'json_schema', json_schema: { schema: <schema>, strict: true } }` (available in `gpt-4o` and later). Fall back to `response_format: { type: 'json_object' }` if the model doesn't support strict schemas, with server-side validation.
+
+**Note (2026)**: Anthropic's structured outputs API (guaranteed JSON schema adherence, public beta as of mid-2026) is now available for Claude Sonnet 4.6+. This is the preferred path for the Anthropic provider — it eliminates the need for prompt-level JSON coercion and guarantees parse-safe responses. Use `betas: ['output-128k-2025-02-19']` and pass the MulOutputSchema as the `schema` parameter in the messages API call.
 
 ---
 
