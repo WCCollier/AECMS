@@ -6,7 +6,6 @@ import {
   Delete,
   Body,
   Query,
-  Param,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -30,11 +29,6 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { UpdateShippingAddressDto } from './dto/shipping-address.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { BackstageGuard } from './guards/backstage.guard';
-import { CapabilityGuard } from '../capabilities/guards/capability.guard';
-import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
-import { UpdateUserRoleDto } from './dto/update-user-role.dto';
-import { UserRole } from '@prisma/client';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -190,39 +184,6 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid code or expired session' })
   async verifyTwoFactor(@Body() dto: VerifyTwoFactorDto) {
     return this.authService.verifyTwoFactor(dto.preAuthToken, dto.code);
-  }
-
-  // ── User Management (Owner-only) ────────────────────────────────────────
-
-  @Get('admin/users')
-  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-  @RequiresCapability('user.assign_role')
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'List all users (Owner only)' })
-  async listUsers(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-  ) {
-    return this.authService.listUsers(
-      Math.max(1, parseInt(page ?? '1', 10) || 1),
-      Math.min(100, parseInt(limit ?? '20', 10) || 20),
-      search,
-    );
-  }
-
-  @Patch('admin/users/:id/role')
-  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
-  @RequiresCapability('user.assign_role')
-  @ApiBearerAuth()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: "Change a user's role (Owner only)" })
-  async updateUserRole(
-    @Request() req: any,
-    @Param('id') id: string,
-    @Body() dto: UpdateUserRoleDto,
-  ) {
-    return this.authService.updateUserRole(req.user.id, id, dto.role as UserRole);
   }
 
   @Post('2fa/setup')
