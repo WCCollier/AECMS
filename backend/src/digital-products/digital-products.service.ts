@@ -124,6 +124,45 @@ export class DigitalProductsService {
   }
 
   /**
+   * List all digital files across all products — for the backstage Digital Storage panel
+   */
+  async listAllFiles(page = 1, limit = 50, search?: string) {
+    const skip = (page - 1) * limit;
+    const where = search
+      ? { product: { title: { contains: search, mode: 'insensitive' as const } } }
+      : {};
+
+    const [files, total] = await Promise.all([
+      this.prisma.digitalProductFile.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { created_at: 'desc' },
+        include: {
+          product: { select: { id: true, title: true, slug: true, status: true } },
+        },
+      }),
+      this.prisma.digitalProductFile.count({ where }),
+    ]);
+
+    return {
+      data: files.map((f) => ({
+        id: f.id,
+        product_id: f.product_id,
+        product: f.product,
+        format: f.format,
+        file_path: f.file_id,
+        personalization_enabled: f.personalization_enabled,
+        personalization_tested: f.personalization_tested,
+        max_downloads: f.max_downloads,
+        created_at: f.created_at,
+        updated_at: f.updated_at,
+      })),
+      meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
    * Get a specific digital file
    */
   async getDigitalFile(id: string): Promise<DigitalFileResponseDto> {

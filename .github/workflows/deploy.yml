@@ -19,6 +19,10 @@ on:
     branches: [deploy]
   workflow_dispatch:
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   GCP_PROJECT: ${{ vars.GCP_PROJECT_NUMBER }}
   GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}

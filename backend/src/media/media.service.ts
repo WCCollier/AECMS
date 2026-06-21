@@ -10,13 +10,18 @@ import { AuditLogService } from '../audit/audit.service';
 import { Media } from '@prisma/client';
 import sharp from 'sharp';
 import * as path from 'path';
+import * as AdmZip from 'adm-zip';
 import { UpdateMediaDto, QueryMediaDto } from './dto';
 import { STORAGE_PROVIDER } from '../storage';
 import type { StorageProvider } from '../storage';
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024;       // 10 MB per file
+const MAX_ZIP_SIZE = 50 * 1024 * 1024;         // 50 MB per zip
+const MAX_ZIP_UNCOMPRESSED = 100 * 1024 * 1024; // 100 MB total uncompressed
+const MAX_ZIP_ENTRIES = 500;
+
 @Injectable()
 export class MediaService {
-  private readonly maxFileSize = 10 * 1024 * 1024; // 10 MB
   private readonly allowedMimeTypes = [
     'image/jpeg',
     'image/jpg',
@@ -40,32 +45,43 @@ export class MediaService {
     caption?: string,
   ): Promise<Media> {
     this.validateFile(file);
+    return this.uploadBuffer(file.buffer, file.originalname, file.mimetype, file.size, userId, altText, caption);
+  }
 
+  private async uploadBuffer(
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string,
+    size: number,
+    userId: string,
+    altText?: string,
+    caption?: string,
+  ): Promise<Media> {
     try {
       const timestamp = Date.now();
-      const sanitizedName = this.sanitizeFilename(file.originalname);
+      const sanitizedName = this.sanitizeFilename(originalName);
       const filename = `${timestamp}-${sanitizedName}`;
 
-      await this.storageProvider.upload(file.buffer, filename, {
-        contentType: file.mimetype,
-        metadata: { originalName: file.originalname, uploadedBy: userId },
+      await this.storageProvider.upload(buffer, filename, {
+        contentType: mimeType,
+        metadata: { originalName, uploadedBy: userId },
       });
 
       let thumbnailPath: string | null = null;
-      const isImage = file.mimetype.startsWith('image/');
+      const isImage = mimeType.startsWith('image/');
 
-      if (isImage && file.mimetype !== 'image/svg+xml') {
-        thumbnailPath = await this.generateThumbnail(file.buffer, filename);
+      if (isImage && mimeType !== 'image/svg+xml') {
+        thumbnailPath = await this.generateThumbnail(buffer, filename);
       }
 
-      const dimensions = isImage ? await this.getImageDimensions(file.buffer) : null;
+      const dimensions = isImage ? await this.getImageDimensions(buffer) : null;
 
       const media = await this.prisma.media.create({
         data: {
           filename,
-          original_name: file.originalname,
-          mime_type: file.mimetype,
-          size: file.size,
+          original_name: originalName,
+          mime_type: mimeType,
+          size,
           file_path: filename,
           thumbnail_path: thumbnailPath,
           alt_text: altText || null,
@@ -81,7 +97,7 @@ export class MediaService {
         user_id: userId,
         resource_type: 'media',
         resource_id: media.id,
-        metadata: { filename: file.originalname, mime_type: file.mimetype, size: file.size },
+        metadata: { filename: originalName, mime_type: mimeType, size },
       });
 
       return this.transformMedia(media);
@@ -90,32 +106,283 @@ export class MediaService {
     }
   }
 
-  async findAll(query: QueryMediaDto) {
-    const { page = 1, limit = 20, search } = query;
-    const skip = (page - 1) * limit;
-    const where = search
-      ? {
-          OR: [
-            { original_name: { contains: search, mode: 'insensitive' as const } },
-            { alt_text: { contains: search, mode: 'insensitive' as const } },
-            { caption: { contains: search, mode: 'insensitive' as const } },
-          ],
+  async bulkUpload(
+    files: Express.Multer.File[],
+    userId: string,
+  ): Promise<{ succeeded: Media[]; failed: { name: string; error: string }[] }> {
+    const succeeded: Media[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    for (const file of files) {
+      const isZip = file.mimetype === 'application/zip' || file.originalname.toLowerCase().endsWith('.zip');
+
+      if (isZip) {
+        if (file.size > MAX_ZIP_SIZE) {
+          failed.push({ name: file.originalname, error: `Zip exceeds 50 MB limit` });
+          continue;
         }
-      : {};
+        const zipResults = await this.extractAndUploadZip(file, userId);
+        succeeded.push(...zipResults.succeeded);
+        failed.push(...zipResults.failed);
+      } else {
+        try {
+          this.validateFile(file);
+          const media = await this.uploadBuffer(file.buffer, file.originalname, file.mimetype, file.size, userId);
+          succeeded.push(media);
+        } catch (err) {
+          failed.push({ name: file.originalname, error: err.message });
+        }
+      }
+    }
+
+    await this.auditLog.log({
+      event_type: 'media.bulk_uploaded',
+      user_id: userId,
+      resource_type: 'media',
+      metadata: { count: succeeded.length, failed: failed.length },
+    });
+
+    return { succeeded, failed };
+  }
+
+  private async extractAndUploadZip(
+    zipFile: Express.Multer.File,
+    userId: string,
+  ): Promise<{ succeeded: Media[]; failed: { name: string; error: string }[] }> {
+    const succeeded: Media[] = [];
+    const failed: { name: string; error: string }[] = [];
+
+    let zip: AdmZip;
+    try {
+      zip = new AdmZip(zipFile.buffer);
+    } catch {
+      return { succeeded, failed: [{ name: zipFile.originalname, error: 'Invalid or corrupt zip file' }] };
+    }
+
+    const entries = zip.getEntries();
+
+    if (entries.length > MAX_ZIP_ENTRIES) {
+      return { succeeded, failed: [{ name: zipFile.originalname, error: `Zip contains more than ${MAX_ZIP_ENTRIES} entries` }] };
+    }
+
+    const totalUncompressed = entries.reduce((sum, e) => sum + e.header.size, 0);
+    if (totalUncompressed > MAX_ZIP_UNCOMPRESSED) {
+      return { succeeded, failed: [{ name: zipFile.originalname, error: `Zip uncompressed size exceeds 100 MB` }] };
+    }
+
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+
+      const entryName = path.basename(entry.entryName);
+      if (entryName.startsWith('.') || entryName.startsWith('__MACOSX')) continue;
+
+      if (entry.header.size > MAX_FILE_SIZE) {
+        failed.push({ name: entryName, error: `Exceeds 10 MB per-file limit` });
+        continue;
+      }
+
+      const buffer = entry.getData();
+      const mimeType = this.inferMimeType(entryName);
+
+      if (!this.allowedMimeTypes.includes(mimeType)) {
+        failed.push({ name: entryName, error: `File type not allowed` });
+        continue;
+      }
+
+      try {
+        const media = await this.uploadBuffer(buffer, entryName, mimeType, buffer.length, userId);
+        succeeded.push(media);
+      } catch (err) {
+        failed.push({ name: entryName, error: err.message });
+      }
+    }
+
+    return { succeeded, failed };
+  }
+
+  async replace(
+    id: string,
+    file: Express.Multer.File,
+    userId: string,
+  ): Promise<Media> {
+    const existing = await this.findOne(id);
+
+    this.validateFile(file);
+
+    const oldSize = existing.size;
+    const oldMime = existing.mime_type;
+
+    // Overwrite bytes at same storage key — URL stays stable
+    await this.storageProvider.upload(file.buffer, this.storagePath(existing.file_path), {
+      contentType: file.mimetype,
+      metadata: { originalName: file.originalname, replacedBy: userId },
+    });
+
+    // Regenerate thumbnail at same key
+    const isImage = file.mimetype.startsWith('image/');
+    if (isImage && file.mimetype !== 'image/svg+xml' && existing.thumbnail_path) {
+      await this.generateThumbnailToPath(file.buffer, this.storagePath(existing.thumbnail_path));
+    }
+
+    const dimensions = isImage ? await this.getImageDimensions(file.buffer) : null;
+
+    const updated = await this.prisma.media.update({
+      where: { id },
+      data: {
+        original_name: file.originalname,
+        mime_type: file.mimetype,
+        size: file.size,
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
+      },
+    });
+
+    await this.auditLog.log({
+      event_type: 'media.replaced',
+      user_id: userId,
+      resource_type: 'media',
+      resource_id: id,
+      metadata: {
+        filename: file.originalname,
+        old_size: oldSize,
+        new_size: file.size,
+        old_mime: oldMime,
+        new_mime: file.mimetype,
+      },
+    });
+
+    return this.transformMedia(updated);
+  }
+
+  async bulkRemove(
+    ids: string[],
+    userId: string,
+  ): Promise<{ deleted: string[]; failed: { id: string; error: string }[] }> {
+    const deleted: string[] = [];
+    const failed: { id: string; error: string }[] = [];
+
+    for (const id of ids) {
+      try {
+        await this.remove(id);
+        deleted.push(id);
+      } catch (err) {
+        failed.push({ id, error: err.message });
+      }
+    }
+
+    await this.auditLog.log({
+      event_type: 'media.bulk_deleted',
+      user_id: userId,
+      resource_type: 'media',
+      metadata: { count: deleted.length, failed: failed.length },
+    });
+
+    return { deleted, failed };
+  }
+
+  async getUsage(id: string): Promise<{
+    total_uses: number;
+    articles: { id: string; title: string; slug: string }[];
+    products: { id: string; title: string; slug: string }[];
+    pages: { id: string; title: string; slug: string }[];
+  }> {
+    await this.findOne(id); // 404 if not found
+
+    const [articleRows, productRows, pageRows] = await Promise.all([
+      this.prisma.articleMedia.findMany({
+        where: { media_id: id },
+        include: { article: { select: { id: true, title: true, slug: true } } },
+      }),
+      this.prisma.productMedia.findMany({
+        where: { media_id: id },
+        include: { product: { select: { id: true, title: true, slug: true } } },
+      }),
+      this.prisma.pageMedia.findMany({
+        where: { media_id: id },
+        include: { page: { select: { id: true, title: true, slug: true } } },
+      }),
+    ]);
+
+    const articles = articleRows.map((r) => r.article);
+    const products = productRows.map((r) => r.product);
+    const pages = pageRows.map((r) => r.page);
+
+    return {
+      total_uses: articles.length + products.length + pages.length,
+      articles,
+      products,
+      pages,
+    };
+  }
+
+  async findAll(query: QueryMediaDto) {
+    const { page = 1, limit = 20, search, mime_type, in_use, sort = 'date' } = query as any;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { original_name: { contains: search, mode: 'insensitive' } },
+        { alt_text: { contains: search, mode: 'insensitive' } },
+        { caption: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (mime_type) {
+      if (mime_type.endsWith('/*')) {
+        where.mime_type = { startsWith: mime_type.replace('/*', '/') };
+      } else {
+        where.mime_type = mime_type;
+      }
+    }
+
+    if (in_use === true || in_use === 'true') {
+      where.OR = [
+        ...(where.OR ?? []),
+        { article_media: { some: {} } },
+        { product_media: { some: {} } },
+        { page_media: { some: {} } },
+      ];
+      // in_use=true: must have at least one join table row
+      where.AND = [
+        {
+          OR: [
+            { article_media: { some: {} } },
+            { product_media: { some: {} } },
+            { page_media: { some: {} } },
+          ],
+        },
+      ];
+      delete where.OR;
+    } else if (in_use === false || in_use === 'false') {
+      where.article_media = { none: {} };
+      where.product_media = { none: {} };
+      where.page_media = { none: {} };
+    }
+
+    const orderBy = sort === 'name'
+      ? { original_name: 'asc' as const }
+      : sort === 'size'
+      ? { size: 'desc' as const }
+      : { uploaded_at: 'desc' as const };
 
     const [media, total] = await Promise.all([
       this.prisma.media.findMany({
-        where, skip, take: limit,
-        orderBy: { uploaded_at: 'desc' },
+        where, skip, take: limit, orderBy,
         include: {
           uploader: { select: { id: true, email: true, first_name: true, last_name: true } },
+          _count: { select: { article_media: true, product_media: true, page_media: true } },
         },
       }),
       this.prisma.media.count({ where }),
     ]);
 
     return {
-      data: media.map((m) => this.transformMedia(m)),
+      data: media.map((m) => ({
+        ...this.transformMedia(m),
+        total_uses: m._count.article_media + m._count.product_media + m._count.page_media,
+      })),
       meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
     };
   }
@@ -173,12 +440,6 @@ export class MediaService {
 
   // ── Private helpers ──────────────────────────────────────────────────────────
 
-  /**
-   * Resolve a stored file_path to a storage key.
-   * Legacy records (before ESM) stored absolute filesystem paths; new records store
-   * the relative filename. The local provider serves both correctly since it
-   * computes its own basePath internally.
-   */
   private storagePath(filePath: string): string {
     if (path.isAbsolute(filePath)) {
       return path.basename(filePath);
@@ -188,16 +449,10 @@ export class MediaService {
 
   private mediaUrl(filePath: string): string {
     const storagePath = this.storagePath(filePath);
-    // getUrl is async but transformMedia is sync — local provider URLs are
-    // deterministic so we compute them inline. Cloud providers store public URLs
-    // directly from upload() response, but for now we replicate the same logic.
-    // Full async URL resolution is available via storageProvider.getUrl(storagePath).
     const providerType = this.storageProvider.getProviderType();
     if (providerType === 'local') {
       return `/uploads/${storagePath}`;
     }
-    // For cloud providers, callers that need a full URL should call
-    // storageProvider.getUrl() directly. The stored file_path is the storage key.
     return storagePath;
   }
 
@@ -210,15 +465,11 @@ export class MediaService {
 
   private validateFile(file: Express.Multer.File): void {
     if (!file) throw new BadRequestException('No file provided');
-    if (file.size > this.maxFileSize) {
-      throw new BadRequestException(
-        `File size exceeds maximum allowed size of ${this.maxFileSize / 1024 / 1024}MB`,
-      );
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException(`File size exceeds maximum allowed size of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
     }
     if (!this.allowedMimeTypes.includes(file.mimetype)) {
-      throw new BadRequestException(
-        `File type not allowed. Allowed types: ${this.allowedMimeTypes.join(', ')}`,
-      );
+      throw new BadRequestException(`File type not allowed. Allowed types: ${this.allowedMimeTypes.join(', ')}`);
     }
   }
 
@@ -229,13 +480,31 @@ export class MediaService {
       .substring(0, 200);
   }
 
+  private inferMimeType(filename: string): string {
+    const ext = path.extname(filename).toLowerCase();
+    const map: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.pdf': 'application/pdf',
+    };
+    return map[ext] ?? 'application/octet-stream';
+  }
+
   private async generateThumbnail(fileBuffer: Buffer, originalFilename: string): Promise<string | null> {
+    const thumbFilename = `thumb-${originalFilename.replace(/\.[^.]+$/, '.jpg')}`;
+    return this.generateThumbnailToPath(fileBuffer, thumbFilename);
+  }
+
+  private async generateThumbnailToPath(fileBuffer: Buffer, thumbFilename: string): Promise<string | null> {
     try {
       const thumbBuffer = await sharp(fileBuffer)
         .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
         .jpeg({ quality: 80 })
         .toBuffer();
-      const thumbFilename = `thumb-${originalFilename.replace(/\.[^.]+$/, '.jpg')}`;
       await this.storageProvider.upload(thumbBuffer, thumbFilename, { contentType: 'image/jpeg' });
       return thumbFilename;
     } catch (error) {

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { PagesService } from './pages.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit.service';
+import { MediaSyncService } from '../media/media-sync.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('PagesService', () => {
@@ -27,6 +28,7 @@ describe('PagesService', () => {
   };
 
   const mockAuditLog = { log: jest.fn() };
+  const mockMediaSync = { syncEntityMedia: jest.fn() };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -34,6 +36,7 @@ describe('PagesService', () => {
         PagesService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditLogService, useValue: mockAuditLog },
+        { provide: MediaSyncService, useValue: mockMediaSync },
       ],
     }).compile();
 

@@ -10,12 +10,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateArticleDto, UpdateArticleDto, QueryArticlesDto } from './dto';
 import { Prisma, ContentStatus, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
+import { MediaSyncService } from '../media/media-sync.service';
 
 @Injectable()
 export class ArticlesService {
   constructor(
     private prisma: PrismaService,
     private auditLog: AuditLogService,
+    private mediaSync: MediaSyncService,
   ) {}
 
   private getMediaInclude() {
@@ -35,24 +37,6 @@ export class ArticlesService {
       tags: { include: { tag: true } },
       ...(withCounts ? { _count: { select: { comments: true, versions: true } } } : {}),
     };
-  }
-
-  /**
-   * Write article_media junction rows for an article, replacing any existing set.
-   * First item in array is primary.
-   */
-  private async setArticleMedia(articleId: string, mediaIds: string[]) {
-    await this.prisma.articleMedia.deleteMany({ where: { article_id: articleId } });
-    if (mediaIds.length === 0) return;
-
-    await this.prisma.articleMedia.createMany({
-      data: mediaIds.map((mediaId, index) => ({
-        article_id: articleId,
-        media_id: mediaId,
-        order: index,
-        is_primary: index === 0,
-      })),
-    });
   }
 
   /**
@@ -108,9 +92,7 @@ export class ArticlesService {
       include: this.getArticleInclude(),
     });
 
-    if (dto.media_ids?.length) {
-      await this.setArticleMedia(article.id, dto.media_ids);
-    }
+    await this.mediaSync.syncEntityMedia('article', article.id, dto.content, dto.media_ids ?? []);
 
     if (dto.status === 'published') {
       await this.createVersion(article.id, dto.title, dto.content, authorId, 'Published');
@@ -299,9 +281,8 @@ export class ArticlesService {
 
     await this.prisma.article.update({ where: { id }, data: updateData });
 
-    if (dto.media_ids !== undefined) {
-      await this.setArticleMedia(id, dto.media_ids);
-    }
+    const freshContent = dto.content ?? article.content;
+    await this.mediaSync.syncEntityMedia('article', id, freshContent, dto.media_ids ?? (article as any).media?.map((m: any) => m.media_id) ?? []);
 
     const isPublishing = dto.status === ContentStatus.published && article.status !== ContentStatus.published;
     const isUpdatingPublished = article.status === ContentStatus.published;

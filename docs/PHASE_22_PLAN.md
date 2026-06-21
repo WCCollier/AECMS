@@ -690,9 +690,337 @@ The `github-ci` service account was not granted `roles/storage.admin`. The H.2-A
 
 ---
 
+## Item M — File Manager (Media Library)
+
+**Priority**: Medium  
+**Requested**: 2026-06-21
+
+### Goal
+
+A first-class backstage tool for managing all uploaded media: a browsable catalogue with thumbnail previews, per-file usage tracking, inline metadata editing, single-file replace (bytes-only, stable URL), bulk upload with drag-and-drop and zip extraction, and multi-select bulk delete with in-use warnings.
+
+---
+
+### Current State
+
+The media backend already exists but is incomplete:
+
+- `GET /media` — paginated list with uploader info ✅
+- `POST /media/upload` — single file, thumbnail generation, audit log ✅
+- `DELETE /media/:id` — storage + DB removal ✅
+- `PATCH /media/:id` — alt text / caption update ✅
+- `ArticleMedia` and `ProductMedia` join tables exist in the DB schema ✅
+- Thumbnails generated at upload (300×300 JPEG) ✅
+
+**Gaps:**
+- No `BackstageGuard` on write endpoints — any authenticated customer JWT can currently upload or delete media
+- No `PageMedia` join table — page-media relationships are not tracked
+- No bulk upload, zip extraction, bulk delete, or replace endpoint
+- No usage lookup (which content items reference a given file)
+- No `/admin/media` page in the backstage at all
+
+---
+
+### M.1 — Prisma: Add `PageMedia` Join Table
+
+Pages are the only content type with no media join table. Media embedded in page content is currently tracked only as URL strings in the TipTap JSON body — meaning "in use" detection for pages is impossible without a join table.
+
+**New model:**
+
+```prisma
+model PageMedia {
+  page_id  String
+  media_id String
+  order    Int     @default(0)
+  is_primary Boolean @default(false)
+
+  page  Page  @relation(fields: [page_id], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [media_id], references: [id], onDelete: Cascade)
+
+  @@id([page_id, media_id])
+  @@map("page_media")
+}
+```
+
+Add the reverse relation to `Media` and `Page` models. Migration: `add_page_media_join_table`.
+
+**Populating the table going forward:** The page editor (TipTap) should write to `PageMedia` when images are inserted. This is a separate concern from the file manager itself — flag as a follow-up if the editor does not yet do this. The file manager's "in use" panel will be accurate for articles and products immediately; for pages it will be accurate only for pages saved after this migration is applied.
+
+---
+
+### M.2 — Backend: Shared `MediaSyncService` — TipTap Content Extraction
+
+The join tables (`ArticleMedia`, `ProductMedia`, `PageMedia`) currently capture only explicit gallery selections. They are blind to images embedded inline in TipTap body content. This section defines the single shared function that fixes all three content types at once and becomes the authoritative write path for all media–content associations going forward.
+
+#### What TipTap nodes embed media records
+
+Only two node types reference Media DB records:
+
+| Node type | How media is stored | Resolution needed |
+|---|---|---|
+| `image` | `attrs.src` = URL string (`/uploads/{filename}` for local; storage key for cloud) | URL → media ID via `filename` lookup |
+| `mediaCarousel` | `attrs.media` = JSON string of `MediaItem[]`, each with `{ id, url, ... }` | None — `id` is already the media record UUID |
+
+All other nodes (`articleEmbed`, `productEmbed`, `videoEmbed`, `xEmbed`, `rssEmbed`, `callout`, `richTextBox`) embed external URLs or content record IDs — not Media records. They are ignored by the extractor.
+
+#### `MediaSyncService`
+
+New service at `backend/src/media/media-sync.service.ts`, injected into `ArticlesService`, `ProductsService`, and `PagesService`.
+
+**Public method:**
+
+```typescript
+async syncEntityMedia(
+  entityType: 'article' | 'product' | 'page',
+  entityId: string,
+  content: string,           // TipTap JSON string (the saved content field)
+  explicitMediaIds: string[] // ordered gallery IDs from the form (may be empty)
+): Promise<void>
+```
+
+**Steps:**
+
+1. **Extract from TipTap JSON** — recursively walk the parsed JSON tree:
+   - `node.type === 'image'`: push `node.attrs.src` to `imageUrls[]`
+   - `node.type === 'mediaCarousel'`: parse `node.attrs.media` as JSON; push each entry's `.id` to `inlineIds[]`
+   - Recurse into `node.content[]` if present
+
+2. **Resolve image URLs to media IDs** — for each URL in `imageUrls[]`:
+   - Extract the filename: strip `/uploads/` prefix (local) or take the path basename (cloud)
+   - Query `prisma.media.findFirst({ where: { filename: basename } })`
+   - Collect resolved IDs; silently skip any URL that doesn't match a Media record (e.g. external hotlinked images)
+
+3. **Merge and deduplicate** — build the final ordered set:
+   - Explicit gallery IDs come first (these carry `is_primary` and `order` semantics)
+   - Inline IDs (`inlineIds` + resolved image URL IDs) that are not already in the explicit set are appended after
+   - Deduplicate, preserving first-seen order
+
+4. **Write join table rows** — delete all existing rows for `entityId`, then `createMany`:
+   - Explicit gallery items: `is_primary = (index === 0)`, `order = index`
+   - Inline-only items: `is_primary = false`, `order = explicitMediaIds.length + inlinePosition`
+   - Target table selected by `entityType` switch: `articleMedia` / `productMedia` / `pageMedia`
+
+#### Integration points
+
+Replace `setArticleMedia()` in `ArticlesService.create()` and `update()` with a call to `syncEntityMedia('article', id, dto.content, dto.media_ids ?? [])`.
+
+Replace `setProductMedia()` in `ProductsService.create()` and `update()` with a call to `syncEntityMedia('product', id, dto.description, dto.media_ids ?? [])`.
+
+Add a call to `syncEntityMedia('page', id, dto.content, [])` in `PagesService.create()` and `update()` (pages have no gallery field, so `explicitMediaIds` is always `[]`).
+
+The existing `setArticleMedia()` and `setProductMedia()` private methods can be removed once replaced.
+
+#### What this means for `GET /media/:id/usage`
+
+With `MediaSyncService` in place, the usage endpoint queries join tables exclusively — no JSON text scanning. Coverage is:
+- Articles: all gallery images + all inline `image` nodes + all `mediaCarousel` node items
+- Products: same
+- Pages: all inline `image` nodes + all `mediaCarousel` node items (no gallery field)
+
+**Known gap**: existing content saved before this migration is applied will not have retroactive join table rows. The "in use" badge may undercount for legacy content. A one-time backfill script can be added if needed, but is not part of this item.
+
+---
+
+### M.3 — Backend: Security Fix — Add `BackstageGuard` to Media Write Endpoints
+
+`POST /media/upload`, `PATCH /media/:id`, `DELETE /media/:id` currently guard with `JwtAuthGuard + CapabilityGuard` only. A customer session JWT with `media.upload` or `media.delete` capability could call these endpoints. Add `BackstageGuard` to all three write endpoints (same pattern as `ArticlesController`).
+
+---
+
+### M.3 — Backend: New `media.manage` Capability
+
+Add `media.manage` to the capabilities seed:
+
+- Category: `content`, scope: `backstage`
+- Description: `Bulk-delete media files and replace file content`
+- Grant to: **Owner** and **Admin** (same as `media.upload` / `media.delete`)
+
+Used to gate bulk-delete and replace. Single upload/delete retain their existing `media.upload` / `media.delete` caps.
+
+---
+
+### M.4 — Backend: New Endpoints
+
+#### `POST /media/bulk-upload`
+
+- Guard: `JwtAuthGuard + BackstageGuard + CapabilityGuard` (`media.upload`)
+- Accepts `multipart/form-data` with field name `files` (multiple)
+- For each file in the upload:
+  - If MIME type is `application/zip` (or filename ends `.zip`): extract with `adm-zip`; apply per-entry limits below; process each entry through the same validate → upload → thumbnail → DB pipeline as single upload
+  - Otherwise: pass through existing `upload()` pipeline
+- **Zip limits**: reject any zip where total uncompressed size > 100 MB or entry count > 500; skip entries whose individual uncompressed size exceeds the 10 MB single-file limit (log as a failure, continue other entries)
+- **Zip size limit**: 50 MB per zip file (separate from the 10 MB per-extracted-file limit)
+- Returns: `{ succeeded: MediaRecord[], failed: { name: string, error: string }[] }`
+- Audit log entry: `media.bulk_uploaded` with `{ count: number, zip_files: number, failed: number }`
+
+#### `DELETE /media/bulk`
+
+- Guard: `JwtAuthGuard + BackstageGuard + CapabilityGuard` (`media.manage`)
+- Body: `{ ids: string[] }`
+- Calls `remove()` for each ID; collects successes and failures
+- Returns: `{ deleted: string[], failed: { id: string, error: string }[] }`
+- Audit log entry: `media.bulk_deleted` with `{ count: number, failed: number }`
+
+#### `POST /media/:id/replace`
+
+- Guard: `JwtAuthGuard + BackstageGuard + CapabilityGuard` (`media.manage`)
+- Accepts `multipart/form-data` with a single `file` field
+- **Strategy: Option A — overwrite bytes at same storage key**
+  - Write new file bytes to the existing `file_path` key in storage (same filename, different bytes)
+  - Regenerate thumbnail to same `thumbnail_path` key
+  - Update `size`, `width`, `height`, `mime_type`, `updated_at` on the DB record
+  - `file_path`, `thumbnail_path`, and therefore all URLs remain unchanged — TipTap embeds continue to work
+  - Cache note: append `?v={unix_timestamp}` to thumbnail URLs in the backstage UI only so the browser always sees the fresh thumbnail; public-facing URLs are unaffected
+- Audit log entry: `media.replaced` with `{ filename, old_size, new_size, old_mime, new_mime }`
+- Returns the updated `Media` record
+
+#### `GET /media/:id/usage`
+
+- Guard: `JwtAuthGuard + BackstageGuard`
+- Queries `ArticleMedia`, `ProductMedia`, `PageMedia` join tables for rows where `media_id = :id`
+- Joins to fetch `id`, `title`, `slug` (or `id` for products where slug exists) for each referencing content item
+- Returns:
+  ```json
+  {
+    "total_uses": 3,
+    "articles": [{ "id": "...", "title": "...", "slug": "..." }],
+    "products": [{ "id": "...", "title": "...", "slug": "..." }],
+    "pages":    [{ "id": "...", "title": "...", "slug": "..." }]
+  }
+  ```
+
+#### Extended `GET /media` query params
+
+Add to `QueryMediaDto`:
+
+- `mime_type?: string` — e.g. `image` matches `image/*`; `application/pdf` matches exact; default: all
+- `in_use?: boolean` — `true` returns only files referenced in at least one join table row; `false` returns only unreferenced files; omit for all
+- `sort?: 'date' | 'name' | 'size'` — default `date` (existing behaviour)
+
+---
+
+### M.5 — Frontend: `/admin/media` Page
+
+**Navigation**: Top-level nav item in the backstage sidebar, between "Pages" and "Products" (or wherever fits the information architecture; keep alongside other content items).
+
+**Layout**: Full-width page. Two areas:
+
+#### Bulk Uploader (collapsible panel at top)
+
+- Drag-and-drop zone: dashed border, accepts any allowed MIME type plus `.zip`
+- "Or browse files" button: `<input type="file" multiple accept="image/*,application/pdf,.zip">` (hidden, triggered by button click)
+- Queued file list: filename + size + per-file progress bar
+- Sends to `POST /media/bulk-upload` as a single multipart request
+- On completion: shows succeeded/failed counts; invalidates catalogue SWR cache
+- Collapses to a single "Upload files" button row when idle
+
+#### Catalogue Grid (main area)
+
+- CSS grid, 4–6 columns depending on viewport
+- Each card:
+  - Thumbnail (for images); file-type icon for PDF, SVG, ZIP
+  - Filename (truncated with ellipsis)
+  - File size + upload date
+  - **"In use" green dot badge** if `total_uses > 0` (fetched in a single batch call to `GET /media/:id/usage` for visible cards, or via an extended `GET /media?include_usage=true` if that proves simpler)
+  - Checkbox (appears on hover; stays visible when any checkbox is selected — "selection mode")
+- Filter bar above grid: search input, MIME type selector (All / Images / PDFs), In Use toggle (All / In Use / Unused), sort selector
+- Infinite scroll (SWR + IntersectionObserver on sentinel div)
+- **Selection mode header** (appears when ≥1 card is checked): "X files selected" + "Delete selected" button
+
+#### Detail Panel (slides in from right when a card is clicked)
+
+- Full-size image preview (or file-type icon for non-images)
+- Read-only metadata: filename, MIME type, dimensions (if image), file size, upload date, uploader
+- Editable fields: alt text, caption — PATCH on blur, with inline save indicator
+- **"Used in" section**:
+  - Fetches `GET /media/:id/usage` on panel open
+  - Lists articles, products, pages as clickable links to their backstage edit pages
+  - Shows "Not used anywhere" if `total_uses === 0`
+- **Action buttons**:
+  - Download — triggers `GET /media/:id/download`
+  - Replace — opens single-file picker; confirms filename/type before sending; sends to `POST /media/:id/replace`; updates panel after success
+  - Delete — single-file delete confirmation modal; warns if `total_uses > 0`
+
+#### Bulk Delete Confirmation Modal
+
+Triggered by "Delete selected" in selection mode header.
+
+Content:
+- "Delete {N} files?" heading
+- If any of the selected files have `total_uses > 0`: warning block — "Warning: {Y} of these files are currently referenced in articles, products, or pages. Deleting them will break those references."
+- Two buttons: **Cancel** / **Delete {N} files** (destructive red)
+- On confirm: calls `DELETE /media/bulk` with selected IDs; shows result toast ("X deleted, Y failed"); refreshes grid
+
+---
+
+---
+
+### M.7 — Frontend: Digital Storage Panel
+
+A second read-only catalogue on the `/admin/media` page, in a separate tab alongside the main Media Library tab.
+
+#### Why read-only and DB-backed
+
+Digital product source files (EPUBs, PDFs) live under the `digital-products/` path in storage and are served exclusively through signed/authenticated backend endpoints. They must never be directly linked, downloaded via the backstage, or deleted outside the product edit flow — doing so could silently break active download tokens and audit trails.
+
+The `DigitalProductFile` DB table already tracks every uploaded source file, including its storage path (`file_id`), format, product association, and whether personalization is enabled. There is no need to list the raw bucket contents — the DB is the authoritative catalogue.
+
+#### Endpoint
+
+New endpoint: `GET /digital-products/files` (or extend the existing module)
+
+- Guard: `JwtAuthGuard + BackstageGuard + CapabilityGuard` (capability: `digital.deliver` — already on Admin + Owner)
+- Returns all `DigitalProductFile` rows joined to their parent `Product` (`id`, `title`, `slug`, `status`)
+- Includes: `id`, `product_id`, `format`, `file_id` (path only — never a URL), `personalization_enabled`, `personalization_tested`, `max_downloads`, `created_at`, `updated_at`, and the joined product fields
+- Pagination and search by product title
+
+#### UI
+
+Tab label: **Digital Files** (alongside **Media Library** tab)
+
+Each row in the catalogue shows:
+- Format badge (`PDF` / `EPUB`)
+- Storage path (the `file_id` value, displayed as plain text — not a link)
+- Product name — clickable link to `/admin/products/{product_id}` (the edit page)
+- Personalization indicator (enabled / tested badges)
+- Upload date
+
+No delete, download, or replace controls are present in this view. A small inline note at the top of the tab: *"Digital source files are managed from each product's edit page. Click a product name to go there."*
+
+The intentional absence of file operations here is a security boundary, not an oversight — it is documented in the UI itself.
+
+#### Implementation notes
+
+- No new storage queries — reads exclusively from `DigitalProductFile` via Prisma
+- No signed URLs generated — `file_id` is displayed as a storage path string for operator visibility, not as a clickable link
+- The panel is useful for operators who want to audit which products have source files uploaded, check personalization status across all digital products at once, or spot orphaned records (files whose product has been deleted — these would show `product: null` and could be flagged)
+
+---
+
+### Implementation Order Within Item M
+
+1. `PageMedia` Prisma migration (M.1)
+2. `MediaSyncService` — TipTap extractor + join table writer (M.2)
+3. Replace `setArticleMedia` / `setProductMedia` calls in ArticlesService and ProductsService with `syncEntityMedia`; add `syncEntityMedia` call to PagesService (M.2)
+4. `BackstageGuard` fix on existing media write endpoints (M.3)
+5. Add `media.manage` to capabilities seed (M.4)
+6. `POST /media/:id/replace` endpoint (M.5)
+7. `GET /media/:id/usage` endpoint — join-table-only, no JSON scanning (M.5)
+8. `POST /media/bulk-upload` with zip support (M.5)
+9. `DELETE /media/bulk` (M.5)
+10. Extend `GET /media` filters (M.5)
+11. Frontend `/admin/media` page — two-tab shell (M.6 + M.7)
+12. Media Library tab — catalogue grid + detail panel (M.6)
+13. Frontend bulk uploader panel (M.6)
+14. Bulk delete modal (M.6)
+15. Wire "In use" badges via usage endpoint (M.6)
+16. Digital Files tab — read-only catalogue with product links (M.7)
+
+---
+
 ## Adding New Items
 
-As live testing surfaces additional new issues, append them here as **Item M**, **Item N**, etc. following the same format:
+As live testing surfaces additional new issues, append them here as **Item N**, **Item O**, etc. following the same format:
 - Problem description
 - Risk / urgency
 - Concrete fix steps

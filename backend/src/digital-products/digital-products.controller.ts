@@ -38,6 +38,24 @@ export class DigitalProductsController {
   ) {}
 
   /**
+   * List all digital files across all products — for the backstage Digital Storage panel
+   */
+  @Get('files/all')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('digital.deliver')
+  async listAllFiles(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.digitalProductsService.listAllFiles(
+      page ? parseInt(page, 10) : 1,
+      limit ? parseInt(limit, 10) : 50,
+      search,
+    );
+  }
+
+  /**
    * Upload a digital file for a product (Admin only)
    */
   @Post('files')

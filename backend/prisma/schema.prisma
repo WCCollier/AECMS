@@ -277,6 +277,7 @@ model Page {
   parent   Page?  @relation("PageHierarchy", fields: [parent_id], references: [id])
   children Page[] @relation("PageHierarchy")
   versions PageVersion[]
+  media    PageMedia[]
 
   @@unique([parent_id, slug])
   @@index([parent_id])
@@ -357,6 +358,7 @@ model Media {
   uploader         User          @relation("MediaUploader", fields: [uploaded_by], references: [id], onDelete: Cascade)
   article_media    ArticleMedia[]
   product_media    ProductMedia[]
+  page_media       PageMedia[]
 
   @@index([mime_type])
   @@index([uploaded_by])
@@ -540,6 +542,19 @@ model ProductMedia {
 
   @@id([product_id, media_id])
   @@map("product_media")
+}
+
+model PageMedia {
+  page_id    String
+  media_id   String
+  order      Int     @default(0)
+  is_primary Boolean @default(false)
+
+  page  Page  @relation(fields: [page_id], references: [id], onDelete: Cascade)
+  media Media @relation(fields: [media_id], references: [id], onDelete: Cascade)
+
+  @@id([page_id, media_id])
+  @@map("page_media")
 }
 
 // ============================================================================
