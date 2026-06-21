@@ -90,7 +90,8 @@ for ROLE in \
   roles/run.developer \
   roles/artifactregistry.writer \
   roles/iam.serviceAccountUser \
-  roles/secretmanager.secretAccessor; do
+  roles/secretmanager.secretAccessor \
+  roles/storage.admin; do
   gcloud projects add-iam-policy-binding "$PROJECT_ID" \
     --member="serviceAccount:${CI_SA_EMAIL}" \
     --role="$ROLE" \
