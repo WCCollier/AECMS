@@ -69,6 +69,11 @@ export class CreateArticleDto {
   @MaxLength(160)
   meta_description?: string;
 
+  @ApiPropertyOptional({ description: 'Open Graph image URL override' })
+  @IsString()
+  @IsOptional()
+  og_image_url?: string;
+
   @ApiPropertyOptional({ description: 'Category IDs', type: [String] })
   @IsArray()
   @IsUUID('4', { each: true })

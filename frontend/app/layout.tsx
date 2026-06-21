@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     template: '%s | AECMS',
   },
   description: 'Advanced Ecommerce Content Management System',
-  keywords: ['cms', 'ecommerce', 'content management'],
 };
 
 async function getSiteTheme(): Promise<{ paletteId: string; fontPairingId: string; siteTitle: string; faviconUrl: string | null }> {

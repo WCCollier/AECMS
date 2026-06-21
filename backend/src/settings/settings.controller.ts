@@ -58,6 +58,19 @@ export class PublicSettingsController {
     ]);
     return { favicon_url, logo_url, brand_color };
   }
+
+  @Get('seo')
+  @ApiOperation({ summary: 'Get public SEO settings (site name, author, canonical domain)' })
+  async getSeoPublic() {
+    const keys = [
+      'seo.site_name', 'seo.site_description', 'seo.og_default_image',
+      'seo.author_name', 'seo.author_url', 'seo.author_twitter',
+      'seo.author_same_as', 'seo.canonical_domain',
+      'seo.google_verification', 'seo.robots_additional',
+    ];
+    const values = await Promise.all(keys.map((k) => this.settingsService.getEffective(k)));
+    return Object.fromEntries(keys.map((k, i) => [k, values[i] ?? '']));
+  }
 }
 
 @ApiTags('settings')
@@ -175,6 +188,19 @@ export class SettingsController {
     );
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'Settings saved' };
+  }
+
+  // ── SEO ────────────────────────────────────────────────────────────────────
+
+  @Patch('seo')
+  @RequiresCapability('system.configure.general')
+  @ApiOperation({ summary: 'Update SEO settings' })
+  async updateSeo(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('seo.')),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'SEO settings saved' };
   }
 
   // ── Appearance (separate capability — delegatable to Admin) ────────────────

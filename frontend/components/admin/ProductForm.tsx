@@ -33,6 +33,13 @@ interface ProductFormData {
   guest_purchaseable: boolean;
   meta_title: string;
   meta_description: string;
+  og_image_url: string;
+  isbn: string;
+  book_format: string;
+  page_count: string;
+  publisher: string;
+  amazon_url: string;
+  goodreads_url: string;
 }
 
 interface ProductFormProps {
@@ -85,11 +92,22 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
       guest_purchaseable: initialData?.guest_purchaseable ?? true,
       meta_title: initialData?.meta_title || '',
       meta_description: initialData?.meta_description || '',
+      og_image_url: (initialData as any)?.og_image_url || '',
+      isbn: (initialData as any)?.isbn || '',
+      book_format: (initialData as any)?.book_format || '',
+      page_count: (initialData as any)?.page_count ? String((initialData as any).page_count) : '',
+      publisher: (initialData as any)?.publisher || '',
+      amazon_url: (initialData as any)?.amazon_url || '',
+      goodreads_url: (initialData as any)?.goodreads_url || '',
     },
   });
 
   const title = watch('title');
   const slug = watch('slug');
+  const metaTitle = watch('meta_title');
+  const metaDescription = watch('meta_description');
+  const shortDesc = watch('short_description');
+  const isbnValue = watch('isbn');
   const productType = watch('product_type');
   const currentStatus = watch('status');
 
@@ -143,6 +161,13 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
         guest_purchaseable: data.guest_purchaseable,
         meta_title: data.meta_title || undefined,
         meta_description: data.meta_description || undefined,
+        og_image_url: data.og_image_url || undefined,
+        isbn: data.isbn || undefined,
+        book_format: data.book_format || undefined,
+        page_count: data.page_count ? parseInt(data.page_count, 10) : undefined,
+        publisher: data.publisher || undefined,
+        amazon_url: data.amazon_url || undefined,
+        goodreads_url: data.goodreads_url || undefined,
         media_ids: gallery.map((e) => e.mediaId),
       };
 
@@ -443,24 +468,94 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
               <CardTitle>SEO</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Google snippet preview */}
+              <div className="rounded-lg border border-foreground/10 bg-foreground/5 p-3 text-xs">
+                <p className="text-[11px] text-foreground/40 mb-1 uppercase tracking-wide">Preview</p>
+                <p className="text-blue-400 truncate">{slug ? `yoursite.com/shop/${slug}` : 'yoursite.com/shop/...'}</p>
+                <p className="text-[15px] text-blue-300 font-medium mt-0.5 truncate">{metaTitle || title || 'Product title'}</p>
+                <p className="text-foreground/60 mt-0.5 line-clamp-2">{metaDescription || shortDesc || 'Meta description will appear here'}</p>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium mb-2">Meta Title</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium">Meta Title</label>
+                  <span className={`text-xs ${metaTitle.length > 60 ? 'text-red-400' : 'text-foreground/40'}`}>{metaTitle.length}/60</span>
+                </div>
                 <Input
                   {...register('meta_title')}
-                  placeholder="SEO title (optional)"
+                  placeholder={title || 'SEO title (defaults to product title)'}
                   className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Meta Description</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium">Meta Description</label>
+                  <span className={`text-xs ${metaDescription.length > 160 ? 'text-red-400' : 'text-foreground/40'}`}>{metaDescription.length}/160</span>
+                </div>
                 <textarea
                   {...register('meta_description')}
-                  placeholder="SEO description (optional)"
+                  placeholder={shortDesc || 'SEO description (defaults to short description)'}
                   rows={3}
                   className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">OG Image URL</label>
+                <Input
+                  {...register('og_image_url')}
+                  placeholder="Override social sharing image (defaults to first product image)"
+                  className="w-full"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Book Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-xs text-foreground/50">Fill in for book products. Used in structured data (schema.org/Book) to help search engines and AI surfaces identify this as a book.</p>
+              <div>
+                <label className="block text-sm font-medium mb-1">ISBN</label>
+                <Input {...register('isbn')} placeholder="e.g. 9781647198855" className="w-full" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Format</label>
+                <select
+                  {...register('book_format')}
+                  className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                >
+                  <option value="">— not a book —</option>
+                  <option value="EBook">eBook</option>
+                  <option value="Paperback">Paperback</option>
+                  <option value="Hardcover">Hardcover</option>
+                  <option value="AudioBook">Audiobook</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Page Count</label>
+                  <Input {...register('page_count')} type="number" placeholder="e.g. 312" className="w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Publisher</label>
+                  <Input {...register('publisher')} placeholder="e.g. BookLocker.com" className="w-full" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Amazon URL</label>
+                <Input {...register('amazon_url')} placeholder="https://www.amazon.com/dp/..." className="w-full" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Goodreads URL</label>
+                <Input {...register('goodreads_url')} placeholder="https://www.goodreads.com/book/show/..." className="w-full" />
+              </div>
+              {(isbnValue || watch('book_format')) && (
+                <p className="text-xs text-green-400/80">Book schema will be emitted for this product page.</p>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -29,6 +29,9 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [zones, setZones] = useState<PageContent['zones']>({});
   const [showInNav, setShowInNav] = useState(true);
   const [parentId, setParentId] = useState<string | null>(null);
+  const [metaTitle, setMetaTitle] = useState('');
+  const [metaDescription, setMetaDescription] = useState('');
+  const [ogImageUrl, setOgImageUrl] = useState('');
   const handleParentChange = (newParentId: string | null) => {
     setParentId(newParentId);
     setPendingReorder(null);
@@ -50,6 +53,9 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
       setStatus(p.status);
       setShowInNav((p as any).show_in_nav ?? true);
       setParentId(p.parent_id ?? null);
+      setMetaTitle((p as any).meta_title ?? '');
+      setMetaDescription((p as any).meta_description ?? '');
+      setOgImageUrl((p as any).og_image_url ?? '');
       const content = parsePageContent(p.content);
       setLayout(content.layout);
       setZones(content.zones);
@@ -87,6 +93,9 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         setStatus(p.status);
         setShowInNav((p as any).show_in_nav ?? true);
         setParentId(p.parent_id ?? null);
+        setMetaTitle((p as any).meta_title ?? '');
+        setMetaDescription((p as any).meta_description ?? '');
+        setOgImageUrl((p as any).og_image_url ?? '');
         const content = parsePageContent(p.content);
         setLayout(content.layout);
         setZones(content.zones);
@@ -125,6 +134,9 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         status,
         show_in_nav: showInNav,
         parent_id: parentId,
+        meta_title: metaTitle || undefined,
+        meta_description: metaDescription || undefined,
+        og_image_url: ogImageUrl || undefined,
       });
       if (pendingReorder) {
         await adminApi.patch('/pages/reorder', { pages: pendingReorder });
@@ -319,6 +331,44 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         onChange={(z) => { setZones(z); setDirty(true); }}
         previewSmall={previewSmall}
       />
+
+      {/* SEO */}
+      <div className="mt-6 p-4 bg-surface rounded-lg border border-border space-y-4">
+        <h3 className="text-sm font-semibold">SEO</h3>
+        {/* Snippet preview */}
+        <div className="rounded-lg border border-foreground/10 bg-foreground/5 p-3 text-xs">
+          <p className="text-[11px] text-foreground/40 mb-1 uppercase tracking-wide">Preview</p>
+          <p className="text-blue-400 truncate">yoursite.com/{slug || '…'}</p>
+          <p className="text-[15px] text-blue-300 font-medium mt-0.5 truncate">{metaTitle || title || 'Page title'}</p>
+          <p className="text-foreground/60 mt-0.5">{metaDescription || 'Meta description will appear here'}</p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium">Meta Title</label>
+              <span className={`text-xs ${metaTitle.length > 60 ? 'text-red-400' : 'text-foreground/40'}`}>{metaTitle.length}/60</span>
+            </div>
+            <Input value={metaTitle} onChange={(e) => { setMetaTitle(e.target.value); setDirty(true); }} placeholder={title || 'SEO title (defaults to page title)'} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">OG Image URL</label>
+            <Input value={ogImageUrl} onChange={(e) => { setOgImageUrl(e.target.value); setDirty(true); }} placeholder="Override social sharing image" />
+          </div>
+        </div>
+        <div>
+          <div className="flex justify-between items-center mb-1">
+            <label className="block text-sm font-medium">Meta Description</label>
+            <span className={`text-xs ${metaDescription.length > 160 ? 'text-red-400' : 'text-foreground/40'}`}>{metaDescription.length}/160</span>
+          </div>
+          <textarea
+            value={metaDescription}
+            onChange={(e) => { setMetaDescription(e.target.value); setDirty(true); }}
+            placeholder="SEO description (defaults to site description)"
+            rows={2}
+            className="w-full px-3 py-2 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 resize-none"
+          />
+        </div>
+      </div>
 
       <div className="mt-6">
         <VersionHistoryPanel resourceType="pages" resourceId={pageId} refreshKey={versionKey} onRestored={handleRestored} />

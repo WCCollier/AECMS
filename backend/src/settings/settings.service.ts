@@ -48,6 +48,9 @@ const ENV_KEY_MAP: Record<string, string> = {
   'storage.s3_access_key_id':          'S3_ACCESS_KEY_ID',
   'storage.s3_secret_access_key_enc':  'S3_SECRET_ACCESS_KEY',
   'storage.cdn_base_url':              'STORAGE_CDN_BASE_URL',
+  // SEO
+  'seo.site_name':                     'SITE_NAME',
+  'seo.canonical_domain':              'APP_URL',
 };
 
 @Injectable()

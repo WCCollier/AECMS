@@ -80,6 +80,11 @@ export class CreatePageDto {
   @MaxLength(160)
   meta_description?: string;
 
+  @ApiPropertyOptional({ description: 'Open Graph image URL override' })
+  @IsString()
+  @IsOptional()
+  og_image_url?: string;
+
   @ApiPropertyOptional({ description: 'Author can edit this page', default: true })
   @IsBoolean()
   @IsOptional()

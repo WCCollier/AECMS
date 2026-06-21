@@ -25,6 +25,7 @@ interface ArticleFormData {
   visibility: 'public' | 'logged_in_only' | 'admin_only';
   meta_title: string;
   meta_description: string;
+  og_image_url: string;
 }
 
 interface ArticleFormProps {
@@ -66,10 +67,15 @@ export function ArticleForm({ articleId, initialData, onSaved }: ArticleFormProp
       visibility: initialData?.visibility || 'public',
       meta_title: initialData?.meta_title || '',
       meta_description: initialData?.meta_description || '',
+      og_image_url: (initialData as any)?.og_image_url || '',
     },
   });
 
   const title = watch('title');
+  const metaTitle = watch('meta_title');
+  const metaDescription = watch('meta_description');
+  const slugValue = watch('slug');
+  const excerptValue = watch('excerpt');
 
   useEffect(() => {
     if (!articleId && title) {
@@ -241,22 +247,45 @@ export function ArticleForm({ articleId, initialData, onSaved }: ArticleFormProp
               <CardTitle>SEO</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Google snippet preview */}
+              <div className="rounded-lg border border-foreground/10 bg-foreground/5 p-3 text-xs">
+                <p className="text-[11px] text-foreground/40 mb-1 uppercase tracking-wide">Preview</p>
+                <p className="text-blue-400 truncate">{slugValue ? `yoursite.com/articles/${slugValue}` : 'yoursite.com/articles/...'}</p>
+                <p className="text-[15px] text-blue-300 font-medium mt-0.5 truncate">{metaTitle || title || 'Article title'}</p>
+                <p className="text-foreground/60 mt-0.5 line-clamp-2">{metaDescription || excerptValue || 'Meta description will appear here'}</p>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium mb-2">Meta Title</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium">Meta Title</label>
+                  <span className={`text-xs ${metaTitle.length > 60 ? 'text-red-400' : 'text-foreground/40'}`}>{metaTitle.length}/60</span>
+                </div>
                 <Input
                   {...register('meta_title')}
-                  placeholder="SEO title (optional)"
+                  placeholder={title || 'SEO title (defaults to article title)'}
                   className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Meta Description</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium">Meta Description</label>
+                  <span className={`text-xs ${metaDescription.length > 160 ? 'text-red-400' : 'text-foreground/40'}`}>{metaDescription.length}/160</span>
+                </div>
                 <textarea
                   {...register('meta_description')}
-                  placeholder="SEO description (optional)"
+                  placeholder={excerptValue || 'SEO description (defaults to excerpt)'}
                   rows={3}
                   className="w-full px-3 py-2 border border-foreground/20 rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">OG Image URL</label>
+                <Input
+                  {...register('og_image_url')}
+                  placeholder="Override social sharing image (defaults to first article image)"
+                  className="w-full"
                 />
               </div>
             </CardContent>

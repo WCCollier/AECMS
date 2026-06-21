@@ -24,6 +24,7 @@
         <a href="index.html">Ch 2 — Platform Setup</a>
         <a href="../ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
         <a href="../ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+        <a href="../ch08-seo.html">Ch 8 — SEO Setup</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-title">Platform Guides</div>
@@ -47,13 +48,71 @@
 
       <div class="page-header">
         <h1>Deploying to Google Cloud Run</h1>
-        <p class="subtitle">Production-grade, serverless containers. Automated via GitHub Actions.</p>
-        <p class="meta">Estimated time: 60–90 minutes &nbsp;·&nbsp; Cost: ~$10–12/month at low traffic</p>
+        <p class="subtitle">Serverless containers that scale to zero — automated via GitHub Actions.</p>
+        <p class="meta">Estimated time: 60–90 minutes &nbsp;·&nbsp; Cost: $0–12/month depending on database choice</p>
       </div>
 
       <div class="callout note">
         <div class="callout-title">ℹ️ Who this is for</div>
-        <p>Cloud Run is best suited for owners who are comfortable with cloud infrastructure or want a scalable foundation that grows with their site. The initial setup has more steps than Railway or Coolify, but the deployment pipeline is fully automated after that.</p>
+        <p>Cloud Run suits owners who are comfortable with cloud infrastructure or want a scalable foundation. The initial setup has more steps than Railway or Coolify, but the deployment pipeline is fully automated after that — push to <code>deploy</code> branch and everything builds and ships without touching a server.</p>
+      </div>
+
+      <h2>What does this actually cost?</h2>
+
+      <p>Cloud Run pricing has two very different profiles depending on database choice:</p>
+
+      <table>
+        <thead>
+          <tr><th>Component</th><th>With Cloud SQL</th><th>With Neon Postgres ★</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Cloud Run compute</strong></td>
+            <td>~$0 at low traffic</td>
+            <td>~$0 at low traffic</td>
+          </tr>
+          <tr>
+            <td><strong>Database</strong></td>
+            <td>~$10/mo (db-f1-micro + IP)</td>
+            <td><strong>$0</strong> (Neon free tier: 0.5 GB)</td>
+          </tr>
+          <tr>
+            <td><strong>Redis (Upstash)</strong></td>
+            <td>$0 (500K cmd/mo free)</td>
+            <td>$0 (500K cmd/mo free)</td>
+          </tr>
+          <tr>
+            <td><strong>Storage (GCS)</strong></td>
+            <td>~$0.05/mo at &lt;5 GB</td>
+            <td>~$0.05/mo at &lt;5 GB</td>
+          </tr>
+          <tr>
+            <td><strong>Secret Manager</strong></td>
+            <td>~$0 (6 secrets, tiny traffic)</td>
+            <td>~$0</td>
+          </tr>
+          <tr>
+            <td><strong>Total</strong></td>
+            <td><strong>~$10–12/mo</strong></td>
+            <td><strong>~$0–2/mo</strong> ✨</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ Cloud Run free tier (monthly, no expiry)</div>
+        <ul>
+          <li><strong>2 million requests/month</strong> — A personal site generating 10,000 page views/month produces roughly 30,000–50,000 backend requests. You have ~40× headroom before paying for compute.</li>
+          <li><strong>360,000 vCPU-seconds/month</strong> — Even at 10ms average per request, 2 million requests uses only ~5,500 vCPU-seconds. The free tier is ~65× larger than what you'll use.</li>
+          <li><strong>180,000 GiB-seconds/month</strong> — About 200 hours of a 512 MB container running non-stop. At idle, you use nothing (containers scale to zero).</li>
+        </ul>
+        <p>The FvR reference deployment has run at effectively $0 in Cloud Run compute costs since launch. The only meaningful bill is Cloud SQL — which you can eliminate by using Neon instead.</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Neon vs Cloud SQL</div>
+        <p><strong>Cloud SQL (default)</strong>: The GitHub Actions workflow in AECMS creates a Cloud SQL instance automatically. Cloud SQL is rock-solid but the db-f1-micro instance costs ~$7/mo in compute plus ~$9.57/mo for the mandatory public IPv4 address — about $10/mo minimum even with zero traffic. It cannot be turned off without losing your data.</p>
+        <p><strong>Neon (near-free alternative)</strong>: Neon's free tier gives you 0.5 GB of PostgreSQL 16 storage, scales to zero when idle (resumes automatically on the next query with a ~1–3 second delay), and costs $0/month indefinitely. To use Neon with Cloud Run, skip the Cloud SQL setup steps (Steps 4 and 4b) and instead add your Neon connection string as the <code>aecms-database-url</code> secret. The rest of the workflow is unchanged. See <a href="https://neon.tech" target="_blank">neon.tech</a> to create a free database.</p>
       </div>
 
       <h2>Architecture Overview</h2>

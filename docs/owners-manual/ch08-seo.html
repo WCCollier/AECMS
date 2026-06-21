@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SEO Setup | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="index.html">
+        <div class="product">AECMS</div>
+        <div class="title">Owner's Manual</div>
+      </a>
+    </div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html">Overview</a>
+        <a href="ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+        <a href="ch08-seo.html" class="active">Ch 8 — SEO Setup</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="ch02-platform-setup/railway.html">Railway</a>
+        <a href="ch02-platform-setup/coolify.html">Coolify + VPS</a>
+        <a href="ch02-platform-setup/cloud-run.html">Google Cloud Run</a>
+        <a href="ch02-platform-setup/render.html">Render</a>
+        <a href="ch02-platform-setup/fly.html">Fly.io</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+
+      <div class="breadcrumb">
+        <a href="index.html">Owner's Manual</a> <span>›</span>
+        Chapter 5 — SEO Setup
+      </div>
+
+      <div class="page-header">
+        <h1>SEO Setup</h1>
+        <p class="subtitle">Help search engines and AI surfaces find your books, articles, and services.</p>
+        <p class="meta">One-time setup &nbsp;·&nbsp; ~30 minutes</p>
+      </div>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ What AECMS does for you automatically</div>
+        <p>Every published page on your site already has accurate <code>&lt;title&gt;</code>, <code>&lt;meta name="description"&gt;</code>, and Open Graph tags based on your content. A <code>/sitemap.xml</code> is generated automatically and updates whenever you publish. A <code>/robots.txt</code> is served at the correct URL. You do not need a separate SEO plugin.</p>
+        <p>This chapter covers the <strong>one-time configuration steps</strong> that make your author identity legible to Google's entity graph and AI answer engines, and the optional per-content fields you can fill in for fine-grained control.</p>
+      </div>
+
+      <h2>Step 1 — Fill in your SEO Settings</h2>
+
+      <p>Go to <strong>Admin → Settings → SEO</strong>. Fill in every field in this tab — it takes about five minutes and has a meaningful impact on how your site appears in search results and AI-generated answers.</p>
+
+      <table>
+        <thead><tr><th>Field</th><th>What to put</th></tr></thead>
+        <tbody>
+          <tr><td>Site Name</td><td>Your site's public name — e.g. <em>Fantasy V Reality</em></td></tr>
+          <tr><td>Site Description</td><td>One or two sentences about the site. Used as the default meta description on pages that don't have their own. Keep it under 160 characters.</td></tr>
+          <tr><td>Default OG Image URL</td><td>A 1200×630px image for social sharing cards when a page has no cover image. Use a branded image — your book cover, author photo, or site logo. Upload it to your media library first and copy the URL.</td></tr>
+          <tr><td>Canonical Domain</td><td>Your primary domain, e.g. <code>https://fantasyvreality.com</code>. This is what appears in canonical link tags — important if you have multiple domains.</td></tr>
+          <tr><td>Author Name</td><td>Your author name exactly as it appears on Amazon and Goodreads — e.g. <em>W. C. Collier</em></td></tr>
+          <tr><td>Author Page URL</td><td>The URL of your author page on this site, or your author alias domain — e.g. <code>https://wccollier.com</code></td></tr>
+          <tr><td>Twitter / X Handle</td><td>Your handle with @, e.g. <code>@wccollier</code>. Used in Twitter Card tags, which also appear in Discord, Slack, and iMessage link previews.</td></tr>
+          <tr><td>Author Profile URLs</td><td>One URL per line — see Step 2 below. This is the most important field for entity recognition.</td></tr>
+          <tr><td>Google Verification Code</td><td>See Step 3 below. Leave blank until you have it.</td></tr>
+        </tbody>
+      </table>
+
+      <h2>Step 2 — Build your Author Profile URL list</h2>
+
+      <p>The <strong>Author Profile URLs</strong> field is the key to Google's knowledge graph. When Google sees the same author name linked across multiple authoritative sources — your site, Amazon Author Central, Goodreads, and social profiles — it connects them into a single entity. This is how you get cited in AI-generated answers like "what authors write about X."</p>
+
+      <p>Paste one URL per line for every profile you have:</p>
+
+      <pre><code>https://www.amazon.com/stores/author/YOUR_AUTHOR_ID
+https://www.goodreads.com/author/show/YOUR_GOODREADS_ID
+https://www.instagram.com/yourhandle
+https://www.tiktok.com/@yourhandle
+https://x.com/yourhandle</code></pre>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ How to find your Amazon Author Central URL</div>
+        <p>Go to <a href="https://author.amazon.com" target="_blank">author.amazon.com</a> and sign in. Your Author Central page URL will be in the format <code>https://www.amazon.com/stores/author/XXXXXXXXXX</code>. Claim your page if you haven't already — it also lets you add a bio, photo, and blog feed that appear on your Amazon book listings.</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ How to find your Goodreads author URL</div>
+        <p>Search for your name on <a href="https://www.goodreads.com" target="_blank">goodreads.com</a>. Your author page URL will be in the format <code>https://www.goodreads.com/author/show/XXXXXXX.Your_Name</code>. If you haven't claimed it yet, click "Is this you? Let us know" on your author page listing.</p>
+      </div>
+
+      <h2>Step 3 — Submit to Google Search Console</h2>
+
+      <ol class="steps">
+        <li>Go to <a href="https://search.google.com/search-console" target="_blank">Google Search Console</a> and sign in with your Google account.</li>
+        <li>Click <strong>Add Property</strong> → <strong>URL prefix</strong> → enter your site's URL (e.g. <code>https://fantasyvreality.com</code>).</li>
+        <li>Choose the <strong>HTML tag</strong> verification method. Google gives you a <code>&lt;meta&gt;</code> tag like:<br>
+          <code>&lt;meta name="google-site-verification" content="aBcDeFgHiJkL…" /&gt;</code>
+        </li>
+        <li>Copy just the <strong>content value</strong> (the part after <code>content=</code>, without quotes) and paste it into <strong>Admin → Settings → SEO → Google Verification Code</strong>. Save.</li>
+        <li>Back in Search Console, click <strong>Verify</strong>. It should confirm immediately.</li>
+        <li>Go to <strong>Sitemaps</strong> in Search Console and submit <code>https://yoursite.com/sitemap.xml</code>. Google will crawl it and start indexing your content within a few days.</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ Also submit to Bing</div>
+        <p>Go to <a href="https://www.bing.com/webmasters" target="_blank">Bing Webmaster Tools</a> and import your Google Search Console property with one click. Bing powers several other search surfaces (DuckDuckGo, Yahoo, Ecosia) and AI answer engines. The same sitemap URL works.</p>
+      </div>
+
+      <h2>Step 4 — Add book details to your product listings</h2>
+
+      <p>When you add a book to the Shop, fill in the <strong>Book Details</strong> panel on the product edit page. These fields populate a <code>schema.org/Book</code> structured data block that search engines use to identify your product as a book — unlocking rich results and AI citation.</p>
+
+      <table>
+        <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>ISBN</td><td>Use the ISBN-13 if you have one (starts with 978 or 979). Available from your publisher or your Amazon listing.</td></tr>
+          <tr><td>Format</td><td>eBook, Paperback, Hardcover, or Audiobook. Set this to get the <code>bookFormat</code> field in structured data.</td></tr>
+          <tr><td>Page Count</td><td>Approximate is fine.</td></tr>
+          <tr><td>Publisher</td><td>e.g. <em>BookLocker.com, Inc.</em> or <em>Self-published</em></td></tr>
+          <tr><td>Amazon URL</td><td>Paste the full URL of the book's Amazon listing. This is the <code>sameAs</code> link that connects your product page to the Amazon entity — the most impactful single field for entity recognition.</td></tr>
+          <tr><td>Goodreads URL</td><td>The book's Goodreads page URL. Add this once the book appears on Goodreads.</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ The Amazon URL field is the most important</div>
+        <p>When your AECMS product page links to the Amazon listing via <code>sameAs</code>, Google's entity graph connects them: "this product and this Amazon book are the same thing." This is what causes your site to appear alongside (or instead of) Amazon in search results for your book title.</p>
+      </div>
+
+      <h2>Step 5 — Test your structured data</h2>
+
+      <p>After filling in the Book Details for your first product, verify the structured data is valid:</p>
+
+      <ol class="steps">
+        <li>Go to <a href="https://search.google.com/test/rich-results" target="_blank">Google Rich Results Test</a>.</li>
+        <li>Enter the URL of a product page — e.g. <code>https://fantasyvreality.com/shop/outsiders-vol-1</code>.</li>
+        <li>The test should show a <strong>Book</strong> result with no errors. Warnings are acceptable.</li>
+        <li>Repeat for an article page — it should show an <strong>Article</strong> result.</li>
+      </ol>
+
+      <h2>Optional — Per-content SEO overrides</h2>
+
+      <p>Every article, product, and page has a <strong>SEO</strong> panel in its edit form. The defaults (title, excerpt/description, first image) are usually sufficient — only override when you want something specific for search results.</p>
+
+      <table>
+        <thead><tr><th>Field</th><th>When to use it</th></tr></thead>
+        <tbody>
+          <tr><td>Meta Title</td><td>When the article/product title is too long for a search result (keep under 60 characters) or you want a different title in search than on the page.</td></tr>
+          <tr><td>Meta Description</td><td>When the excerpt or short description isn't compelling enough as a search snippet. Write it as a call to action. Keep under 160 characters.</td></tr>
+          <tr><td>OG Image URL</td><td>When the first image isn't the right image for social sharing. A book cover works better than a detail photo for social cards.</td></tr>
+        </tbody>
+      </table>
+
+      <p>The <strong>Preview</strong> box in the SEO panel shows how your title and description will appear in a Google search result — it updates live as you type.</p>
+
+      <h2>What to expect</h2>
+
+      <p>After completing these steps:</p>
+      <ul>
+        <li><strong>Within 1–3 days</strong>: Google crawls your sitemap and starts indexing your pages.</li>
+        <li><strong>Within 1–2 weeks</strong>: Your pages start appearing in search results. Book pages with structured data may show rich results.</li>
+        <li><strong>Within 1–3 months</strong>: Google's entity graph begins connecting your author identity across your site, Amazon, and Goodreads. Your name becomes a recognized entity in search and AI systems.</li>
+      </ul>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ AI answer engines (Perplexity, ChatGPT Search, Google AI Mode)</div>
+        <p>These systems read your structured data to verify facts and establish entity relationships. Having valid <code>Book</code> schema with ISBNs, and a <code>Person</code> schema linking to Amazon Author Central and Goodreads, meaningfully increases the probability that your books appear in AI-generated reading recommendations — even without high traffic. It is one of the few levers that doesn't require an existing audience to work.</p>
+      </div>
+
+      <h2>Next Steps</h2>
+      <ul>
+        <li>Return to <a href="ch03-aecms-config.html">Chapter 3</a> to review other configuration options</li>
+        <li>Add your first book to the Shop and fill in the Book Details panel</li>
+        <li>Check Search Console in 48 hours to confirm indexing has started</li>
+      </ul>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>
