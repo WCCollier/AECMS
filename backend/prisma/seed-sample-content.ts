@@ -27,8 +27,17 @@ const prisma = new PrismaClient({ adapter });
 
 // ── TipTap JSON helpers ──────────────────────────────────────────────────────
 
+// For Articles and Products — raw TipTap JSON string
 function doc(...children: object[]) {
   return JSON.stringify({ type: 'doc', content: children });
+}
+
+// For Pages — zone-based layout wrapping a TipTap doc object
+function pageDoc(...children: object[]) {
+  return JSON.stringify({
+    layout: 'no_sidebar',
+    zones: { main: { type: 'doc', content: children } },
+  });
 }
 
 function h1(text: string) {
@@ -74,7 +83,7 @@ function ol(...items: string[]) {
 
 // ── Content definitions ──────────────────────────────────────────────────────
 
-const HOME_CONTENT = doc(
+const HOME_CONTENT = pageDoc(
   h1('Your homepage goes here'),
   p('This is the ', bold('_home_'), ' system page — it acts as a fallback homepage when no other page is designated.'),
   p('To use a custom homepage:'),
@@ -87,7 +96,7 @@ const HOME_CONTENT = doc(
   p('You can freely edit the content above. This placeholder will be replaced with whatever you publish here.'),
 );
 
-const ABOUT_PAGES_CONTENT = doc(
+const ABOUT_PAGES_CONTENT = pageDoc(
   h1('About Pages'),
   p('Pages are the structural backbone of your site. Unlike Articles (which are chronological and discovery-oriented), Pages are evergreen and accessed by URL.'),
   h2('What a Page contains'),
