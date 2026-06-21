@@ -428,7 +428,7 @@ const keyProviderFactory = {
 | Key rotation | Manual re-entry or `POST /settings/re-encrypt` | KMS handles rotation; no re-encrypt needed |
 | Setup effort | Generate one hex string | Configure IAM role or API key |
 
-For fantasyvreality.com on Cloud Run, `gcp` KMS is the natural choice — it is more secure than `local`, costs essentially nothing at this traffic level, and requires no manual key management.
+For Cloud Run deployments, `gcp` KMS is the natural choice — it is more secure than `local`, costs essentially nothing at this traffic level, and requires no manual key management.
 
 ### Key rotation
 

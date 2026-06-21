@@ -47,7 +47,7 @@ JWT_SECRET=7Hj9K2mP4nQ8rT1wE5sA6dF3gL0jK9xC2vB8n=
 
 ### Navigate to Repository Settings
 
-1. Go to: https://github.com/WCCollier/AECMS
+1. Go to: https://github.com/YOUR_USERNAME/AECMS
 2. Click **"Settings"** tab (top navigation)
 3. Click **"Codespaces"** in left sidebar
 4. Scroll to **"Secrets"** section
@@ -197,7 +197,7 @@ cat > .env.example << 'EOF'
 # ============================================================================
 # DO NOT put real values here! This file is committed to git.
 # Set actual values in GitHub Codespaces Secrets:
-# https://github.com/WCCollier/AECMS/settings/secrets/codespaces
+# https://github.com/YOUR_USERNAME/AECMS/settings/secrets/codespaces
 
 # ----------------------------------------------------------------------------
 # Phase 0-1: Foundation & Authentication
@@ -281,7 +281,7 @@ EOF
 
 ### When You Need to Update a Secret (e.g., adding Google OAuth keys in Phase 1):
 
-1. Go to: https://github.com/WCCollier/AECMS/settings/secrets/codespaces
+1. Go to: https://github.com/YOUR_USERNAME/AECMS/settings/secrets/codespaces
 2. Find the secret (e.g., `GOOGLE_CLIENT_ID`)
 3. Click **"Update"**
 4. Paste new value

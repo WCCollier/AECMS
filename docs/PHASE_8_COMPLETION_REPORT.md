@@ -27,7 +27,7 @@ Phase 8 focuses on polishing the application for production readiness. This repo
 
 ### 8.1 Domain Aliasing Module (✅ Complete)
 
-**Purpose**: Allow site Owners to map custom domains to specific routes in the application. For example, `wccollier.com` can be aliased to serve content from `/author` route while preserving the URL in the browser.
+**Purpose**: Allow site Owners to map custom domains to specific routes in the application. For example, `example.com` can be aliased to serve content from `/author` route while preserving the URL in the browser.
 
 **Files Created**:
 - `src/domain-aliases/domain-aliases.module.ts`
@@ -42,7 +42,7 @@ Phase 8 focuses on polishing the application for production readiness. This repo
 ```prisma
 model DomainAlias {
   id                  String    @id @default(uuid())
-  domain              String    @unique  // e.g., "wccollier.com"
+  domain              String    @unique  // e.g., "example.com"
   target_route        String    // e.g., "/author"
   is_active           Boolean   @default(false)
   verification_token  String?   // DNS TXT record token
@@ -78,9 +78,9 @@ model DomainAlias {
 - Owner-only access (enforced by RolesGuard)
 
 **DNS Verification Flow**:
-1. Owner creates domain alias (e.g., `wccollier.com` → `/author`)
+1. Owner creates domain alias (e.g., `example.com` → `/author`)
 2. System generates verification token: `aecms-verify-{random}`
-3. Owner adds TXT record: `_aecms-verify.wccollier.com` = token
+3. Owner adds TXT record: `_aecms-verify.example.com` = token
 4. Owner clicks "Verify Domain" in admin panel
 5. System queries DNS and validates token
 6. Domain is activated on success
@@ -90,7 +90,7 @@ model DomainAlias {
 {
   "alias": {
     "id": "uuid",
-    "domain": "wccollier.com",
+    "domain": "example.com",
     "target_route": "/author",
     "is_active": false,
     "verification_token": "aecms-verify-abc123...",
@@ -98,7 +98,7 @@ model DomainAlias {
   },
   "instructions": {
     "step1": "Log in to your DNS provider",
-    "step2": "Add a TXT record for: _aecms-verify.wccollier.com",
+    "step2": "Add a TXT record for: _aecms-verify.example.com",
     "step3": "Set the value to: aecms-verify-abc123...",
     "step4": "Wait a few minutes for DNS propagation",
     "step5": "Click 'Verify Domain' to complete verification"
@@ -106,7 +106,7 @@ model DomainAlias {
   "cname_setup": {
     "description": "After verification, point your domain to this server:",
     "record_type": "CNAME",
-    "name": "wccollier.com",
+    "name": "example.com",
     "value": "your-primary-domain.com"
   }
 }
@@ -308,7 +308,7 @@ APP_URL=http://localhost:3000
 **Domain Aliasing**:
 ```env
 # Used in DNS instructions
-PRIMARY_DOMAIN=fantasyvreality.com
+PRIMARY_DOMAIN=yourdomain.com
 ```
 
 ---

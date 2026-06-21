@@ -384,7 +384,7 @@ While logged into both customer-facing and backstage simultaneously:
 
 ## Email Verification Testing
 
-> **Email provider**: `EMAIL_PROVIDER_TYPE=smtp` is active — emails are sent via Gmail (`moriakul@gmail.com`). Verification emails for real addresses will land in inboxes. For test accounts with fake addresses (e.g. `verify-test@example.com`), delivery will fail silently; grab the token from the backend log instead.
+> **Email provider**: `EMAIL_PROVIDER_TYPE=smtp` is active — emails are sent via Gmail (`your-email@gmail.com`). Verification emails for real addresses will land in inboxes. For test accounts with fake addresses (e.g. `verify-test@example.com`), delivery will fail silently; grab the token from the backend log instead.
 
 ```bash
 # Register a new user
@@ -571,7 +571,7 @@ TYPE-WORD-WORD-WORD
 
 | Type | Prefix | Example name | Generated SKU |
 |------|--------|-------------|---------------|
-| physical | `P` | American Shooter Hat | `P-AMER-SHOO-HAT` |
+| physical | `P` | Sample Physical Product | `P-SAMP-PHYS-PROD` |
 | digital | `D` | How Writing Works | `D-HOW-WRIT-WORK` |
 | service | `S` | Lesson 1: Marksmanship | `S-LESS-1-MA` |
 
@@ -606,7 +606,7 @@ curl -s -X POST http://localhost:4000/products \
 curl -s "http://localhost:4000/products?status=published" | jq '.data[] | {id,name,price,product_type,stock_status}'
 
 # Get by slug
-curl -s "http://localhost:4000/products/slug/american-shooter-hat" | jq '{id,name,price,stock_quantity}'
+curl -s "http://localhost:4000/products/slug/sample-physical-product" | jq '{id,name,price,stock_quantity}'
 
 # Create product (backstage)
 curl -s -X POST http://localhost:4000/products \
@@ -896,7 +896,7 @@ psql $DATABASE_URL -c "SELECT id, entry_hash, previous_hash, created_at FROM aud
 
 This section covers the full Phase 14 digital delivery flow: creating a digital product with source files, purchasing it, downloading the personalized copy, and sending it to a Kindle device.
 
-> **Email**: `EMAIL_PROVIDER_TYPE=smtp` is active — Kindle delivery emails are sent for real via `moriakul@gmail.com`. Amazon requires that address to be in your **Approved Personal Document E-mail List** before a send will succeed; the wizard guides you through adding it in Step 2. Set `PAYMENT_TEST_MODE=true` in `backend/.env` for instant payment confirmation during testing.
+> **Email**: `EMAIL_PROVIDER_TYPE=smtp` is active — Kindle delivery emails are sent for real via `your-email@gmail.com`. Amazon requires that address to be in your **Approved Personal Document E-mail List** before a send will succeed; the wizard guides you through adding it in Step 2. Set `PAYMENT_TEST_MODE=true` in `backend/.env` for instant payment confirmation during testing.
 
 ---
 
@@ -1131,7 +1131,7 @@ curl -s -X POST "http://localhost:4000/digital-products/downloads/$DOWNLOAD_ID/e
 
 The Kindle wizard opens when the customer clicks the **Kindle** button on any download row in the **Your Digital Downloads** panel.
 
-> **Email**: `EMAIL_PROVIDER_TYPE=smtp` is active — clicking Send to Kindle will deliver a real email from `moriakul@gmail.com` to the Kindle address. Amazon will reject the delivery if that sender isn't whitelisted; the wizard walks you through whitelisting it in Step 2. Confirm delivery in `/tmp/backend.log` (`grep -i "kindle"`) and in your Kindle library.
+> **Email**: `EMAIL_PROVIDER_TYPE=smtp` is active — clicking Send to Kindle will deliver a real email from `your-email@gmail.com` to the Kindle address. Amazon will reject the delivery if that sender isn't whitelisted; the wizard walks you through whitelisting it in Step 2. Confirm delivery in `/tmp/backend.log` (`grep -i "kindle"`) and in your Kindle library.
 
 #### New user — full 4-step onboarding wizard
 
@@ -1144,8 +1144,8 @@ The Kindle wizard opens when the customer clicks the **Kindle** button on any do
 **Step 2 — Whitelist Our Email**
 - Carousel shows `to-kindle_3–4_marked.jpg` with a **magenta** oval on "Add a new e-mail address"
 - "Add a new e-mail address" text in the instructions is highlighted magenta; "Preferences" is highlighted green
-- A copyable code block shows the store's sending address (`moriakul@gmail.com`)
-- **Do this step now**: open Amazon → Account & Lists → Content & Devices → Preferences → Personal Document Settings → Approved Personal Document E-mail List → Add `moriakul@gmail.com`
+- A copyable code block shows the store's sending address (`your-email@gmail.com`)
+- **Do this step now**: open Amazon → Account & Lists → Content & Devices → Preferences → Personal Document Settings → Approved Personal Document E-mail List → Add `your-email@gmail.com`
 - Once added, click "Next" to confirm
 
 **Step 3 — Name This Device**
@@ -1260,7 +1260,7 @@ If no download tokens exist yet (payment pending), the panel shows a message exp
 
 **Kindle wizard — new user**
 - [ ] Step 1: carousel auto-advances; click-to-enlarge works; "Next" disabled without valid Kindle email
-- [ ] Step 2: store sending address (`moriakul@gmail.com`) is copyable; whitelist it in Amazon during this step
+- [ ] Step 2: store sending address (`your-email@gmail.com`) is copyable; whitelist it in Amazon during this step
 - [ ] Step 3: device name input; save checkbox
 - [ ] Step 4: summary shows email + device name + remaining count
 - [ ] Send: backend log shows SMTP `messageId`; file appears in Kindle library; `downloadCount` and `kindleSendCount` both increment
@@ -1483,7 +1483,7 @@ The SMTP provider now reads credentials from the ISM at send time. Fields here p
    ```bash
    grep -i "messageId\|test email" /tmp/backend.log | tail -3
    ```
-6. Check inbox at moriakul@gmail.com for the test email
+6. Check inbox at your-email@gmail.com for the test email
 7. **Verify ISM storage**: the password is now in the DB encrypted; the GET `/settings` response still shows `••••••••` for `email.smtp_pass_enc`
 
 ---

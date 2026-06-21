@@ -29,7 +29,7 @@ Substack does **not** have a public API. What is available:
 ### A1 — New endpoint: `GET /external-feeds/preview`
 
 Query params:
-- `url` — the RSS feed URL (e.g., `https://wccollier.substack.com/feed`)
+- `url` — the RSS feed URL (e.g., `https://example.substack.com/feed`)
 - `count` — number of items to return (default 3, max 10)
 - `item_id` — (optional) return a specific item by GUID/link for a "pinned post" widget
 
@@ -37,11 +37,11 @@ Response shape:
 ```json
 {
   "feed_title": "W.C. Collier on Substack",
-  "feed_url": "https://wccollier.substack.com",
+  "feed_url": "https://example.substack.com",
   "items": [
     {
       "title": "The Article Title",
-      "url": "https://wccollier.substack.com/p/the-article-title",
+      "url": "https://example.substack.com/p/the-article-title",
       "published_at": "2026-06-10T12:00:00Z",
       "excerpt": "The first few hundred characters of the post body, HTML stripped...",
       "image_url": "https://..." // from enclosure or og:image if fetched
@@ -89,7 +89,7 @@ New widget type alongside the existing `MediaCarousel`, `Callout`, `VideoEmbed`,
 
 ```typescript
 interface RssFeedWidgetData {
-  feedUrl: string;            // e.g., "https://wccollier.substack.com/feed"
+  feedUrl: string;            // e.g., "https://example.substack.com/feed"
   specificItemUrl?: string;   // if set: show only this post (matched by <link> in feed)
   count: number;              // 1–5 posts shown when specificItemUrl is not set
   layout: 'list' | 'card';   // card = grid cards; list = stacked rows

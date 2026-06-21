@@ -8,7 +8,7 @@ describe('slugToSku', () => {
   });
 
   it('takes up to three significant words from the slug', () => {
-    expect(slugToSku('american-shooter-hat', 'physical')).toBe('P-AMER-SHOO-HAT');
+    expect(slugToSku('vintage-leather-wallet', 'physical')).toBe('P-VINT-LEAT-WALL');
   });
 
   it('strips stop words before selecting words', () => {
@@ -37,9 +37,9 @@ describe('slugToSku', () => {
   });
 
   it('uses known examples from PRD', () => {
-    expect(slugToSku('american-shooter-hat', 'physical')).toBe('P-AMER-SHOO-HAT');
+    expect(slugToSku('vintage-leather-wallet', 'physical')).toBe('P-VINT-LEAT-WALL');
     expect(slugToSku('how-writing-works', 'digital')).toBe('D-HOW-WRIT-WORK');
-    expect(slugToSku('american-shooter-safe-gun-ownership', 'service')).toBe('S-AMER-SHOO-SAFE');
+    expect(slugToSku('intro-to-woodworking-basics', 'service')).toBe('S-INTR-WOOD-BASI');
   });
 
   it('falls back to X prefix for unknown type', () => {

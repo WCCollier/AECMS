@@ -123,7 +123,7 @@ See `TESTING_GUIDE.md → Phase 9: User Testing` for the full step-by-step seque
 - `POST /cart/validate` pre-flight endpoint corrects over-limit quantities before checkout
 - Checkout pre-flight: redirects back to cart with amber adjustment banner listing exact changes
 - Three UI touch points surface stock errors inline: product detail page, product card (auto-clears 5s), cart stepper
-- Seeded American Shooter Hat (physical, $24.99, 5 in stock) for testing quantifiable items
+- Seeded Sample Product Hat (physical, $24.99, 5 in stock) for testing quantifiable items
 
 ### Unified Comment/Review System (`docs/Shape_Audit.md Item 9`)
 - `ProductReview` table dropped; replaced by `CommentRating` (many-to-one on Comment)

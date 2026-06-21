@@ -2,7 +2,7 @@ name: Deploy to Cloud Run
 
 # ── Required GitHub Variables (Settings → Variables → Repository variables) ──
 #
-#   GCP_PROJECT_NUMBER   Numeric GCP project ID   e.g. 983307563767
+#   GCP_PROJECT_NUMBER   Numeric GCP project ID   e.g. 123456789012
 #   GCP_PROJECT_ID       Text GCP project ID       e.g. my-project
 #   APP_DOMAIN           Your domain (no https://) e.g. myblog.com
 #   GCS_MEDIA_BUCKET     Public media bucket name  e.g. my-project-media

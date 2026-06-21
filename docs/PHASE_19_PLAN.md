@@ -9,13 +9,13 @@
 
 Phase 19 (first deployment to Cloud Run) and Phase 21 (multi-owner deployability) have been merged into a single phase, now tracked as **Phase 21**.
 
-**Rationale**: A standalone first deployment without the deployability infrastructure (setup wizard, seed profiles, CI/CD) is a throwaway exercise. The FvR deployment *is* the proof of deployability. Building both together produces a real, reusable thing rather than a one-off.
+**Rationale**: A standalone first deployment without the deployability infrastructure (setup wizard, seed profiles, CI/CD) is a throwaway exercise. The live deployment is the proof of deployability. Building both together produces a real, reusable thing rather than a one-off.
 
 ---
 
 ## See
 
-→ **[PHASE_21_PLAN.md](./PHASE_21_PLAN.md)** — canonical merged plan, full implementation detail, and deployment checklist for `fantasyvreality.com`.
+→ **[PHASE_21_PLAN.md](./PHASE_21_PLAN.md)** — canonical merged plan, full implementation detail, and deployment checklist for `yourdomain.com`.
 
 ---
 

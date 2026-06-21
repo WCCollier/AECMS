@@ -288,7 +288,7 @@ Implementation: in the Callout display component, if `size === 'small'`, extract
 
 ```
 ┌─────────────────────────────────────────┐
-│ 𝕏  @WCCollier · WC Collier             │
+│ 𝕏  @YourHandle · Your Name             │
 │    "Post text truncated to about 120    │
 │     characters here…"                  │
 │    View on X ↗                         │

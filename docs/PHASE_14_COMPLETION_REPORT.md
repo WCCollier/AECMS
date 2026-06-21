@@ -93,7 +93,7 @@ A modal slideshow component with a state machine (`'device-select' | 'step-find-
 **New user — 4-step onboarding flow:**
 
 - **Step 1 (Find Your Kindle Email)**: Image carousel of annotated Amazon screenshots (bright green highlights). User enters their `@kindle.com` address in an input field. Images: `to-kindle_1–3_marked.jpg` in `frontend/public/kindle-guide/`.
-- **Step 2 (Whitelist Our Email)**: Image carousel (magenta highlights). Instructions to add `moriakul@gmail.com` (from `NEXT_PUBLIC_KINDLE_SENDER_EMAIL` env var) to Amazon's approved sender list. Images: `to-kindle_3–4_marked.jpg`.
+- **Step 2 (Whitelist Our Email)**: Image carousel (magenta highlights). Instructions to add `your-email@gmail.com` (from `NEXT_PUBLIC_KINDLE_SENDER_EMAIL` env var) to Amazon's approved sender list. Images: `to-kindle_3–4_marked.jpg`.
 - **Step 3 (Name This Device)**: Text input for a friendly device name. "Save this device" checkbox (default checked).
 - **Step 4 (Ready to Send!)**: Format selector dropdown, summary of device email and name, download count warning. **Send to Kindle** button calls `POST /kindle/send` and transitions to `sending` → `done`.
 

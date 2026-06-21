@@ -99,7 +99,7 @@ function PageNavItem({ page, ancestors = [], navLink, onClose }: {
   );
 }
 
-export function Header() {
+export function Header({ siteTitle }: { siteTitle: string }) {
   const { user, isAuthenticated, login, logout } = useAuth();
   const { itemCount } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -154,7 +154,7 @@ export function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="text-xl font-bold tracking-tight text-accent">
-            AECMS
+            {siteTitle}
           </Link>
 
           {/* Desktop Navigation */}

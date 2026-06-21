@@ -70,10 +70,10 @@ This document defines the ecommerce functionality for AECMS, including product m
 
 | Product name | Type | Generated SKU |
 |---|---|---|
-| American Shooter Hat | physical | `P-AMER-SHOO-HAT` |
+| Sample Physical Product | physical | `P-SAMP-PHYS-PROD` |
 | Lesson 1: Marksmanship | service | `S-LESS-1-MA` |
 | How Writing Works | digital | `D-HOW-WRIT-WORK` |
-| American Shooter: Safe Gun Ownership | service | `S-AMER-SHOO-SAFE` |
+| Sample Service Product | service | `S-SAMP-SERV-PROD` |
 
 **Behaviour**:
 - On the *Create Product* form, the SKU field is auto-populated as the user types the product name (derived from the slug, which is itself auto-derived from the name)

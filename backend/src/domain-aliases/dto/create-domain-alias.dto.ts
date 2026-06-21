@@ -3,8 +3,8 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateDomainAliasDto {
   @ApiProperty({
-    description: 'Domain name (e.g., wccollier.com)',
-    example: 'wccollier.com',
+    description: 'Domain name (e.g., example.com)',
+    example: 'example.com',
   })
   @IsString()
   @IsNotEmpty()

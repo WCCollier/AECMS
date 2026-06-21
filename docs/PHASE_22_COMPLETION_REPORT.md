@@ -46,7 +46,7 @@ Also updated backend `Dockerfile` base image from `node:20-alpine` → `node:22-
 
 ## Item C — Setup Wizard Placeholder Text ✅
 
-**Problem**: The wizard's first step (Site Identity) showed real personal information in placeholder text: "Fantasy v Reality" as site name, "Ideas worth fighting for" as tagline, "William" / "Collier" as first/last name.
+**Problem**: The wizard's first step (Site Identity) showed real personal information in placeholder text: "My Site" as site name, "Ideas worth fighting for" as tagline, "First" / "Last" as first/last name.
 
 **Fix**: Replaced all four with generic fictional examples:
 - Site name: `My Awesome Site`
@@ -222,7 +222,7 @@ Clicking Export calls `adminApi.get('/orders/export', { params, responseType: 't
 ## Item J — New Owner Experience ✅
 
 ### J.1 — deploy.yml Parameterized
-Replaced 7 hardcoded FvR-specific values with GitHub Variables (`vars.GCP_PROJECT_NUMBER`, `vars.GCP_PROJECT_ID`, `vars.APP_DOMAIN`, `vars.GCS_MEDIA_BUCKET`, `vars.GCS_DIGITAL_BUCKET`, `vars.SETTINGS_KMS_SECRET_ID`, `vars.KINDLE_FROM_EMAIL`). New owners set these 7 values in GitHub repo Settings → Variables; no file editing required. Also added `GCS_BUCKET_MEDIA` and `GCS_BUCKET_DIGITAL` to backend `set-env-vars` so the `getAll()` env fallback populates File Storage tab correctly on Cloud Run.
+Replaced 7 hardcoded deployer-specific values with GitHub Variables (`vars.GCP_PROJECT_NUMBER`, `vars.GCP_PROJECT_ID`, `vars.APP_DOMAIN`, `vars.GCS_MEDIA_BUCKET`, `vars.GCS_DIGITAL_BUCKET`, `vars.SETTINGS_KMS_SECRET_ID`, `vars.KINDLE_FROM_EMAIL`). New owners set these 7 values in GitHub repo Settings → Variables; no file editing required. Also added `GCS_BUCKET_MEDIA` and `GCS_BUCKET_DIGITAL` to backend `set-env-vars` so the `getAll()` env fallback populates File Storage tab correctly on Cloud Run.
 
 ### H.2-A — GCS Bucket Automation
 Added idempotent bucket creation step to `deploy.yml`, after GCP auth and before backend deploy. Creates media bucket (with `allUsers objectViewer` IAM binding) and digital bucket. Existing buckets are silently skipped. No manual `gcloud` commands needed on new GCP deployments.
@@ -302,10 +302,10 @@ New `deploy/` directory at repo root:
 
 ## Item L — GCS Bucket Permissions for github-ci SA ✅
 
-**Problem**: The H.2-A idempotent bucket creation step in `deploy.yml` was throwing 403 errors silently on every deploy because `github-ci` SA was missing `roles/storage.admin`. Buckets existed for FvR so the deploy succeeded, but a new owner's first deploy would fail at bucket creation.
+**Problem**: The H.2-A idempotent bucket creation step in `deploy.yml` was throwing 403 errors silently on every deploy because `github-ci` SA was missing `roles/storage.admin`. Buckets existed for the deploy succeeded, but a new owner's first deploy would fail at bucket creation.
 
 **Changes**:
-- Granted `roles/storage.admin` to `github-ci` SA on the FvR GCP project (immediate live fix)
+- Granted `roles/storage.admin` to `github-ci` SA on the the GCP project (immediate live fix)
 - Added `roles/storage.admin` to the CI SA role list in `backend/scripts/gcp-setup.sh` so new owners running the setup script get correct permissions automatically
 
 **Files changed**: `backend/scripts/gcp-setup.sh`
