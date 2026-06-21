@@ -189,6 +189,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
+              <a
+                href="https://www.givesendgo.com/aecms-an-open-source-e-commerce-cms?utm_source=sharelink&utm_medium=copy_link&utm_campaign=aecms-an-open-source-e-commerce-cms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 block text-xs text-center text-foreground/35 hover:text-accent transition-colors"
+              >
+                AECMS is open source — donate ♥
+              </a>
             </div>
           </div>
         </aside>
