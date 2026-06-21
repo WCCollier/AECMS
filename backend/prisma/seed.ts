@@ -41,6 +41,7 @@ async function main() {
     { name: 'page.delete',         category: 'content',   scope: 'backstage', description: 'Delete pages' },
     { name: 'media.upload',        category: 'content',   scope: 'backstage', description: 'Upload media files' },
     { name: 'media.delete',        category: 'content',   scope: 'backstage', description: 'Delete media files' },
+    { name: 'media.manage',        category: 'content',   scope: 'backstage', description: 'Bulk-delete media files and replace file content' },
 
     // Ecommerce
     { name: 'product.create',      category: 'ecommerce', scope: 'backstage', description: 'Create products' },
@@ -210,6 +211,7 @@ async function main() {
     'page.delete',
     'media.upload',
     'media.delete',
+    'media.manage',
     'product.create',
     'product.edit.own',
     'product.edit',

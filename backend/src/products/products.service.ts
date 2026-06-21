@@ -10,12 +10,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, UpdateProductDto, QueryProductsDto } from './dto';
 import { Prisma, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
+import { MediaSyncService } from '../media/media-sync.service';
 
 @Injectable()
 export class ProductsService {
   constructor(
     private prisma: PrismaService,
     private auditLog: AuditLogService,
+    private mediaSync: MediaSyncService,
   ) {}
 
   /**
@@ -121,17 +123,12 @@ export class ProductsService {
       include: this.getProductIncludes(),
     });
 
-    if (dto.media_ids?.length) {
-      await this.setProductMedia(product.id, dto.media_ids);
-      const fresh = await this.prisma.product.findUnique({
-        where: { id: product.id },
-        include: this.getProductIncludes(),
-      });
-      const result = await this.transformProduct(fresh!);
-      return warnings.length ? { ...result, warnings } : result;
-    }
-
-    const result = await this.transformProduct(product);
+    await this.mediaSync.syncEntityMedia('product', product.id, dto.description ?? '', dto.media_ids ?? []);
+    const fresh = await this.prisma.product.findUnique({
+      where: { id: product.id },
+      include: this.getProductIncludes(),
+    });
+    const result = await this.transformProduct(fresh!);
     return warnings.length ? { ...result, warnings } : result;
   }
 
@@ -474,23 +471,9 @@ export class ProductsService {
       include: this.getProductIncludes(),
     });
 
-    if (dto.media_ids !== undefined) {
-      await this.setProductMedia(id, dto.media_ids);
-      const fresh = await this.prisma.product.findUnique({
-        where: { id },
-        include: this.getProductIncludes(),
-      });
-      await this.createProductVersion(fresh!, userId, (dto as any).change_summary);
-      await this.auditLog.log({
-        event_type: 'product.updated',
-        user_id: userId,
-        resource_type: 'product',
-        resource_id: id,
-        changes: diffChanges(product as any, dto as any),
-      });
-      const freshResult = await this.transformProduct(fresh!);
-      return updateWarnings.length ? { ...freshResult, warnings: updateWarnings } : freshResult;
-    }
+    const freshContent = dto.description ?? product.description ?? '';
+    const freshExplicitIds = dto.media_ids ?? (product as any).media?.map((m: any) => m.media_id) ?? [];
+    await this.mediaSync.syncEntityMedia('product', id, freshContent, freshExplicitIds);
 
     await this.createProductVersion(updated, userId, (dto as any).change_summary);
     const diff = diffChanges(product as any, dto as any);
@@ -698,22 +681,6 @@ export class ProductsService {
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
       .substring(0, 200);
-  }
-
-  /**
-   * Get product includes for queries
-   */
-  private async setProductMedia(productId: string, mediaIds: string[]) {
-    await this.prisma.productMedia.deleteMany({ where: { product_id: productId } });
-    if (mediaIds.length === 0) return;
-    await this.prisma.productMedia.createMany({
-      data: mediaIds.map((mediaId, index) => ({
-        product_id: productId,
-        media_id: mediaId,
-        order: index,
-        is_primary: index === 0,
-      })),
-    });
   }
 
   private getProductIncludes() {

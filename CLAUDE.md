@@ -43,7 +43,7 @@
 **Phase 20**: ✅ COMPLETE - Themes and templates: 8 curated palettes, 5 font pairings, CSS variable injection in root layout, /admin/settings/appearance backstage UI (2026-06-17)
 **Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
 **Phase 21**: 🚧 IN PROGRESS - Deployability + first live deployment (merged with Phase 19): SEED_PROFILE system, setup wizard, GcpKeyProvider, Dockerfiles, GitHub Actions CI/CD, Cloud Run, FvR content migration
-**Phase 22**: ✅ COMPLETE - Dependency upgrades & live-testing fixes: Items A–G, I (2026-06-20); Item J (new owner experience: platform config helpers, deploy.yml parameterization, GET /setup/profile, wizard context-aware success, settings panel env-sourced badges, Owner's Manual HTML site, deploy/ platform files) + H.2-A/H.4 (GCS bucket automation in workflow, test-storage-preview endpoint) (2026-06-21)
+**Phase 22**: ✅ COMPLETE - All items A–M (2026-06-21). Key additions: TipTap alignment, Node 22, Next.js 15.3.9 security upgrade, new-owner wizard/Owner's Manual, CSV export, MediaSyncService (TipTap→join table), PageMedia join table, bulk upload/replace/delete, /admin/media (Media Library + Digital Files tabs)
 **Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
 
 **Session 2026-06-18 improvements** (not phase-tracked):

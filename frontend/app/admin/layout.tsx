@@ -16,6 +16,7 @@ import {
   LayoutTemplate,
   ClipboardList,
   Paintbrush,
+  Images,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import adminApi from '@/lib/adminApi';
@@ -41,6 +42,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; required
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/articles', label: 'Articles', icon: FileText },
   { href: '/admin/pages', label: 'Pages', icon: LayoutTemplate },
+  { href: '/admin/media', label: 'Media', icon: Images, requiredCap: 'media.upload' },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, requiredCap: 'system.view_audit' },
   { href: '/admin/domains', label: 'Domains', icon: Globe, requiredCap: 'domain.manage' },

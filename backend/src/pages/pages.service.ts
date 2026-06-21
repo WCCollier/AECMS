@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto, UpdatePageDto, QueryPagesDto, ReorderPagesDto } from './dto';
 import { Prisma, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
+import { MediaSyncService } from '../media/media-sync.service';
 
 const RESERVED_SLUGS = [
   'shop', 'articles', 'cart', 'checkout', 'account',
@@ -21,6 +22,7 @@ export class PagesService {
   constructor(
     private prisma: PrismaService,
     private auditLog: AuditLogService,
+    private mediaSync: MediaSyncService,
   ) {}
 
   /**
@@ -88,6 +90,8 @@ export class PagesService {
         },
       },
     });
+
+    await this.mediaSync.syncEntityMedia('page', page.id, dto.content ?? '', []);
 
     await this.auditLog.log({
       event_type: 'page.created',
@@ -452,6 +456,8 @@ export class PagesService {
         },
       },
     });
+
+    await this.mediaSync.syncEntityMedia('page', id, dto.content ?? page.content ?? '', []);
 
     const isPublishing = dto.status === 'published' && page.status !== 'published';
     const isUpdatingPublished = page.status === 'published';

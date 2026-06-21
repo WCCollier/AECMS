@@ -4,9 +4,10 @@ import { ArticlesController } from './articles.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import { AuthModule } from '../auth/auth.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
-  imports: [PrismaModule, CapabilitiesModule, AuthModule],
+  imports: [PrismaModule, CapabilitiesModule, AuthModule, MediaModule],
   controllers: [ArticlesController],
   providers: [ArticlesService],
   exports: [ArticlesService],

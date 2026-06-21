@@ -2,9 +2,10 @@
 
 **Project**: AECMS  
 **Phase**: 22  
-**Status**: ✅ COMPLETE  
-**Completed**: 2026-06-20  
-**Commits**: 3 (`013f777`, `3ecea7c`, `b86727b`)
+**Status**: ✅ COMPLETE (all items A–M, including H.2-A/B and H.4)  
+**Started**: 2026-06-20  
+**Last updated**: 2026-06-21  
+**Commits**: `013f777`, `3ecea7c`, `b86727b`, `b7545c8`, `527f346`, `c56a7de`, `eb8d731`, `85ca5e8`, `fbfc0d3`, `f662187` + Item M (uncommitted)
 
 ---
 
@@ -275,9 +276,134 @@ New `deploy/` directory at repo root:
 
 ---
 
-## Test Results
+## Item K — Next.js Security Upgrade (14.0.4 → 15.3.9) ✅
 
-| Suite | Before | After |
+**Problem**: `next@14.0.4` carried 14 published CVEs (DoS, request smuggling, cache poisoning, XSS). `npm audit` during the CI/CD log review surfaced this. Next.js 16.2.9 was attempted but had an unfixed `/_global-error` prerender bug with Turbopack + React 19 (`useContext null` in `__next_viewport_boundary__`); 15.3.9 was chosen as the stable target.
+
+**Changes**:
+- Upgraded `next` from `14.0.4` → `15.3.9`
+- `next.config.mjs`: removed deprecated `eslint` block and `webpack()` chunk-split function; added `turbopack: {}` to satisfy Turbopack config requirement
+- Root layout: added separate `Viewport` export (required in Next.js 15+; can no longer be part of `Metadata`)
+- `app/global-error.tsx`: added full `<head>` (Next.js 15 requirement — global-error replaces root layout)
+- Restored `pages/_document.tsx` and `pages/_error.tsx` (still required in Next.js 15 for Pages Router `/404` fallback generation)
+- Async params migration in `[...slug]/page.tsx`, `admin/pages/[id]/edit/page.tsx`, `admin/pages/[id]/preview/page.tsx`
+- Refactored three `'use client'` page files that failed Next.js 15's static generation prerender worker to server component wrappers:
+  - `app/setup/page.tsx` → thin server wrapper; client logic moved to `SetupWizard.tsx`
+  - `app/admin/orders/[id]/page.tsx` → server wrapper; logic moved to `AdminOrderDetailClient.tsx`
+  - `app/admin/maintenance/migrate-content/page.tsx` → server wrapper rendering client component
+- `JSX.IntrinsicElements` → `React.JSX.IntrinsicElements` in `ArticleEmbed.tsx` and `ProductEmbed.tsx` (namespace moved in newer `@types/react`)
+- Added `export const dynamic = 'force-dynamic'` to checkout cancel/success pages
+
+**Note**: Next.js 16 upgrade deferred — `16.2.9` has unfixed prerender bug. Plan as separate phase once `16.3.x` stabilizes.
+
+**Files changed**: `frontend/package.json`, `frontend/next.config.mjs`, `frontend/app/layout.tsx`, `frontend/app/global-error.tsx`, `frontend/pages/_document.tsx`, `frontend/pages/_error.tsx`, `frontend/app/(site)/[...slug]/page.tsx`, `frontend/app/admin/pages/[id]/edit/page.tsx`, `frontend/app/admin/pages/[id]/preview/page.tsx`, `frontend/app/setup/page.tsx` + `SetupWizard.tsx` (new), `frontend/app/admin/orders/[id]/page.tsx` + `AdminOrderDetailClient.tsx` (new), `frontend/app/admin/maintenance/migrate-content/page.tsx`, `frontend/components/widgets/ArticleEmbed/ArticleEmbed.tsx`, `frontend/components/widgets/ProductEmbed/ProductEmbed.tsx`, `frontend/app/(site)/checkout/cancel/page.tsx`, `frontend/app/(site)/checkout/success/page.tsx`
+
+---
+
+## Item L — GCS Bucket Permissions for github-ci SA ✅
+
+**Problem**: The H.2-A idempotent bucket creation step in `deploy.yml` was throwing 403 errors silently on every deploy because `github-ci` SA was missing `roles/storage.admin`. Buckets existed for FvR so the deploy succeeded, but a new owner's first deploy would fail at bucket creation.
+
+**Changes**:
+- Granted `roles/storage.admin` to `github-ci` SA on the FvR GCP project (immediate live fix)
+- Added `roles/storage.admin` to the CI SA role list in `backend/scripts/gcp-setup.sh` so new owners running the setup script get correct permissions automatically
+
+**Files changed**: `backend/scripts/gcp-setup.sh`
+
+---
+
+## Post-J Fixes (2026-06-21)
+
+Three bugs found during live testing of the production deploy:
+
+### Homepage Warning Conditional
+The settings panel warning incorrectly appended *"Visitors will be redirected to /articles"* even when `_home_` was published and would catch the fallback. Fixed the conditional in `SettingsClient.tsx` so the redirect message only appears when both the designated page and `_home_` are unpublished.
+
+### KINDLE_FROM_EMAIL Env Var Removed
+The Kindle wizard sender address was hardcoded as a build-time env var (`NEXT_PUBLIC_KINDLE_SENDER_EMAIL`), requiring a redeploy to change. Removed the env var entirely. `GET /setup/profile` now returns `kindleFromEmail` (reads `email.kindle_from` → `email.from_address` from ISM). The wizard fetches it at runtime via SWR. Removed the variable from `deploy.yml`, `env.example` files, and the Owner's Manual.
+
+### Sample Content Seed Timing
+`seed-sample-content.js` ran at container boot before the wizard, when no owner user existed. After wizard completion, the boot-time guard was already satisfied so content was never seeded. Fixed by moving `seedSampleContent(ownerId)` into `SetupService.completeSetup()` — fires immediately after owner creation, with idempotency guards on each slug.
+
+**Files changed**: `frontend/app/admin/settings/SettingsClient.tsx`, `frontend/components/digital/KindleWizard.tsx`, `backend/src/setup/setup.service.ts`, `.github/workflows/deploy.yml`, `deploy/*/env.example` files, `docs/owners-manual/`
+
+---
+
+## Item M — File Manager (Media Library) ✅
+
+### M.1 — PageMedia Join Table
+
+Added `PageMedia` model to Prisma schema (mirroring `ArticleMedia`/`ProductMedia`): composite PK on `[page_id, media_id]`, cascade delete, `order` and `is_primary` fields. Added reverse relations on `Page` and `Media` models.
+
+**Migration**: `20260621061222_add_page_media_and_media_manage`
+
+### M.2 — MediaSyncService (Shared TipTap Content Extractor)
+
+New service `backend/src/media/media-sync.service.ts`. Single public method: `syncEntityMedia(entityType, entityId, content, explicitMediaIds[])`.
+
+Extracts two TipTap node types:
+- `image` nodes: `attrs.src` URL → strips `/uploads/` prefix → resolves to media ID via `media.filename` DB lookup
+- `mediaCarousel` nodes: `attrs.media` JSON array → extracts `id` fields directly (already media UUIDs)
+
+Merges explicit gallery IDs (first, with `is_primary` and `order` semantics) with inline-only IDs (appended after). Writes the merged set to `ArticleMedia`, `ProductMedia`, or `PageMedia` in a single delete + createMany.
+
+**Integration**:
+- `ArticlesService`: removed `setArticleMedia()` private method; replaced both call sites with `mediaSync.syncEntityMedia('article', ...)`
+- `ProductsService`: removed `setProductMedia()` private method; replaced both call sites with `mediaSync.syncEntityMedia('product', ...)`
+- `PagesService`: added `mediaSync.syncEntityMedia('page', ...)` after create and update — pages now tracked for the first time
+- `MediaModule` exports `MediaSyncService`; `ArticlesModule`, `ProductsModule`, `PagesModule` now import `MediaModule`
+
+### M.3 — BackstageGuard on Media Write Endpoints
+
+Added `BackstageGuard` to `POST /media/upload`, `PATCH /media/:id`, `DELETE /media/:id`. Previously these only checked `JwtAuthGuard + CapabilityGuard`, meaning a customer-session JWT with `media.upload` or `media.delete` could call them.
+
+### M.4 — `media.manage` Capability
+
+Added to capabilities seed (category: `content`, scope: `backstage`). Granted to Admin and Owner. Gates bulk-delete and file-replace endpoints.
+
+### M.5 — New Backend Endpoints
+
+| Endpoint | Capability | Description |
+|---|---|---|
+| `POST /media/bulk-upload` | `media.upload` | Multi-file + zip extraction. Zip limits: 50 MB per zip, 100 MB total uncompressed, 500 entries, 10 MB per extracted file. Returns `{ succeeded[], failed[] }`. |
+| `DELETE /media/bulk` | `media.manage` | Batch delete by ID array. Returns `{ deleted[], failed[] }`. |
+| `POST /media/:id/replace` | `media.manage` | Overwrites bytes at same storage key — URL stays stable. Regenerates thumbnail in-place. Audit logged with old/new size and mime type. |
+| `GET /media/:id/usage` | `BackstageGuard` | Returns `{ total_uses, articles[], products[], pages[] }` from join tables. No JSON scanning. |
+| `GET /digital-products/files/all` | `digital.deliver` | Paginated backstage catalogue of all `DigitalProductFile` rows with product joins. |
+
+`GET /media` extended with `mime_type`, `in_use`, and `sort` query params. Now returns `total_uses` count per item (from join table `_count`).
+
+`adm-zip` added to backend dependencies for zip extraction.
+
+### M.6 — Frontend `/admin/media`
+
+New page at `frontend/app/admin/media/` (server wrapper + `MediaLibraryClient.tsx`). Added **Media** nav item to backstage sidebar (between Pages and Orders; gated on `media.upload`).
+
+**Media Library tab**:
+- Thumbnail grid (4–6 columns depending on detail panel state), with in-use green dot badge and hover-reveal checkbox
+- Filter bar: search, MIME type (All / Images / PDFs), In Use toggle (All / In Use / Unused), sort (date / name / size)
+- Selection mode header with bulk-delete trigger
+- Bulk uploader (collapsible): drag-and-drop zone + browse-files button; zip-aware; per-batch `POST /media/bulk-upload`; shows succeeded/failed counts on completion
+- Detail panel (slides in from right on card click): full preview, read-only metadata, editable alt text/caption (PATCH on blur), "Used in" section with links to article/product/page edit pages, Download/Replace/Delete actions with in-use warning on single delete
+- Bulk delete confirmation modal: lists count of in-use files; two-button confirm
+
+**Digital Files tab**:
+- Read-only table of all digital source files with format badge, product name (link to product edit page), storage path (display-only), personalization status badges, upload date
+- Informational banner: *"Digital source files are managed from each product's edit page."*
+- No file operations — intentional security boundary
+
+### Test results after Item M
+
+| Suite | Count |
+|-------|-------|
+| Backend unit tests | 190/190 ✅ |
+| Frontend unit tests | 125/125 ✅ |
+
+---
+
+## Full Test Results
+
+| Suite | Before Phase 22 | After Items A–M |
 |-------|--------|-------|
 | Backend unit tests | 190/190 | 190/190 ✅ |
 | Frontend unit tests | 125/125 | 125/125 ✅ |
@@ -287,7 +413,15 @@ New `deploy/` directory at repo root:
 ## Git Log
 
 ```
+(Item M — uncommitted, working tree)
+f662187 Fix: seed sample content in completeSetup() instead of docker-start.sh boot
+fbfc0d3 Phase 22 items K/L: Next.js 15 upgrade changes (modified files)
+85ca5e8 Phase 22 items K/L: Next.js 15.3.9 security upgrade + GCS bucket permissions
+eb8d731 Fix: remove KINDLE_FROM_EMAIL env var; Kindle wizard reads sender from ISM at runtime
+c56a7de Fix: homepage warning incorrectly appended /articles redirect when _home_ is published
+527f346 Phase 22: completion report updated, CLAUDE.md status updated to COMPLETE
 b7545c8 Phase 22 Item J: new owner experience, platform config helpers, Owner's Manual
+bd96d29 Phase 22: completion report, updated CLAUDE.md, plan docs
 b86727b Phase 22 items A/B: TipTap version alignment, Node.js 22 upgrade
 3ecea7c Phase 22 items G/I: sample content seed, _home_ guard, homepage warning, CSV export
 013f777 Phase 22 items C/D/E/F: wizard placeholders, password toggles, capability seed, email test
@@ -295,9 +429,12 @@ b86727b Phase 22 items A/B: TipTap version alignment, Node.js 22 upgrade
 
 ---
 
+## Remaining Items
+
+All planned items are complete. H.2-B (storage test button sends current form values) was implemented as part of J/H.4 and incorrectly marked "Not started" in a prior revision of this report. H.3 (provider type read-only badge) was absorbed into J.7. No outstanding items remain.
+
 ## Next Steps
 
-- **Deploy**: Merge `main → deploy` and push to trigger the GitHub Actions pipeline (update GitHub Variables first: GCP_PROJECT_NUMBER, GCP_PROJECT_ID, APP_DOMAIN, GCS_MEDIA_BUCKET, GCS_DIGITAL_BUCKET, SETTINGS_KMS_SECRET_ID, KINDLE_FROM_EMAIL)
-- **Phase 21 remaining**: FvR content migration (`seed-fvr.ts` against production DB via Cloud SQL proxy) + Phase 21 completion report
-- **Phase 23**: Owner knows what goes here
+- **Commit Item M** and merge `main → deploy`
 - **Phase 24**: Sales tax infrastructure (activation trigger: $1k revenue or Texas Comptroller registration)
+- **Next.js 16**: Deferred until `16.3.x` stabilizes (unfixed `/_global-error` prerender bug in `16.2.9`)
