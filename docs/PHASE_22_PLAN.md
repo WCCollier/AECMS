@@ -299,13 +299,10 @@ This creates a specific trap: an owner who set bucket names as Cloud Run env var
 
 The GCS buckets `fantasyvreality-media` and `fantasyvreality-digital` were created manually via `gcloud storage buckets create` during the Phase 21 setup session. They are not created by the GitHub Actions workflow, the Docker build, the setup wizard, or any install script. `STORAGE_PROVIDER_TYPE=gcs` is hardcoded in the workflow, so any fresh deployment to a new GCP project would start the GCS provider but fail silently on the first file operation because the buckets don't exist.
 
-**Fix options to evaluate in Phase 22:**
+**Decision**: Both A + C. ✅
 
-- **Option A (preferred for Cloud Run path)**: Add an idempotent bucket-creation step to the GitHub Actions workflow, after the GCP auth step and before the backend deploy. `gcloud storage buckets create` returns a benign error if the bucket already exists, or use `--if-not-exists` when available. Also apply the `allUsers` objectViewer binding for the media bucket in the same step.
-- **Option B**: Provide a `scripts/setup-gcs.sh` helper that the owner runs once before first deploy. Document it prominently in DEPLOYMENT.md.
-- **Option C**: The setup wizard detects `STORAGE_PROVIDER_TYPE=gcs` and includes a storage validation step that calls `POST /settings/test-storage` and surfaces a clear error if the buckets are missing, with inline instructions.
-
-Options A and C are not mutually exclusive and together give the best experience.
+- **Option A**: Add idempotent `gcloud storage buckets create` step to `deploy.yml` after GCP auth and before backend deploy. Also apply `allUsers` objectViewer binding for media bucket. Implemented alongside J.1 (deploy.yml parameterization).
+- **Option C**: Setup wizard storage step (J.5) calls `POST /settings/test-storage-preview` and surfaces clear error with instructions if buckets are missing.
 
 ### H.3 — Pre-install decisions should be reflected and locked in the UI
 
@@ -446,9 +443,212 @@ The date range controls should allow the user to select any past date so they ca
 
 ---
 
+## Item J — New Owner Experience: Config Helpers, Wizard Extensions, Owner's Manual
+
+**Priority**: High — must be implemented before Item H (H.2–H.4)  
+**Requested**: 2026-06-21  
+**Depends on**: Items A–I complete
+
+### Goal
+
+A new owner cloning this repo to deploy on their own infrastructure currently faces three friction points:
+
+1. **No single configuration entry point.** Env vars are scattered; `deploy.yml` has hardcoded FvR-specific values a new owner must hunt down and change.
+2. **The setup wizard only handles account creation.** Storage, email, and site URL are left for the owner to discover in Admin Settings — with no guidance on what to enter or what the fields mean.
+3. **No documentation.** There is no end-user guide explaining how to choose infrastructure, configure it, and connect it to AECMS.
+
+Item J solves all three. It also absorbs **Item H.1** (settings panel reflecting env var values), since the same profile endpoint powers both.
+
+---
+
+### J.1 — Parameterize `deploy.yml` for Portability
+
+**Problem**: `deploy.yml` contains hardcoded FvR-specific values: `GCP_PROJECT` (`983307563767`), `GCP_PROJECT_ID` (`fantasyvreality`), domain name (`fantasyvreality.com`), KMS secret ID (`aecms-sek`), bucket prefix. A new Cloud Run deployer must find and change all of these manually.
+
+**Fix**: Replace hardcoded values with GitHub Variables (`vars.*`) or derive them from a small set of `vars.*` that the owner sets in their repo's Settings → Variables:
+
+| GitHub Variable | Current hardcoded value |
+|---|---|
+| `GCP_PROJECT_NUMBER` | `983307563767` |
+| `GCP_PROJECT_ID` | `fantasyvreality` |
+| `APP_DOMAIN` | `fantasyvreality.com` |
+| `GCS_MEDIA_BUCKET` | `fantasyvreality-media` |
+| `GCS_DIGITAL_BUCKET` | `fantasyvreality-digital` |
+| `BACKEND_SERVICE_NAME` | `aecms-backend` |
+| `FRONTEND_SERVICE_NAME` | `aecms-frontend` |
+
+The Cloud SQL instance name, service account email, and Secret Manager IDs should follow a convention derivable from `GCP_PROJECT_ID` (e.g. `aecms-db`, `aecms-backend@{GCP_PROJECT_ID}.iam.gserviceaccount.com`) to minimize the number of variables an owner must set.
+
+---
+
+### J.2 — Platform Starter Files
+
+Add a `deploy/` directory at the repo root with ready-to-use configuration files for each supported platform:
+
+```
+deploy/
+├── cloud-run/
+│   └── README.md          ← points to deploy.yml; explains GitHub Variables to set
+├── railway/
+│   ├── railway.toml       ← service definitions for backend + frontend
+│   └── README.md
+├── render/
+│   ├── render.yaml        ← service definitions with env var declarations
+│   └── README.md
+├── fly/
+│   ├── fly.backend.toml
+│   ├── fly.frontend.toml
+│   └── README.md
+└── coolify/
+    ├── docker-compose.production.yml  ← production-ready Compose with postgres + redis services
+    └── README.md
+```
+
+Each platform's `README.md` is a short "here's what to click / what to run" quickstart — the full narrative lives in the Owner's Manual.
+
+---
+
+### J.3 — Env Var Templates Per Platform
+
+Each platform directory in `deploy/` gets an `env.example` file listing every env var the owner must set on that platform, with:
+- The variable name
+- A description
+- A sample value or `YOUR_VALUE_HERE` placeholder
+- Notes on where to get the value (e.g. "From Railway PostgreSQL plugin — copy the connection string")
+
+A shared `env.reference.md` at `deploy/env.reference.md` documents every AECMS env var, its type, defaults, and which provider needs it.
+
+---
+
+### J.4 — Backend `/setup/profile` Endpoint (absorbs H.1)
+
+**New endpoint**: `GET /setup/profile` (public — no auth required; called before owner account exists)
+
+Returns the deployment context as read by the running process:
+
+```json
+{
+  "storageProvider": "gcs" | "s3" | "local",
+  "emailProvider": "smtp" | "console",
+  "kmsProvider": "gcp" | "local",
+  "appUrl": "https://example.com",
+  "isFirstRun": true,
+  "settings": {
+    "storage.provider_type": { "value": "gcs", "source": "env" },
+    "storage.gcs_media_bucket": { "value": "my-media", "source": "env" },
+    ...
+  }
+}
+```
+
+The `settings` map is the **H.1 fix**: `SettingsService.getAll()` is updated to merge env var fallbacks for any key not present in the DB, attaching a `source: 'db' | 'env'` flag. The profile endpoint returns this enriched map. The Admin Settings UI renders `source: 'env'` values as read-only with the label *"Set via environment variable — enter a value here to override."*
+
+This replaces the need for Item H.1 as a standalone fix — it is implemented here.
+
+---
+
+### J.5 — Setup Wizard: Storage Configuration Step
+
+Add a storage step to the setup wizard, inserted after the admin account creation step.
+
+**Behavior driven by `GET /setup/profile`:**
+
+| `storageProvider` | Wizard behavior |
+|---|---|
+| `local` | Show a "Files stored locally" confirmation screen. No input needed. One click to continue. |
+| `gcs` | Show GCS fields: media bucket name, digital bucket name, credentials note. Pre-fill from `settings` profile. Test button (calls `POST /settings/test-storage-preview` with form values). |
+| `s3` | Show S3 fields: endpoint URL, region, access key ID, secret key, media bucket, digital bucket. Pre-fill from profile. Test button. |
+
+If the test passes, values are saved to ISM and the owner can proceed. If it fails, inline error with a link to the relevant Owner's Manual section.
+
+---
+
+### J.6 — Setup Wizard: Email Configuration Step
+
+Add an email step after the storage step.
+
+**Behavior driven by profile:**
+
+| `emailProvider` | Wizard behavior |
+|---|---|
+| `console` | Show a warning: "Email is in development mode — no emails will be sent. Set `EMAIL_PROVIDER_TYPE=smtp` and redeploy to enable." Allow owner to continue without configuring. |
+| `smtp` | Show SMTP fields: host, port, username, password, from address. Pre-fill from profile (env-sourced). Test button (calls `POST /settings/test-email-preview`). |
+
+---
+
+### J.7 — Wizard and Settings Panel Personalization via Profile
+
+Using the profile endpoint, make both the wizard and Admin Settings panel context-aware:
+
+**Wizard:**
+- Pre-fill the Site URL field in the Site Identity step from `appUrl` in the profile
+- Show the active storage provider name in the storage step header
+- On the email step, show the from-address from env if available
+
+**Settings panel (all tabs):**
+- Env-sourced values rendered read-only with *"Set via environment variable"* label (the H.1 fix)
+- File Storage tab: if `kmsProvider=gcp`, hide the credentials JSON field and show *"Cloud Run service account is used automatically — no credentials file needed."*
+- Storage tab: Provider Type shown as a read-only badge with active value from profile, labeled *"Requires redeployment to change"* (this is H.3, absorbed here)
+
+**What personalization is NOT attempted:**
+- Site name, tagline, owner name — no env data maps to these. Item C generic placeholders remain correct.
+
+---
+
+### J.8 — Owner's Manual HTML Site
+
+Create `docs/owners-manual/` — a self-contained HTML site viewable locally (open `index.html` in a browser) or via GitHub Pages.
+
+**Structure:**
+```
+docs/owners-manual/
+├── index.html                      ← overview, decision flowchart, quick-start paths
+├── style.css                       ← shared styles
+├── ch01-infrastructure.html        ← choosing hosting, DB, Redis, storage, email
+├── ch02-platform-setup/
+│   ├── index.html                  ← platform comparison table with links
+│   ├── railway.html
+│   ├── coolify.html
+│   ├── cloud-run.html
+│   ├── render.html
+│   └── fly.html
+├── ch03-aecms-config.html          ← what env vars to set and where, per platform
+├── ch04-first-launch.html          ← setup wizard walkthrough with screenshots/descriptions
+├── ch05-admin-settings.html        ← post-install configuration reference
+├── ch06-going-live.html            ← domain, SSL, DNS, first content
+└── ch07-maintenance.html           ← backups, updates, cost monitoring
+```
+
+**Implementation order**: build the shell and chapters 1–3 first (these are the pre-install blockers); chapters 4–7 can follow in a subsequent session.
+
+---
+
+### Implementation Order Within Item J
+
+1. **J.4 first** — profile endpoint + `getAll()` env-merge fix (H.1). Everything else reads from this.
+2. **J.1** — parameterize `deploy.yml`. Unblocks accurate Cloud Run documentation.
+3. **J.2 + J.3** — platform starter files and env templates. Unblocks chapter 3 of the manual.
+4. **J.5 + J.6** — wizard storage and email steps.
+5. **J.7** — wizard and settings panel personalization.
+6. **J.8** — Owner's Manual HTML site (can be parallelized with J.5–J.7 once J.1–J.3 are done).
+
+---
+
+### Relationship to Item H
+
+After J is complete:
+
+- **H.1** is fully implemented by J.4. Remove H.1 from the H checklist.
+- **H.3** (provider type read-only badge) is fully implemented by J.7. Remove H.3.
+- **H.2** (GCS bucket automation) and **H.4** (storage test with live form values) remain as H.2 and H.4 respectively.
+
+H therefore reduces to two items: bucket automation (H.2) and the storage test-preview endpoint (H.4). These can be implemented after J.
+
+---
+
 ## Adding New Items
 
-As live testing surfaces additional new issues, append them here as **Item J**, **Item K**, etc. following the same format:
+As live testing surfaces additional new issues, append them here as **Item K**, **Item L**, etc. following the same format:
 - Problem description
 - Risk / urgency
 - Concrete fix steps

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Google Cloud Run Setup | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="../index.html">
+        <div class="product">AECMS</div>
+        <div class="title">Owner's Manual</div>
+      </a>
+    </div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="../index.html">Overview</a>
+        <a href="../ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="index.html">Ch 2 — Platform Setup</a>
+        <a href="../ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="../ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="railway.html">Railway</a>
+        <a href="coolify.html">Coolify + VPS</a>
+        <a href="cloud-run.html" class="active">Google Cloud Run</a>
+        <a href="render.html">Render</a>
+        <a href="fly.html">Fly.io</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+
+      <div class="breadcrumb">
+        <a href="../index.html">Owner's Manual</a> <span>›</span>
+        <a href="index.html">Chapter 2</a> <span>›</span>
+        Google Cloud Run
+      </div>
+
+      <div class="page-header">
+        <h1>Deploying to Google Cloud Run</h1>
+        <p class="subtitle">Production-grade, serverless containers. Automated via GitHub Actions.</p>
+        <p class="meta">Estimated time: 60–90 minutes &nbsp;·&nbsp; Cost: ~$10–12/month at low traffic</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Who this is for</div>
+        <p>Cloud Run is best suited for owners who are comfortable with cloud infrastructure or want a scalable foundation that grows with their site. The initial setup has more steps than Railway or Coolify, but the deployment pipeline is fully automated after that.</p>
+      </div>
+
+      <h2>Architecture Overview</h2>
+      <ul>
+        <li><strong>Cloud Run</strong> — runs backend and frontend containers (scales to zero when idle)</li>
+        <li><strong>Cloud SQL</strong> — managed PostgreSQL 15 ($7–9/month for smallest instance)</li>
+        <li><strong>Upstash Redis</strong> — serverless Redis (free tier is sufficient for low traffic)</li>
+        <li><strong>Google Cloud Storage</strong> — two buckets (media + digital), created automatically</li>
+        <li><strong>Secret Manager</strong> — stores database URL, JWT secret, Redis URL, and the Settings Encryption Key</li>
+        <li><strong>GitHub Actions</strong> — builds Docker images and deploys on every push to the <code>deploy</code> branch</li>
+      </ul>
+
+      <h2>Before You Start</h2>
+      <ul>
+        <li>A <a href="https://github.com" target="_blank">GitHub account</a> with the AECMS repository forked</li>
+        <li>A <a href="https://console.cloud.google.com" target="_blank">Google Cloud account</a> with billing enabled</li>
+        <li>The <a href="https://cloud.google.com/sdk/docs/install" target="_blank">Google Cloud CLI (<code>gcloud</code>)</a> installed on your computer</li>
+        <li>A domain name with access to its DNS settings</li>
+      </ul>
+
+      <h2>Step 1 — Create a GCP Project</h2>
+      <ol class="steps">
+        <li>Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> → click the project dropdown → <strong>New Project</strong>.</li>
+        <li>Enter a project name (e.g. <code>my-aecms-site</code>). Note the auto-generated <strong>Project ID</strong> (e.g. <code>my-aecms-site-123456</code>) — you'll need it throughout.</li>
+        <li>Note the <strong>Project Number</strong> (numeric) shown in the Dashboard.</li>
+      </ol>
+
+      <h2>Step 2 — Enable Required APIs</h2>
+      <pre><code>gcloud config set project YOUR_PROJECT_ID
+
+gcloud services enable \
+  run.googleapis.com \
+  sqladmin.googleapis.com \
+  secretmanager.googleapis.com \
+  artifactregistry.googleapis.com \
+  storage.googleapis.com \
+  cloudresourcemanager.googleapis.com</code></pre>
+
+      <h2>Step 3 — Create Artifact Registry Repository</h2>
+      <pre><code>gcloud artifacts repositories create aecms \
+  --repository-format=docker \
+  --location=us-central1 \
+  --description="AECMS container images"</code></pre>
+
+      <h2>Step 4 — Create Cloud SQL Database</h2>
+      <pre><code># Create the instance (takes 3–5 minutes)
+gcloud sql instances create aecms-db \
+  --database-version=POSTGRES_15 \
+  --tier=db-f1-micro \
+  --region=us-central1 \
+  --storage-auto-increase
+
+# Create the database and user
+gcloud sql databases create aecms --instance=aecms-db
+gcloud sql users create aecms --instance=aecms-db --password=YOUR_DB_PASSWORD</code></pre>
+
+      <h2>Step 5 — Create Upstash Redis</h2>
+      <ol class="steps">
+        <li>Go to <a href="https://upstash.com" target="_blank">upstash.com</a> → create a free account.</li>
+        <li>Create a Redis database: choose the region closest to <code>us-central1</code>.</li>
+        <li>Copy the <strong>Redis URL</strong> from the database details page.</li>
+      </ol>
+
+      <h2>Step 6 — Store Secrets in Secret Manager</h2>
+      <pre><code># Generate a JWT secret
+JWT_SECRET=$(openssl rand -hex 64)
+
+# Generate the Settings Encryption Key — SAVE THIS SOMEWHERE SAFE
+SEK=$(openssl rand -hex 32)
+
+# Store each secret
+echo -n "postgresql://aecms:YOUR_DB_PASSWORD@/aecms?host=/cloudsql/YOUR_PROJECT_ID:us-central1:aecms-db" \
+  | gcloud secrets create aecms-database-url --data-file=-
+
+echo -n "$JWT_SECRET" | gcloud secrets create aecms-jwt-secret --data-file=-
+
+echo -n "YOUR_UPSTASH_REDIS_URL" | gcloud secrets create aecms-redis-url --data-file=-
+
+echo -n "$SEK" | gcloud secrets create aecms-sek --data-file=-
+
+echo "⚠️  Save your SEK: $SEK"</code></pre>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Save your Settings Encryption Key</div>
+        <p>The <code>SEK</code> value printed above is your Settings Encryption Key. It is stored in Secret Manager, but you should also write it down and keep it in a password manager. If Secret Manager is deleted or the secret is rotated without backing it up, all credentials stored in Admin Settings become permanently unreadable.</p>
+      </div>
+
+      <h2>Step 7 — Create a Service Account</h2>
+      <pre><code>gcloud iam service-accounts create aecms-backend \
+  --display-name="AECMS Backend Service Account"
+
+SA="aecms-backend@YOUR_PROJECT_ID.iam.gserviceaccount.com"
+
+# Grant required roles
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID --member="serviceAccount:$SA" --role="roles/cloudsql.client"
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID --member="serviceAccount:$SA" --role="roles/secretmanager.secretAccessor"
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID --member="serviceAccount:$SA" --role="roles/storage.admin"
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID --member="serviceAccount:$SA" --role="roles/run.admin"
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID --member="serviceAccount:$SA" --role="roles/artifactregistry.writer"
+
+# Create a key for GitHub Actions
+gcloud iam service-accounts keys create gcp-sa-key.json --iam-account="$SA"</code></pre>
+
+      <h2>Step 8 — Set GitHub Variables and Secrets</h2>
+      <p>In your forked GitHub repository, go to <strong>Settings → Secrets and variables → Actions</strong>.</p>
+      <h4>Add these Variables (not secrets):</h4>
+      <table>
+        <thead><tr><th>Variable name</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td><code>GCP_PROJECT_NUMBER</code></td><td>Your numeric project number</td></tr>
+          <tr><td><code>GCP_PROJECT_ID</code></td><td>Your text project ID</td></tr>
+          <tr><td><code>APP_DOMAIN</code></td><td>Your domain (e.g. <code>myblog.com</code>)</td></tr>
+          <tr><td><code>GCS_MEDIA_BUCKET</code></td><td>e.g. <code>myblog-media</code></td></tr>
+          <tr><td><code>GCS_DIGITAL_BUCKET</code></td><td>e.g. <code>myblog-digital</code></td></tr>
+          <tr><td><code>SETTINGS_KMS_SECRET_ID</code></td><td><code>aecms-sek</code></td></tr>
+          <tr><td><code>KINDLE_FROM_EMAIL</code></td><td>Your email address</td></tr>
+        </tbody>
+      </table>
+      <h4>Add this Secret:</h4>
+      <table>
+        <thead><tr><th>Secret name</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td><code>GCP_SA_KEY</code></td><td>Paste the entire contents of <code>gcp-sa-key.json</code></td></tr>
+        </tbody>
+      </table>
+      <p>Then delete <code>gcp-sa-key.json</code> from your computer — it's now in GitHub Secrets.</p>
+
+      <h2>Step 9 — Deploy</h2>
+      <ol class="steps">
+        <li>In your forked repo, go to the <strong>Actions</strong> tab → select the <strong>Deploy to Cloud Run</strong> workflow → click <strong>Run workflow</strong>.</li>
+        <li>The workflow: runs tests → creates GCS buckets (idempotent) → builds and pushes Docker images → deploys backend → deploys frontend.</li>
+        <li>After ~6 minutes, the workflow prints the backend and frontend Cloud Run URLs.</li>
+        <li>Visit the frontend URL to see your site or the setup wizard.</li>
+      </ol>
+
+      <h2>Step 10 — Map Your Domain</h2>
+      <ol class="steps">
+        <li>Map your domain to Cloud Run:
+          <pre><code>gcloud beta run domain-mappings create \
+  --service aecms-frontend \
+  --domain yourdomain.com \
+  --region us-central1
+
+gcloud beta run domain-mappings create \
+  --service aecms-frontend \
+  --domain www.yourdomain.com \
+  --region us-central1</code></pre>
+        </li>
+        <li>Run <code>gcloud beta run domain-mappings describe --domain yourdomain.com --region us-central1</code> to get the DNS records you need to add.</li>
+        <li>In your domain registrar's DNS, add the A/AAAA and CNAME records shown.</li>
+        <li>DNS propagation takes up to 24 hours. Cloud Run handles SSL automatically once DNS is active.</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ Set APP_DOMAIN before first deploy</div>
+        <p>Set <code>APP_DOMAIN</code> to your final domain name (e.g. <code>myblog.com</code>) in GitHub Variables before running the first deploy. The workflow bakes this into the container as <code>APP_URL</code>. If you change it later, you will need to redeploy.</p>
+      </div>
+
+      <h2>Next Steps</h2>
+      <ul>
+        <li><a href="../ch04-first-launch.html">Chapter 4</a> — Run the setup wizard</li>
+        <li><a href="../ch06-going-live.html">Chapter 6</a> — Verify domain and SSL</li>
+      </ul>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

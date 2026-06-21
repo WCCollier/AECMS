@@ -13,6 +13,15 @@ interface FormData {
   confirm_password: string;
 }
 
+interface DeployProfile {
+  storageProvider: string;
+  emailProvider: string;
+  kmsProvider: string;
+  appUrl: string;
+  isFirstRun: boolean;
+  envKeys: string[];
+}
+
 const EMPTY: FormData = {
   site_name: '',
   site_tagline: '',
@@ -76,14 +85,19 @@ export default function SetupPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [confirmTouched, setConfirmTouched] = useState(false);
+  const [profile, setProfile] = useState<DeployProfile | null>(null);
 
   useEffect(() => {
-    // If setup is already complete, redirect home
-    fetch('/api-proxy/setup/status')
-      .then((r) => r.json())
-      .then((d) => {
-        if (!d.required) router.replace('/');
-        else setChecking(false);
+    Promise.all([
+      fetch('/api-proxy/setup/status').then((r) => r.json()),
+      fetch('/api-proxy/setup/profile').then((r) => r.json()).catch(() => null),
+    ])
+      .then(([status, profileData]) => {
+        if (!status.required) router.replace('/');
+        else {
+          if (profileData) setProfile(profileData);
+          setChecking(false);
+        }
       })
       .catch(() => setChecking(false));
   }, [router]);
@@ -332,19 +346,89 @@ export default function SetupPage() {
           )}
 
           {step === 3 && (
-            <div className="text-center space-y-4">
-              <div className="text-4xl mb-4">✓</div>
-              <h2 className="text-lg font-semibold">Your site is ready</h2>
-              <p className="text-sm text-foreground/60">
-                <strong>{data.site_name}</strong> is set up. Log in to the backstage to
-                configure email, payments, and storage, then start publishing.
-              </p>
-              <p className="text-xs text-foreground/40 mt-2">
-                You&apos;ll be prompted to set up two-factor authentication on first login.
-              </p>
+            <div className="space-y-5">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                    className="text-green-500">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-semibold">Account created</h2>
+                <p className="text-sm text-foreground/60 mt-1">
+                  <strong>{data.site_name}</strong> is set up.
+                </p>
+              </div>
+
+              <div className="border border-foreground/10 rounded-lg divide-y divide-foreground/10 text-sm">
+                {/* Storage next step */}
+                {profile?.storageProvider === 'gcs' || profile?.storageProvider === 's3' ? (
+                  <div className="flex items-start gap-3 px-4 py-3">
+                    <span className="text-amber-500 mt-0.5">⚠</span>
+                    <div>
+                      <p className="font-medium text-foreground/80">Confirm storage buckets</p>
+                      <p className="text-xs text-foreground/50 mt-0.5">
+                        {profile.storageProvider === 'gcs' ? 'Google Cloud Storage' : 'S3-compatible storage'} is active.
+                        Verify your bucket names in <strong>Settings → File Storage</strong> after logging in.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 px-4 py-3">
+                    <span className="text-green-500 mt-0.5">✓</span>
+                    <div>
+                      <p className="font-medium text-foreground/80">Local storage active</p>
+                      <p className="text-xs text-foreground/50 mt-0.5">Files will be stored on this server. No additional configuration needed.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Email next step */}
+                {profile?.emailProvider === 'console' ? (
+                  <div className="flex items-start gap-3 px-4 py-3">
+                    <span className="text-amber-500 mt-0.5">⚠</span>
+                    <div>
+                      <p className="font-medium text-foreground/80">Email is in development mode</p>
+                      <p className="text-xs text-foreground/50 mt-0.5">
+                        No emails will be sent. Configure SMTP in <strong>Settings → Email</strong> when ready.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 px-4 py-3">
+                    <span className="text-foreground/30 mt-0.5">→</span>
+                    <div>
+                      <p className="font-medium text-foreground/80">Configure email</p>
+                      <p className="text-xs text-foreground/50 mt-0.5">
+                        Add your SMTP credentials in <strong>Settings → Email</strong> to enable order receipts and verification emails.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Payments */}
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <span className="text-foreground/30 mt-0.5">→</span>
+                  <div>
+                    <p className="font-medium text-foreground/80">Connect payment providers</p>
+                    <p className="text-xs text-foreground/50 mt-0.5">Add Stripe and/or PayPal keys in <strong>Settings → Payment Providers</strong>.</p>
+                  </div>
+                </div>
+
+                {/* 2FA reminder */}
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <span className="text-foreground/30 mt-0.5">→</span>
+                  <div>
+                    <p className="font-medium text-foreground/80">Set up two-factor authentication</p>
+                    <p className="text-xs text-foreground/50 mt-0.5">You&apos;ll be prompted on first backstage login.</p>
+                  </div>
+                </div>
+              </div>
+
               <a
                 href="/admin"
-                className="block mt-6 py-2.5 bg-foreground text-background text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
+                className="block mt-2 py-2.5 bg-foreground text-background text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity text-center"
               >
                 Go to Backstage
               </a>

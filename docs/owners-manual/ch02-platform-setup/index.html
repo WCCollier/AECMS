@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 2 — Platform Setup | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+<div class="layout">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="../index.html">
+        <div class="product">AECMS</div>
+        <div class="title">Owner's Manual</div>
+      </a>
+    </div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="../index.html">Overview</a>
+        <a href="../ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="index.html" class="active">Ch 2 — Platform Setup</a>
+        <a href="../ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="../ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Platform Guides</div>
+        <a href="railway.html">Railway</a>
+        <a href="coolify.html">Coolify + VPS</a>
+        <a href="cloud-run.html">Google Cloud Run</a>
+        <a href="render.html">Render</a>
+        <a href="fly.html">Fly.io</a>
+      </div>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <div class="content">
+
+      <div class="breadcrumb">
+        <a href="../index.html">Owner's Manual</a>
+        <span>›</span>
+        Chapter 2
+      </div>
+
+      <div class="page-header">
+        <h1>Chapter 2 — Platform Setup</h1>
+        <p class="subtitle">Step-by-step setup for your chosen hosting platform.</p>
+      </div>
+
+      <p>Select your platform from the guides below. Each guide walks you through:</p>
+      <ol>
+        <li>Creating the platform account and project</li>
+        <li>Setting up the database and Redis</li>
+        <li>Deploying the AECMS containers from GitHub</li>
+        <li>Setting required environment variables</li>
+        <li>Mapping your custom domain</li>
+      </ol>
+
+      <div class="platform-grid" style="margin-top: 1.75rem;">
+        <a href="railway.html" class="platform-card">
+          <div class="name">Railway</div>
+          <span class="badge free">$5/mo hobby</span>
+          <div class="desc">Easiest setup. PostgreSQL and Redis plugins built in. Deploy directly from GitHub. Recommended for non-technical owners.</div>
+        </a>
+        <a href="coolify.html" class="platform-card">
+          <div class="name">Coolify + VPS</div>
+          <span class="badge selfhost">$5–6/mo VPS</span>
+          <div class="desc">Best value. Self-host everything on a cheap VPS. One-time server setup, then a Coolify dashboard handles the rest.</div>
+        </a>
+        <a href="cloud-run.html" class="platform-card">
+          <div class="name">Google Cloud Run</div>
+          <span class="badge paid">~$10–12/mo</span>
+          <div class="desc">Most scalable. Automated deployment via GitHub Actions. GCS buckets created automatically. Requires a GCP account.</div>
+        </a>
+        <a href="render.html" class="platform-card">
+          <div class="name">Render</div>
+          <span class="badge paid">~$14+/mo</span>
+          <div class="desc">Similar to Railway. Good UI. No truly free tier for running services (web services sleep on free plan).</div>
+        </a>
+        <a href="fly.html" class="platform-card">
+          <div class="name">Fly.io</div>
+          <span class="badge free">~$0–10/mo</span>
+          <div class="desc">Generous free tier. Requires Fly CLI. Better for owners comfortable with a terminal.</div>
+        </a>
+      </div>
+
+      <div class="callout note" style="margin-top: 2rem;">
+        <div class="callout-title">ℹ️ Domain timing</div>
+        <p>All platforms give you a default URL (e.g. <code>myapp.railway.app</code>) immediately after deploy. You can run the setup wizard on that URL while your custom domain's DNS propagates. See <a href="../ch06-going-live.html">Chapter 6</a> for domain mapping details.</p>
+      </div>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

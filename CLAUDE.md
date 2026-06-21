@@ -43,7 +43,7 @@
 **Phase 20**: ✅ COMPLETE - Themes and templates: 8 curated palettes, 5 font pairings, CSS variable injection in root layout, /admin/settings/appearance backstage UI (2026-06-17)
 **Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
 **Phase 21**: 🚧 IN PROGRESS - Deployability + first live deployment (merged with Phase 19): SEED_PROFILE system, setup wizard, GcpKeyProvider, Dockerfiles, GitHub Actions CI/CD, Cloud Run, FvR content migration
-**Phase 22**: ✅ COMPLETE - Dependency upgrades & live-testing fixes: TipTap 3.27.1 alignment, Node 22 upgrade, password show/hide site-wide, capability seed on boot, email test uses live form values, sample draft content seed, _home_ deletion guard, homepage warning, CSV transaction export (2026-06-20)
+**Phase 22**: 🚧 IN PROGRESS - Dependency upgrades & live-testing fixes: Items A–G, I complete (2026-06-20); Items J (new owner experience: platform config helpers, wizard extensions, Owner's Manual) and H.2/H.4 (storage tab UX) remaining. J must be implemented before H.
 **Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
 
 **Session 2026-06-18 improvements** (not phase-tracked):
@@ -288,6 +288,7 @@ rm -rf backend/dist frontend/.next
 - Run tests after changes: `npm run test && npm run build`
 - Commit incrementally with descriptive messages
 - **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
+- **IMPORTANT**: During theoretical or design discussions (architecture choices, platform comparisons, technology options, ecosystem questions), always use the WebSearch tool to verify information is current before answering. Don't rely solely on training data for fast-moving topics like hosting pricing, library versions, or ecosystem trends.
 
 ## Internal Secrets Manager (ISM)
 

@@ -60,14 +60,33 @@ export class SettingsService {
     @Inject(KEY_PROVIDER) private keyProvider: KeyProvider,
   ) {}
 
-  /** Returns all settings as key→value, with _enc values redacted to '••••••••' */
+  /** Returns all settings as key→value, with _enc values redacted to '••••••••'.
+   *  Keys not in DB are filled from ENV_KEY_MAP fallbacks so the UI always shows active config. */
   async getAll(): Promise<Record<string, string>> {
     const rows = await this.prisma.siteSettings.findMany();
+    const dbKeySet = new Set(rows.map((r) => r.key));
     const result: Record<string, string> = {};
     for (const row of rows) {
       result[row.key] = isEncryptedKey(row.key) ? REDACTED : row.value;
     }
+    for (const [settingKey, envKey] of Object.entries(ENV_KEY_MAP)) {
+      if (!dbKeySet.has(settingKey)) {
+        const envValue = process.env[envKey];
+        if (envValue) {
+          result[settingKey] = isEncryptedKey(settingKey) ? REDACTED : envValue;
+        }
+      }
+    }
     return result;
+  }
+
+  /** Returns setting keys whose active value comes from an env var, not the DB. */
+  async getEnvSourcedKeys(): Promise<string[]> {
+    const rows = await this.prisma.siteSettings.findMany({ select: { key: true } });
+    const dbKeySet = new Set(rows.map((r) => r.key));
+    return Object.entries(ENV_KEY_MAP)
+      .filter(([settingKey, envKey]) => !dbKeySet.has(settingKey) && Boolean(process.env[envKey]))
+      .map(([settingKey]) => settingKey);
   }
 
   /** Returns the decrypted plaintext value for a single key, or null if not set */

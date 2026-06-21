@@ -10,7 +10,7 @@ import {
   UseGuards,
   Res,
 } from '@nestjs/common';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';

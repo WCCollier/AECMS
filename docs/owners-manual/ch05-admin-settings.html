@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 5 — Admin Settings | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html"><div class="product">AECMS</div><div class="title">Owner's Manual</div></a></div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html">Overview</a>
+        <a href="ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Running Your Site</div>
+        <a href="ch05-admin-settings.html" class="active">Ch 5 — Admin Settings</a>
+        <a href="ch06-going-live.html">Ch 6 — Going Live</a>
+        <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
+      </div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="content">
+      <div class="breadcrumb"><a href="index.html">Owner's Manual</a> <span>›</span> Chapter 5</div>
+      <div class="page-header">
+        <h1>Chapter 5 — Admin Settings</h1>
+        <p class="subtitle">A reference for every settings tab in the backstage.</p>
+        <p class="meta">Full guide coming soon — key sections documented below.</p>
+      </div>
+
+      <h2>General</h2>
+      <p>Site title, tagline, timezone, date format, and homepage mode. The <strong>Homepage</strong> setting controls what visitors see at your root URL (<code>/</code>):</p>
+      <ul>
+        <li><strong>Article Feed</strong> — redirects <code>/</code> to <code>/articles</code></li>
+        <li><strong>Custom Page</strong> — shows a specific page at <code>/</code>. Select a published page from the dropdown. If the selected page is not published, the site falls back to the <code>_home_</code> page, then to the article feed.</li>
+      </ul>
+
+      <h2>Email / SMTP</h2>
+      <p>Enter your SMTP credentials here. Required fields: Host, Port, Username, Password, From Address. Click <strong>Test</strong> to send a test email using the values currently in the form (you do not need to save first). Save after a successful test.</p>
+
+      <h2>Payment Providers</h2>
+      <p>Stripe and PayPal credentials. Click <strong>Verify</strong> after entering credentials to confirm the API connection is working. Stripe handles cards, Apple Pay, Google Pay, and Amazon Pay. PayPal is an alternative checkout option.</p>
+
+      <h2>File Storage</h2>
+      <p>Shows the active storage provider and bucket configuration. Fields set via environment variables appear with an <strong>env var</strong> badge and are read-only — to change them, update the environment variable and redeploy. You can override env var values by entering a value here; the in-database value takes precedence.</p>
+      <p>Click <strong>Test Storage Connection</strong> to verify a write/read/delete round-trip against your storage provider using the values currently in the form.</p>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Changing bucket names after files are uploaded</div>
+        <p>If you change the media or digital bucket name after files have already been uploaded, existing media URLs and download links will break. You must migrate files to the new bucket before changing the name here.</p>
+      </div>
+
+      <h2>Appearance</h2>
+      <p>Choose a color palette and font pairing. Changes apply site-wide immediately after saving. Available palettes: Midnight, Ocean, Forest, Sunset, Rose, Storm, Ember, Arctic.</p>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

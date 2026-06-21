@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 4 — First Launch | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html"><div class="product">AECMS</div><div class="title">Owner's Manual</div></a></div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html">Overview</a>
+        <a href="ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html" class="active">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Running Your Site</div>
+        <a href="ch05-admin-settings.html">Ch 5 — Admin Settings</a>
+        <a href="ch06-going-live.html">Ch 6 — Going Live</a>
+        <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
+      </div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="content">
+      <div class="breadcrumb"><a href="index.html">Owner's Manual</a> <span>›</span> Chapter 4</div>
+      <div class="page-header">
+        <h1>Chapter 4 — First Launch &amp; Setup Wizard</h1>
+        <p class="subtitle">Create your owner account and confirm your deployment is working.</p>
+      </div>
+
+      <h2>The Setup Wizard</h2>
+      <p>The first time you visit your site, AECMS detects that no owner account exists and redirects you to the setup wizard at <code>/setup</code>. The wizard walks you through two steps:</p>
+
+      <h3>Step 1 — Site Identity</h3>
+      <ul>
+        <li><strong>Site Name</strong> — shown in browser tabs, emails, and the Admin panel header</li>
+        <li><strong>Tagline</strong> — a short description (optional)</li>
+        <li><strong>Your name</strong> — shown as the author of content you create</li>
+      </ul>
+
+      <h3>Step 2 — Owner Account</h3>
+      <ul>
+        <li><strong>Email address</strong> — your login email</li>
+        <li><strong>Password</strong> — minimum 12 characters; use the strength indicator as a guide</li>
+      </ul>
+      <p>Click <strong>Create Site</strong>. AECMS creates your owner account and saves the site identity settings.</p>
+
+      <h3>Step 3 — Next Steps</h3>
+      <p>The final screen shows context-aware next steps based on how your deployment is configured:</p>
+      <ul>
+        <li>If you are using <strong>GCS or S3 storage</strong>, a reminder to verify your bucket names in Settings → File Storage</li>
+        <li>If email is in <strong>development mode</strong> (<code>EMAIL_PROVIDER_TYPE=console</code>), a reminder to configure SMTP</li>
+        <li>A reminder to set up two-factor authentication on first backstage login</li>
+      </ul>
+
+      <h2>After the Wizard</h2>
+      <ol class="steps">
+        <li><strong>Log in to the Backstage</strong> — click "Go to Backstage" and enter your email and password. You will be prompted to set up two-factor authentication (TOTP). Use an authenticator app (Google Authenticator, Authy, 1Password, etc.) to scan the QR code.</li>
+        <li><strong>Configure Email</strong> — go to <strong>Settings → Email / SMTP</strong>. Enter your SMTP credentials and click <strong>Test</strong> to verify they work before saving.</li>
+        <li><strong>Configure Storage</strong> — if you are using cloud storage (not local), go to <strong>Settings → File Storage</strong>. Verify the bucket names shown are correct and click <strong>Test Storage Connection</strong>.</li>
+        <li><strong>Connect payments</strong> — go to <strong>Settings → Payment Providers</strong>. Enter your Stripe and/or PayPal credentials.</li>
+        <li><strong>Publish your homepage</strong> — go to <strong>Pages</strong>. Find the <code>_home_</code> page that was created for you, edit it, and publish it. Then go to <strong>Settings → General</strong> and set Homepage to <strong>Custom Page → Home</strong>.</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ Sample content is pre-loaded</div>
+        <p>AECMS creates four draft items on first install: a home page, an "about pages" guide, a "welcome to articles" article, and an "about products" product. These explain how each content type works. You can edit or delete them at any time. The home page cannot be deleted (it is the last-resort homepage fallback).</p>
+      </div>
+
+      <p style="margin-top: 2rem;">
+        <a href="ch05-admin-settings.html" style="display:inline-block;background:#2563eb;color:#fff;padding:0.6rem 1.25rem;border-radius:0.5rem;font-weight:600;font-size:0.95rem;">Chapter 5 — Admin Settings →</a>
+      </p>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 3 — Configure AECMS | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html"><div class="product">AECMS</div><div class="title">Owner's Manual</div></a></div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html">Overview</a>
+        <a href="ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html" class="active">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Running Your Site</div>
+        <a href="ch05-admin-settings.html">Ch 5 — Admin Settings</a>
+        <a href="ch06-going-live.html">Ch 6 — Going Live</a>
+        <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
+      </div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="content">
+      <div class="breadcrumb"><a href="index.html">Owner's Manual</a> <span>›</span> Chapter 3</div>
+      <div class="page-header">
+        <h1>Chapter 3 — Configure AECMS</h1>
+        <p class="subtitle">The environment variables that connect your chosen services to AECMS.</p>
+      </div>
+
+      <p>AECMS is configured entirely through environment variables. You set these in your hosting platform's dashboard (Railway, Coolify, Render) or in your GitHub repository's Variables and Secrets (Cloud Run). No files in the repository need to be edited.</p>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Most configuration happens in Admin Settings</div>
+        <p>Credentials for Stripe, PayPal, and SMTP are configured in the Admin Settings panel <em>after</em> the setup wizard runs. You only need the environment variables below for the initial deployment.</p>
+      </div>
+
+      <h2>Minimum Required Variables</h2>
+      <p>These must be set before your first deployment:</p>
+
+      <table>
+        <thead><tr><th>Variable</th><th>Description</th><th>How to generate</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>DATABASE_URL</code></td>
+            <td>PostgreSQL connection string</td>
+            <td>Provided by your database service</td>
+          </tr>
+          <tr>
+            <td><code>REDIS_URL</code></td>
+            <td>Redis connection string</td>
+            <td>Provided by your Redis service</td>
+          </tr>
+          <tr>
+            <td><code>JWT_SECRET</code></td>
+            <td>Signs authentication tokens</td>
+            <td><code>openssl rand -hex 64</code></td>
+          </tr>
+          <tr>
+            <td><code>SETTINGS_ENCRYPTION_KEY</code></td>
+            <td>Encrypts credentials stored in Admin Settings</td>
+            <td><code>openssl rand -hex 32</code> — <strong>save this</strong></td>
+          </tr>
+          <tr>
+            <td><code>APP_URL</code></td>
+            <td>Your site's full public URL</td>
+            <td>e.g. <code>https://myblog.com</code></td>
+          </tr>
+          <tr>
+            <td><code>NODE_ENV</code></td>
+            <td>Runtime environment</td>
+            <td>Always <code>production</code></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Storage Variables</h2>
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>STORAGE_PROVIDER_TYPE</code></td><td><code>local</code></td><td><code>local</code>, <code>gcs</code>, or <code>s3</code></td></tr>
+          <tr><td><code>STORAGE_PATH</code></td><td><code>/app/uploads</code></td><td>Local storage path (local provider only)</td></tr>
+          <tr><td><code>S3_ENDPOINT</code></td><td>—</td><td>S3-compatible endpoint URL (e.g. Cloudflare R2)</td></tr>
+          <tr><td><code>S3_REGION</code></td><td><code>us-east-1</code></td><td>Storage region</td></tr>
+          <tr><td><code>GCS_BUCKET_MEDIA</code></td><td>—</td><td>GCS media bucket name (Cloud Run only)</td></tr>
+          <tr><td><code>GCS_BUCKET_DIGITAL</code></td><td>—</td><td>GCS digital bucket name (Cloud Run only)</td></tr>
+        </tbody>
+      </table>
+      <p>Bucket names and S3 credentials can also be configured in <strong>Admin Settings → File Storage</strong> after install.</p>
+
+      <h2>Email Variable</h2>
+      <table>
+        <thead><tr><th>Variable</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td><code>EMAIL_PROVIDER_TYPE</code></td><td><code>smtp</code> (for production) or <code>console</code> (dev mode — no emails sent)</td></tr>
+        </tbody>
+      </table>
+      <p>SMTP credentials (host, port, username, password, from address) are configured in <strong>Admin Settings → Email</strong> after install.</p>
+
+      <h2>Platform-Specific Files</h2>
+      <p>Template env files for each platform are in the <code>deploy/</code> directory of the repository:</p>
+      <ul>
+        <li><code>deploy/railway/env.example</code> — Railway variables</li>
+        <li><code>deploy/coolify/env.example</code> — Coolify / VPS variables</li>
+        <li><code>deploy/cloud-run/env.example</code> — GitHub Variables and Secrets for Cloud Run</li>
+      </ul>
+      <p>For a complete list of all available variables, see <code>deploy/env.reference.md</code>.</p>
+
+      <p style="margin-top: 2rem;">
+        <a href="ch04-first-launch.html" style="display:inline-block;background:#2563eb;color:#fff;padding:0.6rem 1.25rem;border-radius:0.5rem;font-weight:600;font-size:0.95rem;">Chapter 4 — First Launch →</a>
+      </p>
+    </div>
+  </main>
+</div>
+</body>
+</html>
