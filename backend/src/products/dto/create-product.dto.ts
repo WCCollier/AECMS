@@ -115,6 +115,43 @@ export class CreateProductDto {
   @MaxLength(160)
   meta_description?: string;
 
+  @ApiPropertyOptional({ description: 'Open Graph image URL override' })
+  @IsString()
+  @IsOptional()
+  og_image_url?: string;
+
+  @ApiPropertyOptional({ description: 'ISBN-10 or ISBN-13' })
+  @IsString()
+  @IsOptional()
+  isbn?: string;
+
+  @ApiPropertyOptional({ description: 'Book format', enum: ['EBook', 'Paperback', 'Hardcover', 'AudioBook'] })
+  @IsString()
+  @IsOptional()
+  book_format?: string;
+
+  @ApiPropertyOptional({ description: 'Number of pages' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  page_count?: number;
+
+  @ApiPropertyOptional({ description: 'Publisher name' })
+  @IsString()
+  @IsOptional()
+  publisher?: string;
+
+  @ApiPropertyOptional({ description: 'Amazon product URL (for sameAs structured data)' })
+  @IsString()
+  @IsOptional()
+  amazon_url?: string;
+
+  @ApiPropertyOptional({ description: 'Goodreads URL (for sameAs structured data)' })
+  @IsString()
+  @IsOptional()
+  goodreads_url?: string;
+
   @ApiPropertyOptional({ description: 'Category IDs', type: [String] })
   @IsArray()
   @IsUUID('4', { each: true })

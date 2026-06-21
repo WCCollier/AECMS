@@ -176,6 +176,7 @@ model Article {
   published_at        DateTime?
   meta_title          String?
   meta_description    String?
+  og_image_url        String?
 
   // Granular permissions (PRD 12)
   author_can_edit     Boolean     @default(true)
@@ -261,6 +262,7 @@ model Page {
   published_at        DateTime?
   meta_title          String?
   meta_description    String?
+  og_image_url        String?
   show_in_nav         Boolean     @default(true)
   nav_order           Int         @default(0)
 
@@ -412,6 +414,15 @@ model Product {
   // SEO
   meta_title          String?
   meta_description    String?
+  og_image_url        String?
+
+  // Book metadata (for products that are books)
+  isbn                String?
+  book_format         String?   // EBook | Paperback | Hardcover | AudioBook
+  page_count          Int?
+  publisher           String?
+  amazon_url          String?
+  goodreads_url       String?
 
   published_at        DateTime?
   created_at          DateTime    @default(now())
