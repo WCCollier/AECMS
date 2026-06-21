@@ -447,7 +447,7 @@ export function SettingsClient() {
                       return (
                         <p className="text-xs text-amber-400 flex items-start gap-1.5">
                           <span className="mt-0.5">⚠</span>
-                          The selected page is not currently published. Your site will fall back to the _home_ page{homePagePublished ? '' : ' — which is also not published'}. Visitors will be redirected to /articles.
+                          The selected page is not currently published. Your site will fall back to the _home_ page{homePagePublished ? '.' : ' — which is also not published. Visitors will be redirected to /articles.'}
                         </p>
                       );
                     }
