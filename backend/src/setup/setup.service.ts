@@ -75,9 +75,30 @@ export class SetupService {
   }
 
   private async seedSampleContent(ownerId: string): Promise<void> {
+    // Pages must use the zone-layout format so the page editor can render them.
+    // { layout, zones: { main: <tiptap-doc> } } — NOT raw TipTap JSON.
     const homeBody = JSON.stringify({
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Welcome to your new site! Edit this page and publish it, then set it as your homepage in Admin → Settings → General.' }] }],
+      layout: 'no_sidebar',
+      zones: {
+        main: {
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'Welcome to your new site! Edit this page and publish it, then set it as your homepage in Admin → Settings → General.' }] },
+          ],
+        },
+      },
+    });
+
+    const aboutPagesBody = JSON.stringify({
+      layout: 'no_sidebar',
+      zones: {
+        main: {
+          type: 'doc',
+          content: [
+            { type: 'paragraph', content: [{ type: 'text', text: 'This is a sample page. Use Pages to build your site structure.' }] },
+          ],
+        },
+      },
     });
 
     const [existingHome, existingAbout, existingArticle, existingProduct] = await Promise.all([
@@ -89,12 +110,12 @@ export class SetupService {
 
     await Promise.all([
       !existingHome && this.prisma.page.create({ data: {
-        slug: '_home_', title: 'Home', content: homeBody, status: 'draft', visibility: 'public',
+        slug: '_home_', title: 'Home', content: homeBody, status: 'published', visibility: 'public',
         author_id: ownerId, author_can_delete: false, admin_can_delete: false,
       }}),
       !existingAbout && this.prisma.page.create({ data: {
-        slug: 'about-pages', title: 'About Pages', status: 'draft', visibility: 'admin_only',
-        content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'This is a sample page. Use Pages to build your site structure.' }] }] }),
+        slug: 'about-pages', title: 'About Pages', status: 'draft', visibility: 'public',
+        content: aboutPagesBody,
         author_id: ownerId,
       }}),
       !existingArticle && this.prisma.article.create({ data: {
