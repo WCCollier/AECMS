@@ -80,6 +80,35 @@ export interface PageContent {
   };
 }
 
+// Section-based page content (Phase 23 Part 1)
+export interface SectionBackground {
+  type: 'none' | 'color' | 'image';
+  value?: string;
+  attachment?: 'scroll' | 'fixed' | 'parallax';
+}
+
+export interface PageZone {
+  id: string;
+  span: number;
+  content: object;
+}
+
+export interface PageSection {
+  id: string;
+  /** Always equals sum(zone.span). Stored for schema consistency; never exposed as a raw input to editors. */
+  columns: number;
+  minHeight?: string;
+  background?: SectionBackground;
+  zones: PageZone[];
+}
+
+export interface SectionsPageContent {
+  type: 'sections';
+  sections: PageSection[];
+}
+
+export type AnyPageContent = PageContent | SectionsPageContent;
+
 export interface Page {
   id: string;
   title: string;

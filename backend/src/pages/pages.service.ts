@@ -61,6 +61,8 @@ export class PagesService {
       }
     }
 
+    this.validateSectionsContent(dto.content);
+
     // Create page
     const page = await this.prisma.page.create({
       data: {
@@ -409,6 +411,8 @@ export class PagesService {
       }
     }
 
+    this.validateSectionsContent(dto.content);
+
     // Handle status change to published
     let published_at = page.published_at;
     if (dto.status === 'published' && page.status !== 'published') {
@@ -704,6 +708,29 @@ export class PagesService {
     }
 
     throw new ForbiddenException('You do not have permission to delete this page');
+  }
+
+  /**
+   * Validates section-based page content: each section's zone spans must sum to columns.
+   */
+  private validateSectionsContent(content: string | undefined | null): void {
+    if (!content) return;
+    try {
+      const obj = JSON.parse(content);
+      if (obj?.type !== 'sections' || !Array.isArray(obj.sections)) return;
+      for (const section of obj.sections) {
+        if (!Array.isArray(section.zones)) continue;
+        const spanSum: number = section.zones.reduce((s: number, z: { span?: unknown }) => s + (Number(z.span) || 0), 0);
+        if (spanSum !== section.columns) {
+          throw new BadRequestException(
+            `Section "${section.id}": zone spans sum to ${spanSum} but columns is ${section.columns}`,
+          );
+        }
+      }
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      // malformed JSON — let Prisma/DTO handle it
+    }
   }
 
   /**

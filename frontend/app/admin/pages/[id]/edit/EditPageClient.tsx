@@ -3,14 +3,21 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Eye, LayoutTemplate } from 'lucide-react';
+import { ArrowLeft, Eye, LayoutTemplate, ArrowUpCircle } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import adminApi from '@/lib/adminApi';
 import { PageZoneEditor } from '@/components/admin/PageZoneEditor';
+import { SectionsPageEditor } from '@/components/admin/SectionsPageEditor';
 import { VersionHistoryPanel } from '@/components/admin/VersionHistoryPanel';
 import { SiblingReorderPanel } from '@/components/admin/SiblingReorderPanel';
-import { getZonesForLayout, parsePageContent, LAYOUT_LABELS } from '@/lib/pageContent';
-import type { Page, PageLayout, PageContent } from '@/types';
+import {
+  getZonesForLayout,
+  parseAnyPageContent,
+  isSectionsContent,
+  legacyToSections,
+  LAYOUT_LABELS,
+} from '@/lib/pageContent';
+import type { Page, PageLayout, PageContent, PageSection } from '@/types';
 
 const LAYOUT_OPTIONS: PageLayout[] = ['no_sidebar', 'sidebar_left', 'sidebar_right', 'split_comparison'];
 
@@ -25,13 +32,33 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>('draft');
+
+  // Content mode: 'sections' (new schema) or 'legacy' (flat zones)
+  const [contentMode, setContentMode] = useState<'sections' | 'legacy'>('sections');
+
+  // Legacy mode state
   const [layout, setLayout] = useState<PageLayout>('no_sidebar');
   const [zones, setZones] = useState<PageContent['zones']>({});
+  const [previewSmall, setPreviewSmall] = useState(false);
+  const [layoutChangeWarning, setLayoutChangeWarning] = useState(false);
+  const [pendingLayout, setPendingLayout] = useState<PageLayout | null>(null);
+
+  // Sections mode state
+  const [sections, setSections] = useState<PageSection[]>([]);
+
   const [showInNav, setShowInNav] = useState(true);
   const [parentId, setParentId] = useState<string | null>(null);
   const [metaTitle, setMetaTitle] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
   const [ogImageUrl, setOgImageUrl] = useState('');
+  const [allPages, setAllPages] = useState<Array<{ id: string; title: string }>>([]);
+  const [pendingReorder, setPendingReorder] = useState<{ id: string; nav_order: number }[] | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [versionKey, setVersionKey] = useState(0);
+  const [zoneKey, setZoneKey] = useState(0);
   const handleParentChange = (newParentId: string | null) => {
     setParentId(newParentId);
     setPendingReorder(null);
@@ -43,6 +70,18 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
     setDirty(true);
   };
 
+  function applyParsedContent(raw: string | object | null | undefined) {
+    const parsed = parseAnyPageContent(raw);
+    if (isSectionsContent(parsed)) {
+      setContentMode('sections');
+      setSections(parsed.sections);
+    } else {
+      setContentMode('legacy');
+      setLayout((parsed as PageContent).layout);
+      setZones((parsed as PageContent).zones);
+    }
+  }
+
   const handleRestored = async () => {
     try {
       const res = await adminApi.get<Page>(`/pages/${pageId}`);
@@ -51,37 +90,22 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
       setTitle(p.title);
       setSlug(p.slug);
       setStatus(p.status);
-      setShowInNav((p as any).show_in_nav ?? true);
+      setShowInNav((p as unknown as { show_in_nav?: boolean }).show_in_nav ?? true);
       setParentId(p.parent_id ?? null);
       setMetaTitle((p as any).meta_title ?? '');
       setMetaDescription((p as any).meta_description ?? '');
       setOgImageUrl((p as any).og_image_url ?? '');
-      const content = parsePageContent(p.content);
-      setLayout(content.layout);
-      setZones(content.zones);
+      applyParsedContent(p.content);
       setDirty(false);
       setPendingReorder(null);
-      setVersionKey((k) => k + 1);
-      setZoneKey((k) => k + 1);
-    } catch {
-      // version list will still refresh via key increment from handleRestore
-    }
+      setVersionKey(k => k + 1);
+      setZoneKey(k => k + 1);
+    } catch { /* version list will refresh via key */ }
   };
-  const [allPages, setAllPages] = useState<Array<{ id: string; title: string }>>([]);
-  const [pendingReorder, setPendingReorder] = useState<{ id: string; nav_order: number }[] | null>(null);
-  const [previewSmall, setPreviewSmall] = useState(false);
-  const [dirty, setDirty] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [versionKey, setVersionKey] = useState(0);
-  const [zoneKey, setZoneKey] = useState(0);
-  const [layoutChangeWarning, setLayoutChangeWarning] = useState(false);
-  const [pendingLayout, setPendingLayout] = useState<PageLayout | null>(null);
 
   useEffect(() => {
     adminApi.get('/pages?limit=100&status=published').then((res) => {
-      setAllPages((res.data?.data ?? []).filter((p: any) => p.id !== pageId));
+      setAllPages((res.data?.data ?? []).filter((p: { id: string }) => p.id !== pageId));
     }).catch(() => {});
 
     adminApi.get<Page>(`/pages/${pageId}`)
@@ -91,14 +115,12 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         setTitle(p.title);
         setSlug(p.slug);
         setStatus(p.status);
-        setShowInNav((p as any).show_in_nav ?? true);
+        setShowInNav((p as unknown as { show_in_nav?: boolean }).show_in_nav ?? true);
         setParentId(p.parent_id ?? null);
         setMetaTitle((p as any).meta_title ?? '');
         setMetaDescription((p as any).meta_description ?? '');
         setOgImageUrl((p as any).og_image_url ?? '');
-        const content = parsePageContent(p.content);
-        setLayout(content.layout);
-        setZones(content.zones);
+        applyParsedContent(p.content);
       })
       .catch(() => setError('Failed to load page.'))
       .finally(() => setLoading(false));
@@ -120,35 +142,52 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
     setDirty(true);
   };
 
+  const handleUpgradeToSections = () => {
+    if (!window.confirm('Upgrade this page to the new section layout? The content will be preserved and converted losslessly.')) return;
+    const upgraded = legacyToSections({ layout, zones });
+    setContentMode('sections');
+    setSections(upgraded.sections);
+    setDirty(true);
+  };
+
   const handleSave = async () => {
     if (!title.trim()) { setError('Title is required.'); return; }
     setSaving(true);
     setError(null);
     try {
-      const pageContent: PageContent = { layout, zones };
-      await adminApi.patch(`/pages/${pageId}`, {
+      const pageContent =
+        contentMode === 'sections'
+          ? { type: 'sections', sections }
+          : { layout, zones };
+
+      const body: Record<string, unknown> = {
         title: title.trim(),
         slug,
         content: JSON.stringify(pageContent),
-        layout,
         status,
         show_in_nav: showInNav,
         parent_id: parentId,
         meta_title: metaTitle || undefined,
         meta_description: metaDescription || undefined,
         og_image_url: ogImageUrl || undefined,
-      });
+      };
+
+      // layout column only relevant for legacy pages
+      if (contentMode === 'legacy') body.layout = layout;
+
+      await adminApi.patch(`/pages/${pageId}`, body);
+
       if (pendingReorder) {
         await adminApi.patch('/pages/reorder', { pages: pendingReorder });
       }
       setDirty(false);
       setPendingReorder(null);
       setSaved(true);
-      setVersionKey((k) => k + 1);
+      setVersionKey(k => k + 1);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Save failed.';
-      setError(Array.isArray(msg) ? msg.join(', ') : msg);
+      const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message ?? 'Save failed.';
+      setError(Array.isArray(msg) ? msg.join(', ') : msg as string);
     } finally {
       setSaving(false);
     }
@@ -172,7 +211,6 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
           <h1 className="text-2xl font-bold">Edit Page</h1>
         </div>
         <div className="flex items-center gap-3">
-          {/* Full-page preview — opens in new tab */}
           <a
             href={`/admin/pages/${pageId}/preview`}
             target="_blank"
@@ -182,10 +220,10 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
             <Eye className="w-4 h-4" />
             Preview
           </a>
-          {getZonesForLayout(layout).length > 1 && (
+          {contentMode === 'legacy' && getZonesForLayout(layout).length > 1 && (
             <button
               type="button"
-              onClick={() => setPreviewSmall((v) => !v)}
+              onClick={() => setPreviewSmall(v => !v)}
               className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border transition-colors ${
                 previewSmall ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
               }`}
@@ -267,15 +305,13 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
             <label htmlFor="show_in_nav" className="text-sm font-medium cursor-pointer">Show in navigation</label>
           </div>
         </div>
-        {/* URL preview */}
         <p className="text-xs text-foreground/40">
           URL: <span className="font-mono text-foreground/60">
             {parentId
-              ? `/${allPages.find((p) => p.id === parentId)?.title?.toLowerCase().replace(/\s+/g, '-') ?? '…'}/${slug}`
+              ? `/${allPages.find(p => p.id === parentId)?.title?.toLowerCase().replace(/\s+/g, '-') ?? '…'}/${slug}`
               : `/${slug}`}
           </span>
         </p>
-        {/* Sibling reorder */}
         <div className="border-t border-border pt-3">
           <label className="block text-sm font-medium mb-2">Navigation Order</label>
           <SiblingReorderPanel
@@ -288,49 +324,71 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         </div>
       </div>
 
-      {/* Layout selector */}
-      <div className="mb-6">
-        <p className="text-sm font-medium mb-2">Layout</p>
-        <div className="flex flex-wrap gap-2">
-          {LAYOUT_OPTIONS.map((opt) => (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => handleLayoutChange(opt)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
-                opt === layout
-                  ? 'border-accent bg-accent/10 text-accent'
-                  : 'border-border hover:border-accent/50'
-              }`}
-            >
-              <LayoutTemplate className="w-3.5 h-3.5" />
-              {LAYOUT_LABELS[opt]}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Layout change confirmation */}
-      {layoutChangeWarning && pendingLayout && (
-        <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-          <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Change layout to {LAYOUT_LABELS[pendingLayout]}?</p>
-          <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
-            Main/Left zone content will be preserved. Sidebar and Right zone content will be discarded.
-          </p>
-          <div className="flex gap-2 mt-3">
-            <Button variant="outline" onClick={confirmLayoutChange} className="text-sm">Confirm Change</Button>
-            <Button variant="ghost" onClick={() => { setLayoutChangeWarning(false); setPendingLayout(null); }} className="text-sm">Cancel</Button>
+      {/* Layout mode: legacy shows selector + upgrade option; sections shows badge */}
+      {contentMode === 'legacy' ? (
+        <div className="mb-6">
+          <p className="text-sm font-medium mb-2">Layout</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {LAYOUT_OPTIONS.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => handleLayoutChange(opt)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm transition-colors ${
+                  opt === layout
+                    ? 'border-accent bg-accent/10 text-accent'
+                    : 'border-border hover:border-accent/50'
+                }`}
+              >
+                <LayoutTemplate className="w-3.5 h-3.5" />
+                {LAYOUT_LABELS[opt]}
+              </button>
+            ))}
           </div>
+          <button
+            type="button"
+            onClick={handleUpgradeToSections}
+            className="flex items-center gap-1.5 text-xs text-foreground/50 hover:text-accent transition-colors"
+          >
+            <ArrowUpCircle className="w-3.5 h-3.5" />
+            Upgrade to Section Layout
+          </button>
+
+          {layoutChangeWarning && pendingLayout && (
+            <div className="mt-3 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">Change layout to {LAYOUT_LABELS[pendingLayout]}?</p>
+              <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                Main/Left zone content will be preserved. Sidebar and Right zone content will be discarded.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <Button variant="outline" onClick={confirmLayoutChange} className="text-sm">Confirm Change</Button>
+                <Button variant="ghost" onClick={() => { setLayoutChangeWarning(false); setPendingLayout(null); }} className="text-sm">Cancel</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-accent/15 text-accent font-medium">Section Layout</span>
+          <span className="text-xs text-foreground/40">{sections.length} section{sections.length !== 1 ? 's' : ''}</span>
         </div>
       )}
 
-      <PageZoneEditor
-        key={zoneKey}
-        layout={layout}
-        zones={zones}
-        onChange={(z) => { setZones(z); setDirty(true); }}
-        previewSmall={previewSmall}
-      />
+      {/* Content editor */}
+      {contentMode === 'legacy' ? (
+        <PageZoneEditor
+          key={zoneKey}
+          layout={layout}
+          zones={zones}
+          onChange={(z) => { setZones(z); setDirty(true); }}
+          previewSmall={previewSmall}
+        />
+      ) : (
+        <SectionsPageEditor
+          sections={sections}
+          onChange={(s) => { setSections(s); setDirty(true); }}
+        />
+      )}
 
       {/* SEO */}
       <div className="mt-6 p-4 bg-surface rounded-lg border border-border space-y-4">
