@@ -49,12 +49,10 @@ function h2(text: string) {
 }
 
 function p(...runs: (string | { text: string; marks?: object[] })[]) {
-  return {
-    type: 'paragraph',
-    content: runs.map((r) =>
-      typeof r === 'string' ? { type: 'text', text: r } : { type: 'text', ...r },
-    ),
-  };
+  const content = runs
+    .map((r) => (typeof r === 'string' ? { type: 'text', text: r } : { type: 'text', ...r }))
+    .filter((n) => n.text !== '');
+  return content.length ? { type: 'paragraph', content } : { type: 'paragraph' };
 }
 
 function bold(text: string) {
