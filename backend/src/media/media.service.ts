@@ -10,7 +10,7 @@ import { AuditLogService } from '../audit/audit.service';
 import { Media } from '@prisma/client';
 import sharp from 'sharp';
 import * as path from 'path';
-import * as AdmZip from 'adm-zip';
+import AdmZip from 'adm-zip';
 import { UpdateMediaDto, QueryMediaDto } from './dto';
 import { STORAGE_PROVIDER } from '../storage';
 import type { StorageProvider } from '../storage';
