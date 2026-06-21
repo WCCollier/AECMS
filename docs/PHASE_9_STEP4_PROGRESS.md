@@ -82,9 +82,9 @@ The three online course products seeded by `seed-content.ts` were typed as `Prod
 **Fix**: Changed `product_type` to `ProductType.service`, `stock_status` to `StockStatus.available`, `stock_quantity` to `null` in both `seed-content.ts` and the live DB.
 
 Products corrected:
-- American Shooter: Safe Gun Ownership and Handling (AS-SGO-001)
-- American Shooter Supplemental: Classroom and Lab (AS-CL-001)
-- American Shooter Alternative: Direct to Defensive Shooting (AS-DDS-001)
+- Sample Product: Safe Gun Ownership and Handling (AS-SGO-001)
+- Sample Product Supplemental: Classroom and Lab (AS-CL-001)
+- Sample Product Alternative: Direct to Defensive Shooting (AS-DDS-001)
 
 ---
 
@@ -94,21 +94,21 @@ All 15 products seeded by `seed_lessons.ts` previously had no SKU. SKUs assigned
 
 | Slug | SKU |
 |------|-----|
-| american-shooter-lesson-1-marksmanship | AS-L1-MARKS |
-| american-shooter-lesson-2-wing-shooting | AS-L2-WING |
-| american-shooter-lesson-3-defensive-shooting-basics | AS-L3-DEF-B |
-| american-shooter-lesson-4-defensive-shooting-additional-skills | AS-L4-DEF-A |
-| american-shooter-supplemental-traditional-static-shooting | AS-SUPP-TSS |
-| american-shooter-supplemental-traditional-dynamic-shooting | AS-SUPP-TDS |
-| american-shooter-alternative-direct-to-defensive-shooting | AS-ALT-DDS |
-| american-shooter-strategies-for-personal-protection | AS-STRAT-PP |
-| american-shooter-community-training-seminar | AS-COMM-SEM |
+| sample-product-lesson-1-marksmanship | AS-L1-MARKS |
+| sample-product-lesson-2-wing-shooting | AS-L2-WING |
+| sample-product-lesson-3-defensive-shooting-basics | AS-L3-DEF-B |
+| sample-product-lesson-4-defensive-shooting-additional-skills | AS-L4-DEF-A |
+| sample-product-supplemental-traditional-static-shooting | AS-SUPP-TSS |
+| sample-product-supplemental-traditional-dynamic-shooting | AS-SUPP-TDS |
+| sample-product-alternative-direct-to-defensive-shooting | AS-ALT-DDS |
+| sample-product-strategies-for-personal-protection | AS-STRAT-PP |
+| sample-product-community-training-seminar | AS-COMM-SEM |
 | nra-basic-pistol | NRA-BP |
 | nra-basic-rifle | NRA-BR |
 | nra-personal-protection-inside-the-home | NRA-PPIH |
 | nra-personal-protection-outside-the-home | NRA-PPOH |
-| american-shooter-supplemental-classroom-and-lab-online | AS-SUPP-CAL-O |
-| american-shooter-hourly-lessons | AS-HOURLY |
+| sample-product-supplemental-classroom-and-lab-online | AS-SUPP-CAL-O |
+| sample-product-hourly-lessons | AS-HOURLY |
 
 All 19 products in the catalogue now have SKUs.
 

@@ -9,7 +9,7 @@
 
 ## Decision
 
-Phases 19 and 21 are merged. A standalone "first deployment" with no deployability guarantees is a throwaway exercise. Instead: build the thing properly — setup wizard, seed profiles, update strategy, CI/CD — and then use those systems to deploy `fantasyvreality.com` as the live integration test. The FvR deployment *is* the proof that this works for any owner.
+Phases 19 and 21 are merged. A standalone "first deployment" with no deployability guarantees is a throwaway exercise. Instead: build the thing properly — setup wizard, seed profiles, update strategy, CI/CD — and then use those systems to deploy `yourdomain.com` as the live integration test. The live deployment is the proof that this works for any owner.
 
 ---
 
@@ -23,7 +23,7 @@ Ship a genuinely deployable version of AECMS. Any reasonably technical person sh
 4. Hit `/setup` to create their Owner account and configure the site
 5. Be running a functional CMS
 
-Then use that exact process to stand up `fantasyvreality.com`, backfilling it with the FvR seed content as the final step.
+Then use that exact process to stand up `yourdomain.com`, backfilling it with site content as the final step.
 
 ---
 
@@ -39,7 +39,7 @@ These Phase 19/21 concerns are complete and do not need implementation:
 | ESM (cloud storage abstraction) | `GcsStorageProvider`, `S3StorageProvider`, `StorageModule` factory | session 2026-06-18 |
 | Theme / appearance | 8 palettes, 5 font pairings, CSS vars, Appearance tab | 20 |
 | Domain aliases | Alternate domain capture (301 redirect), `alias_type` field | 8 / 17 |
-| FvR seed content | `seed-fvr.ts` reads `fvr-content.xml`; 73 articles + 15 products | session 2026-06-18 |
+| site content seed | `[removed]` reads `[removed]`; 73 articles + 15 products | session 2026-06-18 |
 | Basic DEPLOYMENT.md | Docker Compose deployment guide | session 2026-06-18 |
 
 ---
@@ -50,31 +50,31 @@ These Phase 19/21 concerns are complete and do not need implementation:
 
 **Goal**: Separate the application from WCC-specific content so any owner can deploy a clean instance.
 
-The current `seed-all.sh` runs `seed.ts` (users + caps) → `seed-fvr.ts` (FvR content) → `seed-orders.ts` (test data). For a generic deployment, only `seed.ts` should run; FvR content must be opt-in.
+The current `seed-all.sh` runs `seed.ts` (users + caps) → `[removed]` (site content). For a generic deployment, only `seed.ts` should run; custom content can be seeded separately.
 
 **Implementation**:
 
-1. Add `SEED_PROFILE` env var: `minimal` | `fvr` | `demo` (default: `minimal`)
+1. Add `SEED_PROFILE env var: minimal (default))
 2. Restructure seed directory:
    ```
    backend/prisma/
    ├── seed.ts               ← always runs: capabilities, roles, default site settings
-   ├── seed-fvr.ts           ← fvr profile: reads fvr-content.xml
-   ├── seed-orders.ts        ← fvr profile only (test orders)
+   ├── [removed]           ← removed
+   ├── seed-orders.ts        ← removed
    └── seed-all.sh           ← reads SEED_PROFILE and runs the right scripts
    ```
 3. Update `seed-all.sh`:
    ```bash
    PROFILE=${SEED_PROFILE:-minimal}
    npx ts-node prisma/seed.ts
-   if [ "$PROFILE" = "fvr" ] || [ "$PROFILE" = "demo" ]; then
-     npx ts-node prisma/seed-fvr.ts
+   # custom content profile removed
+     npx ts-node prisma/[removed]
      npx ts-node prisma/seed-orders.ts
    fi
    ```
 4. `seed.ts` does NOT create the Owner user in minimal mode — the setup wizard does that on first run.
 
-**Note**: `FvR_Deployment/` is gitignored; `fvr-content.xml` lives there and is not shipped in the generic codebase. The `seed-fvr.ts` script is in git but is a no-op if the XML is absent.
+**Note**: `FvR_Deployment/` is gitignored; `[removed]` lives there and is not shipped in the generic codebase. The `[removed]` script is in git but is a no-op if the XML is absent.
 
 ---
 
@@ -133,7 +133,7 @@ Step 3 — Done
 { key: 'general.site_tagline', value: '' },
 ```
 
-For the FvR deployment these are overridden in the wizard or manually via Admin Settings.
+For each deployment these are overridden in the wizard or manually via Admin Settings.
 
 ---
 
@@ -204,15 +204,15 @@ Upstash setup: create account at upstash.com, create database, copy the `rediss:
 
 ```bash
 # Public media bucket (images, uploads)
-gcloud storage buckets create gs://fantasyvreality-media \
+gcloud storage buckets create gs://your-project-media \
   --location=us-central1 \
   --uniform-bucket-level-access
 
-gcloud storage buckets add-iam-policy-binding gs://fantasyvreality-media \
+gcloud storage buckets add-iam-policy-binding gs://your-project-media \
   --member=allUsers --role=roles/storage.objectViewer
 
 # Private digital bucket (EPUBs, PDFs — signed URLs only)
-gcloud storage buckets create gs://fantasyvreality-digital \
+gcloud storage buckets create gs://your-project-digital \
   --location=us-central1 \
   --uniform-bucket-level-access
 ```
@@ -367,7 +367,7 @@ gcloud run deploy aecms-backend \
   --cpu 1 \
   --concurrency 80 \
   --add-cloudsql-instances PROJECT:us-central1:aecms-db \
-  --set-env-vars "NODE_ENV=production,STORAGE_PROVIDER_TYPE=gcs,SETTINGS_ENCRYPTION_KEY_PROVIDER=gcp,GCS_MEDIA_BUCKET=fantasyvreality-media,GCS_DIGITAL_BUCKET=fantasyvreality-digital,STORAGE_GCS_PROJECT_ID=PROJECT" \
+  --set-env-vars "NODE_ENV=production,STORAGE_PROVIDER_TYPE=gcs,SETTINGS_ENCRYPTION_KEY_PROVIDER=gcp,GCS_MEDIA_BUCKET=your-project-media,GCS_DIGITAL_BUCKET=your-project-digital,STORAGE_GCS_PROJECT_ID=PROJECT" \
   --set-secrets "DATABASE_URL=aecms-database-url:latest,SETTINGS_ENCRYPTION_KEY=aecms-sek:latest,JWT_SECRET=aecms-jwt-secret:latest,JWT_REFRESH_SECRET=aecms-jwt-refresh-secret:latest,TOTP_ENCRYPTION_KEY=aecms-totp-key:latest,REDIS_URL=aecms-redis-url:latest"
 ```
 
@@ -385,7 +385,7 @@ gcloud run deploy aecms-frontend \
   --set-env-vars "NEXT_PUBLIC_API_URL=https://aecms-backend-HASH-uc.a.run.app,NODE_ENV=production"
 ```
 
-**Note**: The `NEXT_PUBLIC_API_URL` should be the backend's Cloud Run URL (or `https://fantasyvreality.com/api` once the domain is mapped). The backend and frontend are on separate Cloud Run services. Single-domain routing (frontend proxies `/api/*` to backend) avoids CORS entirely and is the recommended approach.
+**Note**: The `NEXT_PUBLIC_API_URL` should be the backend's Cloud Run URL (or `https://yourdomain.com/api` once the domain is mapped). The backend and frontend are on separate Cloud Run services. Single-domain routing (frontend proxies `/api/*` to backend) avoids CORS entirely and is the recommended approach.
 
 #### G3 — Custom Domain
 
@@ -393,13 +393,13 @@ gcloud run deploy aecms-frontend \
 # Map custom domain to frontend service
 gcloud run domain-mappings create \
   --service aecms-frontend \
-  --domain fantasyvreality.com \
+  --domain yourdomain.com \
   --region us-central1
 
 # API subdomain mapped to backend (OR: use Next.js rewrites to proxy /api/* to backend)
 gcloud run domain-mappings create \
   --service aecms-backend \
-  --domain api.fantasyvreality.com \
+  --domain api.yourdomain.com \
   --region us-central1
 ```
 
@@ -413,17 +413,17 @@ rewrites: async () => [{
   destination: `${process.env.BACKEND_URL}/api/:path*`,  // internal Cloud Run URL
 }]
 ```
-Then only `fantasyvreality.com` is the public-facing domain. No `api.` subdomain needed.
+Then only `yourdomain.com` is the public-facing domain. No `api.` subdomain needed.
 
 ---
 
-### Part H — FvR Content Migration
+### Part H — Content Migration
 
 Once the production instance is running and the setup wizard is complete:
 
 1. **Run seed against production DB**:
    ```bash
-   SEED_PROFILE=fvr \
+   SEED_PROFILE=minimal \
    DATABASE_URL="postgresql://aecms:PASSWORD@/aecms?host=/cloudsql/PROJECT:us-central1:aecms-db" \
    bash prisma/seed-all.sh
    ```
@@ -431,7 +431,7 @@ Once the production instance is running and the setup wizard is complete:
 
 2. **Upload media files to GCS**:
    ```bash
-   gsutil -m cp -r backend/uploads/wp-import/* gs://fantasyvreality-media/wp-import/
+   gsutil -m cp -r backend/uploads/wp-import/* gs://your-project-media/wp-import/
    ```
    Lesson product images are now in GCS and served via public bucket URL.
 
@@ -439,30 +439,30 @@ Once the production instance is running and the setup wizard is complete:
    ```sql
    UPDATE articles 
    SET content = REPLACE(content, 
-     'https://fantasyvreality.com/wp-content/uploads/', 
-     'https://storage.googleapis.com/fantasyvreality-media/wp-import/')
+     'https://yourdomain.com/wp-content/uploads/', 
+     'https://storage.googleapis.com/your-project-media/wp-import/')
    WHERE content LIKE '%wp-content/uploads%';
    ```
    (Exact URLs TBD based on what's actually in the content.)
 
 4. **Configure via Admin Settings** (post-login in backstage):
-   - General: site name = "Fantasy v Reality", tagline, favicon
+   - General: site name, tagline, and favicon
    - Email: SMTP credentials. Options in order of preference:
-     1. **Resend** (recommended) — free tier, excellent deliverability, requires domain verification. Host: `smtp.resend.com`, Port: 587, User: `resend`, Pass: API key. Verify `fantasyvreality.com` at resend.com first, then update DNS (SPF/DKIM records provided by Resend).
-     2. **HostGator SMTP** (`mail.fantasyvreality.com`) — works immediately, no extra signup, but lower deliverability for transactional email.
+     1. **Resend** (recommended) — free tier, excellent deliverability, requires domain verification. Host: `smtp.resend.com`, Port: 587, User: `resend`, Pass: API key. Verify `yourdomain.com` at resend.com first, then update DNS (SPF/DKIM records provided by Resend).
+     2. **HostGator SMTP** (`mail.yourdomain.com`) — works immediately, no extra signup, but lower deliverability for transactional email.
      3. **Gmail app password** — dev/testing only, not suitable for production (`noreply@` addresses can't be sent from Gmail).
    - Payments: Stripe live keys, PayPal live keys
    - Storage: already set to GCS via env vars on Cloud Run; verify Test Connection ✓
 
-5. **Stripe webhook**: Update webhook endpoint in Stripe dashboard to `https://fantasyvreality.com/api/payments/webhooks/stripe`. Re-run `stripe listen` is not needed in production — use the Stripe dashboard to create a production webhook.
+5. **Stripe webhook**: Update webhook endpoint in Stripe dashboard to `https://yourdomain.com/api/payments/webhooks/stripe`. Re-run `stripe listen` is not needed in production — use the Stripe dashboard to create a production webhook.
 
-6. **PayPal return URLs**: Update in PayPal developer portal to `https://fantasyvreality.com/checkout/success` and `/checkout/cancel`.
+6. **PayPal return URLs**: Update in PayPal developer portal to `https://yourdomain.com/checkout/success` and `/checkout/cancel`.
 
 ---
 
 ### Part I — Update Strategy
 
-**The owner update path** (tested on FvR after initial launch):
+**The owner update path** (tested post-launch):
 
 ```bash
 # On Codespaces: develop, test, push
@@ -477,7 +477,7 @@ gcloud run deploy aecms-frontend --image .../frontend:NEW_SHA --region us-centra
 
 **Safety rules** (enforced by convention):
 1. Prisma migrations are additive only in production-facing releases. Destructive migrations require a maintenance window and are flagged in commit messages with `BREAKING MIGRATION`.
-2. `seed.ts` is safe to re-run (idempotent upserts). `seed-fvr.ts` is safe to re-run (updates content from XML). `seed-orders.ts` skips if orders exist.
+2. `seed.ts` is safe to re-run (idempotent upserts). `[removed]` is safe to re-run (updates content from XML). `seed-orders.ts` skips if orders exist.
 3. Owner data (articles, products, users, ISM secrets) is never touched by application updates.
 
 **Backstage version display** (minimal): Show current commit SHA or package.json version in the backstage footer. No automated update checker needed for a personal site.
@@ -499,14 +499,14 @@ gcloud run deploy aecms-frontend --image .../frontend:NEW_SHA --region us-centra
 | 9 | F | GitHub Actions workflow + GCP service account | Partly |
 | 10 | G | Cloud Run deploy (backend + frontend) | No |
 | 11 | G | Custom domain + SSL | Partly |
-| 12 | H | FvR content migration (seed + media upload) | No |
+| 12 | H | Content migration (seed + media upload) | No |
 | 13 | I | Update strategy test (push a change, verify auto-deploy) | No |
 
 Steps 1–6 can be done entirely in Codespaces before any GCP work. Step 7 is the owner gate.
 
 ---
 
-## Cost Estimate (FvR — Low Traffic)
+## Cost Estimate (Cloud Run — Low Traffic)
 
 | Service | Monthly |
 |---|---|
@@ -536,7 +536,7 @@ No Load Balancer. Cloud Run custom domain mappings handle SSL natively. CDN defe
 - [ ] `gcloud auth login` complete; project set (`gcloud config set project PROJECT`)
 - [ ] Cloud SQL instance created and accessible
 - [ ] Upstash Redis instance created; URL noted
-- [ ] GCS buckets created (`fantasyvreality-media`, `fantasyvreality-digital`)
+- [ ] GCS buckets created (`your-project-media`, `your-project-digital`)
 - [ ] Secret Manager secrets populated (SEK, database URL, JWT secrets, Redis URL)
 - [ ] Artifact Registry repository created
 - [ ] GitHub secret `GCP_SA_KEY` added
@@ -545,17 +545,17 @@ No Load Balancer. Cloud Run custom domain mappings handle SSL natively. CDN defe
 - [ ] GitHub Actions workflow in place; first run succeeds
 - [ ] Backend Cloud Run service running; `/api/health` returns 200
 - [ ] Frontend Cloud Run service running; site loads
-- [ ] Custom domain `fantasyvreality.com` mapped; DNS configured; SSL active
+- [ ] Custom domain `yourdomain.com` mapped; DNS configured; SSL active
 - [ ] `/setup` wizard completes; Owner account created; redirects to backstage
 
-### FvR content
-- [ ] `seed-all.sh SEED_PROFILE=fvr` run against production DB
+### Initial content
+- [ ] `seed-all.sh` run against production DB
 - [ ] Lesson product images uploaded to GCS media bucket
-- [ ] Admin Settings → General: site name = "Fantasy v Reality", favicon uploaded
+- [ ] Admin Settings → General: site name, tagline, and favicon configured
 - [ ] Admin Settings → Email: SMTP configured; test email sent ✓
 - [ ] Admin Settings → Payment: Stripe live keys; PayPal live keys; both verified ✓
 - [ ] Admin Settings → Storage: GCS; Test Connection ✓
-- [ ] Stripe webhook updated to `https://fantasyvreality.com/api/payments/webhooks/stripe`
+- [ ] Stripe webhook updated to `https://yourdomain.com/api/payments/webhooks/stripe`
 - [ ] PayPal return URLs updated to production domain
 - [ ] End-to-end purchase flow tested in production (Stripe live, small amount)
 
@@ -572,5 +572,5 @@ No Load Balancer. Cloud Run custom domain mappings handle SSL natively. CDN defe
 - **Backstage update notifications**: Banner showing available version. Useful for multi-owner, unnecessary for single-owner with GitHub Actions CD.
 - **Getting-started checklist**: Nice UX, but the wizard + Admin Settings already guide the owner through the same tasks.
 - **Multi-instance generalization**: Licensing, published packages, SaaS model — all deferred indefinitely.
-- **Docker Compose single-server deployment**: DEPLOYMENT.md covers this. Not the primary target for FvR.
+- **Docker Compose single-server deployment**: DEPLOYMENT.md covers this. Not the primary target for Cloud Run deployment.
 - **Load Balancer + CDN**: Skip for now. Cloud Run native domain mapping + GCS public bucket is sufficient.

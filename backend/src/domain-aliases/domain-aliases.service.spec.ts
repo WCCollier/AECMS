@@ -20,7 +20,7 @@ describe('DomainAliasesService', () => {
 
   const mockDomainAlias = {
     id: 'alias-1',
-    domain: 'wccollier.com',
+    domain: 'example.com',
     target_route: '/author',
     is_active: false,
     verification_token: 'aecms-verify-abc123',
@@ -58,14 +58,14 @@ describe('DomainAliasesService', () => {
       mockPrismaService.domainAlias.create.mockResolvedValue(mockDomainAlias);
 
       const result = await service.create(
-        { domain: 'wccollier.com', target_route: '/author' },
+        { domain: 'example.com', target_route: '/author' },
         'user-1',
       );
 
       expect(result).toEqual(mockDomainAlias);
       expect(mockPrismaService.domainAlias.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          domain: 'wccollier.com',
+          domain: 'example.com',
           target_route: '/author',
           owner_id: 'user-1',
           is_active: false,
@@ -77,7 +77,7 @@ describe('DomainAliasesService', () => {
       mockPrismaService.domainAlias.findUnique.mockResolvedValue(mockDomainAlias);
 
       await expect(
-        service.create({ domain: 'wccollier.com', target_route: '/author' }, 'user-1'),
+        service.create({ domain: 'example.com', target_route: '/author' }, 'user-1'),
       ).rejects.toThrow(ConflictException);
     });
 
@@ -85,11 +85,11 @@ describe('DomainAliasesService', () => {
       mockPrismaService.domainAlias.findUnique.mockResolvedValue(null);
       mockPrismaService.domainAlias.create.mockResolvedValue(mockDomainAlias);
 
-      await service.create({ domain: 'WCCollier.COM', target_route: '/author' }, 'user-1');
+      await service.create({ domain: 'EXAMPLE.COM', target_route: '/author' }, 'user-1');
 
       expect(mockPrismaService.domainAlias.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          domain: 'wccollier.com',
+          domain: 'example.com',
         }),
       });
     });
@@ -198,7 +198,7 @@ describe('DomainAliasesService', () => {
     it('should return verification instructions', () => {
       const instructions = service.getVerificationInstructions(mockDomainAlias as any);
 
-      expect(instructions).toHaveProperty('domain', 'wccollier.com');
+      expect(instructions).toHaveProperty('domain', 'example.com');
       expect(instructions).toHaveProperty('verification_token');
       expect(instructions).toHaveProperty('instructions');
       expect(instructions).toHaveProperty('cname_setup');

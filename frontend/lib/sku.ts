@@ -14,7 +14,7 @@ const TYPE_PREFIX: Record<string, string> = {
  *   WORDs = up to 3 significant slug segments, each truncated to 4 chars, uppercased
  *
  * Examples:
- *   "american-shooter-hat"  + physical → "P-AMER-SHOO-HAT"
+ *   "vintage-leather-wallet" + physical → "P-VINT-LEAT-WALL"
  *   "how-writing-works"     + digital  → "D-HOW-WRIT-WORK"
  *   "lesson-1-marksmanship" + service  → "S-LESS-1-MA"
  */

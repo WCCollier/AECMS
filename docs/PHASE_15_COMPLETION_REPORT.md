@@ -226,7 +226,7 @@ Owner-verified against the live Codespaces testbed using ISM-stored credentials 
 
 | Test | Result |
 |------|--------|
-| Admin Settings → Email tab → **Send Test Email** | ✅ Green ✓; email delivered to moriakul@gmail.com |
+| Admin Settings → Email tab → **Send Test Email** | ✅ Green ✓; email delivered to your-email@gmail.com |
 | Admin Settings → Payment Providers → **Verify Stripe Connection** | ✅ Green ✓ Connected (sandbox `sk_test_...`) |
 | Admin Settings → Payment Providers → **Verify PayPal Connection** | ✅ Green ✓ Connected (sandbox credentials) |
 

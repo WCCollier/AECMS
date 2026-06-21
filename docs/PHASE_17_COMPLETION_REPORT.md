@@ -55,9 +55,9 @@ Static assets, Next.js internals, and the `/uploads/` path are excluded from the
    - `alias_type === 'proxy'`: returns `NextResponse.rewrite(new URL(target_route + incomingPathSuffix, request.url))`
 6. If no alias matches the host, the request passes through unmodified.
 
-**Path suffix preservation** — the incoming path beyond `target_route` is appended to the redirect/rewrite target. For example, if `example.com` aliases to `/blog`, a request to `example.com/2024/my-post` redirects to `fantasyvreality.com/blog/2024/my-post`.
+**Path suffix preservation** — the incoming path beyond `target_route` is appended to the redirect/rewrite target. For example, if `example.com` aliases to `/blog`, a request to `example.com/2024/my-post` redirects to `yourdomain.com/blog/2024/my-post`.
 
-**`NEXT_PUBLIC_BASE_DOMAIN`** environment variable — the primary domain name. Should be set in production to `fantasyvreality.com` (or the owner's chosen domain). In development/Codespaces it can be omitted and the middleware skip conditions handle it.
+**`NEXT_PUBLIC_BASE_DOMAIN`** environment variable — the primary domain name. Should be set in production to `yourdomain.com` (or the owner's chosen domain). In development/Codespaces it can be omitted and the middleware skip conditions handle it.
 
 ### Area 17-C: Limitations and Future Work
 

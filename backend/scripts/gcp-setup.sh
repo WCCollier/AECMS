@@ -5,20 +5,23 @@
 #
 # Prerequisites:
 #   gcloud auth login
-#   gcloud config set project 983307563767
+#   gcloud config set project YOUR_PROJECT_ID
 
 set -euo pipefail
 
-PROJECT="983307563767"
-REGION="us-central1"
+# ── CONFIGURE THESE FOR YOUR DEPLOYMENT ─────────────────────────────────────
+PROJECT="${GCP_PROJECT_NUMBER:?Set GCP_PROJECT_NUMBER env var to your numeric project ID}"
+REGION="${GCP_REGION:-us-central1}"
+MEDIA_BUCKET="${GCS_MEDIA_BUCKET:?Set GCS_MEDIA_BUCKET env var (e.g. mysite-media)}"
+DIGITAL_BUCKET="${GCS_DIGITAL_BUCKET:?Set GCS_DIGITAL_BUCKET env var (e.g. mysite-digital)}"
+# ─────────────────────────────────────────────────────────────────────────────
+
 REPO="aecms"
 BACKEND_SA="aecms-backend"
 CI_SA="github-ci"
 SQL_INSTANCE="aecms-db"
 SQL_DB="aecms"
 SQL_USER="aecms"
-MEDIA_BUCKET="fantasyvreality-media"
-DIGITAL_BUCKET="fantasyvreality-digital"
 
 # Derive project ID — most gcloud commands require the ID string, not the number
 PROJECT_ID=$(gcloud projects describe "$PROJECT" --format='value(projectId)')
@@ -221,7 +224,7 @@ echo "   Sign up at https://upstash.com → create a Redis DB → copy the redis
 echo "   echo -n 'rediss://...' | gcloud secrets versions add aecms-redis-url --data-file=- --project $PROJECT_ID"
 echo ""
 echo "2. Add GCP_SA_KEY to GitHub repository secrets:"
-echo "   Go to: https://github.com/WCCollier/AECMS/settings/secrets/actions"
+echo "   Go to: https://github.com/YOUR_USERNAME/AECMS/settings/secrets/actions"
 echo "   Create secret named: GCP_SA_KEY"
 echo "   Value: $(cat "$KEY_FILE")"
 echo ""
@@ -230,10 +233,9 @@ echo "   rm $KEY_FILE"
 echo ""
 echo "4. Merge main → deploy to trigger the first deployment."
 echo ""
-echo "5. After first deploy, map custom domains:"
-echo "   gcloud run domain-mappings create --service aecms-frontend --domain fantasyvreality.com --region $REGION --project $PROJECT_ID"
-echo "   gcloud run domain-mappings create --service aecms-frontend --domain www.fantasyvreality.com --region $REGION --project $PROJECT_ID"
-echo "   gcloud run domain-mappings create --service aecms-frontend --domain wccollier.com --region $REGION --project $PROJECT_ID"
+echo "5. After first deploy, map your custom domain(s):"
+echo "   gcloud run domain-mappings create --service aecms-frontend --domain yourdomain.com --region $REGION --project $PROJECT_ID"
+echo "   gcloud run domain-mappings create --service aecms-frontend --domain www.yourdomain.com --region $REGION --project $PROJECT_ID"
 echo ""
 echo "6. After first deploy, log in to backstage and configure:"
 echo "   - Admin Settings → File Storage: set GCS bucket names:"

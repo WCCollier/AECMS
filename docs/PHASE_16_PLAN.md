@@ -94,7 +94,7 @@ If the site later needs fine-grained menu management (multiple menus, custom lab
 
 ### C1 — URL structure ✅ DECIDED
 
-> **Decision**: Top-level pages at the root (e.g., `fantasyvreality.com/author`). Max depth: 3 levels (root → child → grandchild).
+> **Decision**: Top-level pages at the root (e.g., `yourdomain.com/author`). Max depth: 3 levels (root → child → grandchild).
 
 Pages are addressable by their natural path, not under `/pages/`:
 
@@ -153,7 +153,7 @@ Add fields:
 - **Parent page** — select dropdown of existing pages (excluding self and descendants to prevent cycles); "None (top-level)" as default
 - **Show in navigation** — checkbox (default true)
 - **Navigation order** — number input (default 0, lower = earlier)
-- **Full URL preview** — read-only computed field showing the resolved path (e.g., `fantasyvreality.com/author/bio`)
+- **Full URL preview** — read-only computed field showing the resolved path (e.g., `yourdomain.com/author/bio`)
 
 ### D3 — Navigation preview
 

@@ -229,7 +229,7 @@ Test each widget type in the TipTap editor (use an article or page in admin).
 
 **Prerequisite**: Area 1 setup complete, `stripe listen` running.
 
-1. Log in as member, add the American Shooter Hat (physical, $24.99) to cart
+1. Log in as member, add the Sample Physical Product (physical, $24.99) to cart
 2. Go to `/cart` → Proceed to Checkout
 3. Fill in shipping address
 4. Select Stripe, click Pay → should redirect to Stripe's hosted checkout page
@@ -348,7 +348,7 @@ curl -X PATCH http://localhost:4000/orders/<ORDER_ID>/status \
 5. Verify article content reverts to that version, status is now Draft
 
 **Products:**
-1. Edit the American Shooter Hat, change price to $27.99, save
+1. Edit the Sample Physical Product, change price to $27.99, save
 2. Edit again, change price back to $24.99, save
 3. Open Version History panel — should show 2 versions
 4. Restore version 1 — verify price reverts to $27.99 (the first save)

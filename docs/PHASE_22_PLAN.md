@@ -80,7 +80,7 @@ Check https://github.com/actions for current stable versions before upgrading.
 
 ### Problem
 
-The setup wizard's first slide (site name, tagline, first/last name fields) shows example/placeholder text prefilled with real data from the testbed: "Fantasy v Reality" as the site name and "William Collier" as the owner name. If this project is ever open-sourced, reused, or demoed to a third party, that personal info will be visible to anyone who opens the wizard.
+The setup wizard's first slide (site name, tagline, first/last name fields) shows example/placeholder text prefilled with real data from the testbed: "My Site" as the site name and "Site Owner" as the owner name. If this project is ever open-sourced, reused, or demoed to a third party, that personal info will be visible to anyone who opens the wizard.
 
 ### Fix
 
@@ -297,7 +297,7 @@ This creates a specific trap: an owner who set bucket names as Cloud Run env var
 
 ### H.2 — Bucket creation is a manual prerequisite with no automation or documentation
 
-The GCS buckets `fantasyvreality-media` and `fantasyvreality-digital` were created manually via `gcloud storage buckets create` during the Phase 21 setup session. They are not created by the GitHub Actions workflow, the Docker build, the setup wizard, or any install script. `STORAGE_PROVIDER_TYPE=gcs` is hardcoded in the workflow, so any fresh deployment to a new GCP project would start the GCS provider but fail silently on the first file operation because the buckets don't exist.
+The GCS buckets `your-project-media` and `your-project-digital` were created manually via `gcloud storage buckets create` during the Phase 21 setup session. They are not created by the GitHub Actions workflow, the Docker build, the setup wizard, or any install script. `STORAGE_PROVIDER_TYPE=gcs` is hardcoded in the workflow, so any fresh deployment to a new GCP project would start the GCS provider but fail silently on the first file operation because the buckets don't exist.
 
 **Decision**: Both A + C. ✅
 
@@ -453,7 +453,7 @@ The date range controls should allow the user to select any past date so they ca
 
 A new owner cloning this repo to deploy on their own infrastructure currently faces three friction points:
 
-1. **No single configuration entry point.** Env vars are scattered; `deploy.yml` has hardcoded FvR-specific values a new owner must hunt down and change.
+1. **No single configuration entry point.** Env vars are scattered; `deploy.yml` has hardcoded deployer-specific values a new owner must hunt down and change.
 2. **The setup wizard only handles account creation.** Storage, email, and site URL are left for the owner to discover in Admin Settings — with no guidance on what to enter or what the fields mean.
 3. **No documentation.** There is no end-user guide explaining how to choose infrastructure, configure it, and connect it to AECMS.
 
@@ -463,17 +463,17 @@ Item J solves all three. It also absorbs **Item H.1** (settings panel reflecting
 
 ### J.1 — Parameterize `deploy.yml` for Portability
 
-**Problem**: `deploy.yml` contains hardcoded FvR-specific values: `GCP_PROJECT` (`983307563767`), `GCP_PROJECT_ID` (`fantasyvreality`), domain name (`fantasyvreality.com`), KMS secret ID (`aecms-sek`), bucket prefix. A new Cloud Run deployer must find and change all of these manually.
+**Problem**: `deploy.yml` contains hardcoded deployer-specific values: `GCP_PROJECT` (`YOUR_PROJECT_NUMBER`), `GCP_PROJECT_ID` (`YOUR_PROJECT_ID`), domain name (`yourdomain.com`), KMS secret ID (`aecms-sek`), bucket prefix. A new Cloud Run deployer must find and change all of these manually.
 
 **Fix**: Replace hardcoded values with GitHub Variables (`vars.*`) or derive them from a small set of `vars.*` that the owner sets in their repo's Settings → Variables:
 
 | GitHub Variable | Current hardcoded value |
 |---|---|
-| `GCP_PROJECT_NUMBER` | `983307563767` |
-| `GCP_PROJECT_ID` | `fantasyvreality` |
-| `APP_DOMAIN` | `fantasyvreality.com` |
-| `GCS_MEDIA_BUCKET` | `fantasyvreality-media` |
-| `GCS_DIGITAL_BUCKET` | `fantasyvreality-digital` |
+| `GCP_PROJECT_NUMBER` | `YOUR_PROJECT_NUMBER` |
+| `GCP_PROJECT_ID` | `YOUR_PROJECT_ID` |
+| `APP_DOMAIN` | `yourdomain.com` |
+| `GCS_MEDIA_BUCKET` | `your-project-media` |
+| `GCS_DIGITAL_BUCKET` | `your-project-digital` |
 | `BACKEND_SERVICE_NAME` | `aecms-backend` |
 | `FRONTEND_SERVICE_NAME` | `aecms-frontend` |
 
@@ -681,11 +681,11 @@ H therefore reduces to two items: bucket automation (H.2) and the storage test-p
 
 ### Problem
 
-The `github-ci` service account was not granted `roles/storage.admin`. The H.2-A idempotent bucket creation step (`gcloud storage buckets create ...`) in `deploy.yml` was throwing 403 errors on every deploy. Buckets already existed for FvR so the deploy succeeded, but the step was meaningless noise, and a new owner's first deploy would fail.
+The `github-ci` service account was not granted `roles/storage.admin`. The H.2-A idempotent bucket creation step (`gcloud storage buckets create ...`) in `deploy.yml` was throwing 403 errors on every deploy. Buckets already existed for the deploy succeeded, but the step was meaningless noise, and a new owner's first deploy would fail.
 
 ### Changes
 
-- Granted `roles/storage.admin` to `github-ci@fantasyvreality.iam.gserviceaccount.com` on the FvR GCP project (immediate fix)
+- Granted `roles/storage.admin` to `github-ci@YOUR_PROJECT_ID.iam.gserviceaccount.com` on the the GCP project (immediate fix)
 - Added `roles/storage.admin` to the CI SA role list in `backend/scripts/gcp-setup.sh` so new owners who run the setup script get the correct permissions automatically
 
 ---
