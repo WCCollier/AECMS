@@ -1045,12 +1045,18 @@ Owners have no backstage UI to view registered accounts or change their roles. T
 - Sidebar nav item "Users" gated by `user.assign_role` capability (hidden from Admin)
 - Pagination + debounced search
 
+### Ownership model
+
+`role = 'owner'` is a column on each user row — there is no singleton constraint. Promoting a user to Owner **adds** a second Owner; the actor's own role is untouched. Multiple co-owners are intentional and desirable (no accidental lockout if one account is lost). There is no "transfer" flow that strips the granting Owner's role.
+
 ### Status: ✅ COMPLETE (2026-06-21)
 
 Files changed:
 - `backend/src/auth/dto/update-user-role.dto.ts` — new
 - `backend/src/auth/auth.service.ts` — `listUsers()` + `updateUserRole()`
-- `backend/src/auth/auth.controller.ts` — 2 new endpoints + guard imports
+- `backend/src/users/users.controller.ts` — new (moved from auth to avoid circular dep)
+- `backend/src/users/users.module.ts` — new
+- `backend/src/app.module.ts` — registers UsersModule
 - `frontend/app/admin/users/page.tsx` — new
 - `frontend/app/admin/users/UsersClient.tsx` — new
 - `frontend/app/admin/layout.tsx` — Users nav item

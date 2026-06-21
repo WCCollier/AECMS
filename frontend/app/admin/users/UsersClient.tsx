@@ -59,7 +59,7 @@ function ConfirmModal({ targetEmail, fromRole, toRole, onConfirm, onCancel }: Co
           {isOwnerTransfer && <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />}
           <div>
             <h3 className="font-semibold text-lg">
-              {isOwnerTransfer ? 'Transfer Ownership' : 'Change Role'}
+              {isOwnerTransfer ? 'Grant Owner Role' : 'Change Role'}
             </h3>
             <p className="text-sm text-foreground/60 mt-1">
               Change <strong>{targetEmail}</strong> from{' '}
@@ -67,8 +67,8 @@ function ConfirmModal({ targetEmail, fromRole, toRole, onConfirm, onCancel }: Co
             </p>
             {isOwnerTransfer && (
               <p className="text-sm text-amber-600 mt-3 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                Granting Owner role gives this account full system access including all settings,
-                secrets, and the ability to manage other owners. Proceed only if you intend this.
+                Owner is additive — your own Owner role is unaffected. This account will gain full
+                system access including all settings, secrets, and the ability to manage other owners.
               </p>
             )}
           </div>
