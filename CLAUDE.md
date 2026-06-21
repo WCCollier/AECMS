@@ -61,6 +61,7 @@ Specific rules:
 **Phase 22**: ✅ COMPLETE - All items A–N (2026-06-21). Key additions: TipTap alignment, Node 22, Next.js 15.3.9 security upgrade, new-owner wizard/Owner's Manual, CSV export, MediaSyncService (TipTap→join table), PageMedia join table, bulk upload/replace/delete, /admin/media (Media Library + Digital Files tabs), /admin/users (role management, user.assign_role-gated)
 **Phase 23**: 🚧 IN PROGRESS (Part 1 built, pending testbed QA before Part 1 deploy) - Mul Converter. Part 1 complete (2026-06-21): section-based page schema (SectionsPageContent, PageSection, PageZone, SectionBackground), SectionEditor UI (template picker, gutter-drag span diagram, background flyout, height selector), SectionsPageEditor (dnd-kit reorder), SectionsLayout renderer, legacyToSections upgrade action, backend span validation. Part 2 (Mul Converter AI tool) begins after Part 1 soaks in production. PRD: docs/prd/13-mul-converter.md
 **Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
+**Phase 31**: 💡 CONCEPT - Native mobile app: Expo/React Native app that targets any AECMS instance, reads the site manifest, applies the active theme natively, and renders articles/shop/account. Two models: single-site white-label (owner publishes their own app) and multi-site reader. PRD: docs/prd/14-mobile-app.md
 
 **Session 2026-06-18 improvements** (not phase-tracked):
 - TipTap link insertion modal (Pages/Articles/Products/URL tabs, new-tab toggle, inline search)
@@ -295,7 +296,8 @@ rm -rf backend/dist frontend/.next
 - `docs/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
 - `docs/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
 - `docs/prd/13-mul-converter.md` - Mul Converter PRD: full design spec (access control, data flow, AI provider abstraction, system prompt, custom palette system)
-- `docs/prd/` - 13 PRD documents with full specifications
+- `docs/prd/14-mobile-app.md` - Mobile App PRD (Phase 31): Expo/React Native app, discovery manifest, theme mapping, two distribution models, IAP compliance notes
+- `docs/prd/` - 14 PRD documents with full specifications
 
 ## Notes for Claude
 
