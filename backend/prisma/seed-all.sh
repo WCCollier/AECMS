@@ -9,7 +9,7 @@ echo "=== Running seed scripts (SEED_PROFILE=${PROFILE}) ==="
 npx ts-node prisma/seed.ts
 
 # Always (minimal+): sample draft content for fresh installs
-npx ts-node prisma/seed-sample-content.ts
+node scripts/seed-sample-content.js
 
 # fvr profile: FvR-specific content + test orders
 if [ "$PROFILE" = "fvr" ] || [ "$PROFILE" = "demo" ]; then

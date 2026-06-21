@@ -75,49 +75,16 @@ export class SetupService {
   }
 
   private async seedSampleContent(ownerId: string): Promise<void> {
-    // Pages must use the zone-layout format so the page editor can render them.
-    // { layout, zones: { main: <tiptap-doc> } } — NOT raw TipTap JSON.
-    const homeBody = JSON.stringify({
-      layout: 'no_sidebar',
-      zones: {
-        main: {
-          type: 'doc',
-          content: [
-            { type: 'paragraph', content: [{ type: 'text', text: 'Welcome to your new site! Edit this page and publish it, then set it as your homepage in Admin → Settings → General.' }] },
-          ],
-        },
-      },
-    });
-
-    const aboutPagesBody = JSON.stringify({
-      layout: 'no_sidebar',
-      zones: {
-        main: {
-          type: 'doc',
-          content: [
-            { type: 'paragraph', content: [{ type: 'text', text: 'This is a sample page. Use Pages to build your site structure.' }] },
-          ],
-        },
-      },
-    });
-
-    const [existingHome, existingAbout, existingArticle, existingProduct] = await Promise.all([
-      this.prisma.page.findFirst({ where: { slug: '_home_', parent_id: null } }),
-      this.prisma.page.findFirst({ where: { slug: 'about-pages', parent_id: null } }),
+    // Pages (_home_, about-pages) are seeded at container startup by
+    // scripts/seed-sample-content.js before the app starts, so they will
+    // already exist by the time the wizard runs. This method only handles
+    // the article and product, which require an owner ID.
+    const [existingArticle, existingProduct] = await Promise.all([
       this.prisma.article.findFirst({ where: { slug: 'welcome' } }),
       this.prisma.product.findFirst({ where: { slug: 'about-products', deleted_at: null } }),
     ]);
 
     await Promise.all([
-      !existingHome && this.prisma.page.create({ data: {
-        slug: '_home_', title: 'Home', content: homeBody, status: 'published', visibility: 'public',
-        author_id: ownerId, author_can_delete: false, admin_can_delete: false,
-      }}),
-      !existingAbout && this.prisma.page.create({ data: {
-        slug: 'about-pages', title: 'About Pages', status: 'draft', visibility: 'public',
-        content: aboutPagesBody,
-        author_id: ownerId,
-      }}),
       !existingArticle && this.prisma.article.create({ data: {
         slug: 'welcome', title: 'Welcome to AECMS', status: 'draft', visibility: 'public',
         content: JSON.stringify({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'This is a sample article. Edit or delete it and start writing your own content.' }] }] }),

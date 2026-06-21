@@ -1,8 +1,22 @@
 'use strict';
 /**
- * Plain CJS equivalent of prisma/seed-sample-content.ts
- * Used by docker-start.sh (no ts-node in production image).
+ * seed-sample-content.js
+ *
+ * Creates 4 draft/published tutorial artifacts for a fresh install.
+ * Called by docker-start.sh on first boot (capabilities count = 0).
+ * Also called by seed-all.sh for local dev.
+ *
+ * Artifacts:
+ *   _home_         — published page (homepage placeholder)
+ *   about-pages    — draft page    (explains the page system)
+ *   welcome        — draft article (explains the article system)
+ *   about-products — draft product (explains product types)
+ *
+ * All creation calls are slug-guarded (skip if already exists).
+ * Pages are created without an owner — the Page model has no author_id.
+ * Article and product require an owner; skipped gracefully if none exists yet.
  */
+
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
@@ -11,36 +25,76 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// ── TipTap JSON helpers ──────────────────────────────────────────────────────
+
+// For Articles and Products — raw TipTap JSON string
 function doc(...children) {
   return JSON.stringify({ type: 'doc', content: children });
 }
-function h1(text) { return { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text }] }; }
-function h2(text) { return { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text }] }; }
-function p(...runs) {
-  return { type: 'paragraph', content: runs.map((r) => typeof r === 'string' ? { type: 'text', text: r } : { type: 'text', ...r }) };
-}
-function bold(text) { return { text, marks: [{ type: 'bold' }] }; }
-function ul(...items) {
-  return { type: 'bulletList', content: items.map((item) => ({ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: item }] }] })) };
-}
-function ol(...items) {
-  return { type: 'orderedList', content: items.map((item) => ({ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: item }] }] })) };
+
+// For Pages — zone-based layout wrapping a TipTap doc object
+function pageDoc(...children) {
+  return JSON.stringify({
+    layout: 'no_sidebar',
+    zones: { main: { type: 'doc', content: children } },
+  });
 }
 
-const HOME_CONTENT = doc(
-  h1('Your homepage goes here'),
-  p('This is the ', bold('_home_'), ' system page — it acts as a fallback homepage when no other page is designated.'),
-  p('To use a custom homepage:'),
-  ol(
-    'Edit this page (or create a new one) and publish it.',
-    'In Admin → Settings → General, set Homepage Mode to "Static Page" and select your published page.',
-  ),
-  p('As long as _home_ is published, it silently catches any gap if your designated homepage becomes unavailable. See the "About Pages" page in your library for a full explanation.'),
-  p(''),
-  p('You can freely edit the content above. This placeholder will be replaced with whatever you publish here.'),
+function h1(text) {
+  return { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text }] };
+}
+
+function h2(text) {
+  return { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text }] };
+}
+
+// Empty string runs are filtered out; p() with no non-empty runs emits a
+// bare { type:'paragraph' } — the correct TipTap representation of a spacer.
+function p(...runs) {
+  const content = runs
+    .map((r) => (typeof r === 'string' ? { type: 'text', text: r } : { type: 'text', ...r }))
+    .filter((n) => n.text !== '');
+  return content.length ? { type: 'paragraph', content } : { type: 'paragraph' };
+}
+
+function bold(text) {
+  return { text, marks: [{ type: 'bold' }] };
+}
+
+function ul(...items) {
+  return {
+    type: 'bulletList',
+    content: items.map((item) => ({
+      type: 'listItem',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: item }] }],
+    })),
+  };
+}
+
+function ol(...items) {
+  return {
+    type: 'orderedList',
+    content: items.map((item) => ({
+      type: 'listItem',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: item }] }],
+    })),
+  };
+}
+
+// ── Content definitions ──────────────────────────────────────────────────────
+
+const HOME_CONTENT = pageDoc(
+  h1('Welcome'),
+  p('This is your homepage. Edit it from Admin → Pages → _home_ whenever you are ready to build your real homepage.'),
+  { type: 'paragraph' },
+  h2('Latest Writing'),
+  p('Essays, commentary, and analysis — browse the full archive to find what interests you.'),
+  { type: 'paragraph' },
+  h2('The Shop'),
+  p('Books, courses, and digital products available in the shop.'),
 );
 
-const ABOUT_PAGES_CONTENT = doc(
+const ABOUT_PAGES_CONTENT = pageDoc(
   h1('About Pages'),
   p('Pages are the structural backbone of your site. Unlike Articles (which are chronological and discovery-oriented), Pages are evergreen and accessed by URL.'),
   h2('What a Page contains'),
@@ -54,14 +108,14 @@ const ABOUT_PAGES_CONTENT = doc(
     'Navigation options (show in nav, nav order)',
   ),
   h2('Page hierarchy and URLs'),
-  p('Pages can be nested. A child page with slug "contact" under a parent with slug "about" is served at /about/contact. The catch-all router resolves any depth automatically.'),
+  p('Pages can be nested. A child page with slug “contact” under a parent with slug “about” is served at /about/contact. The catch-all router resolves any depth automatically.'),
   h2('Navigation'),
-  p('Pages with "Show in Nav" enabled appear in the site header. Use "Nav Order" to control their position. Nested pages become sub-menu items under their parent.'),
+  p('Pages with “Show in Nav” enabled appear in the site header. Use “Nav Order” to control their position. Nested pages become sub-menu items under their parent.'),
   h2('The homepage waterfall'),
-  p('When Homepage Mode is set to "Static Page" in Admin → Settings → General, the site resolves the root URL (/) in this order:'),
+  p('When Homepage Mode is set to “Static Page” in Admin → Settings → General, the site resolves the root URL (/) in this order:'),
   ol(
     'The page you explicitly designated as homepage in General Settings — served at / and also at its own slug URL.',
-    'If that page is unpublished, deleted, or not set: the page with the reserved slug _home_ (this site). Publish _home_ and it silently catches the gap.',
+    'If that page is unpublished, deleted, or not set: the page with the reserved slug _home_ (this page). Publish _home_ and it silently catches the gap.',
     'If _home_ is also missing or unpublished: the site redirects / to /articles so visitors always see something.',
   ),
   p(bold('Tip:'), ' Keep _home_ published as a safety net, even if a different page is your real homepage. The _home_ page cannot be deleted via the API — only its content can be changed.'),
@@ -97,7 +151,7 @@ const ABOUT_PRODUCTS_CONTENT = doc(
   ul(
     'Physical — shipped to the buyer. Requires a shipping address at checkout. Has stock quantity and SKU.',
     'Digital — delivered by download link or email after payment. Upload source files (PDF, EPUB, ZIP, MP3, etc.) in the Digital Files panel.',
-    'Service — a consultation, session, or subscription. No shipping, no file. Stock is replaced by an "available / unavailable" toggle.',
+    'Service — a consultation, session, or subscription. No shipping, no file. Stock is replaced by an “available / unavailable” toggle.',
   ),
   h2('Key fields'),
   ul(
@@ -112,20 +166,17 @@ const ABOUT_PRODUCTS_CONTENT = doc(
     'Status: draft or published',
   ),
   h2('Digital file delivery'),
-  p("For digital products, upload source files in the Digital Files panel (visible after saving the product). You can upload multiple formats (e.g. PDF + EPUB). After purchase, the buyer receives a timed download link. Optionally, files can be personalised with the buyer's name."),
+  p('For digital products, upload source files in the Digital Files panel (visible after saving the product). You can upload multiple formats (e.g. PDF + EPUB). After purchase, the buyer receives a timed download link. Optionally, files can be personalised with the buyer\'s name.'),
   h2('Payments'),
   p('Stripe handles cards, Apple Pay, Google Pay, and Amazon Pay via Stripe Checkout. PayPal is available as an alternative. Configure your payment credentials in Admin → Settings → Payment Providers.'),
 );
 
+// ── Seed ─────────────────────────────────────────────────────────────────────
+
 async function main() {
   console.log('[seed-sample-content] Starting...');
 
-  const owner = await prisma.user.findFirst({ where: { role: 'owner' } });
-  if (!owner) {
-    console.log('[seed-sample-content] No owner account found — skipping (run after setup wizard).');
-    return;
-  }
-
+  // Pages have no author_id — create them regardless of whether an owner exists.
   const existingHome = await prisma.page.findFirst({ where: { slug: '_home_', parent_id: null } });
   if (existingHome) {
     console.log('[seed-sample-content] _home_ page already exists — skipping.');
@@ -135,7 +186,7 @@ async function main() {
         title: 'Home',
         slug: '_home_',
         content: HOME_CONTENT,
-        status: 'draft',
+        status: 'published',
         visibility: 'public',
         template: 'full-width',
         show_in_nav: false,
@@ -144,7 +195,7 @@ async function main() {
         admin_can_delete: false,
       },
     });
-    console.log('[seed-sample-content] ✓ Created _home_ page (draft)');
+    console.log('[seed-sample-content] ✓ Created _home_ page (published)');
   }
 
   const existingAboutPages = await prisma.page.findFirst({ where: { slug: 'about-pages', parent_id: null } });
@@ -164,6 +215,14 @@ async function main() {
       },
     });
     console.log('[seed-sample-content] ✓ Created about-pages page (draft)');
+  }
+
+  // Article and product require an owner for author_id.
+  const owner = await prisma.user.findFirst({ where: { role: 'owner' } });
+  if (!owner) {
+    console.log('[seed-sample-content] No owner account yet — skipping article and product (wizard will create them).');
+    console.log('[seed-sample-content] Done.');
+    return;
   }
 
   const existingArticle = await prisma.article.findFirst({ where: { slug: 'welcome' } });
