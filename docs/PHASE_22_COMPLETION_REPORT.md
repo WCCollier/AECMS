@@ -433,8 +433,79 @@ b86727b Phase 22 items A/B: TipTap version alignment, Node.js 22 upgrade
 
 All planned items are complete. H.2-B (storage test button sends current form values) was implemented as part of J/H.4 and incorrectly marked "Not started" in a prior revision of this report. H.3 (provider type read-only badge) was absorbed into J.7. No outstanding items remain.
 
+---
+
+## Session 2026-06-21 — Post-Phase-22 Additions
+
+These items were completed in the session following Phase 22, after the first live production deployment. They are recorded here rather than as a new phase because they are continuations of Phase 21/22 work rather than a new capability area.
+
+### Seed content bug fixes
+
+Four separate bugs prevented the seeded pages from rendering in the TipTap editor and on the customer-facing site:
+
+1. **Zone format**: Pages require `{ layout, zones: { main: <tiptap-doc> } }` — raw TipTap JSON (`{ type:'doc', content:[] }`) falls back to empty zones in `parsePageContent()`. Both `_home_` and `about-pages` were being created with the wrong format. Fixed: `pageDoc()` helper wraps all page content in zone format.
+
+2. **Empty text nodes**: `{ type:'text', text:'' }` is invalid in TipTap's schema. A document containing one causes TipTap to silently discard the entire document and render nothing. The `p()` helper was emitting these for blank spacer paragraphs. Fixed: `p()` now filters empty runs and emits bare `{ type:'paragraph' }` (no `content` key) for spacers.
+
+3. **Three creation paths**: `setup.service.ts`, `seed.ts` section 5, and `seed-sample-content.js` all created `_home_`. The wizard ran first on the live install and created `_home_` with wrong-format content; the seed script found it existing and skipped. Fixed: wizard no longer creates pages (boot script handles them unconditionally); section 5 in `seed.ts` removed.
+
+4. **CJS/TS dual-file drift**: `prisma/seed-sample-content.ts` (which had the fixes) and `scripts/seed-sample-content.js` (which Docker actually runs) had diverged. Fixed: TS file deleted; JS file is the single source of truth; `seed-all.sh` updated to call the JS file directly.
+
+**Commits**: `064d39b`, `0e1417d`, `4039db1`, `54b738d`, `ab16c02`
+
+### Wizard tutorial content upgrade
+
+The wizard's `seedSampleContent()` had thin one-liner placeholder content for the tutorial article and product. Upgraded to full rich TipTap documents:
+
+- **"About Articles"** (`slug: welcome`): h1, intro paragraph, four h2 sections (What an Article contains, Publishing, Comments and reviews, Version history), bullet lists
+- **"About Products"** (`slug: about-products`): h1, intro paragraph, four h2 sections (Product types, Key fields, Digital file delivery, Payments), bullet lists with all three product types described
+
+At the same time, article and product creation was removed from `seed-sample-content.js` — the wizard is the correct place for content that requires an owner ID.
+
+**Commit**: `ccad262`
+
+### Generic distribution — personal identifier purge
+
+After the FvR content migration was complete and confirmed live, all personal and site-specific identifiers were removed from the repo to make AECMS suitable for generic open-source distribution:
+
+**Deleted** (9 items): `FvR_Deployment/`, five FvR seed scripts, `seed-faux-orders.js`, `docs/CLIPBOARD.md` (contained raw DB credentials), `HANDOFF_NOTES.md`
+
+**Sanitized** (37 files): all references to the live site domain, personal email address, personal GitHub username, personal name, GCP project IDs and numbers, Cloud Run deployment URLs, DB password, product brand names — replaced with generic placeholders or made dynamic.
+
+Zero personal identifier matches remain in any tracked source file.
+
+**Commit**: `71d3dc6`
+
+### Live deployment policy
+
+With a live deployment running, a backward-compatibility policy was documented to govern all future `deploy` branch merges. Additive-only migrations, no destructive schema changes in the same deploy as the code that reads them, maintenance windows required for anything that can't comply.
+
+Documented in `CLAUDE.md` (top of file, before phase status) and `docs/DEPLOYMENT.md` (decision table at the top of the guide).
+
+**Commit**: `2354890`
+
+### Dynamic customer-facing branding
+
+**Problem**: The customer-facing `Header.tsx` had `AECMS` hardcoded as the top-left site badge. The `Footer.tsx` had the previous owner's site name and tagline hardcoded.
+
+**Fix**:
+- `app/(site)/layout.tsx` upgraded to async Server Component; fetches `site_title` from `GET /settings-public/general` server-side (5-min revalidation), passes to `<Header>` as prop
+- `Header.tsx`: renders `siteTitle` prop in the logo position
+- `Footer.tsx`: async Server Component; fetches `site_title` and `tagline`; renders owner's brand in the brand column and copyright line; tagline renders conditionally if configured
+
+Any owner who sets their site title via the wizard or Admin → Settings → General immediately sees their own branding on the customer-facing site. Backstage retains "AECMS Admin".
+
+**Commit**: `f31ac9d`
+
+### AECMS donation link in backstage sidebar
+
+Added a small "AECMS is open source — donate ♥" link at the bottom of the backstage sidebar footer, linking to the AECMS GiveSendGo campaign. Styled as dim secondary text (`text-foreground/35`), accent on hover — present on every backstage page but unobtrusive.
+
+**Commit**: `f31ac9d`
+
+---
+
 ## Next Steps
 
-- **Commit Item M** and merge `main → deploy`
 - **Phase 24**: Sales tax infrastructure (activation trigger: $1k revenue or Texas Comptroller registration)
 - **Next.js 16**: Deferred until `16.3.x` stabilizes (unfixed `/_global-error` prerender bug in `16.2.9`)
