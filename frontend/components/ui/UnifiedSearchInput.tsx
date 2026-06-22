@@ -30,7 +30,7 @@ function parseDiv(div: HTMLDivElement): { slugs: string[]; text: string } {
     }
   });
 
-  return { slugs, text: textParts.join('').trim() };
+  return { slugs, text: textParts.join('').replace(/\u200B/g, '').trim() };
 }
 
 // Build chip HTML (inline, not rendered by React — written directly into contenteditable)
@@ -40,14 +40,13 @@ function makeChipHtml(slug: string, name: string): string {
 
 // Rebuild the div (used on mount and on external state sync)
 function rebuildDiv(div: HTMLDivElement, slugs: string[], allTags: Tag[], searchText = '') {
-  const html =
+  div.innerHTML =
     slugs
       .map((slug) => {
         const tag = allTags.find((t) => t.slug === slug);
         return makeChipHtml(slug, tag?.name ?? slug);
       })
-      .join('') + (searchText ? `​${searchText}` : '​');
-  div.innerHTML = html;
+      .join('') + (searchText || '');
   // Place cursor at end
   const range = document.createRange();
   const sel = window.getSelection();
