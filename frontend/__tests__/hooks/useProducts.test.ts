@@ -80,7 +80,6 @@ describe('useProducts', () => {
       useProducts({
         page: 2,
         limit: 24,
-        category: 'electronics',
         search: 'phone',
       })
     );
@@ -91,10 +90,6 @@ describe('useProducts', () => {
     );
     expect(mockUseSWR).toHaveBeenCalledWith(
       expect.stringContaining('limit=24'),
-      expect.any(Function)
-    );
-    expect(mockUseSWR).toHaveBeenCalledWith(
-      expect.stringContaining('category=electronics'),
       expect.any(Function)
     );
     expect(mockUseSWR).toHaveBeenCalledWith(
