@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Article } from '@/types';
-import { FileText, Calendar } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 
 interface ArticleCardProps {
   article: Article;
@@ -19,9 +19,11 @@ export function ArticleCard({ article }: ArticleCardProps) {
   const hasImage = !!article.featured_image_url;
 
   return (
-    <Link href={`/latest/${article.slug}`} className="group">
+    <div className="group relative">
+      {/* Cover link — makes the whole card clickable; declared first so content paints on top */}
+      <Link href={`/articles/${article.slug}`} className="absolute inset-0 rounded-xl" aria-label={article.title} />
+
       <article className="h-full bg-surface border border-border rounded-xl overflow-hidden hover:border-accent/30 transition-colors">
-        {/* Only render image block when there's an actual image */}
         {hasImage && (
           <div className="aspect-video relative bg-surface-raised">
             <Image
@@ -34,16 +36,17 @@ export function ArticleCard({ article }: ArticleCardProps) {
         )}
 
         <div className="p-5 flex flex-col h-full">
-          {/* Tags */}
+          {/* Tags — relative so they sit above the cover link */}
           {article.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {article.tags.slice(0, 3).map((tag) => (
-                <span
+                <Link
                   key={tag.id}
-                  className="text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium"
+                  href={`/articles?tags=${tag.slug}`}
+                  className="relative text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium hover:bg-accent/20 transition-colors"
                 >
                   {tag.name}
-                </span>
+                </Link>
               ))}
               {article.tags.length > 3 && (
                 <span className="text-xs px-2 py-0.5 bg-foreground/5 text-foreground/40 rounded-full font-medium">
@@ -71,6 +74,6 @@ export function ArticleCard({ article }: ArticleCardProps) {
           )}
         </div>
       </article>
-    </Link>
+    </div>
   );
 }

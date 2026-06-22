@@ -54,7 +54,10 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   const isOutOfStock = !isService && !isDigital && product.stock_quantity != null && product.stock_quantity <= 0;
 
   return (
-    <Link href={`/shop/${product.slug}`} className="group">
+    <div className="group relative">
+      {/* Cover link — declared first so content paints on top */}
+      <Link href={`/shop/${product.slug}`} className="absolute inset-0 rounded-xl" aria-label={product.title} />
+
       <div className="bg-surface border border-border rounded-xl overflow-hidden hover:border-accent/30 transition-colors">
         {/* Image */}
         <div className="aspect-square relative bg-surface-raised">
@@ -91,16 +94,17 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
 
         {/* Content */}
         <div className="p-4">
-          {/* Tags */}
+          {/* Tags — relative so they sit above the cover link */}
           {product.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
               {product.tags.slice(0, 3).map((tag) => (
-                <span
+                <Link
                   key={tag.id}
-                  className="text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium"
+                  href={`/shop?tags=${tag.slug}`}
+                  className="relative text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium hover:bg-accent/20 transition-colors"
                 >
                   {tag.name}
-                </span>
+                </Link>
               ))}
               {product.tags.length > 3 && (
                 <span className="text-xs px-2 py-0.5 bg-foreground/5 text-foreground/40 rounded-full font-medium">
@@ -148,6 +152,6 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
           )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

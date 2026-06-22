@@ -133,6 +133,21 @@ export function ProductPageClient() {
         <div>
           <h1 className="text-3xl font-bold mb-2">{product.title}</h1>
 
+          {/* Tags */}
+          {product.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {product.tags.map((tag) => (
+                <Link
+                  key={tag.id}
+                  href={`/shop?tags=${tag.slug}`}
+                  className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-accent/10 hover:text-accent transition-colors"
+                >
+                  #{tag.name}
+                </Link>
+              ))}
+            </div>
+          )}
+
           {/* Price */}
           <div className="flex items-center gap-3 mb-6">
             <span className="text-2xl font-bold">{formatPrice(product.price)}</span>
@@ -223,21 +238,6 @@ export function ProductPageClient() {
           <p className="text-sm text-foreground/50">
             SKU: {product.sku}
           </p>
-
-          {/* Tags */}
-          {product.tags.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {product.tags.map((tag) => (
-                <Link
-                  key={tag.id}
-                  href={`/shop?tags=${tag.slug}`}
-                  className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-accent/10 hover:text-accent transition-colors"
-                >
-                  #{tag.name}
-                </Link>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
