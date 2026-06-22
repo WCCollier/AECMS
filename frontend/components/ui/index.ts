@@ -11,3 +11,5 @@ export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 
 export { ViewModeToggle } from './ViewModeToggle';
 export { TagChipStrip } from './TagChipStrip';
+export { UnifiedSearchInput } from './UnifiedSearchInput';
+export type { UnifiedSearchInputProps } from './UnifiedSearchInput';

@@ -10,7 +10,6 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { CapabilitiesModule } from './capabilities/capabilities.module';
 import { MediaModule } from './media/media.module';
-import { CategoriesModule } from './categories/categories.module';
 import { TagsModule } from './tags/tags.module';
 import { ArticlesModule } from './articles/articles.module';
 import { PagesModule } from './pages/pages.module';
@@ -62,7 +61,6 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     CapabilitiesModule,
     MediaModule,
-    CategoriesModule,
     TagsModule,
     ArticlesModule,
     PagesModule,

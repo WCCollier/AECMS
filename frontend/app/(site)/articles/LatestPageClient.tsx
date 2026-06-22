@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useArticles } from '@/hooks/useArticles';
 import { useInfiniteArticles } from '@/hooks/useInfiniteArticles';
 import { useViewMode } from '@/contexts/ViewModeContext';
 import { ArticleCard } from '@/components/blog/ArticleCard';
-import { Button, Input, ViewModeToggle, TagChipStrip } from '@/components/ui';
-import { Search, X } from 'lucide-react';
+import { Button, ViewModeToggle, UnifiedSearchInput } from '@/components/ui';
 
 const LIMIT = 9;
 
@@ -21,9 +20,6 @@ export function LatestPageClient() {
 
   const [page, setPage] = useState(forcePaginated ? urlPage : 1);
   const [search, setSearch] = useState(() => searchParams?.get('search') ?? '');
-  const [searchInput, setSearchInput] = useState(() => searchParams?.get('search') ?? '');
-
-  // Tag filter state — initialise from URL on mount
   const [selectedTags, setSelectedTags] = useState<string[]>(() => {
     const raw = searchParams?.get('tags') ?? searchParams?.get('tag') ?? '';
     return raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
@@ -32,22 +28,28 @@ export function LatestPageClient() {
     searchParams?.get('tag_logic') === 'or' ? 'or' : 'and',
   );
 
+  // Track what was last committed to the URL so the search button can show ×
+  const [committedTags, setCommittedTags] = useState<string[]>(selectedTags);
+  const [committedSearch, setCommittedSearch] = useState(search);
+
   // Sync all filter state from URL — handles external navigation (e.g. tag chip clicks on tiles)
   useEffect(() => {
     const raw = searchParams?.get('tags') ?? searchParams?.get('tag') ?? '';
-    setSelectedTags(raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : []);
-    setTagLogic(searchParams?.get('tag_logic') === 'or' ? 'or' : 'and');
+    const tags = raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const logic = searchParams?.get('tag_logic') === 'or' ? 'or' : 'and';
     const srch = searchParams?.get('search') ?? '';
+
+    setSelectedTags(tags);
+    setTagLogic(logic);
     setSearch(srch);
-    setSearchInput(srch);
+    setCommittedTags(tags);
+    setCommittedSearch(srch);
     setPage(1);
   }, [searchParams]);
 
   const buildParams = (p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const params = new URLSearchParams(searchParams?.toString());
-    // page
     if (p === 1) params.delete('page'); else params.set('page', p.toString());
-    // tags
     if (tags.length > 0) {
       params.set('tags', tags.join(','));
       params.delete('tag');
@@ -55,22 +57,21 @@ export function LatestPageClient() {
       params.delete('tags');
       params.delete('tag');
     }
-    // tag logic
     if (logic === 'or' && tags.length >= 2) params.set('tag_logic', 'or');
     else params.delete('tag_logic');
-    // search
     if (srch) params.set('search', srch); else params.delete('search');
     return params.toString();
   };
 
-  const updateUrl = (p: number, tags = selectedTags, logic = tagLogic, srch = search) => {
+  const updateUrl = useCallback((p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const qs = buildParams(p, tags, logic, srch);
     router.replace(`/articles${qs ? `?${qs}` : ''}`, { scroll: false });
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, searchParams]);
 
   const handlePageChange = (next: number) => {
     setPage(next);
-    updateUrl(next);
+    updateUrl(next, selectedTags, tagLogic, search);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -83,32 +84,26 @@ export function LatestPageClient() {
     }
   }, [effectiveMode, router, searchParams]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearch(searchInput);
-    setPage(1);
-    updateUrl(1, selectedTags, tagLogic, searchInput);
-    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const clearSearch = () => {
-    setSearch('');
-    setSearchInput('');
-    setPage(1);
-    updateUrl(1, selectedTags, tagLogic, '');
-    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleTagsChange = (tags: string[]) => {
+  const handleSearch = (tags: string[], logic: 'and' | 'or', srch: string) => {
     setSelectedTags(tags);
+    setTagLogic(logic);
+    setSearch(srch);
+    setCommittedTags(tags);
+    setCommittedSearch(srch);
     setPage(1);
-    updateUrl(1, tags, tagLogic, search);
+    updateUrl(1, tags, logic, srch);
     if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleLogicChange = (logic: 'and' | 'or') => {
-    setTagLogic(logic);
-    updateUrl(page, selectedTags, logic, search);
+  const handleClear = () => {
+    setSelectedTags([]);
+    setTagLogic('and');
+    setSearch('');
+    setCommittedTags([]);
+    setCommittedSearch('');
+    setPage(1);
+    updateUrl(1, [], 'and', '');
+    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // ── Paginated ─────────────────────────────────────────────────────────────
@@ -132,10 +127,8 @@ export function LatestPageClient() {
 
   useEffect(() => {
     if (effectiveMode !== 'infinite') return;
-
     const el = sentinelRef.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && infinite.hasMore && !infinite.isFetchingMore) {
@@ -144,7 +137,6 @@ export function LatestPageClient() {
       },
       { rootMargin: '200px' }
     );
-
     observer.observe(el);
     return () => observer.disconnect();
   }, [effectiveMode, infinite]);
@@ -154,6 +146,12 @@ export function LatestPageClient() {
   const isError = effectiveMode === 'paginated' ? paginated.isError : false;
   const articles = effectiveMode === 'paginated' ? paginated.articles : infinite.articles;
   const totalPages = effectiveMode === 'paginated' ? paginated.totalPages : 0;
+  const total = effectiveMode === 'paginated' ? (paginated.total ?? 0) : infinite.total;
+
+  const hasActiveFilters = selectedTags.length > 0 || !!search;
+  const isSearchActive =
+    committedTags.join(',') === selectedTags.join(',') && committedSearch === search &&
+    (committedTags.length > 0 || !!committedSearch);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -165,41 +163,16 @@ export function LatestPageClient() {
             <p className="text-foreground/60 mt-1">Articles and updates</p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <ViewModeToggle />
-
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
-                <Input
-                  id="articles-search"
-                  name="search"
-                  type="text"
-                  placeholder="Search articles..."
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  className="pl-10 w-64"
-                />
-              </div>
-              {search && searchInput === search ? (
-                <Button type="button" variant="secondary" onClick={clearSearch}>
-                  <X className="w-4 h-4" />
-                </Button>
-              ) : (
-                <Button type="submit" variant="secondary">Search</Button>
-              )}
-            </form>
-          </div>
+          <UnifiedSearchInput
+            initialTags={selectedTags}
+            initialTagLogic={tagLogic}
+            initialSearch={search}
+            placeholder="Search articles or filter by tag…"
+            onSearch={handleSearch}
+            onClear={handleClear}
+            isSearchActive={isSearchActive}
+          />
         </div>
-
-        {/* Tag filter strip */}
-        <TagChipStrip
-          selected={selectedTags}
-          tagLogic={tagLogic}
-          onChange={handleTagsChange}
-          onLogicChange={handleLogicChange}
-          placeholder="Filter by tag…"
-        />
       </div>
 
       {isLoading ? (
@@ -215,13 +188,22 @@ export function LatestPageClient() {
       ) : articles.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-foreground/60">
-            {search || selectedTags.length > 0
+            {hasActiveFilters
               ? 'No articles match your current filters.'
               : 'No articles published yet.'}
           </p>
         </div>
       ) : (
         <>
+          {/* Result count + ViewModeToggle above grid */}
+          <div className="flex items-center justify-between mb-4 text-sm text-foreground/50">
+            <span>
+              {total} {total === 1 ? 'article' : 'articles'}
+              {hasActiveFilters ? ' matching your filters' : ''}
+            </span>
+            <ViewModeToggle />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {articles.map((article) => (
               <ArticleCard key={article.id} article={article} />

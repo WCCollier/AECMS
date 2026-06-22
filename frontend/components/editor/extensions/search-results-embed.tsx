@@ -9,6 +9,7 @@ import { LayoutGrid, Trash2, Settings } from 'lucide-react';
 type ContentType = 'articles' | 'products';
 type TagLogic = 'and' | 'or';
 type Display = 'grid' | 'list';
+type DisplayMode = 'auto' | 'paginated';
 
 interface SearchResultsAttrs {
   contentType: ContentType;
@@ -18,11 +19,37 @@ interface SearchResultsAttrs {
   display: Display;
   pageSize: number;
   title: string;
+  displayMode: DisplayMode;
 }
 
 function parseTagsAttr(raw: string): string[] {
   if (!raw) return [];
   try { return JSON.parse(raw); } catch { return []; }
+}
+
+/**
+ * Checks whether any substantive node follows `currentIndex` in the same
+ * parent node array. Empty paragraphs are ignored; anything else counts as
+ * trailing content, which means infinite scroll should not auto-enable.
+ */
+function hasTrailingContent(
+  editor: NodeViewProps['editor'],
+  getPos: () => number | undefined,
+): boolean {
+  const pos = typeof getPos === 'function' ? getPos() : undefined;
+  if (pos === undefined) return false;
+
+  const $pos = editor.state.doc.resolve(pos);
+  const parent = $pos.parent;
+  const idxInParent = $pos.index($pos.depth);
+
+  for (let i = idxInParent + 1; i < parent.childCount; i++) {
+    const sibling = parent.child(i);
+    if (sibling.type.name !== 'paragraph' || (sibling.textContent?.trim() ?? '') !== '') {
+      return true;
+    }
+  }
+  return false;
 }
 
 function ConfigPanel({
@@ -41,6 +68,7 @@ function ConfigPanel({
   const [display, setDisplay] = useState<Display>(attrs.display ?? 'grid');
   const [pageSize, setPageSize] = useState(attrs.pageSize ?? 6);
   const [title, setTitle] = useState(attrs.title ?? '');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>(attrs.displayMode ?? 'auto');
 
   const save = () => {
     onUpdate({
@@ -51,6 +79,7 @@ function ConfigPanel({
       display,
       pageSize,
       title,
+      displayMode,
     });
     onDone();
   };
@@ -159,6 +188,27 @@ function ConfigPanel({
         </div>
       </div>
 
+      {/* Display mode */}
+      <div>
+        <p className="text-xs font-medium text-foreground/60 mb-1.5">Scroll mode</p>
+        <div className="flex gap-2">
+          {([['auto', 'Auto (infinite when at zone tail)'], ['paginated', 'Always paginated']] as [DisplayMode, string][]).map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setDisplayMode(val)}
+              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                displayMode === val
+                  ? 'bg-accent text-white border-accent'
+                  : 'border-foreground/20 hover:border-accent/50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex justify-end gap-2 pt-1">
         <button type="button" onClick={onDone} className="px-3 py-1.5 text-xs border border-border rounded-lg hover:bg-surface-raised transition-colors">
           Cancel
@@ -171,7 +221,7 @@ function ConfigPanel({
   );
 }
 
-function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode }: NodeViewProps) {
+function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode, getPos }: NodeViewProps) {
   const [configuring, setConfiguring] = useState(() => !node.attrs.contentType);
   const attrs = node.attrs as SearchResultsAttrs;
   const tags = parseTagsAttr(attrs.tags);
@@ -197,6 +247,12 @@ function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode
   }
 
   if (!editor.isEditable) {
+    // Zone-trailing detection: allow infinite scroll when displayMode is 'auto'
+    // and there is no substantive content after this node in the same zone.
+    const allowInfiniteScroll =
+      (attrs.displayMode ?? 'auto') !== 'paginated' &&
+      !hasTrailingContent(editor, getPos);
+
     return (
       <NodeViewWrapper contentEditable={false}>
         <SearchResultsWidget
@@ -207,6 +263,7 @@ function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode
           display={attrs.display ?? 'grid'}
           pageSize={Math.min(attrs.pageSize ?? 6, 12)}
           title={attrs.title ?? ''}
+          allowInfiniteScroll={allowInfiniteScroll}
         />
       </NodeViewWrapper>
     );
@@ -219,6 +276,9 @@ function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode
           <LayoutGrid className="w-4 h-4 text-accent/70 shrink-0" />
           <span className="font-medium">{summaryLabel()}</span>
           {attrs.title && <span className="text-foreground/40">&middot; &ldquo;{attrs.title}&rdquo;</span>}
+          {(attrs.displayMode ?? 'auto') === 'paginated' && (
+            <span className="text-foreground/30 text-[10px] ml-auto">paginated</span>
+          )}
         </div>
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
@@ -248,13 +308,14 @@ export const SearchResultsEmbedNode = Node.create({
 
   addAttributes() {
     return {
-      contentType: { default: 'articles', parseHTML: (el) => el.getAttribute('data-content-type') || 'articles', renderHTML: (a) => ({ 'data-content-type': a.contentType }) },
-      tags:        { default: '[]',       parseHTML: (el) => el.getAttribute('data-tags') || '[]',         renderHTML: (a) => ({ 'data-tags': a.tags }) },
-      tagLogic:    { default: 'and',      parseHTML: (el) => el.getAttribute('data-tag-logic') || 'and',   renderHTML: (a) => ({ 'data-tag-logic': a.tagLogic }) },
-      search:      { default: '',         parseHTML: (el) => el.getAttribute('data-search') || '',          renderHTML: (a) => ({ 'data-search': a.search }) },
-      display:     { default: 'grid',     parseHTML: (el) => el.getAttribute('data-display') || 'grid',     renderHTML: (a) => ({ 'data-display': a.display }) },
-      pageSize:    { default: 6,          parseHTML: (el) => Number(el.getAttribute('data-page-size')) || 6, renderHTML: (a) => ({ 'data-page-size': String(a.pageSize) }) },
-      title:       { default: '',         parseHTML: (el) => el.getAttribute('data-title') || '',           renderHTML: (a) => ({ 'data-title': a.title }) },
+      contentType:  { default: 'articles',   parseHTML: (el) => el.getAttribute('data-content-type') || 'articles',    renderHTML: (a) => ({ 'data-content-type': a.contentType }) },
+      tags:         { default: '[]',          parseHTML: (el) => el.getAttribute('data-tags') || '[]',                  renderHTML: (a) => ({ 'data-tags': a.tags }) },
+      tagLogic:     { default: 'and',         parseHTML: (el) => el.getAttribute('data-tag-logic') || 'and',            renderHTML: (a) => ({ 'data-tag-logic': a.tagLogic }) },
+      search:       { default: '',            parseHTML: (el) => el.getAttribute('data-search') || '',                   renderHTML: (a) => ({ 'data-search': a.search }) },
+      display:      { default: 'grid',        parseHTML: (el) => el.getAttribute('data-display') || 'grid',              renderHTML: (a) => ({ 'data-display': a.display }) },
+      pageSize:     { default: 6,             parseHTML: (el) => Number(el.getAttribute('data-page-size')) || 6,         renderHTML: (a) => ({ 'data-page-size': String(a.pageSize) }) },
+      title:        { default: '',            parseHTML: (el) => el.getAttribute('data-title') || '',                    renderHTML: (a) => ({ 'data-title': a.title }) },
+      displayMode:  { default: 'auto',        parseHTML: (el) => el.getAttribute('data-display-mode') || 'auto',         renderHTML: (a) => ({ 'data-display-mode': a.displayMode }) },
     };
   },
 

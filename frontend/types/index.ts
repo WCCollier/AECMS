@@ -102,14 +102,6 @@ export interface Page {
   updated_at: string;
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  parent_id: string | null;
-}
-
 export interface Tag {
   id: string;
   name: string;

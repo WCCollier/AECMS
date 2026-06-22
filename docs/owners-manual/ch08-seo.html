@@ -100,9 +100,16 @@ https://x.com/yourhandle</code></pre>
 
       <h2>Step 3 — Submit to Google Search Console</h2>
 
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Already on Google Cloud Run with a custom domain?</div>
+        <p>Cloud Run domain mapping requires Google Search Console domain verification as part of setup. If you've already mapped a custom domain to your Cloud Run service, Google has likely already added you as a <strong>verified Owner</strong> of that property in Search Console — no additional verification needed.</p>
+        <p><strong>Check first:</strong> open <a href="https://search.google.com/search-console" target="_blank">Google Search Console</a> and look for your domain under "Search properties." If it's already listed and shows you as Owner, <strong>skip straight to Step 6</strong> (submitting the sitemap) — and leave the <strong>Google Verification Code</strong> field in Admin → Settings → SEO blank.</p>
+        <p>The steps below apply if Search Console shows your domain as unverified, or if you are adding a second domain that wasn't part of the Cloud Run setup.</p>
+      </div>
+
       <ol class="steps">
         <li>Go to <a href="https://search.google.com/search-console" target="_blank">Google Search Console</a> and sign in with your Google account.</li>
-        <li>Click <strong>Add Property</strong> → <strong>URL prefix</strong> → enter your site's URL (e.g. <code>https://fantasyvreality.com</code>).</li>
+        <li>Click <strong>Add Property</strong> → <strong>URL prefix</strong> → enter your site's URL (e.g. <code>https://example.com</code>).</li>
         <li>Choose the <strong>HTML tag</strong> verification method. Google gives you a <code>&lt;meta&gt;</code> tag like:<br>
           <code>&lt;meta name="google-site-verification" content="aBcDeFgHiJkL…" /&gt;</code>
         </li>
