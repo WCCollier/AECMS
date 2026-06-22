@@ -21,8 +21,8 @@ export function ShopPageClient() {
   const effectiveMode = forcePaginated ? 'paginated' : mode;
 
   const [page, setPage] = useState(forcePaginated ? urlPage : 1);
-  const [search, setSearch] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState(() => searchParams?.get('search') ?? '');
+  const [searchInput, setSearchInput] = useState(() => searchParams?.get('search') ?? '');
 
   const [selectedTags, setSelectedTags] = useState<string[]>(() => {
     const raw = searchParams?.get('tags') ?? searchParams?.get('tag') ?? '';
@@ -31,6 +31,17 @@ export function ShopPageClient() {
   const [tagLogic, setTagLogic] = useState<'and' | 'or'>(() =>
     searchParams?.get('tag_logic') === 'or' ? 'or' : 'and',
   );
+
+  // Sync all filter state from URL — handles external navigation (e.g. tag chip clicks on tiles)
+  useEffect(() => {
+    const raw = searchParams?.get('tags') ?? searchParams?.get('tag') ?? '';
+    setSelectedTags(raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : []);
+    setTagLogic(searchParams?.get('tag_logic') === 'or' ? 'or' : 'and');
+    const srch = searchParams?.get('search') ?? '';
+    setSearch(srch);
+    setSearchInput(srch);
+    setPage(1);
+  }, [searchParams]);
 
   const buildParams = (p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const params = new URLSearchParams(searchParams?.toString());

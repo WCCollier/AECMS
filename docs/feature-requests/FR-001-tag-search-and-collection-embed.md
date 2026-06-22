@@ -1,9 +1,9 @@
 # FR-001: Tag-Filtered Search & Collection Embed
 
-**Status:** `in-testing`
+**Status:** `in-dev`
 **Requested:** 2026-06-22
-**Deployed:** —
-**Size:** `medium` (2–3 days)
+**Deployed:** Deploy 1 — 2026-06-22 (Deploy 2 pending)
+**Size:** `medium` (2–3 days) + Deploy 2 extension
 
 ---
 
@@ -18,7 +18,9 @@ Extend the existing text search on the Articles and Shop pages to support tag-ba
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-22 | in-planning | Initial request and code analysis |
-| 2026-06-22 | in-testing | Implementation complete; builds and 190 tests pass |
+| 2026-06-22 | in-testing | Deploy 1 implementation complete; builds and tests pass |
+| 2026-06-22 | deployed (D1) | Deploy 1 live and tested on FvR: tag multi-filter, AND/OR toggle, bookmarkable URLs, SearchResultsEmbed, category→tag migration |
+| 2026-06-22 | in-dev | Deploy 2 design complete; pending implementation |
 
 ---
 
@@ -87,9 +89,44 @@ Tags function as the sole classification dimension (no separate category taxonom
 - **No new DB schema** — tags already exist; this is purely a query-layer and UI change.
 - **No new API endpoints** — extend existing `GET /articles` and `GET /products` query params.
 
+### Deploy 2 decisions
+
+**Unified search input — single control replacing two rows**
+
+After live testing Deploy 1, the two-row layout (text search bar + tag chip strip below it) was identified as unnecessarily verbose. Deploy 2 replaces both rows with a single `UnifiedSearchInput` control where tag chips and free text coexist inline.
+
+Implementation vehicle: `contenteditable div` with `contenteditable="false"` chip spans. The browser natively treats these spans as atomic cursor units — arrow-key navigation, click-to-position, backspace/delete all work correctly without custom cursor logic. Text nodes between chips are natural plain text. A tag typeahead dropdown is positioned at the cursor via `getBoundingClientRect()`. On submit, the DOM is walked to extract chips (tag slugs) and text nodes (search terms) separately.
+
+Key behavior decisions:
+- **Enter key**: if the typeahead dropdown is open and an item is highlighted, Enter selects it. If the dropdown is closed or nothing is highlighted, Enter runs the search. Escape always closes the dropdown without selecting.
+- **Search button**: always-visible magnifying glass icon (not the word "Search"). Becomes an × when an active search is applied. Reverts to the magnifying glass the moment the input content diverges from the last-run query.
+- **ALL/ANY toggle**: slides out from the left end of the search bar when chip count reaches 2; slides back in when it drops to 1 or 0. CSS `transition-all` on a `max-width` / `overflow-hidden` wrapper handles the animation.
+- **Overflow**: the input expands to available horizontal space and clips with horizontal scroll when chips + text exceed that width — standard single-line text input behavior.
+- **URL round-trip**: same `?tags=`, `?tag_logic=`, `?search=` params. On mount from URL, the div is reconstructed with chips for each `?tags=` slug and the `?search=` value as trailing text.
+- **`TagChipStrip` retirement from public pages**: the component stays alive for the `SearchResultsEmbed` config panel (different UX context — deliberate configuration, not live browsing). It is removed from `LatestPageClient` and `ShopPageClient`.
+
+**ViewModeToggle relocation + result count**
+
+The infinite-scroll / paginated toggle currently sits beside the search bar, implying it is part of the search UI. It is not — it controls how results are displayed regardless of whether a search is active. Moving it above the grid makes it semantically clear.
+
+New layout above the grid: result count left-aligned (`"73 articles"` when unfiltered, `"5 results"` when search or tags are active), ViewModeToggle right-aligned. Both are always visible. The `total` value is already returned by both paginated and infinite hooks and simply needs a display home.
+
+**SearchResultsEmbed — infinite scroll and display mode**
+
+The embed widget currently always uses paginated mode. Deploy 2 adds viewer-togglable infinite scroll using a zone-trailing-content detection mechanism:
+
+- When the renderer (RichTextContent or zone renderer) encounters a `searchResultsEmbed` node, it inspects the remaining nodes in the same content array. If no substantive content follows, it passes `allowInfiniteScroll={true}` to the widget.
+- **Zone boundary is the containment unit** — not the page section boundary. A widget at the tail of its zone is "at the tail" even if more page sections follow below. The zone content array is what is inspected.
+- A new node attr `displayMode: 'auto' | 'paginated'` (default `'auto'`) lets the creator override the detection. `'paginated'` forces paginated regardless of position.
+- Config panel gains a "Display mode" field: **Auto** (default) / **Always paginate**. "Always infinite" is not exposed — if the creator wants infinite they place the widget last and let Auto handle it.
+
+**Category schema cleanup (part of Deploy 2)**
+
+Deploy 1 data-migrated all categories to tags and stopped all code from reading the category tables. Deploy 2 drops the vestigial tables: a Prisma migration drops `categories`, `article_categories`, `product_categories` and removes the `Category` model from the schema. The `Category` TypeScript interface is removed from `frontend/types/index.ts`.
+
 ### Out of scope
 
-- OR-mode as a separate default — AND remains the default; OR is available via the ALL/ANY toggle (see TagChipStrip design).
+- OR-mode as a separate default — AND remains the default; OR is available via the ALL/ANY toggle.
 - Cross-type unified search (searching articles + products simultaneously in one result set) — would require a new endpoint and a mixed card component. Viable future FR.
 - Tag management UI improvements (reordering, merging, color labels) — separate concern.
 
@@ -251,6 +288,175 @@ New `?tags=` and `?tag_logic=` params mirror `?search=` handling:
 
 ---
 
+### Deploy 2 Implementation Guide
+
+#### Files changed
+
+```
+backend/prisma/schema.prisma                     — remove Category model + ArticleCategory + ProductCategory
+backend/prisma/migrations/<ts>_drop_categories/  — DROP TABLE categories, article_categories, product_categories
+frontend/types/index.ts                          — remove Category interface
+frontend/components/ui/UnifiedSearchInput.tsx    — NEW: contenteditable chip+text input
+frontend/components/ui/index.ts                  — export UnifiedSearchInput
+frontend/app/(site)/articles/LatestPageClient.tsx — replace form+TagChipStrip with UnifiedSearchInput; move ViewModeToggle; add result count
+frontend/app/(site)/shop/ShopPageClient.tsx       — same
+frontend/components/widgets/SearchResultsWidget.tsx — add allowInfiniteScroll prop + viewer toggle
+frontend/components/editor/extensions/search-results-embed.tsx — add displayMode attr + pass allowInfiniteScroll to widget
+```
+
+#### Category schema cleanup
+
+**Prisma migration** (data-only in Deploy 1; destructive in Deploy 2):
+```sql
+DROP TABLE article_categories;
+DROP TABLE product_categories;
+DROP TABLE categories;
+```
+
+Remove from `schema.prisma`:
+```
+model Category { ... }      ← delete
+model ArticleCategory { ... } ← delete
+model ProductCategory { ... } ← delete
+```
+Remove `categories` relation from `Article` and `Product` models.
+
+Remove `Category` interface from `frontend/types/index.ts`.
+
+#### `UnifiedSearchInput` component
+
+```tsx
+interface UnifiedSearchInputProps {
+  initialTags?: string[];          // slugs; populates chips on mount
+  initialTagLogic?: 'and' | 'or';
+  initialSearch?: string;          // text; populates after chips on mount
+  placeholder?: string;
+  onSearch: (tags: string[], tagLogic: 'and' | 'or', search: string) => void;
+  onClear: () => void;
+  isSearchActive: boolean;         // true when last-run query is current input state
+}
+```
+
+**DOM structure:**
+```html
+<div class="flex items-center gap-2">
+  <!-- ALL/ANY toggle — slides in/out from left -->
+  <div class="overflow-hidden transition-all duration-200" style="max-width: <0 or 4rem>">
+    <LogicToggle />
+  </div>
+
+  <!-- The unified input -->
+  <div class="flex-1 relative border rounded-lg flex items-center px-3 min-h-[38px]">
+    <div
+      contenteditable="true"
+      role="combobox"
+      class="flex-1 outline-none flex flex-wrap items-center gap-1.5 min-w-0"
+    >
+      <!-- chip spans: contenteditable="false" -->
+      <span contenteditable="false" class="chip">outsiders <button>×</button></span>
+      <!-- text node at cursor -->
+    </div>
+    <!-- Typeahead dropdown — absolutely positioned below input -->
+    <TagDropdown ... />
+  </div>
+
+  <!-- Search / clear button -->
+  <button type="button" onClick={isSearchActive ? onClear : runSearch}>
+    {isSearchActive ? <X /> : <Search />}
+  </button>
+</div>
+```
+
+**Core logic:**
+
+`parseContent(div: HTMLElement): { tags: string[], search: string }` — walks `childNodes`; for each `ELEMENT_NODE` with `data-tag-slug`, collects the slug; for each `TEXT_NODE`, collects trimmed text. Text nodes are joined with a single space. Returns structured query.
+
+`buildContent(div, tags, tagLogic, search)` — inverse: clears the div, appends chip spans for each tag slug, appends a text node for the search string. Called on mount when initialising from URL params.
+
+`onInput` handler (debounced 150ms) — extracts the text at the cursor's text node; queries `useTags()` in-memory for matches; updates dropdown state.
+
+`onKeyDown` handler:
+- `ArrowDown` / `ArrowUp`: cycle through dropdown items
+- `Enter`: if dropdown open and item highlighted → insert chip, close dropdown, move cursor; else → call `runSearch()`
+- `Escape`: close dropdown
+- `Backspace` at start of a text node with zero length, immediately right of a chip → remove the chip (find preceding element sibling, remove it from DOM, update tags state)
+- `Delete` at end of a text node with zero length, immediately left of a chip → remove the chip (find next element sibling)
+
+**Tag insertion at cursor:**
+1. Get current selection range.
+2. Delete the text typed so far that matched the tag (replace the text node up to cursor).
+3. Insert a `<span contenteditable="false" data-tag-slug="<slug>" class="chip">…</span>`.
+4. Insert an empty text node after the span and move the cursor into it.
+5. Close dropdown, update tags state.
+
+**Chip visual:** same styling as the existing TagChipStrip chips — `bg-accent/10 text-accent rounded-full text-xs px-2 py-0.5 font-medium` — so the inline chips read as the same visual language as the tile tag badges.
+
+**`isSearchActive` computation (in parent):** true when `committedTags` deep-equals current chip list AND `committedSearch` equals current text AND either is non-empty. Parent maintains `committed*` state updated on each `onSearch` call.
+
+#### `LatestPageClient` / `ShopPageClient` changes
+
+Replace:
+```tsx
+<div className="flex items-center gap-4">
+  <ViewModeToggle />
+  <form>...</form>
+</div>
+<TagChipStrip ... />
+```
+
+With:
+```tsx
+<UnifiedSearchInput
+  initialTags={selectedTags}
+  initialTagLogic={tagLogic}
+  initialSearch={search}
+  placeholder="Search or filter by tag…"
+  onSearch={handleUnifiedSearch}
+  onClear={handleClear}
+  isSearchActive={isSearchActive}
+/>
+```
+
+Add above the grid:
+```tsx
+<div className="flex items-center justify-between mb-4 text-sm text-foreground/50">
+  <span>{total} {contentNoun}{hasActiveFilters ? ' matching your filters' : ''}</span>
+  <ViewModeToggle />
+</div>
+```
+
+`handleUnifiedSearch(tags, tagLogic, search)` — sets all three state values, resets page to 1, calls `updateUrl()`.
+
+#### `SearchResultsEmbed` / `SearchResultsWidget` changes
+
+**New node attr:** `displayMode: 'auto' | 'paginated'` (default `'auto'`).
+
+**Config panel:** add "Display mode" field below Page size:
+- Auto — uses infinite scroll when widget is the last item in its zone; paginated otherwise
+- Always paginate — forces paginated regardless of position
+
+**Renderer (`RichTextContent` or zone renderer)** — when iterating nodes, detect trailing content:
+```typescript
+function hasTrailingContent(nodes: TipTapNode[], currentIndex: number): boolean {
+  return nodes.slice(currentIndex + 1).some(n =>
+    n.type !== 'paragraph' || (n.content?.length ?? 0) > 0
+  );
+}
+// Then when rendering searchResultsEmbed:
+const allowInfiniteScroll =
+  attrs.displayMode !== 'paginated' &&
+  !hasTrailingContent(parentNodes, nodeIndex);
+```
+
+**`SearchResultsWidget`** — when `allowInfiniteScroll` is true:
+- Renders `ViewModeToggle` in top-right of the widget header area
+- Uses `useInfiniteArticles` / `useInfiniteProducts` in infinite mode, `useArticles` / `useProducts` in paginated mode
+- Infinite sentinel div at bottom of widget (IntersectionObserver same as catalogue pages)
+- "You've seen everything" message when results exhausted
+- When `allowInfiniteScroll` is false: always paginated, toggle hidden (current behavior)
+
+---
+
 ## Completion Report
 
 **Implemented:** 2026-06-22
@@ -340,6 +546,65 @@ None.
 1. Configure an embed with a tag combination that has no content.
 2. Confirm a "No results" message renders (not an error or blank space).
 
+---
+
+### Deploy 2 test scenarios
+
+**J. Unified search input — chip insertion**
+1. Navigate to `/articles`.
+2. Click the search bar. Type the first 2 characters of a known tag.
+3. Confirm a typeahead dropdown appears below the input with matching tags.
+4. Click a tag in the dropdown. Confirm: it becomes a chip INSIDE the search bar, the text cursor moves to the right of the chip, the dropdown closes, results filter immediately.
+5. Continue typing another tag name. Confirm another dropdown appears.
+6. Select the second tag. Confirm two chips are now inline in the input. Confirm the ALL/ANY toggle has slid in from the left of the input.
+7. Type plain text after the chips. Press Enter (or the magnifying glass). Confirm the search runs with both tag chips AND the plain text applied.
+8. Check the URL: `?tags=slug1,slug2&search=text`. Confirm `?tag_logic` is absent (AND is default).
+
+**K. Unified search input — chip deletion**
+1. With two or more chips active, place the cursor immediately to the right of the leftmost chip (click between chips or use arrow keys).
+2. Press Backspace. Confirm the chip to the left of the cursor is removed; the tag filter updates immediately.
+3. Press Delete with cursor immediately to the left of a chip. Confirm the chip to the right is removed.
+4. Remove all chips. Confirm the ALL/ANY toggle slides back out of view.
+
+**L. Unified search input — keyboard navigation**
+1. Type partial tag text to open the dropdown.
+2. Press ArrowDown/ArrowUp to cycle through dropdown items; confirm highlight moves.
+3. Press Enter on a highlighted item — confirm it becomes a chip (search does NOT run yet).
+4. Press Escape — confirm the dropdown closes with no chip added.
+5. With no dropdown open, press Enter — confirm the search runs.
+
+**M. Search button states**
+1. With empty input: magnifying glass icon is visible; clicking it runs an empty search (full catalogue).
+2. Apply chips + text and submit. Icon becomes ×. Results show.
+3. Edit the input (add or remove a chip, or change the text). Icon reverts to magnifying glass.
+4. Click ×: input clears to empty, full catalogue restores, icon reverts to magnifying glass.
+
+**N. ViewModeToggle and result count**
+1. Navigate to `/articles` with no filters. Confirm above the grid there is a result count ("N articles") on the left and the infinite/paginated toggle on the right.
+2. Apply a tag filter. Confirm the count updates to reflect the filtered result set ("N results matching your filters" or similar).
+3. Toggle between infinite and paginated via the toggle above the grid. Confirm behavior changes correctly.
+4. Confirm the toggle is NOT visible beside the search bar (it has been removed from that location).
+
+**O. SearchResultsEmbed — auto infinite scroll (widget at zone tail)**
+1. Create a page with a single zone containing only a `SearchResultsEmbed` node (nothing follows it in the zone).
+2. Seed enough matching content to exceed one page.
+3. View the page as a visitor. Confirm the widget shows a view mode toggle. Switch to infinite scroll — confirm results load as you scroll. Confirm the "You've seen everything" message when results are exhausted.
+4. Confirm the page sections below (if any) remain intact below the widget.
+
+**P. SearchResultsEmbed — forced paginated (content follows in zone)**
+1. Create a page with a zone containing a `SearchResultsEmbed` node followed by a Rich Text block with text.
+2. View as a visitor. Confirm the widget shows Previous/Next pagination controls only; no view mode toggle.
+3. Confirm the trailing rich text renders below the widget without being displaced.
+
+**Q. SearchResultsEmbed — "Always paginate" override**
+1. On a page where the embed is the last node in its zone (would normally allow infinite scroll), open the embed config and set Display Mode to "Always paginate".
+2. View as visitor. Confirm paginated controls only; no view mode toggle.
+
+**R. Category schema drop (Deploy 2 DB cleanup)**
+1. After migration runs, confirm `SELECT * FROM categories` returns an error (table doesn't exist).
+2. Confirm no 500 errors on any customer-facing or admin page.
+3. Confirm tag filtering still works (data was migrated in Deploy 1; this confirms no residual dependency).
+
 ### Acceptance criteria
 
 - [ ] Typing in the tag input on `/articles` shows a typeahead dropdown; already-selected tags are absent.
@@ -361,6 +626,22 @@ None.
 - [ ] "See all" link in embed includes `?tag_logic=or` when OR mode is set.
 - [ ] Empty-state message shown when query returns zero results.
 - [ ] No DB schema changes required (no migrations).
+
+**Deploy 2 acceptance criteria:**
+- [ ] Typing in the unified search bar produces a tag typeahead dropdown; selecting a tag adds a chip inline in the input at the cursor position.
+- [ ] Chips behave as atomic cursor units: arrow-key navigation treats a chip as one unit; Backspace left of a chip deletes it; Delete right of a chip deletes it.
+- [ ] Plain text typed after chips is not promoted to a chip unless the user selects it from the dropdown.
+- [ ] On submit, chips supply the `?tags=` filter and plain text supplies `?search=`; they combine as before.
+- [ ] ALL/ANY toggle slides in from the left of the search bar when chip count reaches 2; slides back when chip count drops below 2.
+- [ ] Search button shows magnifying glass icon when no active search; shows × when search is active; reverts to magnifying glass when input diverges from last-run query.
+- [ ] Clicking × clears input and restores full catalogue.
+- [ ] ViewModeToggle is no longer adjacent to the search bar; it appears above the article/product grid.
+- [ ] Result count is always visible above the grid, reflecting total (unfiltered) or filtered count.
+- [ ] `SearchResultsEmbed` at the tail of its zone shows a viewer-togglable infinite/paginated control.
+- [ ] `SearchResultsEmbed` with content following it in the same zone shows paginated only (no toggle).
+- [ ] "Always paginate" config override forces paginated even when the widget is at the zone tail.
+- [ ] `categories`, `article_categories`, `product_categories` tables are dropped with no application errors.
+- [ ] `Category` model and TypeScript interface are removed; no TypeScript compile errors.
 
 ---
 
