@@ -33,7 +33,6 @@ export class ArticlesService {
     return {
       author: { select: { id: true, email: true, first_name: true, last_name: true } },
       ...this.getMediaInclude(),
-      categories: { include: { category: true } },
       tags: { include: { tag: true } },
       ...(withCounts ? { _count: { select: { comments: true, versions: true } } } : {}),
     };
@@ -53,11 +52,6 @@ export class ArticlesService {
         );
       }
       throw new ConflictException(`Article with slug "${slug}" already exists`);
-    }
-
-    if (dto.category_ids?.length) {
-      const cats = await this.prisma.category.findMany({ where: { id: { in: dto.category_ids } } });
-      if (cats.length !== dto.category_ids.length) throw new BadRequestException('One or more categories not found');
     }
 
     if (dto.tag_ids?.length) {
@@ -82,9 +76,6 @@ export class ArticlesService {
         admin_can_delete: dto.admin_can_delete ?? true,
         author: { connect: { id: authorId } },
         published_at: dto.status === 'published' ? new Date() : null,
-        categories: dto.category_ids
-          ? { create: dto.category_ids.map((id) => ({ category: { connect: { id } } })) }
-          : undefined,
         tags: dto.tag_ids
           ? { create: dto.tag_ids.map((id) => ({ tag: { connect: { id } } })) }
           : undefined,
@@ -126,7 +117,7 @@ export class ArticlesService {
     canDeleteAny = false,
   ) {
     const {
-      status, visibility, category_id, category, tag_id, tag, tags, tag_logic,
+      status, visibility, tag_id, tag, tags, tag_logic,
       author_id, search, page = 1, limit = 20,
       sort_by = 'created_at', sort_order = 'desc',
       include_deleted,
@@ -158,9 +149,6 @@ export class ArticlesService {
       if (status) where.status = status;
       if (visibility) where.visibility = visibility;
     }
-
-    if (category_id) where.categories = { some: { category_id } };
-    else if (category) where.categories = { some: { category: { slug: category } } };
 
     if (tags) {
       const slugs = tags.split(',').map((s) => s.trim()).filter(Boolean);
@@ -277,15 +265,6 @@ export class ArticlesService {
       admin_can_delete: dto.admin_can_delete,
       published_at,
     };
-
-    if (dto.category_ids !== undefined) {
-      await this.prisma.articleCategory.deleteMany({ where: { article_id: id } });
-      if (dto.category_ids.length > 0) {
-        updateData.categories = {
-          create: dto.category_ids.map((catId) => ({ category: { connect: { id: catId } } })),
-        };
-      }
-    }
 
     if (dto.tag_ids !== undefined) {
       await this.prisma.articleTag.deleteMany({ where: { article_id: id } });
@@ -478,7 +457,6 @@ export class ArticlesService {
       ...article,
       media: mediaItems,
       featured_image_url: primaryMedia?.url ?? null,
-      categories: article.categories?.map((ac: any) => ac.category) || [],
       tags: article.tags?.map((at: any) => at.tag) || [],
       comment_count: article._count?.comments || 0,
       version_count: article._count?.versions || 0,

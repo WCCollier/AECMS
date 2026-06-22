@@ -15,8 +15,6 @@ export function LatestPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { mode } = useViewMode();
-  const categoryParam = searchParams?.get('category') ?? undefined;
-
   const urlPage = parseInt(searchParams?.get('page') ?? '', 10);
   const forcePaginated = !isNaN(urlPage) && urlPage > 0;
   const effectiveMode = forcePaginated ? 'paginated' : mode;
@@ -24,9 +22,6 @@ export function LatestPageClient() {
   const [page, setPage] = useState(forcePaginated ? urlPage : 1);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-
-  // Reset to page 1 when category filter changes
-  useEffect(() => { setPage(1); }, [categoryParam]);
 
   const updateUrl = (p: number) => {
     const params = new URLSearchParams(searchParams?.toString());
@@ -78,14 +73,12 @@ export function LatestPageClient() {
   const paginated = useArticles({
     page,
     limit: LIMIT,
-    category: categoryParam,
     search: search || undefined,
   });
 
   // ── Infinite ──────────────────────────────────────────────────────────────
   const infinite = useInfiniteArticles({
     limit: LIMIT,
-    category: categoryParam,
     search: search || undefined,
   });
 
@@ -122,11 +115,7 @@ export function LatestPageClient() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold">Latest</h1>
-          <p className="text-foreground/60 mt-1">
-            {categoryParam
-              ? <>Filtered by: <span className="text-accent font-medium capitalize">{categoryParam.replace(/-/g, ' ')}</span></>
-              : 'Articles and updates'}
-          </p>
+          <p className="text-foreground/60 mt-1">Articles and updates</p>
         </div>
 
         <div className="flex items-center gap-4">
@@ -171,8 +160,6 @@ export function LatestPageClient() {
           <p className="text-foreground/60">
             {search
               ? `No articles found for "${search}"`
-              : categoryParam
-              ? `No articles found in "${categoryParam.replace(/-/g, ' ')}"`
               : 'No articles published yet.'}
           </p>
         </div>

@@ -5,7 +5,6 @@ import type { Article, PaginatedResponse } from '@/types';
 interface Options {
   limit?: number;
   search?: string;
-  category?: string;
   tag?: string;
   tags?: string[];
   tagLogic?: 'and' | 'or';
@@ -13,7 +12,7 @@ interface Options {
 
 const LIMIT = 9;
 
-export function useInfiniteArticles({ limit = LIMIT, search, category, tag, tags, tagLogic }: Options = {}) {
+export function useInfiniteArticles({ limit = LIMIT, search, tag, tags, tagLogic }: Options = {}) {
   const getKey = (pageIndex: number, previousData: PaginatedResponse<Article> | null) => {
     if (previousData) {
       const meta = previousData.meta ?? previousData;
@@ -26,7 +25,6 @@ export function useInfiniteArticles({ limit = LIMIT, search, category, tag, tags
     params.set('page', (pageIndex + 1).toString());
     params.set('limit', limit.toString());
     if (search) params.set('search', search);
-    if (category) params.set('category', category);
     if (tags && tags.length > 0) {
       params.set('tags', tags.join(','));
       if (tagLogic === 'or') params.set('tag_logic', 'or');

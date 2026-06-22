@@ -224,25 +224,17 @@ export function ProductPageClient() {
             SKU: {product.sku}
           </p>
 
-          {/* Categories/Tags */}
-          {(product.categories.length > 0 || product.tags.length > 0) && (
+          {/* Tags */}
+          {product.tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {product.categories.map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={`/shop?category=${cat.slug}`}
-                  className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-foreground/10 transition-colors"
-                >
-                  {cat.name}
-                </Link>
-              ))}
               {product.tags.map((tag) => (
-                <span
+                <Link
                   key={tag.id}
-                  className="text-sm px-3 py-1 bg-foreground/5 rounded-full"
+                  href={`/shop?tags=${tag.slug}`}
+                  className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-accent/10 hover:text-accent transition-colors"
                 >
-                  {tag.name}
-                </span>
+                  #{tag.name}
+                </Link>
               ))}
             </div>
           )}

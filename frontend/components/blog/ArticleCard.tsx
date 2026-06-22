@@ -34,17 +34,22 @@ export function ArticleCard({ article }: ArticleCardProps) {
         )}
 
         <div className="p-5 flex flex-col h-full">
-          {/* Category */}
-          {article.categories.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {article.categories.slice(0, 2).map((cat) => (
+          {/* Tags */}
+          {article.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {article.tags.slice(0, 3).map((tag) => (
                 <span
-                  key={cat.id}
+                  key={tag.id}
                   className="text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium"
                 >
-                  {cat.name}
+                  {tag.name}
                 </span>
               ))}
+              {article.tags.length > 3 && (
+                <span className="text-xs px-2 py-0.5 bg-foreground/5 text-foreground/40 rounded-full font-medium">
+                  +{article.tags.length - 3}
+                </span>
+              )}
             </div>
           )}
 
