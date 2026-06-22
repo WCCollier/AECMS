@@ -61,8 +61,8 @@ Specific rules:
 **Phase 22**: ✅ COMPLETE - All items A–N (2026-06-21). Key additions: TipTap alignment, Node 22, Next.js 15.3.9 security upgrade, new-owner wizard/Owner's Manual, CSV export, MediaSyncService (TipTap→join table), PageMedia join table, bulk upload/replace/delete, /admin/media (Media Library + Digital Files tabs), /admin/users (role management, user.assign_role-gated)
 **Phase 23**: 🚧 IN PROGRESS (Part 1 built, pending testbed QA before Part 1 deploy) - Mul Converter. Part 1 complete (2026-06-21): section-based page schema (SectionsPageContent, PageSection, PageZone, SectionBackground), SectionEditor UI (template picker, gutter-drag span diagram, background flyout, height selector), SectionsPageEditor (dnd-kit reorder), SectionsLayout renderer, legacyToSections upgrade action, backend span validation. Part 2 (Mul Converter AI tool) begins after Part 1 soaks in production. PRD: docs/prd/13-mul-converter.md
 **Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
-**Phase 25**: 📋 PLANNED - Cloud SQL → Neon migration: replace Cloud SQL (~$10/mo) with Neon Postgres free tier; one-line deploy.yml change + GCP Secret update; saves ~$10/month at near-zero effort. Plan: docs/PHASE_25_PLAN.md
-**Phase 26**: 📋 PLANNED - SEO toolkit: per-content meta fields, Open Graph, JSON-LD structured data (Book/Article/Person/Service/BreadcrumbList), dynamic sitemap, robots.txt, SEO admin panel, book-specific fields (ISBN, Amazon/Goodreads sameAs). PRD: docs/prd/15-seo-toolkit.md. Plan: docs/PHASE_26_PLAN.md
+**Phase 25**: 📋 PLANNED - Cloud SQL → Neon migration: replace Cloud SQL (~$10/mo) with Neon Postgres free tier; one-line deploy.yml change + GCP Secret update; saves ~$10/month at near-zero effort. Plan: docs/phases/PHASE_25_PLAN.md
+**Phase 26**: 📋 PLANNED - SEO toolkit: per-content meta fields, Open Graph, JSON-LD structured data (Book/Article/Person/Service/BreadcrumbList), dynamic sitemap, robots.txt, SEO admin panel, book-specific fields (ISBN, Amazon/Goodreads sameAs). PRD: docs/prd/15-seo-toolkit.md. Plan: docs/phases/PHASE_26_PLAN.md
 **Phase 31**: 💡 CONCEPT - Native mobile app: Expo/React Native app that targets any AECMS instance, reads the site manifest, applies the active theme natively, and renders articles/shop/account. Two models: single-site white-label (owner publishes their own app) and multi-site reader. PRD: docs/prd/14-mobile-app.md
 
 **Session 2026-06-18 improvements** (not phase-tracked):
@@ -261,45 +261,60 @@ If disk is >80% full, also clear build artifacts:
 rm -rf backend/dist frontend/.next
 ```
 
+## Feature Requests
+
+Small, self-contained features that don't constitute major phase-level work live here. Each feature gets a single document that combines synopsis, status, discussion, design guide, completion report, and testing guide.
+
+- `docs/feature-requests/_TEMPLATE.md` - Document template for all feature requests
+- `docs/feature-requests/` - One file per feature (FR-NNN-kebab-name.md)
+
+**Status values:** `draft` → `accepted` → `in-planning` → `in-dev` → `in-testing` → `deployed` (or `deferred` / `rejected`)
+
+**Naming:** FR-001, FR-002, … — sequential, permanent. Rejected/deferred FRs keep their number.
+
+**What goes here vs. a Phase:** Use an FR for focused additions that don't require schema redesigns, new modules, or multi-sprint planning. If it introduces a new Prisma model, a new NestJS module, or touches more than ~5 files in a coordinated way, it probably warrants a Phase instead.
+
+**Lifecycle note (per IMPORTANT note below):** After implementing a feature request, fill in the Completion Report and Testing Guide sections of its FR doc, then set status to `deployed`.
+
 ## Phase Documentation
 
 - `docs/IMPLEMENTATION_PLAN.md` - Full implementation roadmap
-- `docs/PHASE_1_COMPLETION_REPORT.md` - Auth & database details
-- `docs/PHASE_2_COMPLETION_REPORT.md` - RBAC system details
-- `docs/PHASE_3_COMPLETION_REPORT.md` - Content management details
-- `docs/PHASE_4_COMPLETION_REPORT.md` - Ecommerce core details
-- `docs/PHASE_5_COMPLETION_REPORT.md` - Payments integration details
-- `docs/PHASE_5_PLAN.md` - Payments human configuration requirements
-- `docs/PHASE_6_COMPLETION_REPORT.md` - Frontend implementation details
-- `docs/PHASE_6B_COMPLETION_REPORT.md` - Comments & AI moderation details
-- `docs/PHASE_7_COMPLETION_REPORT.md` - Digital products details
-- `docs/PHASE_8_COMPLETION_REPORT.md` - Domain aliasing & email verification
-- `docs/PHASE_9_COMPLETION_REPORT.md` - User testing progress and bugs found
-- `docs/PHASE_9_BACKSTAGE_COMPLETION.md` - Customer/backstage session bifurcation details
-- `docs/BACKSTAGE_REFACTOR_PLAN.md` - Full implementation plan with completion checklist
+- `docs/phases/PHASE_1_COMPLETION_REPORT.md` - Auth & database details
+- `docs/phases/PHASE_2_COMPLETION_REPORT.md` - RBAC system details
+- `docs/phases/PHASE_3_COMPLETION_REPORT.md` - Content management details
+- `docs/phases/PHASE_4_COMPLETION_REPORT.md` - Ecommerce core details
+- `docs/phases/PHASE_5_COMPLETION_REPORT.md` - Payments integration details
+- `docs/phases/PHASE_5_PLAN.md` - Payments human configuration requirements
+- `docs/phases/PHASE_6_COMPLETION_REPORT.md` - Frontend implementation details
+- `docs/phases/PHASE_6B_COMPLETION_REPORT.md` - Comments & AI moderation details
+- `docs/phases/PHASE_7_COMPLETION_REPORT.md` - Digital products details
+- `docs/phases/PHASE_8_COMPLETION_REPORT.md` - Domain aliasing & email verification
+- `docs/phases/PHASE_9_COMPLETION_REPORT.md` - User testing progress and bugs found
+- `docs/phases/PHASE_9_BACKSTAGE_COMPLETION.md` - Customer/backstage session bifurcation details
+- `docs/phases/BACKSTAGE_REFACTOR_PLAN.md` - Full implementation plan with completion checklist
 - `docs/TESTING_GUIDE.md` - Full testing guide including Phase 13 manual sequence, Stripe/PayPal setup
-- `docs/PHASE_10A_COMPLETION_REPORT.md` - MediaGallery widget, media schema normalization
-- `docs/PHASE_10B_COMPLETION_REPORT.md` - TipTap JSON migration, inline widget nodes
-- `docs/PHASE_11_PLAN.md` - Pages: widget-composed page builder, dual-size widget system
-- `docs/PHASE_11_COMPLETION_REPORT.md` - Phase 11 implementation details
-- `docs/PHASE_12_PLAN.md` - Audit trail, transaction logging, content version history
-- `docs/PHASE_12_COMPLETION_REPORT.md` - Phase 12 implementation details
-- `docs/PHASE_13_COMPLETION_REPORT.md` - Phase 13 QA results, capability refactor, bug fixes
-- `docs/PHASE_14_COMPLETION_REPORT.md` - Phase 14 digital delivery, Kindle wizard, name fields
-- `docs/PHASE_15_COMPLETION_REPORT.md` - Phase 15 admin settings: SiteSettings, ISM (KeyProvider/LocalKeyProvider), settings UI
-- `docs/PHASE_16_COMPLETION_REPORT.md` - Phase 16 nav menus: articles route, dynamic header, catch-all pages
-- `docs/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
-- `docs/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
-- `docs/PHASE_18_PLAN.md` - Substack integration widget: RSS feed preview with height fade and CTA
-- `docs/PHASE_19_PLAN.md` - ♻️ Merged into Phase 21 (redirect doc)
-- `docs/PHASE_20_PLAN.md` - Themes and templates: color palettes, typography, backgrounds
-- `docs/PHASE_21_PLAN.md` - Deployability + live deployment plan (merged 19+21)
-- `docs/PHASE_21_COMPLETION_REPORT.md` - Phase 21 completion: wizard, CI/CD, Cloud Run, content migration, distribution prep
-- `docs/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
-- `docs/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
-- `docs/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, PayPal flat-rate, tax settings, reporting
-- `docs/PHASE_25_PLAN.md` - Cloud SQL → Neon migration: ~$10/mo savings, one-line deploy change
-- `docs/PHASE_26_PLAN.md` - SEO toolkit: 11 items, generateMetadata, JSON-LD, sitemap, robots, book fields
+- `docs/phases/PHASE_10A_COMPLETION_REPORT.md` - MediaGallery widget, media schema normalization
+- `docs/phases/PHASE_10B_COMPLETION_REPORT.md` - TipTap JSON migration, inline widget nodes
+- `docs/phases/PHASE_11_PLAN.md` - Pages: widget-composed page builder, dual-size widget system
+- `docs/phases/PHASE_11_COMPLETION_REPORT.md` - Phase 11 implementation details
+- `docs/phases/PHASE_12_PLAN.md` - Audit trail, transaction logging, content version history
+- `docs/phases/PHASE_12_COMPLETION_REPORT.md` - Phase 12 implementation details
+- `docs/phases/PHASE_13_COMPLETION_REPORT.md` - Phase 13 QA results, capability refactor, bug fixes
+- `docs/phases/PHASE_14_COMPLETION_REPORT.md` - Phase 14 digital delivery, Kindle wizard, name fields
+- `docs/phases/PHASE_15_COMPLETION_REPORT.md` - Phase 15 admin settings: SiteSettings, ISM (KeyProvider/LocalKeyProvider), settings UI
+- `docs/phases/PHASE_16_COMPLETION_REPORT.md` - Phase 16 nav menus: articles route, dynamic header, catch-all pages
+- `docs/phases/PHASE_16_PLAN.md` - Navigation menus: dynamic nav, page hierarchy, catch-all routing
+- `docs/phases/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
+- `docs/phases/PHASE_18_PLAN.md` - Substack integration widget: RSS feed preview with height fade and CTA
+- `docs/phases/PHASE_19_PLAN.md` - ♻️ Merged into Phase 21 (redirect doc)
+- `docs/phases/PHASE_20_PLAN.md` - Themes and templates: color palettes, typography, backgrounds
+- `docs/phases/PHASE_21_PLAN.md` - Deployability + live deployment plan (merged 19+21)
+- `docs/phases/PHASE_21_COMPLETION_REPORT.md` - Phase 21 completion: wizard, CI/CD, Cloud Run, content migration, distribution prep
+- `docs/phases/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
+- `docs/phases/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
+- `docs/phases/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, PayPal flat-rate, tax settings, reporting
+- `docs/phases/PHASE_25_PLAN.md` - Cloud SQL → Neon migration: ~$10/mo savings, one-line deploy change
+- `docs/phases/PHASE_26_PLAN.md` - SEO toolkit: 11 items, generateMetadata, JSON-LD, sitemap, robots, book fields
 - `docs/prd/13-mul-converter.md` - Mul Converter PRD: full design spec (access control, data flow, AI provider abstraction, system prompt, custom palette system)
 - `docs/prd/14-mobile-app.md` - Mobile App PRD (Phase 31): Expo/React Native app, discovery manifest, theme mapping, two distribution models, IAP compliance notes
 - `docs/prd/15-seo-toolkit.md` - SEO Toolkit PRD (Phase 26): meta fields, OG tags, JSON-LD (Book/Article/Person/Service), sitemap, robots.txt, book ISBN/sameAs fields
@@ -314,7 +329,8 @@ rm -rf backend/dist frontend/.next
 - Keep solutions simple (YAGNI)
 - Run tests after changes: `npm run test && npm run build`
 - Commit incrementally with descriptive messages
-- **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
+- **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/phases/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
+- **IMPORTANT**: After implementing a feature request, fill in the Completion Report and Testing Guide sections of its `docs/feature-requests/FR-NNN-*.md` file and set status to `deployed`
 - **IMPORTANT**: During theoretical or design discussions (architecture choices, platform comparisons, technology options, ecosystem questions), always use the WebSearch tool to verify information is current before answering. Don't rely solely on training data for fast-moving topics like hosting pricing, library versions, or ecosystem trends.
 
 ## Internal Secrets Manager (ISM)

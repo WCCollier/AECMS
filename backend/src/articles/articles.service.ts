@@ -126,7 +126,7 @@ export class ArticlesService {
     canDeleteAny = false,
   ) {
     const {
-      status, visibility, category_id, category, tag_id, tag,
+      status, visibility, category_id, category, tag_id, tag, tags, tag_logic,
       author_id, search, page = 1, limit = 20,
       sort_by = 'created_at', sort_order = 'desc',
       include_deleted,
@@ -162,8 +162,25 @@ export class ArticlesService {
     if (category_id) where.categories = { some: { category_id } };
     else if (category) where.categories = { some: { category: { slug: category } } };
 
-    if (tag_id) where.tags = { some: { tag_id } };
-    else if (tag) where.tags = { some: { tag: { slug: tag } } };
+    if (tags) {
+      const slugs = tags.split(',').map((s) => s.trim()).filter(Boolean);
+      if (slugs.length === 1) {
+        where.tags = { some: { tag: { slug: slugs[0] } } };
+      } else if (slugs.length > 1) {
+        if (tag_logic === 'or') {
+          where.tags = { some: { tag: { slug: { in: slugs } } } };
+        } else {
+          where.AND = [
+            ...((where.AND as any[]) ?? []),
+            ...slugs.map((slug) => ({ tags: { some: { tag: { slug } } } })),
+          ];
+        }
+      }
+    } else if (tag_id) {
+      where.tags = { some: { tag_id } };
+    } else if (tag) {
+      where.tags = { some: { tag: { slug: tag } } };
+    }
 
     if (author_id) where.author_id = author_id;
 

@@ -11,7 +11,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 async function getArticle(slug: string) {
   try {
-    const res = await fetch(`${BACKEND}/articles/${slug}`, { next: { revalidate: 60 } });
+    const res = await fetch(`${BACKEND}/articles/by-slug/${slug}`, { next: { revalidate: 60 } });
     if (!res.ok) return null;
     return res.json();
   } catch {

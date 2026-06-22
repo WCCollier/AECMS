@@ -6,7 +6,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { useInfiniteProducts } from '@/hooks/useInfiniteProducts';
 import { useViewMode } from '@/contexts/ViewModeContext';
 import { ProductCard } from '@/components/shop/ProductCard';
-import { Button, Input, ViewModeToggle } from '@/components/ui';
+import { Button, Input, ViewModeToggle, TagChipStrip } from '@/components/ui';
 import { Search, X } from 'lucide-react';
 
 const LIMIT = 12;
@@ -16,7 +16,6 @@ export function ShopPageClient() {
   const searchParams = useSearchParams();
   const { mode } = useViewMode();
 
-  // If URL has ?page=N, force paginated for this visit
   const urlPage = parseInt(searchParams?.get('page') ?? '', 10);
   const forcePaginated = !isNaN(urlPage) && urlPage > 0;
   const effectiveMode = forcePaginated ? 'paginated' : mode;
@@ -25,17 +24,35 @@ export function ShopPageClient() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
 
-  // Sync URL when in paginated mode
-  const updateUrl = useCallback((p: number) => {
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const raw = searchParams?.get('tags') ?? searchParams?.get('tag') ?? '';
+    return raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  });
+  const [tagLogic, setTagLogic] = useState<'and' | 'or'>(() =>
+    searchParams?.get('tag_logic') === 'or' ? 'or' : 'and',
+  );
+
+  const buildParams = (p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const params = new URLSearchParams(searchParams?.toString());
-    if (p === 1) {
-      params.delete('page');
+    if (p === 1) params.delete('page'); else params.set('page', p.toString());
+    if (tags.length > 0) {
+      params.set('tags', tags.join(','));
+      params.delete('tag');
     } else {
-      params.set('page', p.toString());
+      params.delete('tags');
+      params.delete('tag');
     }
-    const qs = params.toString();
+    if (logic === 'or' && tags.length >= 2) params.set('tag_logic', 'or');
+    else params.delete('tag_logic');
+    if (srch) params.set('search', srch); else params.delete('search');
+    return params.toString();
+  };
+
+  const updateUrl = useCallback((p: number, tags = selectedTags, logic = tagLogic, srch = search) => {
+    const qs = buildParams(p, tags, logic, srch);
     router.replace(`/shop${qs ? `?${qs}` : ''}`, { scroll: false });
-  }, [router, searchParams]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, searchParams, selectedTags, tagLogic, search]);
 
   const handlePageChange = (next: number) => {
     setPage(next);
@@ -43,7 +60,6 @@ export function ShopPageClient() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // When mode changes away from forced-paginated, clean up URL
   useEffect(() => {
     if (effectiveMode === 'infinite' && searchParams?.get('page')) {
       router.replace('/shop', { scroll: false });
@@ -54,31 +70,46 @@ export function ShopPageClient() {
     e.preventDefault();
     setSearch(searchInput);
     setPage(1);
-    updateUrl(1);
-    if (effectiveMode === 'infinite') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    updateUrl(1, selectedTags, tagLogic, searchInput);
+    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const clearSearch = () => {
     setSearch('');
     setSearchInput('');
     setPage(1);
-    updateUrl(1);
-    if (effectiveMode === 'infinite') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    updateUrl(1, selectedTags, tagLogic, '');
+    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleTagsChange = (tags: string[]) => {
+    setSelectedTags(tags);
+    setPage(1);
+    updateUrl(1, tags, tagLogic, search);
+    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogicChange = (logic: 'and' | 'or') => {
+    setTagLogic(logic);
+    updateUrl(page, selectedTags, logic, search);
   };
 
   // ── Paginated mode ────────────────────────────────────────────────────────
   const paginated = useProducts({
     page,
     limit: LIMIT,
+    tags: selectedTags.length > 0 ? selectedTags : undefined,
+    tagLogic,
     search: search || undefined,
   });
 
   // ── Infinite scroll mode ──────────────────────────────────────────────────
-  const infinite = useInfiniteProducts({ limit: LIMIT, search: search || undefined });
+  const infinite = useInfiniteProducts({
+    limit: LIMIT,
+    tags: selectedTags.length > 0 ? selectedTags : undefined,
+    tagLogic,
+    search: search || undefined,
+  });
 
   // Sentinel ref for IntersectionObserver
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -111,37 +142,48 @@ export function ShopPageClient() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">Shop</h1>
-          <p className="text-foreground/60 mt-1">Browse our products</p>
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Shop</h1>
+            <p className="text-foreground/60 mt-1">Browse our products</p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <ViewModeToggle />
+
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
+                <Input
+                  id="shop-search"
+                  name="search"
+                  type="text"
+                  placeholder="Search products..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+              {search && searchInput === search ? (
+                <Button type="button" variant="secondary" onClick={clearSearch}>
+                  <X className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button type="submit" variant="secondary">Search</Button>
+              )}
+            </form>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <ViewModeToggle />
-
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
-              <Input
-                id="shop-search"
-                name="search"
-                type="text"
-                placeholder="Search products..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-10 w-64"
-              />
-            </div>
-            {search && searchInput === search ? (
-              <Button type="button" variant="secondary" onClick={clearSearch}>
-                <X className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button type="submit" variant="secondary">Search</Button>
-            )}
-          </form>
-        </div>
+        {/* Tag filter strip */}
+        <TagChipStrip
+          selected={selectedTags}
+          tagLogic={tagLogic}
+          onChange={handleTagsChange}
+          onLogicChange={handleLogicChange}
+          placeholder="Filter by tag…"
+        />
       </div>
 
       {/* Products Grid */}
@@ -162,7 +204,9 @@ export function ShopPageClient() {
       ) : products.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-foreground/60">
-            {search ? `No products found for "${search}"` : 'No products available yet.'}
+            {search || selectedTags.length > 0
+              ? 'No products match your current filters.'
+              : 'No products available yet.'}
           </p>
         </div>
       ) : (

@@ -250,7 +250,7 @@ curl -s -X POST http://localhost:4000/payments/paypal/reconcile \
 
 ## Phase 13 Testing Sequence
 
-See `docs/PHASE_13_PLAN.md` for the full checklist with step-by-step instructions for each area.
+See `docs/phases/PHASE_13_PLAN.md` for the full checklist with step-by-step instructions for each area.
 
 **Summary of areas:**
 1. Stripe live sandbox setup

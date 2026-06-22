@@ -5,11 +5,13 @@ import type { Product, PaginatedResponse } from '@/types';
 interface Options {
   limit?: number;
   search?: string;
+  tags?: string[];
+  tagLogic?: 'and' | 'or';
 }
 
 const LIMIT = 12;
 
-export function useInfiniteProducts({ limit = LIMIT, search }: Options = {}) {
+export function useInfiniteProducts({ limit = LIMIT, search, tags, tagLogic }: Options = {}) {
   const getKey = (pageIndex: number, previousData: PaginatedResponse<Product> | null) => {
     if (previousData) {
       const meta = previousData.meta ?? previousData;
@@ -22,6 +24,10 @@ export function useInfiniteProducts({ limit = LIMIT, search }: Options = {}) {
     params.set('page', (pageIndex + 1).toString());
     params.set('limit', limit.toString());
     if (search) params.set('search', search);
+    if (tags && tags.length > 0) {
+      params.set('tags', tags.join(','));
+      if (tagLogic === 'or') params.set('tag_logic', 'or');
+    }
     return `/products?${params.toString()}`;
   };
 

@@ -6,7 +6,7 @@ import {
   Bold, Italic, Strikethrough, Code, List, ListOrdered, Quote,
   Undo, Redo, Link as LinkIcon, Unlink, Heading1, Heading2, Heading3,
   Minus, ImagePlus, X, Upload, Info, Video, Twitter, GalleryHorizontal,
-  FileText, ShoppingBag, Square, Rss,
+  FileText, ShoppingBag, Square, Rss, LibraryBig,
   AlignLeft, AlignCenter, AlignRight,
 } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
@@ -237,6 +237,14 @@ export function TipTapEditor({
     }).run();
   }, [editor]);
 
+  const insertSearchResultsEmbed = useCallback(() => {
+    if (!editor) return;
+    editor.chain().focus().insertContent({
+      type: 'searchResultsEmbed',
+      attrs: { contentType: 'articles', tags: '[]', tagLogic: 'and', search: '', display: 'grid', pageSize: 6, title: '' },
+    }).run();
+  }, [editor]);
+
   if (!editor) {
     return (
       <div className={`border border-border rounded-lg ${className}`}>
@@ -358,6 +366,11 @@ export function TipTapEditor({
         {/* RSS Feed embed */}
         <MenuButton onClick={insertRssEmbed} title="Embed RSS feed">
           <Rss className="w-4 h-4" />
+        </MenuButton>
+
+        {/* Collection embed */}
+        <MenuButton onClick={insertSearchResultsEmbed} title="Embed content collection (tag/search query)">
+          <LibraryBig className="w-4 h-4" />
         </MenuButton>
 
         <MenuDivider />

@@ -30,7 +30,7 @@ The Mul Converter depends on an expanded page schema — the **section-based con
 ---
 
 ## Non-Goals (v1)
-
+ok
 - Automated content migration (text, images) from the source page
 - Semantic replication of navigation structure
 - Support for CSS animations, gradients as accent colors, or transparency effects in the palette
