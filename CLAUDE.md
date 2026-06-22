@@ -331,6 +331,7 @@ Small, self-contained features that don't constitute major phase-level work live
 - Commit incrementally with descriptive messages
 - **IMPORTANT**: After completing each phase, create a detailed completion report at `docs/phases/PHASE_X_COMPLETION_REPORT.md` following the format of previous reports (see Phase 2-4 reports for examples)
 - **IMPORTANT**: After implementing a feature request, fill in the Completion Report and Testing Guide sections of its `docs/feature-requests/FR-NNN-*.md` file and set status to `deployed`
+- **IMPORTANT**: This file (`CLAUDE.md`) is public — it is committed to the repo on all branches. Periodically review it for references to the owner's specific deployment (domain names, real URLs, personal names, book titles, business details) that should not be in a generic distributable codebase. Flag any such references to the owner for scrubbing before they accumulate.
 - **IMPORTANT**: During theoretical or design discussions (architecture choices, platform comparisons, technology options, ecosystem questions), always use the WebSearch tool to verify information is current before answering. Don't rely solely on training data for fast-moving topics like hosting pricing, library versions, or ecosystem trends.
 
 ## Internal Secrets Manager (ISM)
