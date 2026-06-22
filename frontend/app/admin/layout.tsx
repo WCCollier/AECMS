@@ -68,25 +68,52 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (isLoginRoute) { setChecked(true); return; }
 
+    // Reject immediately if no token exists at all
     const token = getAdminAccessToken();
     if (!token) {
       router.push('/admin/login');
       return;
     }
 
+    // Resolve user identity: prefer sessionStorage (survives tab refreshes but
+    // not full browser restarts). If missing, we have no user ID to validate
+    // against — force re-login rather than render a ghost session.
     const stored = typeof window !== 'undefined'
       ? sessionStorage.getItem('admin_user')
       : null;
+
+    let userId: string | null = null;
     if (stored) {
       try {
         const u = JSON.parse(stored);
         setAdminUser(u);
-        adminApi.get(`/capabilities/users/${u.id}`)
-          .then((res) => setUserCaps((res.data as { name: string }[]).map((c) => c.name)))
-          .catch(() => {});
-      } catch { /* ignore */ }
+        userId = u.id;
+      } catch { /* ignore malformed sessionStorage */ }
     }
-    setChecked(true);
+
+    if (!userId) {
+      // sessionStorage was cleared (browser restart) — tokens may still be valid,
+      // but we have no user context. Redirect to login; the stored tokens will
+      // auto-fill the refresh flow on the next successful login.
+      clearAdminSession();
+      router.push('/admin/login');
+      return;
+    }
+
+    // Always validate against the server before rendering the admin UI.
+    // adminApi's response interceptor will attempt token refresh on 401.
+    // If refresh also fails, the interceptor clears the session and hard-redirects
+    // to /admin/login. We must NOT call setChecked(true) until this resolves so
+    // the admin UI is never shown to an unauthenticated request.
+    adminApi.get(`/capabilities/users/${userId}`)
+      .then((res) => {
+        setUserCaps((res.data as { name: string }[]).map((c) => c.name));
+        setChecked(true);
+      })
+      .catch(() => {
+        // Interceptor has already cleared the session and redirected.
+        // Keep the spinner; do not render the admin UI.
+      });
   }, [isLoginRoute, router]);
 
   const handleLogout = () => {
