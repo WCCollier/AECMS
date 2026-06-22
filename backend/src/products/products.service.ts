@@ -61,16 +61,6 @@ export class ProductsService {
       warnings.push(`The SKU "${sku}" was previously used by a deleted product. You may be recreating similar content.`);
     }
 
-    // Validate categories exist
-    if (dto.category_ids && dto.category_ids.length > 0) {
-      const categories = await this.prisma.category.findMany({
-        where: { id: { in: dto.category_ids } },
-      });
-      if (categories.length !== dto.category_ids.length) {
-        throw new BadRequestException('One or more categories not found');
-      }
-    }
-
     // Validate tags exist
     if (dto.tag_ids && dto.tag_ids.length > 0) {
       const tags = await this.prisma.tag.findMany({
@@ -105,13 +95,6 @@ export class ProductsService {
         admin_can_edit: dto.admin_can_edit ?? true,
         admin_can_delete: dto.admin_can_delete ?? true,
         published_at: dto.status === 'published' ? new Date() : null,
-        categories: dto.category_ids
-          ? {
-              create: dto.category_ids.map((categoryId) => ({
-                category: { connect: { id: categoryId } },
-              })),
-            }
-          : undefined,
         tags: dto.tag_ids
           ? {
               create: dto.tag_ids.map((tagId) => ({
@@ -169,7 +152,6 @@ export class ProductsService {
       visibility,
       stock_status,
       product_type,
-      category_id,
       tag_id,
       tag,
       tags,
@@ -234,15 +216,6 @@ export class ProductsService {
     // Product type filter
     if (product_type) {
       where.product_type = product_type;
-    }
-
-    // Category filter
-    if (category_id) {
-      where.categories = {
-        some: {
-          category_id,
-        },
-      };
     }
 
     // Tag filter
@@ -450,20 +423,6 @@ export class ProductsService {
       admin_can_delete: dto.admin_can_delete,
       published_at,
     };
-
-    // Handle category updates
-    if (dto.category_ids !== undefined) {
-      await this.prisma.productCategory.deleteMany({
-        where: { product_id: id },
-      });
-      if (dto.category_ids.length > 0) {
-        updateData.categories = {
-          create: dto.category_ids.map((categoryId) => ({
-            category: { connect: { id: categoryId } },
-          })),
-        };
-      }
-    }
 
     // Handle tag updates
     if (dto.tag_ids !== undefined) {
@@ -708,11 +667,6 @@ export class ProductsService {
           email: true,
         },
       },
-      categories: {
-        include: {
-          category: true,
-        },
-      },
       tags: {
         include: {
           tag: true,
@@ -781,7 +735,6 @@ export class ProductsService {
     return {
       ...product,
       price: parseFloat(product.price.toString()),
-      categories: product.categories?.map((pc: any) => pc.category) || [],
       tags: product.tags?.map((pt: any) => pt.tag) || [],
       media: mediaItems,
       featured_image_url: primaryMedia?.url ?? null,

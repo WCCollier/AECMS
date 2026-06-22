@@ -156,13 +156,18 @@ export function ArticleEmbed({ articleId, titleAttrs = DEFAULT_TITLE_ATTRS }: Ar
         </div>
       )}
       <div className="p-4">
-        {article.categories && article.categories.length > 0 && (
-          <div className="flex gap-2 mb-2 flex-wrap">
-            {article.categories.map((cat) => (
-              <span key={cat.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full">
-                {cat.name}
+        {article.tags && article.tags.length > 0 && (
+          <div className="flex gap-1.5 mb-2 flex-wrap">
+            {article.tags.slice(0, 3).map((tag) => (
+              <span key={tag.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full">
+                {tag.name}
               </span>
             ))}
+            {article.tags.length > 3 && (
+              <span className="text-xs bg-foreground/5 text-foreground/40 px-2 py-0.5 rounded-full">
+                +{article.tags.length - 3}
+              </span>
+            )}
           </div>
         )}
         {!titleHidden && (

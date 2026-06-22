@@ -74,12 +74,6 @@ export class CreateArticleDto {
   @IsOptional()
   og_image_url?: string;
 
-  @ApiPropertyOptional({ description: 'Category IDs', type: [String] })
-  @IsArray()
-  @IsUUID('4', { each: true })
-  @IsOptional()
-  category_ids?: string[];
-
   @ApiPropertyOptional({ description: 'Tag IDs', type: [String] })
   @IsArray()
   @IsUUID('4', { each: true })

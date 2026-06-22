@@ -68,21 +68,6 @@ export function ArticlePageClient() {
         </div>
       )}
 
-      {/* Categories */}
-      {article.categories.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-4">
-          {article.categories.map((cat) => (
-            <Link
-              key={cat.id}
-              href={`/latest?category=${cat.slug}`}
-              className="text-xs px-3 py-1 bg-accent/10 text-accent rounded-full hover:bg-accent/20 transition-colors font-medium"
-            >
-              {cat.name}
-            </Link>
-          ))}
-        </div>
-      )}
-
       {/* Title */}
       <h1 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">{article.title}</h1>
 

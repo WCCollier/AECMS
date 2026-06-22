@@ -91,6 +91,24 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
 
         {/* Content */}
         <div className="p-4">
+          {/* Tags */}
+          {product.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {product.tags.slice(0, 3).map((tag) => (
+                <span
+                  key={tag.id}
+                  className="text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium"
+                >
+                  {tag.name}
+                </span>
+              ))}
+              {product.tags.length > 3 && (
+                <span className="text-xs px-2 py-0.5 bg-foreground/5 text-foreground/40 rounded-full font-medium">
+                  +{product.tags.length - 3}
+                </span>
+              )}
+            </div>
+          )}
           <h3 className="font-semibold truncate group-hover:text-foreground/70 transition-colors">
             {product.title}
           </h3>

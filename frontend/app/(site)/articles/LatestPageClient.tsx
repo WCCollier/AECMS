@@ -15,8 +15,6 @@ export function LatestPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { mode } = useViewMode();
-  const categoryParam = searchParams?.get('category') ?? undefined;
-
   const urlPage = parseInt(searchParams?.get('page') ?? '', 10);
   const forcePaginated = !isNaN(urlPage) && urlPage > 0;
   const effectiveMode = forcePaginated ? 'paginated' : mode;
@@ -33,9 +31,6 @@ export function LatestPageClient() {
   const [tagLogic, setTagLogic] = useState<'and' | 'or'>(() =>
     searchParams?.get('tag_logic') === 'or' ? 'or' : 'and',
   );
-
-  // Reset to page 1 when category filter changes
-  useEffect(() => { setPage(1); }, [categoryParam]);
 
   const buildParams = (p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const params = new URLSearchParams(searchParams?.toString());
@@ -109,7 +104,6 @@ export function LatestPageClient() {
   const paginated = useArticles({
     page,
     limit: LIMIT,
-    category: categoryParam,
     tags: selectedTags.length > 0 ? selectedTags : undefined,
     tagLogic,
     search: search || undefined,
@@ -118,7 +112,6 @@ export function LatestPageClient() {
   // ── Infinite ──────────────────────────────────────────────────────────────
   const infinite = useInfiniteArticles({
     limit: LIMIT,
-    category: categoryParam,
     tags: selectedTags.length > 0 ? selectedTags : undefined,
     tagLogic,
     search: search || undefined,
@@ -158,11 +151,7 @@ export function LatestPageClient() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold">Latest</h1>
-            <p className="text-foreground/60 mt-1">
-              {categoryParam
-                ? <>Filtered by: <span className="text-accent font-medium capitalize">{categoryParam.replace(/-/g, ' ')}</span></>
-                : 'Articles and updates'}
-            </p>
+            <p className="text-foreground/60 mt-1">Articles and updates</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -217,8 +206,6 @@ export function LatestPageClient() {
           <p className="text-foreground/60">
             {search || selectedTags.length > 0
               ? 'No articles match your current filters.'
-              : categoryParam
-              ? `No articles found in "${categoryParam.replace(/-/g, ' ')}"`
               : 'No articles published yet.'}
           </p>
         </div>

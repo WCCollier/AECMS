@@ -34,11 +34,6 @@ export class QueryProductsDto {
   @IsOptional()
   product_type?: ProductType;
 
-  @ApiPropertyOptional({ description: 'Filter by category ID' })
-  @IsUUID()
-  @IsOptional()
-  category_id?: string;
-
   @ApiPropertyOptional({ description: 'Filter by tag ID' })
   @IsUUID()
   @IsOptional()

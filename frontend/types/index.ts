@@ -63,7 +63,6 @@ export interface Article {
   status: 'draft' | 'published' | 'archived';
   published_at: string | null;
   author: User & { first_name?: string; last_name?: string };
-  categories: Category[];
   tags: Tag[];
   created_at: string;
   updated_at: string;
@@ -138,7 +137,6 @@ export interface Product {
   comment_count: number;
   review_count: number;
   average_rating: number | null;
-  categories: Category[];
   tags: Tag[];
   created_at: string;
   updated_at: string;

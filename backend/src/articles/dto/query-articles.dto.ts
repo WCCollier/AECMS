@@ -23,16 +23,6 @@ export class QueryArticlesDto {
   @IsOptional()
   visibility?: ContentVisibility;
 
-  @ApiPropertyOptional({ description: 'Filter by category ID (UUID)' })
-  @IsUUID()
-  @IsOptional()
-  category_id?: string;
-
-  @ApiPropertyOptional({ description: 'Filter by category slug' })
-  @IsString()
-  @IsOptional()
-  category?: string;
-
   @ApiPropertyOptional({ description: 'Filter by tag ID (UUID)' })
   @IsUUID()
   @IsOptional()

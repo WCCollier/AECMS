@@ -63,6 +63,10 @@ migration/
 # WordPress import source files — no longer needed; images committed directly to backend/uploads/wp-import/
 seed_data/
 
+# Local (deployment-specific) seed scripts and data — never committed
+# Drop fvr-content.xml and site-specific seed scripts here
+backend/prisma/seeds/local/
+
 # Test artifacts
 test-results/
 frontend/test-results/

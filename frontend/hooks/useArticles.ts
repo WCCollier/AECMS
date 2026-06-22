@@ -5,7 +5,6 @@ import type { Article, PaginatedResponse } from '@/types';
 interface UseArticlesOptions {
   page?: number;
   limit?: number;
-  category?: string;
   tag?: string;
   tags?: string[];
   tagLogic?: 'and' | 'or';
@@ -13,12 +12,11 @@ interface UseArticlesOptions {
 }
 
 export function useArticles(options: UseArticlesOptions = {}) {
-  const { page = 1, limit = 10, category, tag, tags, tagLogic, search } = options;
+  const { page = 1, limit = 10, tag, tags, tagLogic, search } = options;
 
   const params = new URLSearchParams();
   params.set('page', page.toString());
   params.set('limit', limit.toString());
-  if (category) params.set('category', category);
   if (tags && tags.length > 0) {
     params.set('tags', tags.join(','));
     if (tagLogic === 'or') params.set('tag_logic', 'or');
