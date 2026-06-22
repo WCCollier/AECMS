@@ -10,6 +10,7 @@ import { RichTextBoxNode } from './rich-text-box';
 import { ArticleEmbedNode } from './article-embed';
 import { ProductEmbedNode } from './product-embed';
 import { RssEmbedNode } from './rss-embed';
+import { SearchResultsEmbedNode } from './search-results-embed';
 
 export { CalloutNode } from './callout';
 export { VideoEmbedNode } from './video-embed';
@@ -19,6 +20,7 @@ export { RichTextBoxNode } from './rich-text-box';
 export { ArticleEmbedNode } from './article-embed';
 export { ProductEmbedNode } from './product-embed';
 export { RssEmbedNode } from './rss-embed';
+export { SearchResultsEmbedNode } from './search-results-embed';
 export { conditionalDisplayAttribute, SHOW_WHEN_OPTIONS, SHOW_WHEN_LABELS } from './conditionalDisplay';
 
 const baseExtensions = [
@@ -50,6 +52,7 @@ const baseExtensions = [
   ArticleEmbedNode,
   ProductEmbedNode,
   RssEmbedNode,
+  SearchResultsEmbedNode,
 ];
 
 /** Extensions for the write editor (links are not click-navigable while editing) */
@@ -79,5 +82,6 @@ export function getDisplayExtensions() {
     ArticleEmbedNode,
     ProductEmbedNode,
     RssEmbedNode,
+    SearchResultsEmbedNode,
   ];
 }

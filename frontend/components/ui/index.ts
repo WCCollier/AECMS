@@ -10,3 +10,4 @@ export type { PasswordInputProps } from './PasswordInput';
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './Card';
 
 export { ViewModeToggle } from './ViewModeToggle';
+export { TagChipStrip } from './TagChipStrip';

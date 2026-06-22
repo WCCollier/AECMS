@@ -7,11 +7,13 @@ interface Options {
   search?: string;
   category?: string;
   tag?: string;
+  tags?: string[];
+  tagLogic?: 'and' | 'or';
 }
 
 const LIMIT = 9;
 
-export function useInfiniteArticles({ limit = LIMIT, search, category, tag }: Options = {}) {
+export function useInfiniteArticles({ limit = LIMIT, search, category, tag, tags, tagLogic }: Options = {}) {
   const getKey = (pageIndex: number, previousData: PaginatedResponse<Article> | null) => {
     if (previousData) {
       const meta = previousData.meta ?? previousData;
@@ -25,7 +27,12 @@ export function useInfiniteArticles({ limit = LIMIT, search, category, tag }: Op
     params.set('limit', limit.toString());
     if (search) params.set('search', search);
     if (category) params.set('category', category);
-    if (tag) params.set('tag', tag);
+    if (tags && tags.length > 0) {
+      params.set('tags', tags.join(','));
+      if (tagLogic === 'or') params.set('tag_logic', 'or');
+    } else if (tag) {
+      params.set('tag', tag);
+    }
     return `/articles?${params.toString()}`;
   };
 

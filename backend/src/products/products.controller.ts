@@ -12,7 +12,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { CreateProductDto, UpdateProductDto, QueryProductsDto } from './dto';
@@ -43,6 +43,9 @@ export class ProductsController {
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get all products with filtering and pagination' })
+  @ApiQuery({ name: 'tag', required: false, type: String, description: 'Filter by tag slug' })
+  @ApiQuery({ name: 'tags', required: false, type: String, description: 'Filter by multiple tag slugs (comma-separated)' })
+  @ApiQuery({ name: 'tag_logic', required: false, enum: ['and', 'or'], description: 'Multi-tag logic (default: and)' })
   async findAll(@Query() query: QueryProductsDto, @CurrentUser() user: any) {
     const isBackstage = user?.session_type === 'backstage';
     let canDeleteOwn = false;

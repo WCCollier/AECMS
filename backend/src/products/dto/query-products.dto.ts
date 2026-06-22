@@ -44,6 +44,21 @@ export class QueryProductsDto {
   @IsOptional()
   tag_id?: string;
 
+  @ApiPropertyOptional({ description: 'Filter by tag slug' })
+  @IsString()
+  @IsOptional()
+  tag?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by multiple tag slugs (comma-separated)' })
+  @IsString()
+  @IsOptional()
+  tags?: string;
+
+  @ApiPropertyOptional({ description: 'Multi-tag logic: and (default) or or', enum: ['and', 'or'] })
+  @IsEnum(['and', 'or'])
+  @IsOptional()
+  tag_logic?: 'and' | 'or';
+
   @ApiPropertyOptional({ description: 'Minimum price' })
   @Type(() => Number)
   @IsNumber()

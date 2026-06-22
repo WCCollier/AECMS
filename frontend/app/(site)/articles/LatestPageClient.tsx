@@ -6,7 +6,7 @@ import { useArticles } from '@/hooks/useArticles';
 import { useInfiniteArticles } from '@/hooks/useInfiniteArticles';
 import { useViewMode } from '@/contexts/ViewModeContext';
 import { ArticleCard } from '@/components/blog/ArticleCard';
-import { Button, Input, ViewModeToggle } from '@/components/ui';
+import { Button, Input, ViewModeToggle, TagChipStrip } from '@/components/ui';
 import { Search, X } from 'lucide-react';
 
 const LIMIT = 9;
@@ -25,18 +25,41 @@ export function LatestPageClient() {
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
 
+  // Tag filter state — initialise from URL on mount
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const raw = searchParams?.get('tags') ?? searchParams?.get('tag') ?? '';
+    return raw ? raw.split(',').map((s) => s.trim()).filter(Boolean) : [];
+  });
+  const [tagLogic, setTagLogic] = useState<'and' | 'or'>(() =>
+    searchParams?.get('tag_logic') === 'or' ? 'or' : 'and',
+  );
+
   // Reset to page 1 when category filter changes
   useEffect(() => { setPage(1); }, [categoryParam]);
 
-  const updateUrl = (p: number) => {
+  const buildParams = (p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const params = new URLSearchParams(searchParams?.toString());
-    if (p === 1) {
-      params.delete('page');
+    // page
+    if (p === 1) params.delete('page'); else params.set('page', p.toString());
+    // tags
+    if (tags.length > 0) {
+      params.set('tags', tags.join(','));
+      params.delete('tag');
     } else {
-      params.set('page', p.toString());
+      params.delete('tags');
+      params.delete('tag');
     }
-    const qs = params.toString();
-    router.replace(`/latest${qs ? `?${qs}` : ''}`, { scroll: false });
+    // tag logic
+    if (logic === 'or' && tags.length >= 2) params.set('tag_logic', 'or');
+    else params.delete('tag_logic');
+    // search
+    if (srch) params.set('search', srch); else params.delete('search');
+    return params.toString();
+  };
+
+  const updateUrl = (p: number, tags = selectedTags, logic = tagLogic, srch = search) => {
+    const qs = buildParams(p, tags, logic, srch);
+    router.replace(`/articles${qs ? `?${qs}` : ''}`, { scroll: false });
   };
 
   const handlePageChange = (next: number) => {
@@ -50,7 +73,7 @@ export function LatestPageClient() {
       const params = new URLSearchParams(searchParams.toString());
       params.delete('page');
       const qs = params.toString();
-      router.replace(`/latest${qs ? `?${qs}` : ''}`, { scroll: false });
+      router.replace(`/articles${qs ? `?${qs}` : ''}`, { scroll: false });
     }
   }, [effectiveMode, router, searchParams]);
 
@@ -58,20 +81,28 @@ export function LatestPageClient() {
     e.preventDefault();
     setSearch(searchInput);
     setPage(1);
-    updateUrl(1);
-    if (effectiveMode === 'infinite') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    updateUrl(1, selectedTags, tagLogic, searchInput);
+    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const clearSearch = () => {
     setSearch('');
     setSearchInput('');
     setPage(1);
-    updateUrl(1);
-    if (effectiveMode === 'infinite') {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    updateUrl(1, selectedTags, tagLogic, '');
+    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleTagsChange = (tags: string[]) => {
+    setSelectedTags(tags);
+    setPage(1);
+    updateUrl(1, tags, tagLogic, search);
+    if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogicChange = (logic: 'and' | 'or') => {
+    setTagLogic(logic);
+    updateUrl(page, selectedTags, logic, search);
   };
 
   // ── Paginated ─────────────────────────────────────────────────────────────
@@ -79,6 +110,8 @@ export function LatestPageClient() {
     page,
     limit: LIMIT,
     category: categoryParam,
+    tags: selectedTags.length > 0 ? selectedTags : undefined,
+    tagLogic,
     search: search || undefined,
   });
 
@@ -86,6 +119,8 @@ export function LatestPageClient() {
   const infinite = useInfiniteArticles({
     limit: LIMIT,
     category: categoryParam,
+    tags: selectedTags.length > 0 ? selectedTags : undefined,
+    tagLogic,
     search: search || undefined,
   });
 
@@ -119,41 +154,52 @@ export function LatestPageClient() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold">Latest</h1>
-          <p className="text-foreground/60 mt-1">
-            {categoryParam
-              ? <>Filtered by: <span className="text-accent font-medium capitalize">{categoryParam.replace(/-/g, ' ')}</span></>
-              : 'Articles and updates'}
-          </p>
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Latest</h1>
+            <p className="text-foreground/60 mt-1">
+              {categoryParam
+                ? <>Filtered by: <span className="text-accent font-medium capitalize">{categoryParam.replace(/-/g, ' ')}</span></>
+                : 'Articles and updates'}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <ViewModeToggle />
+
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
+                <Input
+                  id="articles-search"
+                  name="search"
+                  type="text"
+                  placeholder="Search articles..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+              {search && searchInput === search ? (
+                <Button type="button" variant="secondary" onClick={clearSearch}>
+                  <X className="w-4 h-4" />
+                </Button>
+              ) : (
+                <Button type="submit" variant="secondary">Search</Button>
+              )}
+            </form>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <ViewModeToggle />
-
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
-              <Input
-                id="articles-search"
-                name="search"
-                type="text"
-                placeholder="Search articles..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-10 w-64"
-              />
-            </div>
-            {search && searchInput === search ? (
-              <Button type="button" variant="secondary" onClick={clearSearch}>
-                <X className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button type="submit" variant="secondary">Search</Button>
-            )}
-          </form>
-        </div>
+        {/* Tag filter strip */}
+        <TagChipStrip
+          selected={selectedTags}
+          tagLogic={tagLogic}
+          onChange={handleTagsChange}
+          onLogicChange={handleLogicChange}
+          placeholder="Filter by tag…"
+        />
       </div>
 
       {isLoading ? (
@@ -169,8 +215,8 @@ export function LatestPageClient() {
       ) : articles.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-foreground/60">
-            {search
-              ? `No articles found for "${search}"`
+            {search || selectedTags.length > 0
+              ? 'No articles match your current filters.'
               : categoryParam
               ? `No articles found in "${categoryParam.replace(/-/g, ' ')}"`
               : 'No articles published yet.'}

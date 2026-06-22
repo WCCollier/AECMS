@@ -171,6 +171,9 @@ export class ProductsService {
       product_type,
       category_id,
       tag_id,
+      tag,
+      tags,
+      tag_logic,
       min_price,
       max_price,
       guest_purchaseable,
@@ -243,12 +246,24 @@ export class ProductsService {
     }
 
     // Tag filter
-    if (tag_id) {
-      where.tags = {
-        some: {
-          tag_id,
-        },
-      };
+    if (tags) {
+      const slugs = tags.split(',').map((s) => s.trim()).filter(Boolean);
+      if (slugs.length === 1) {
+        where.tags = { some: { tag: { slug: slugs[0] } } };
+      } else if (slugs.length > 1) {
+        if (tag_logic === 'or') {
+          where.tags = { some: { tag: { slug: { in: slugs } } } };
+        } else {
+          where.AND = [
+            ...((where.AND as any[]) ?? []),
+            ...slugs.map((slug) => ({ tags: { some: { tag: { slug } } } })),
+          ];
+        }
+      }
+    } else if (tag_id) {
+      where.tags = { some: { tag_id } };
+    } else if (tag) {
+      where.tags = { some: { tag: { slug: tag } } };
     }
 
     // Price range filter

@@ -7,17 +7,24 @@ interface UseArticlesOptions {
   limit?: number;
   category?: string;
   tag?: string;
+  tags?: string[];
+  tagLogic?: 'and' | 'or';
   search?: string;
 }
 
 export function useArticles(options: UseArticlesOptions = {}) {
-  const { page = 1, limit = 10, category, tag, search } = options;
+  const { page = 1, limit = 10, category, tag, tags, tagLogic, search } = options;
 
   const params = new URLSearchParams();
   params.set('page', page.toString());
   params.set('limit', limit.toString());
   if (category) params.set('category', category);
-  if (tag) params.set('tag', tag);
+  if (tags && tags.length > 0) {
+    params.set('tags', tags.join(','));
+    if (tagLogic === 'or') params.set('tag_logic', 'or');
+  } else if (tag) {
+    params.set('tag', tag);
+  }
   if (search) params.set('search', search);
 
   const { data, error, isLoading, mutate } = useSWR<PaginatedResponse<Article>>(
