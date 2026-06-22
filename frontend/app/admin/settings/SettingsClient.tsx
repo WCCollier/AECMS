@@ -824,13 +824,13 @@ export function SettingsClient() {
       {activeTab === 'seo' && (
         <div>
           <FieldRow label="Site Name" help="Used in Open Graph tags and JSON-LD structured data">
-            <TextInput value={f('seo.site_name')} onChange={(v) => set('seo.site_name', v)} placeholder="Fantasy V Reality" />
+            <TextInput value={f('seo.site_name')} onChange={(v) => set('seo.site_name', v)} placeholder="My Author Site" />
           </FieldRow>
           <FieldRow label="Site Description" help="Default meta description for the homepage and pages without a custom description">
             <textarea
               value={f('seo.site_description')}
               onChange={(e) => set('seo.site_description', e.target.value)}
-              placeholder="Fiction, non-fiction, and firearms instruction from W. C. Collier."
+              placeholder="Books, articles, and updates from your author name."
               rows={3}
               className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-neutral-500 resize-y"
             />
@@ -844,7 +844,7 @@ export function SettingsClient() {
             )}
           </FieldRow>
           <FieldRow label="Canonical Domain" help="Primary domain used in canonical links and structured data. Defaults to your APP_URL.">
-            <TextInput value={f('seo.canonical_domain')} onChange={(v) => set('seo.canonical_domain', v)} placeholder="https://fantasyvreality.com" />
+            <TextInput value={f('seo.canonical_domain')} onChange={(v) => set('seo.canonical_domain', v)} placeholder="https://yoursite.com" />
           </FieldRow>
 
           <div className="pt-4 pb-2">
@@ -852,19 +852,19 @@ export function SettingsClient() {
             <p className="text-xs text-neutral-500 mt-0.5">Used in JSON-LD Person and author schema across all content. Essential for Google&apos;s entity graph.</p>
           </div>
           <FieldRow label="Author Name" help="Your public author name as it appears in schema markup">
-            <TextInput value={f('seo.author_name')} onChange={(v) => set('seo.author_name', v)} placeholder="W. C. Collier" />
+            <TextInput value={f('seo.author_name')} onChange={(v) => set('seo.author_name', v)} placeholder="Your Author Name" />
           </FieldRow>
           <FieldRow label="Author Page URL" help="Canonical URL of your author page (e.g. your author alias domain)">
-            <TextInput value={f('seo.author_url')} onChange={(v) => set('seo.author_url', v)} placeholder="https://wccollier.com" />
+            <TextInput value={f('seo.author_url')} onChange={(v) => set('seo.author_url', v)} placeholder="https://yourname.com" />
           </FieldRow>
           <FieldRow label="Twitter / X Handle" help="Used for twitter:creator card tag (include @)">
-            <TextInput value={f('seo.author_twitter')} onChange={(v) => set('seo.author_twitter', v)} placeholder="@wccollier" />
+            <TextInput value={f('seo.author_twitter')} onChange={(v) => set('seo.author_twitter', v)} placeholder="@yourhandle" />
           </FieldRow>
           <FieldRow label="Author Profile URLs" help="One URL per line. Added to sameAs in Person schema — links your identity across Amazon Author Central, Goodreads, Instagram, etc.">
             <textarea
               value={f('seo.author_same_as')}
               onChange={(e) => set('seo.author_same_as', e.target.value)}
-              placeholder={'https://www.amazon.com/stores/author/...\nhttps://www.goodreads.com/author/show/...\nhttps://www.instagram.com/wccollier'}
+              placeholder={'https://www.amazon.com/stores/author/...\nhttps://www.goodreads.com/author/show/...\nhttps://www.instagram.com/yourhandle'}
               rows={4}
               className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-neutral-500 resize-y font-mono"
             />
