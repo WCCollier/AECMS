@@ -151,14 +151,16 @@ export function UnifiedSearchInput({
       const { slugs } = parseDiv(divRef.current);
       if (slugs.includes(slug)) return;
       const next = [...slugs, slug];
-      // Rebuild div: new chip + empty text node
       rebuildDiv(divRef.current, next, allTags, '');
       setChipSlugs(next);
       setDropdownOpen(false);
       setDropdownFilter('');
       divRef.current.focus();
+      // Auto-submit on chip add — same immediate-filter behaviour as TagChipStrip
+      setCommitted({ tags: next, search: '' });
+      onSearch(next, tagLogic, '');
     },
-    [allTags],
+    [allTags, tagLogic, onSearch],
   );
 
   // ── Remove a tag chip ─────────────────────────────────────────────────────
@@ -170,8 +172,12 @@ export function UnifiedSearchInput({
       rebuildDiv(divRef.current, next, allTags, text);
       setChipSlugs(next);
       divRef.current.focus();
+      // Auto-submit on chip remove — keep results in sync
+      const newCommitted = next.length > 0 || !!text ? { tags: next, search: text } : null;
+      setCommitted(newCommitted);
+      onSearch(next, tagLogic, text);
     },
-    [allTags],
+    [allTags, tagLogic, onSearch],
   );
 
   // ── Keydown ───────────────────────────────────────────────────────────────
