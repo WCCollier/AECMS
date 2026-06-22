@@ -193,12 +193,17 @@ export function UnifiedSearchInput({
 
       if (e.key === 'Enter') {
         e.preventDefault();
+        const { slugs, text } = getCurrentState();
+        setCommitted({ tags: slugs, search: text });
+        onSearch(slugs, tagLogic, text);
+        setDropdownOpen(false);
+        return;
+      }
+
+      if (e.key === 'Tab') {
         if (dropdownOpen && filtered[highlightedIdx]) {
+          e.preventDefault();
           addTag(filtered[highlightedIdx].slug);
-        } else {
-          const { slugs, text } = getCurrentState();
-          setCommitted({ tags: slugs, search: text });
-          onSearch(slugs, tagLogic, text);
         }
         return;
       }
@@ -299,7 +304,13 @@ export function UnifiedSearchInput({
         <div className="relative group mr-2 shrink-0">
           <button
             type="button"
-            onClick={() => setTagLogic((l) => (l === 'and' ? 'or' : 'and'))}
+            onClick={() => {
+              const nextLogic = tagLogic === 'and' ? 'or' : 'and';
+              setTagLogic(nextLogic);
+              const { slugs, text } = getCurrentState();
+              setCommitted({ tags: slugs, search: text });
+              onSearch(slugs, nextLogic, text);
+            }}
             className="flex items-center w-14 h-7 rounded-full border border-foreground/20 bg-foreground/5 cursor-pointer select-none overflow-hidden"
             aria-label={`Tag match mode: ${tagLogic === 'and' ? 'ALL' : 'ANY'}`}
           >
