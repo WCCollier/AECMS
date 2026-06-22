@@ -29,9 +29,6 @@ export function ShopPageClient() {
     searchParams?.get('tag_logic') === 'or' ? 'or' : 'and',
   );
 
-  // Track what was last committed to the URL so the search button can show ×
-  const [committedTags, setCommittedTags] = useState<string[]>(selectedTags);
-  const [committedSearch, setCommittedSearch] = useState(search);
 
   // Sync all filter state from URL — handles external navigation (e.g. tag chip clicks on tiles)
   useEffect(() => {
@@ -43,8 +40,6 @@ export function ShopPageClient() {
     setSelectedTags(tags);
     setTagLogic(logic);
     setSearch(srch);
-    setCommittedTags(tags);
-    setCommittedSearch(srch);
     setPage(1);
   }, [searchParams]);
 
@@ -86,8 +81,6 @@ export function ShopPageClient() {
     setSelectedTags(tags);
     setTagLogic(logic);
     setSearch(srch);
-    setCommittedTags(tags);
-    setCommittedSearch(srch);
     setPage(1);
     updateUrl(1, tags, logic, srch);
     if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -97,8 +90,6 @@ export function ShopPageClient() {
     setSelectedTags([]);
     setTagLogic('and');
     setSearch('');
-    setCommittedTags([]);
-    setCommittedSearch('');
     setPage(1);
     updateUrl(1, [], 'and', '');
     if (effectiveMode === 'infinite') window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -147,9 +138,6 @@ export function ShopPageClient() {
   const total = effectiveMode === 'paginated' ? (paginated.total ?? 0) : infinite.total;
 
   const hasActiveFilters = selectedTags.length > 0 || !!search;
-  const isSearchActive =
-    committedTags.join(',') === selectedTags.join(',') && committedSearch === search &&
-    (committedTags.length > 0 || !!committedSearch);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -168,7 +156,6 @@ export function ShopPageClient() {
             placeholder="Search products or filter by tag…"
             onSearch={handleSearch}
             onClear={handleClear}
-            isSearchActive={isSearchActive}
           />
         </div>
       </div>

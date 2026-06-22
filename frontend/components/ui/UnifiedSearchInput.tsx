@@ -12,7 +12,6 @@ export interface UnifiedSearchInputProps {
   placeholder?: string;
   onSearch: (tags: string[], tagLogic: 'and' | 'or', search: string) => void;
   onClear: () => void;
-  isSearchActive: boolean;
 }
 
 // Extract chip slugs and trailing text from the contenteditable div
@@ -63,7 +62,6 @@ export function UnifiedSearchInput({
   placeholder = 'Search or filter by tag…',
   onSearch,
   onClear,
-  isSearchActive,
 }: UnifiedSearchInputProps) {
   const { tags: allTags } = useTags();
   const divRef = useRef<HTMLDivElement>(null);
@@ -74,6 +72,20 @@ export function UnifiedSearchInput({
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownFilter, setDropdownFilter] = useState('');
   const [highlightedIdx, setHighlightedIdx] = useState(0);
+
+  // Committed state: what was last submitted via onSearch (null = nothing committed).
+  // The button shows × only when the current input matches committed state.
+  // When the user diverges from committed state, the button reverts to the magnifying glass.
+  const [committed, setCommitted] = useState<{ tags: string[]; search: string } | null>(
+    initialTags.length > 0 || !!initialSearch ? { tags: initialTags, search: initialSearch } : null,
+  );
+
+  // Derived: show the × (clear) button only when there IS a committed search
+  // AND the current input still matches it.
+  const showClear =
+    committed !== null &&
+    chipSlugs.join(',') === committed.tags.join(',') &&
+    dropdownFilter === committed.search;
 
   // Track whether the div has been initialised (avoid double-rebuild on strict mode)
   const initialisedRef = useRef(false);
@@ -109,6 +121,11 @@ export function UnifiedSearchInput({
     setTagLogic(initialTagLogic);
     setDropdownOpen(false);
     setDropdownFilter('');
+    setCommitted(
+      initialTags.length > 0 || !!initialSearch
+        ? { tags: initialTags, search: initialSearch }
+        : null,
+    );
   }, [initialTags, initialSearch, initialTagLogic, allTags]);
 
   // ── Parse helpers ──────────────────────────────────────────────────────────
@@ -174,6 +191,7 @@ export function UnifiedSearchInput({
           addTag(filtered[highlightedIdx].slug);
         } else {
           const { slugs, text } = getCurrentState();
+          setCommitted({ tags: slugs, search: text });
           onSearch(slugs, tagLogic, text);
         }
         return;
@@ -244,10 +262,12 @@ export function UnifiedSearchInput({
 
   // ── Search button ─────────────────────────────────────────────────────────
   const handleSearchButton = () => {
-    if (isSearchActive) {
+    if (showClear) {
+      setCommitted(null);
       onClear();
     } else {
       const { slugs, text } = getCurrentState();
+      setCommitted({ tags: slugs, search: text });
       onSearch(slugs, tagLogic, text);
     }
   };
@@ -323,9 +343,9 @@ export function UnifiedSearchInput({
           type="button"
           onClick={handleSearchButton}
           className="ml-2 shrink-0 text-foreground/50 hover:text-foreground transition-colors"
-          aria-label={isSearchActive ? 'Clear search' : 'Search'}
+          aria-label={showClear ? 'Clear search' : 'Search'}
         >
-          {isSearchActive ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+          {showClear ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
         </button>
       </div>
 
