@@ -193,7 +193,6 @@ model Article {
   deleted_at          DateTime?
 
   author          User            @relation(fields: [author_id], references: [id])
-  categories      ArticleCategory[]
   tags            ArticleTag[]
   media           ArticleMedia[]
   comments        Comment[]
@@ -286,24 +285,6 @@ model Page {
   @@map("pages")
 }
 
-model Category {
-  id          String   @id @default(uuid())
-  name        String
-  slug        String   @unique
-  description String?
-  parent_id   String?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
-
-  parent   Category? @relation("CategoryHierarchy", fields: [parent_id], references: [id])
-  children Category[] @relation("CategoryHierarchy")
-  articles ArticleCategory[]
-  products ProductCategory[]
-
-  @@index([slug])
-  @@map("categories")
-}
-
 model Tag {
   id          String   @id @default(uuid())
   name        String
@@ -317,17 +298,6 @@ model Tag {
 
   @@index([slug])
   @@map("tags")
-}
-
-model ArticleCategory {
-  article_id  String
-  category_id String
-
-  article  Article  @relation(fields: [article_id], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
-
-  @@id([article_id, category_id])
-  @@map("article_categories")
 }
 
 model ArticleTag {
@@ -430,7 +400,6 @@ model Product {
   deleted_at          DateTime?
 
   author           User?           @relation("ProductAuthor", fields: [author_id], references: [id])
-  categories       ProductCategory[]
   tags             ProductTag[]
   media            ProductMedia[]
   comments         Comment[]
@@ -518,17 +487,6 @@ model KindleDevice {
 
   @@index([user_id])
   @@map("kindle_devices")
-}
-
-model ProductCategory {
-  product_id  String
-  category_id String
-
-  product  Product  @relation(fields: [product_id], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
-
-  @@id([product_id, category_id])
-  @@map("product_categories")
 }
 
 model ProductTag {

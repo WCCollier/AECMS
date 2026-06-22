@@ -426,12 +426,12 @@ async function main() {
   const owner = await prisma.user.findFirst({ where: { role: 'owner' } });
   if (!owner) throw new Error('No owner user found — run prisma db seed first');
 
-  const shortThoughtsCat = await prisma.category.upsert({
+  const shortThoughtsTag = await prisma.tag.upsert({
     where: { slug: 'short-thoughts' },
     update: {},
     create: { name: 'Short Thoughts', slug: 'short-thoughts', description: 'Short philosophical essays and reflections' },
   });
-  console.log('Category ready: Short Thoughts');
+  console.log('Tag ready: Short Thoughts');
 
   let created = 0, skipped = 0;
 
@@ -457,8 +457,8 @@ async function main() {
         admin_can_delete: true,
       },
     });
-    await prisma.articleCategory.create({
-      data: { article_id: article.id, category_id: shortThoughtsCat.id },
+    await prisma.articleTag.create({
+      data: { article_id: article.id, tag_id: shortThoughtsTag.id },
     });
     created++;
     if (created % 10 === 0) console.log(`  ${created} articles created...`);

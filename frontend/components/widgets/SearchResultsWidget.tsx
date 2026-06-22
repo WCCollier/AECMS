@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useArticles } from '@/hooks/useArticles';
 import { useProducts } from '@/hooks/useProducts';
+import { useInfiniteArticles } from '@/hooks/useInfiniteArticles';
+import { useInfiniteProducts } from '@/hooks/useInfiniteProducts';
 import { ArticleCard } from '@/components/blog/ArticleCard';
 import { ProductCard } from '@/components/shop/ProductCard';
 import { Button } from '@/components/ui';
@@ -17,6 +19,8 @@ export interface SearchResultsWidgetProps {
   display: 'grid' | 'list';
   pageSize: number;
   title: string;
+  /** When true the widget can expand infinitely; false = always paginated */
+  allowInfiniteScroll?: boolean;
 }
 
 function buildSeeAllUrl(contentType: 'articles' | 'products', tags: string[], tagLogic: 'and' | 'or', search: string) {
@@ -39,25 +43,80 @@ export function SearchResultsWidget({
   display,
   pageSize,
   title,
+  allowInfiniteScroll = false,
 }: SearchResultsWidgetProps) {
+  // Viewer-togglable: start in infinite mode when allowed, paginated otherwise
+  const [viewerMode, setViewerMode] = useState<'infinite' | 'paginated'>(
+    allowInfiniteScroll ? 'infinite' : 'paginated',
+  );
   const [page, setPage] = useState(1);
 
-  const articleQuery = useArticles(
-    contentType === 'articles'
+  // Sync viewer mode when prop changes (e.g. embed config update)
+  useEffect(() => {
+    setViewerMode(allowInfiniteScroll ? 'infinite' : 'paginated');
+    setPage(1);
+  }, [allowInfiniteScroll]);
+
+  // ── Paginated queries ─────────────────────────────────────────────────────
+  const articlePagedQuery = useArticles(
+    contentType === 'articles' && viewerMode === 'paginated'
+      ? { page, limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
+      : { limit: 0 },
+  );
+  const productPagedQuery = useProducts(
+    contentType === 'products' && viewerMode === 'paginated'
       ? { page, limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
       : { limit: 0 },
   );
 
-  const productQuery = useProducts(
-    contentType === 'products'
-      ? { page, limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
+  // ── Infinite queries ──────────────────────────────────────────────────────
+  const articleInfiniteQuery = useInfiniteArticles(
+    contentType === 'articles' && viewerMode === 'infinite'
+      ? { limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
+      : { limit: 0 },
+  );
+  const productInfiniteQuery = useInfiniteProducts(
+    contentType === 'products' && viewerMode === 'infinite'
+      ? { limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
       : { limit: 0 },
   );
 
-  const isLoading = contentType === 'articles' ? articleQuery.isLoading : productQuery.isLoading;
-  const totalPages = contentType === 'articles' ? articleQuery.totalPages : productQuery.totalPages;
-  const articles = articleQuery.articles;
-  const products = productQuery.products;
+  // ── Sentinel for infinite scroll ──────────────────────────────────────────
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const infiniteQuery = contentType === 'articles' ? articleInfiniteQuery : productInfiniteQuery;
+
+  useEffect(() => {
+    if (viewerMode !== 'infinite') return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && infiniteQuery.hasMore && !infiniteQuery.isFetchingMore) {
+          infiniteQuery.loadMore();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [viewerMode, infiniteQuery]);
+
+  // ── Derived display values ────────────────────────────────────────────────
+  const isLoading =
+    viewerMode === 'paginated'
+      ? contentType === 'articles' ? articlePagedQuery.isLoading : productPagedQuery.isLoading
+      : contentType === 'articles' ? articleInfiniteQuery.isLoading : productInfiniteQuery.isLoading;
+
+  const totalPages =
+    viewerMode === 'paginated'
+      ? contentType === 'articles' ? articlePagedQuery.totalPages : productPagedQuery.totalPages
+      : 0;
+
+  const articles =
+    viewerMode === 'paginated' ? articlePagedQuery.articles : articleInfiniteQuery.articles;
+  const products =
+    viewerMode === 'paginated' ? productPagedQuery.products : productInfiniteQuery.products;
+
   const hasResults = contentType === 'articles' ? articles.length > 0 : products.length > 0;
 
   const seeAllUrl = buildSeeAllUrl(contentType, tags, tagLogic, search);
@@ -69,8 +128,23 @@ export function SearchResultsWidget({
 
   return (
     <div className="my-4">
-      {title && (
-        <h3 className="text-lg font-semibold mb-4">{title}</h3>
+      {/* Header row: title + viewer mode toggle */}
+      {(title || allowInfiniteScroll) && (
+        <div className="flex items-center justify-between mb-4">
+          {title && <h3 className="text-lg font-semibold">{title}</h3>}
+          {allowInfiniteScroll && (
+            <button
+              type="button"
+              onClick={() => {
+                setViewerMode((m) => (m === 'infinite' ? 'paginated' : 'infinite'));
+                setPage(1);
+              }}
+              className="text-xs text-foreground/50 hover:text-foreground border border-foreground/20 rounded-full px-2.5 py-0.5 transition-colors"
+            >
+              {viewerMode === 'infinite' ? 'Paginated' : 'Infinite scroll'}
+            </button>
+          )}
+        </div>
       )}
 
       {isLoading ? (
@@ -89,8 +163,8 @@ export function SearchResultsWidget({
               : products.map((p, i) => <ProductCard key={p.id} product={p} priority={i < 3} />)}
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
+          {/* Paginated controls */}
+          {viewerMode === 'paginated' && totalPages > 1 && (
             <div className="flex justify-center gap-2 mt-4">
               <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
                 Previous
@@ -101,6 +175,27 @@ export function SearchResultsWidget({
               <Button variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
                 Next
               </Button>
+            </div>
+          )}
+
+          {/* Infinite scroll sentinel + status */}
+          {viewerMode === 'infinite' && (
+            <div className="mt-4 flex flex-col items-center gap-3">
+              {infiniteQuery.isFetchingMore && (
+                <div className="flex gap-1.5">
+                  {[...Array(3)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-2 h-2 rounded-full bg-foreground/40 animate-bounce"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    />
+                  ))}
+                </div>
+              )}
+              {!infiniteQuery.hasMore && hasResults && (
+                <p className="text-sm text-foreground/40">You&apos;ve seen everything</p>
+              )}
+              <div ref={sentinelRef} className="h-1" />
             </div>
           )}
 
