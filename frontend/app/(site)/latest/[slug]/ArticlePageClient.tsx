@@ -81,25 +81,23 @@ export function ArticlePageClient() {
         )}
       </div>
 
-      {/* Content */}
-      <RichTextContent content={article.content} className="prose-article" />
-
       {/* Tags */}
       {article.tags.length > 0 && (
-        <div className="mt-8 pt-8 border-t border-foreground/10">
-          <h3 className="text-sm font-medium mb-3">Tags</h3>
-          <div className="flex flex-wrap gap-2">
-            {article.tags.map((tag) => (
-              <span
-                key={tag.id}
-                className="text-sm px-3 py-1 bg-foreground/5 rounded-full"
-              >
-                #{tag.name}
-              </span>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-2 mb-8">
+          {article.tags.map((tag) => (
+            <Link
+              key={tag.id}
+              href={`/articles?tags=${tag.slug}`}
+              className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-accent/10 hover:text-accent transition-colors"
+            >
+              #{tag.name}
+            </Link>
+          ))}
         </div>
       )}
+
+      {/* Content */}
+      <RichTextContent content={article.content} className="prose-article" />
 
       <CommentList articleId={article.id} />
     </article>
