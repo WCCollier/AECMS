@@ -1,6 +1,6 @@
 # PRD 13: Mul Converter
 
-**Version**: 1.4  
+**Version**: 1.5  
 **Status**: Draft  
 **Phase**: 23  
 **Author**: WCCollier
@@ -990,62 +990,93 @@ For a typical 3-section scaffold with 2 background images, total generation adds
 
 ## Part 3: Scroll-Driven Background Transitions + Gradient Overlays
 
-Part 3 extends the section background system with a declared exit transition per section and gradient overlay masks. Both properties are core to hand-built page design and to Mul Converter output quality. They are implemented entirely in the frontend (renderer + editor + system prompt) with no backend changes.
+Part 3 implements true simultaneous crossfade between section backgrounds, a full transition vocabulary, gradient overlay masks, and enriched HTML signal extraction for the Mul Converter. No production pages currently use the sections format, so there is no backward compatibility burden.
 
-### Design rationale
+### Renderer architecture: true crossfade via fixed-position background stack
 
-The current renderer applies `background-image` as a CSS property directly on the section `div`. This makes scroll-driven transitions impossible — you cannot animate a CSS background property in response to scroll without JavaScript, and even with JavaScript the `background-image` property is not interpolatable. Extracting backgrounds to dedicated child layers (see Phase 23 item R) is the prerequisite that unlocks the entire transition vocabulary.
+The renderer splits into two independent passes:
 
-The `overlay` system (already implemented as a solid-color scrim) is extended to support CSS gradient strings. A gradient overlay gives the AI — and the human editor — a way to ensure text legibility without flattening the background image. A bottom vignette is the standard pattern for hero sections; other variants suit editorial, magazine, and gallery layouts.
+**Pass 1 — Fixed background stack.** All section background composites are rendered as `position: fixed; inset: 0` layers, z-ordered so that earlier sections in the page sit above later ones (section 0 = highest z-index). Scroll-driven animation (`animation-timeline: view()`, anchored to each section's content spacer) drives opacity, clip-path, or transform on each layer as its corresponding section exits the viewport.
+
+**Pass 2 — Transparent content sections.** Content sections are normal document-flow divs with no background CSS. They provide scroll height, anchor animation timelines, and render zone grids above the background stack.
+
+This produces **true simultaneous crossfade**: as section A's composite fades from opacity 1→0, section B's composite (already at full opacity at a lower z-index) is revealed beneath it. At the midpoint of the transition both composites are visible simultaneously — a genuine dissolve, not a sequential fade-to-nothing.
+
+### Composite unit: background image + overlay
+
+The overlay div is a child of the background composite layer — not a sibling at the same level. When the composite transitions (fades, clips, slides), the overlay rides it as a single inseparable unit. No synchronization is needed because there is nothing to synchronize: the scrim belongs to its background.
+
+```
+<div class="fixed-bg-layer" style="z-index: N; ...scroll-driven animation...">
+  <div class="bg-image" />      ← image
+  <div class="bg-overlay" />    ← overlay rides the composite
+</div>
+```
+
+**Parallax exception.** For `transition: 'parallax'`, the image drifts at ~50% scroll speed while the overlay must remain planted (otherwise the gradient shifts relative to the zone text, breaking legibility). Image and overlay are siblings inside the fixed layer; `transform` is applied only to the image div. The image is oversized by 20% top/bottom to prevent black bars at drift extremes.
 
 ### `background.transition` vocabulary
 
+`'parallax'` moves from `attachment` to `transition`. `attachment` is simplified to `'scroll' | 'fixed'` only.
+
 | Value | Visual effect | Best use |
 |---|---|---|
-| `'none'` | Hard edge (current default) | Colour and gradient backgrounds; no regression |
-| `'fade'` | Background opacity 1→0 as section exits | Hero image sections; the standard for image backgrounds |
-| `'wipe-v'` | Vertical clip wipe upward | Structured content transitions; mirrors default hard-edge but softened |
-| `'wipe-left'` | Lateral clip wipe left→right | Alternating image+text layouts, magazine style |
-| `'wipe-right'` | Lateral clip wipe right→left | Reverse of wipe-left |
-| `'slide-up'` | Background image slides upward on exit | Dynamic/motion-heavy pages; strong directional energy |
-| `'parallax'` | Background drifts at ~50% scroll speed | Depth aesthetics, photography-forward pages |
-
-`transition` is orthogonal to `attachment`. `attachment: 'fixed'` (window-pane effect within the section) can be combined with any `transition`. `'parallax'` was previously a value on `attachment`; it moves here because it describes scroll behaviour at the section boundary, not mid-section CSS `background-attachment`.
+| `'none'` | Hard edge (default) | Color and gradient backgrounds; no regression |
+| `'fade'` | Composite opacity 1→0 as section exits; dissolves into section below | Hero image sections; default for image backgrounds |
+| `'wipe-v'` | Vertical clip wipe upward | Structured transitions; intentional hard-edge variant |
+| `'wipe-left'` | Lateral clip wipe, composite clips left revealing next from right | Alternating image+text, magazine style |
+| `'wipe-right'` | Lateral clip wipe, reverse | Reverse magazine alternation |
+| `'slide-up'` | Composite translates upward off screen | Motion-heavy, scroll-storytelling pages |
+| `'parallax'` | Image drifts at ~50% scroll speed; overlay stays planted | Photography-forward, depth aesthetics |
 
 ### Gradient overlay patterns
 
-When `overlay.gradient` is set, the overlay div renders the gradient string directly as its `background`. Alpha is baked into the gradient stops; no separate `opacity` field is needed.
+When `overlay.gradient` is set, alpha is baked into the gradient stops; no separate `opacity` field is needed.
 
 | Pattern | CSS | Use |
 |---|---|---|
-| Bottom vignette | `linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75) 100%)` | Hero with headline at the bottom |
-| Top vignette | `linear-gradient(to top, transparent 30%, rgba(0,0,0,0.75) 100%)` | Section with caption above a photo |
+| Bottom vignette | `linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75) 100%)` | Hero with headline at the bottom — default |
+| Top vignette | `linear-gradient(to top, transparent 30%, rgba(0,0,0,0.75) 100%)` | Caption above a photo |
 | Dual vignette | `linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.5) 100%)` | Framed / cinematic section |
 | Radial vignette | `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%)` | Centre-focus portrait or product shot |
-| Side fade | `linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)` | Text panel beside a background image, left-aligned content |
+| Side fade | `linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)` | Text panel beside an image, left-aligned |
 
-These are offered as presets in the SectionEditor gradient overlay UI but are not enumerated in the schema — any valid CSS gradient string is accepted.
+### Enriched HTML extraction: `AnimationSignals`
 
-### System prompt additions (Section 3C)
+The HTML extractor adds `extractAnimationSignals(html)` producing an `AnimationSignals` struct passed to the AI alongside colors and DOM structure:
 
-Section 3C of `buildSystemPrompt()` adds guidance for transitions and gradient overlays. The AI is instructed to:
+```typescript
+interface AnimationSignals {
+  hasFixedBackground: boolean      // background-attachment: fixed in CSS
+  hasScrollTimeline: boolean       // animation-timeline or scroll() detected
+  hasKeyframes: boolean            // @keyframes present
+  hasOpacityTransition: boolean    // transition/animation involving opacity
+  hasTransformTransition: boolean  // transition/animation involving transform
+  hasStickyElements: boolean       // position: sticky
+  hasHighZIndexStack: boolean      // z-index > 10 on multiple elements
+  libraryFingerprints: string[]    // ['aos', 'gsap', 'locomotive', 'framer-motion']
+  overlayGradients: string[]       // extracted gradient strings from overlay elements
+  motionClassNames: string[]       // class names: parallax, fade, scroll-reveal, etc.
+}
+```
 
-- Set `transition: 'fade'` on any section with `background.type === 'image'` unless the source page has a strong structural / hard-cut aesthetic
-- Use `transition: 'parallax'` for sections where the source page exhibited depth, motion blur, or a photography-forward visual language
-- Use `transition: 'wipe-left'` or `'wipe-right'` for alternating content+image sections (magazine / editorial layouts)
-- Use a bottom vignette gradient overlay (`linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75) 100%)`) by default on hero sections where the headline is positioned at the bottom of the zone
-- Use a solid overlay only when the entire zone needs uniform contrast lift (e.g. full-zone body text on a busy background)
-- Prefer gradient overlays to solid overlays when the background image should remain visually prominent and only the text anchor zone needs contrast support
+Library detection is by data-attribute and class-name fingerprint — no script parsing required. This gives the model concrete observable evidence rather than requiring it to guess from palette alone.
 
-### Narrow-section edge case
+### System prompt Section 3C: signal-to-tool decision tree
 
-On portrait displays, a section whose natural content height is less than the viewport height exits the viewport quickly — the `exit` animation phase begins almost immediately after `entry`. The renderer mitigates this by starting `animation-range` at `contain 50%` for sections without an explicit `minHeight`, delaying the fade until the section's midpoint has cleared the viewport centre.
+The system prompt teaches the model to map `AnimationSignals` to transition and overlay choices — **semantic equivalence, not literal CSS replication**:
 
-The system prompt is instructed to assign `minHeight: "60vh"` to any section with `background.type === 'image'` and `transition !== 'none'` to ensure adequate dwell time.
-
-### Out of scope for Part 3
-
-**True simultaneous crossfade** — rendering two adjacent backgrounds overlapping in the viewport simultaneously requires a full fixed-position layer stack where all section backgrounds are rendered at `position: fixed; z-index` layers and content sections are transparent scroll spacers. This is a more invasive renderer architecture and is deferred.
+- `hasFixedBackground` or `motionClassNames` contains `"parallax"` → `transition: 'parallax'`
+- `libraryFingerprints` contains `"aos"`, `"framer-motion"`, or `"locomotive"` → `transition: 'fade'` (these libraries predominantly use opacity reveals)
+- `libraryFingerprints` contains `"gsap"` → `transition: 'slide-up'` (GSAP commonly animates translateY)
+- DOM shows alternating image+text pairs → alternate `'wipe-left'` / `'wipe-right'`
+- Photography-forward page, no specific signal → `transition: 'fade'`
+- No motion signals, structural/editorial layout → `transition: 'none'`
+- `overlayGradients` non-empty → adopt detected gradient direction and alpha
+- Hero section with image background and zone heading → bottom vignette gradient overlay by default
+- Full-zone body text → solid overlay at 0.4–0.6 opacity
+- Decorative / no zone text → no overlay
+- Any image background with `transition !== 'none'` → `minHeight: "60vh"`
 
 ---
 
