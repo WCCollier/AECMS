@@ -261,14 +261,26 @@ Part 3 is a renderer and schema evolution with no backend changes. It implements
 Introduce `transition` on `SectionBackground` and **remove `attachment` entirely**:
 
 ```typescript
-transition?: 'none' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'slide-left' | 'slide-right' | 'parallax'
-// attachment removed — with the fixed-position background stack all backgrounds
-// are viewport-fixed by architecture; the field has no remaining meaning.
+transition?: 'none' | 'fixed' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'parallax'
+// attachment removed — transition now covers all scroll behaviour cases.
 ```
 
-Default when omitted: `'none'` (hard edge — no regression).
+`transition` controls both whether a section's background enters the fixed-position stack and how it exits. The fixed stack is an **opt-in** — only engaged when `transition !== 'none'`:
 
-Read-time fallback: if stored data contains `attachment: 'parallax'`, treat as `transition: 'parallax'`; any other `attachment` value is silently ignored.
+| Value | Rendering | Effect |
+|---|---|---|
+| `'none'` (default) | **Inline on section div** — scrolls naturally with content | Normal web behaviour; plain websites |
+| `'fixed'` | Fixed-position stack, no exit animation | Window-pane: content scrolls over a planted background. Replaces old `attachment: 'fixed'` |
+| `'fade'` | Fixed-position stack, opacity 1→0 on exit | Dissolves into section below |
+| `'wipe-v'` | Fixed-position stack, clip-path upward on exit | Vertical clip wipe |
+| `'wipe-left'` | Fixed-position stack, clip-path left on exit | Lateral wipe, reveals next from right |
+| `'wipe-right'` | Fixed-position stack, clip-path right on exit | Lateral wipe, reveals next from left |
+| `'slide-up'` | Fixed-position stack, translateY upward on exit | Background slides off screen |
+| `'parallax'` | Fixed-position stack, image drifts at ~50% scroll speed | Depth effect; overlay stays planted |
+
+Sections with `transition: 'none'` are entirely uninvolved in the crossfade stack — their backgrounds render as ordinary inline CSS and scroll naturally with the page. Crossfade only occurs between adjacent sections that are both in the fixed stack.
+
+Read-time fallback: stored `attachment: 'parallax'` → `transition: 'parallax'`; stored `attachment: 'fixed'` → `transition: 'fixed'`; all other `attachment` values silently ignored.
 
 **Files**: `frontend/types/index.ts`, `backend/src/pages/pages.service.ts` (validation update)
 
@@ -466,13 +478,16 @@ Each preset button shows a small directional gradient icon. Clicking populates t
 
 | Icon | Label | Value | One-line description |
 |---|---|---|---|
-| ◻ | None | `none` | Hard cut to next section |
+| ↕ | Scroll | `none` | Background scrolls naturally with the page |
+| ▬ | Fixed | `fixed` | Background stays planted; content scrolls over it |
 | ◑ | Fade | `fade` | Dissolves into next background |
 | ↑▬ | Wipe Down | `wipe-v` | Clips upward off the screen |
 | ←▬ | Wipe Left | `wipe-left` | Clips to the left, reveals next from right |
 | ▬→ | Wipe Right | `wipe-right` | Clips to the right, reveals next from left |
 | ↑↑ | Slide Up | `slide-up` | Background slides upward off screen |
 | ≋ | Parallax | `parallax` | Background drifts at half scroll speed |
+
+The label "Scroll" is used in the UI for `transition: 'none'` to make it self-explanatory rather than showing "None."
 
 Descriptions appear as a single line of muted text beneath the selected option.
 

@@ -1,6 +1,6 @@
 # PRD 13: Mul Converter
 
-**Version**: 1.6  
+**Version**: 1.7  
 **Status**: Draft  
 **Phase**: 23  
 **Author**: WCCollier
@@ -1019,15 +1019,18 @@ The overlay div is a child of the background composite layer — not a sibling a
 
 `attachment` is **removed entirely** from `SectionBackground`. With the fixed-position background stack all backgrounds are viewport-fixed by architecture — the field has no remaining meaning. `'parallax'` was previously a value on `attachment`; it moves to `transition`. Read-time fallback: stored `attachment: 'parallax'` → `transition: 'parallax'`; all other `attachment` values silently ignored. The schema references to `attachment` in Part 1 and Part 2 sections of this document reflect the pre-Part-3 schema and should be treated as superseded.
 
-| Value | Visual effect | Best use |
-|---|---|---|
-| `'none'` | Hard edge (default) | Color and gradient backgrounds; no regression |
-| `'fade'` | Composite opacity 1→0 as section exits; dissolves into section below | Hero image sections; default for image backgrounds |
-| `'wipe-v'` | Vertical clip wipe upward | Structured transitions; intentional hard-edge variant |
-| `'wipe-left'` | Lateral clip wipe, composite clips left revealing next from right | Alternating image+text, magazine style |
-| `'wipe-right'` | Lateral clip wipe, reverse | Reverse magazine alternation |
-| `'slide-up'` | Composite translates upward off screen | Motion-heavy, scroll-storytelling pages |
-| `'parallax'` | Image drifts at ~50% scroll speed; overlay stays planted | Photography-forward, depth aesthetics |
+The fixed-position stack is opt-in — only engaged when `transition !== 'none'`.
+
+| Value | Rendering | Visual effect | Best use |
+|---|---|---|---|
+| `'none'` (default) | Inline on section div | Background scrolls naturally with content | Normal web behaviour; plain sites |
+| `'fixed'` | Fixed stack, no exit animation | Content scrolls over planted background (window-pane). Replaces old `attachment: 'fixed'` | Subtle depth without motion |
+| `'fade'` | Fixed stack | Composite dissolves into section below | Hero image sections; default for image backgrounds |
+| `'wipe-v'` | Fixed stack | Vertical clip wipe upward | Structured transitions |
+| `'wipe-left'` | Fixed stack | Clips left, reveals next from right | Alternating image+text, magazine style |
+| `'wipe-right'` | Fixed stack | Clips right, reveals next from left | Reverse magazine alternation |
+| `'slide-up'` | Fixed stack | Composite translates upward off screen | Motion-heavy, scroll-storytelling |
+| `'parallax'` | Fixed stack | Image drifts at ~50% scroll speed; overlay planted | Photography-forward, depth aesthetics |
 
 ### Gradient overlay patterns
 
@@ -1071,7 +1074,8 @@ The system prompt teaches the model to map `AnimationSignals` to transition and 
 - `libraryFingerprints` contains `"gsap"` → `transition: 'slide-up'` (GSAP commonly animates translateY)
 - DOM shows alternating image+text pairs → alternate `'wipe-left'` / `'wipe-right'`
 - Photography-forward page, no specific signal → `transition: 'fade'`
-- No motion signals, structural/editorial layout → `transition: 'none'`
+- No motion signals, structural/editorial layout → `transition: 'fixed'` (planted background with scrolling content) or `transition: 'none'` (background scrolls with content — use for simple/light sites)
+- Simple informational page, minimal visual design → `transition: 'none'`
 - `overlayGradients` non-empty → adopt detected gradient direction and alpha
 - Hero section with image background and zone heading → bottom vignette gradient overlay by default
 - Full-zone body text → solid overlay at 0.4–0.6 opacity
