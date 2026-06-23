@@ -1,8 +1,8 @@
 # Phase 23 Completion Report: Mul Converter
 
-**Status**: Built — Part 1 (awaiting testbed QA → deploy), Part 2 (awaiting testbed QA → merge to main → deploy)  
-**Branch**: `feature/phase-23-part-2` @ `f707bb4` (pushed to GitHub)  
-**PRD**: `docs/prd/13-mul-converter.md` v1.3  
+**Status**: Built — Part 1 (awaiting testbed QA → deploy), Part 2 (awaiting testbed QA → merge to main → deploy), Part 3 (📋 planned — begins after Part 2 deploys)
+**Branch**: `feature/phase-23-part-2` @ `0e1026d` (pushed to GitHub)  
+**PRD**: `docs/prd/13-mul-converter.md` v1.7  
 **Plan**: `docs/phases/PHASE_23_PLAN.md`  
 **Tests**: 190 backend + 125 frontend unit tests passing (315 total)
 
@@ -403,11 +403,46 @@ The following were added beyond the original plan items (A–O), driven by PRD v
 
 ---
 
+## Part 3: Planned (begins after Part 2 deploys)
+
+Part 3 is a frontend-only evolution with no backend changes. Full specification in `docs/phases/PHASE_23_PLAN.md` items P–V and `docs/prd/13-mul-converter.md` Part 3 section (PRD v1.7).
+
+### Key architectural decisions
+
+**True crossfade via fixed-position background stack:**
+The renderer splits into two passes. All section backgrounds with a non-`'none'` transition are lifted out of their section containers and rendered as `position: fixed; inset: 0` layers, z-ordered so earlier sections sit above later ones. Content sections become transparent scroll spacers. This enables true simultaneous crossfade — as section A's composite fades, section B's composite is already at full opacity underneath.
+
+**Composite unit (image + overlay):**
+The overlay div is a child of the background layer div for all transitions except `'parallax'`. They transition as a single inseparable unit — no synchronization needed. For `'parallax'`, image and overlay are siblings; `transform` applies to the image only so the overlay stays planted while the image drifts.
+
+**`transition` field replaces `attachment`:**
+`SectionBackground.attachment` is removed. `transition` covers all scroll behaviour:
+
+| Value | Rendering | Effect |
+|---|---|---|
+| `'none'` (default) | Inline on section div | Background scrolls naturally with content |
+| `'fixed'` | Fixed stack, no animation | Window-pane: content scrolls over planted background |
+| `'fade'` | Fixed stack | Dissolves into section below |
+| `'wipe-v'` / `'wipe-left'` / `'wipe-right'` | Fixed stack | Clip-path wipes |
+| `'slide-up'` | Fixed stack | Background translates upward |
+| `'parallax'` | Fixed stack | Image drifts at ~50% scroll speed |
+
+Read-time fallback: `attachment: 'parallax'` → `transition: 'parallax'`; `attachment: 'fixed'` → `transition: 'fixed'`.
+
+**AnimationSignals extraction:**
+The HTML extractor gains `extractAnimationSignals()` producing a structured object (`hasFixedBackground`, `hasScrollTimeline`, `libraryFingerprints`, `overlayGradients`, `motionClassNames`, etc.) passed to the Mul Converter AI. Section 3C of the system prompt is a deterministic signal-to-tool decision tree.
+
+**SectionBackgroundPanel:**
+The background flyout is promoted to a slide-in drawer with three sub-sections: Background (None/Color/Gradient/Image with live preview), Overlay (None/Solid/Gradient with named presets), Transition (icon+label picker with descriptions). Transition value `'none'` is labelled "Scroll" in the UI for clarity.
+
+---
+
 ## Deployment Sequence
 
-1. **Testbed QA — Part 1** (aesthetic vocabulary on `main`): verify gradient backgrounds, overlay slider, zone scheme, padding, drop cap, justified text, font import
-2. **Ship Part 1 to deploy**: `git checkout deploy && git merge main --no-edit && git push origin deploy && git checkout main`
+1. **Testbed QA — aesthetic vocabulary** (on `main` @ `02b5644`): verify gradient backgrounds, overlay slider, zone scheme, padding, drop cap, justified text, font import
+2. **Ship aesthetic vocabulary**: `git checkout deploy && git merge main --no-edit && git push origin deploy && git checkout main`
 3. **Testbed QA — Part 2** (Mul Converter on `feature/phase-23-part-2`): configure a text provider, analyze a public URL, verify palette result, verify page draft creation, verify custom palette appears in Appearance panel
 4. **Merge Part 2 to main**: `git checkout main && git merge feature/phase-23-part-2 --no-edit`
 5. **Ship Part 2 to deploy**: `git checkout deploy && git merge main --no-edit && git push origin deploy && git checkout main`
-6. **Post-deploy**: seed `mul.convert` capability against production DB: `npx prisma db seed` via Cloud SQL proxy (the seed is idempotent — existing capabilities are upserted)
+6. **Post-deploy**: seed `mul.convert` capability against production DB: `npx prisma db seed` via Cloud SQL proxy (idempotent — also covers `media.manage` from Phase 22)
+7. **Build Part 3** on a new feature branch after Part 2 is live
