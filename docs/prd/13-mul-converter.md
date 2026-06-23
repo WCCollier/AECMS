@@ -1,6 +1,6 @@
 # PRD 13: Mul Converter
 
-**Version**: 1.2  
+**Version**: 1.3  
 **Status**: Draft  
 **Phase**: 23  
 **Author**: WCCollier
@@ -401,7 +401,10 @@ class XAIMulProvider         implements MulProvider { ... }  // Grok models (Ope
 
 Provider is selected at request time by reading `mul.text_provider` from ISM. The module **does not require** any provider SDK to be present in the container — all providers are implemented as thin HTTP clients (`fetch`/`axios`) so no SDK is a hard dependency. xAI's API is OpenAI-compatible (same request shape, different base URL and key), so `XAIMulProvider` is a thin subclass of `OpenAIMulProvider`.
 
-**OpenAI-native optimization**: When `mul.text_provider === 'openai'` and `mul.image_provider === 'openai'`, the service can use the OpenAI Responses API to handle analysis *and* image generation in a single conversation context. The model sees the source page and the image briefs it just wrote, producing better compositional fidelity than two separate calls. This optimization is transparent to the user — it activates automatically when both providers are OpenAI.
+**Provider-native optimization**: When the text layer and image layer use the same platform, the service can collapse both operations into a single API conversation context. The model sees the source page and the image briefs it just wrote, producing better compositional fidelity than two separate calls. This optimization is transparent to the user — it activates automatically when both providers match.
+
+- **OpenAI-native**: When `text_provider === 'openai'` and `image_provider === 'openai'`, use the OpenAI Responses API conversation mode (analysis + image generation in one context window).
+- **xAI-native**: When `text_provider === 'xai'` and `image_provider === 'xai'`, use Grok's equivalent multi-turn API to handle analysis and Aurora image generation in one context window. xAI's API is OpenAI-wire-compatible, so the implementation is a thin configuration variant of the OpenAI-native path (different base URL and model names; same request/response shape).
 
 ### ISM Keys (namespace: `mul.*`)
 
@@ -414,8 +417,8 @@ Keys are per-platform, not per-layer. When the text model and image model use th
 | `mul.anthropic_api_key_enc` | Yes | API key for Anthropic (falls back to `ANTHROPIC_API_KEY` env var if unset) |
 | `mul.openai_api_key_enc` | Yes | API key for OpenAI — shared by text layer and image layer when both use OpenAI |
 | `mul.xai_api_key_enc` | Yes | API key for xAI (Grok models) |
-| `mul.image_provider` | No | `openai` \| `flux` \| `stability` — omit or `disabled` to disable image generation |
-| `mul.image_model` | No | e.g. `gpt-image-1`, `flux-kontext-pro`, `stable-diffusion-xl-1024-v1-0` |
+| `mul.image_provider` | No | `openai` \| `xai` \| `flux` \| `stability` — omit or `disabled` to disable image generation |
+| `mul.image_model` | No | e.g. `gpt-image-1`, `grok-2-aurora`, `flux-kontext-pro`, `stable-diffusion-xl-1024-v1-0` |
 | `mul.fal_api_key_enc` | Yes | API key for fal.ai (FLUX models) |
 | `mul.stability_api_key_enc` | Yes | API key for Stability AI |
 | `mul.image_reference_mode` | No | `brief-only` (default) \| `reference` — see Image Generation section |
@@ -779,9 +782,9 @@ The settings panel is a collapsible `<details>` section at the top. On first vis
 - API Key: password-style input; shows `••••••••` if already saved; Anthropic can be left blank if `ANTHROPIC_API_KEY` is set in the environment
 
 **Image Generation group** (collapsed by default; expands when owner clicks "Enable image generation"):
-- Provider radio: `Disabled` | `OpenAI` | `Flux (fal.ai)` | `Stability AI`
-- Model: text field, pre-filled with default per provider (`gpt-image-1` / `flux-kontext-pro`)
-- API Key: hidden when provider matches the text provider (key is shared automatically); otherwise separate password input
+- Provider radio: `Disabled` | `OpenAI` | `xAI` | `Flux (fal.ai)` | `Stability AI`
+- Model: text field, pre-filled with default per provider (`gpt-image-1` / `grok-2-aurora` / `flux-kontext-pro`)
+- API Key: hidden when provider matches the text provider (key is shared automatically — applies to both OpenAI↔OpenAI and xAI↔xAI); otherwise separate password input
 - Mode toggle: `Brief-only` | `+ Reference images`
   - Reference mode disclosure: *"Reference mode passes images from the source URL to your image provider for style reference. Only enable if you own or have rights to the source images."*
 - Info note: "Image generation adds ~10–30s. Generated images are saved to your Media Library."
@@ -808,7 +811,8 @@ The user supplies their own model and API key. The system prompt is text-only (n
 
 | Provider | Recommended Model | Mode | Notes |
 |----------|------------------|------|-------|
-| OpenAI | `gpt-image-1` | Brief-only or Reference | Natural language prompts. Shares API key with OpenAI text layer. Best for owners already using OpenAI. OpenAI-native optimization applies when both layers are OpenAI. |
+| OpenAI | `gpt-image-1` | Brief-only or Reference | Natural language prompts. Shares API key with OpenAI text layer. Best for owners already using OpenAI. OpenAI-native optimization applies automatically when both layers are OpenAI. |
+| xAI | `grok-2-aurora` | Brief-only or Reference | xAI's Aurora image generation model. Shares API key with xAI text layer (`mul.xai_api_key_enc`). xAI-native optimization applies automatically when both layers are xAI/Grok. Best for owners already using Grok as the text model. |
 | Flux (fal.ai) | `flux-kontext-pro` | Brief-only or Reference | Best quality for reference-conditioned generation. Descriptor-list prompts. Separate fal.ai key required. |
 | Flux (fal.ai) | `flux-schnell` | Brief-only | Fastest and cheapest; good for layout scaffolding where photorealism isn't critical. |
 | Stability AI | `stable-diffusion-xl-1024-v1-0` | Brief-only | Wide model ecosystem; separate Stability key required. |
@@ -841,8 +845,10 @@ MulConverterService.analyze(url)
   │  [if image_provider configured]
   │  8. For each imageBrief: call image provider → bitmap
   │     → Upload to GCS → create Media record → replace media://placeholder with media://uuid
-  │  [if text_provider === image_provider === openai]
-  │  8′. Use Responses API conversation mode (steps 6+8 merged into one API call)
+  │  [if text_provider === image_provider === 'openai']
+  │  8′. Use OpenAI Responses API conversation mode (steps 6+8 merged into one API call)
+  │  [if text_provider === image_provider === 'xai']
+  │  8″. Use Grok multi-turn API conversation mode (steps 6+8 merged; xAI-native optimization)
   ▼
   Return MulResult to controller → HTTP 200
 
@@ -950,13 +956,16 @@ interface ImageProvider {
 }
 
 class GptImage1Provider  implements ImageProvider { ... }  // OpenAI gpt-image-1
+class XAIImageProvider   implements ImageProvider { ... }  // xAI Aurora (thin subclass of GptImage1Provider; different base URL + model)
 class FluxProvider       implements ImageProvider { ... }  // FLUX models via fal.ai
 class StabilityProvider  implements ImageProvider { ... }  // Stability AI SDXL
 ```
 
-Provider selected by `mul.image_provider` ISM key. All providers use REST/fetch — no image SDK hard dependency. When `imageSourceUrl` is present and the provider supports reference conditioning (OpenAI Responses API, FLUX Kontext), it is passed as a reference input. Providers that don't support reference conditioning ignore the field and use `prompt` only.
+Provider selected by `mul.image_provider` ISM key. All providers use REST/fetch — no image SDK hard dependency. When `imageSourceUrl` is present and the provider supports reference conditioning (OpenAI Responses API, xAI Aurora, FLUX Kontext), it is passed as a reference input. Providers that don't support reference conditioning ignore the field and use `prompt` only.
 
 **Reference mode and OpenAI**: When both `mul.text_provider` and `mul.image_provider` are `openai`, the Responses API conversation mode handles both analysis and reference-conditioned image generation in one context — no separate image API call is needed. The text model's vision understanding of the source page feeds directly into the image generation step.
+
+**Reference mode and xAI**: When both `mul.text_provider` and `mul.image_provider` are `xai`, the same principle applies using Grok's multi-turn API. `XAIImageProvider` is a thin subclass of `GptImage1Provider` with `baseUrl = 'https://api.x.ai/v1'` — xAI's image generation endpoint follows the OpenAI images API shape. The `mul.xai_api_key_enc` key is shared by both layers automatically (per-platform key sharing).
 
 ### ISM Keys (Part 2B additions)
 
@@ -968,7 +977,8 @@ Image generation settings are integrated into the main MulSettingsPanel as descr
 
 ### Latency and Cost Notes
 
-- DALL-E 3: ~8–15s per image, ~$0.04–0.08 per image (1024×1024)
+- GPT-Image-1 / OpenAI: ~8–15s per image, ~$0.04–0.08 per image (1024×1024)
+- xAI Aurora: comparable to GPT-Image-1; pricing subject to xAI's published rates
 - Stability AI SDXL: ~3–8s per image, ~$0.002–0.006 per image
 - Flux (fal.ai): ~2–5s, competitive pricing, highest quality
 
