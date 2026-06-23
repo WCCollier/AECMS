@@ -1,6 +1,6 @@
 # PRD 13: Mul Converter
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Status**: Draft  
 **Phase**: 23  
 **Author**: WCCollier
@@ -29,15 +29,29 @@ The Mul Converter depends on an expanded page schema — the **section-based con
 
 ---
 
+## Renderer-First Design Principle
+
+The AI speaks JSON directly. It does not go through the human section editor — it emits the full output schema and the backend saves it verbatim. This means **the renderer is the contract; the human editor is progressive UI built on top of it.**
+
+Concretely:
+
+- Every property documented in the AI output schema (gradients, overlays, drop caps, font imports, zone schemes, etc.) must be **handled by the page renderer** before Part 2 ships.
+- The human section editor does **not** need to expose UI controls for all of these properties on day one. It must, however, be a faithful steward: any property present in the stored JSON that the editor doesn't know how to display an explicit control for must be **passed through unchanged on save**. Unknown properties must never be silently dropped.
+- Human editor controls for AI-accessible properties can be added incrementally over subsequent phases. There is no requirement for parity between what the AI can produce and what the human can directly manipulate.
+
+This unlocks an important capability: an owner can run the Mul Converter to produce a richly styled page (gradient hero, custom fonts, drop cap opening paragraph, overlay scrim), open it in the section editor to adjust placeholder text, and save — without any of the AI-applied styling being lost, even though the editor has no controls for those properties yet.
+
+---
+
 ## Non-Goals (v1)
-ok
+
 - Automated content migration (text, images) from the source page
 - Semantic replication of navigation structure
-- Support for CSS animations, gradients as accent colors, or transparency effects in the palette
-- Font pairing extraction (deferred to v2; font names are read but not yet wired into the font pairing system)
+- Support for CSS animations or transparency effects in the palette color slots
 - Batch/multi-URL analysis
 - Conversion history or diff view
 - Freeform/absolute canvas positioning (see Page Schema Evolution below)
+- Human editor UI controls for every AI-accessible property (see Renderer-First Design below)
 
 ---
 
@@ -121,23 +135,61 @@ A new `type: 'sections'` page format runs alongside the existing `layout`/`zones
 interface PageZone {
   id: string;       // client-generated UUID
   span: number;     // positive integer; number of grid columns this zone occupies
+  scheme?: 'inherit' | 'light' | 'dark';  // text color context for this zone
+                    //   inherit (default) — uses the page foreground CSS variable
+                    //   light — forces light-on-dark text (white foreground)
+                    //   dark  — forces dark-on-light text (near-black foreground)
+                    // Use when a zone sits on a dark background section but the
+                    // zone itself needs its own text treatment.
   content: TipTapDoc;
 }
 
-interface PageSection {
-  id: string;       // client-generated UUID
-  columns: number;  // grid resolution for this section — positive integer, no upper limit
-  minHeight?: string;  // CSS value — e.g. "100vh", "400px"; omit for auto height
-  background?: {
-    type: 'none' | 'color' | 'image';
-    value?: string;       // hex string for 'color'; "media://uuid" for 'image'
-    attachment?: 'scroll' | 'fixed' | 'parallax';
+interface SectionBackground {
+  type: 'none' | 'color' | 'gradient' | 'image';
+  value?: string;
+    // type 'color'    → hex string, e.g. "#1a2b3c"
+    // type 'gradient' → CSS gradient string, e.g. "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)"
+    //                   Any valid CSS gradient expression is accepted.
+    // type 'image'    → "media://uuid" for a Media Library asset, or
+    //                   "media://placeholder" for an AI-generated slot the owner will fill
+  attachment?: 'scroll' | 'fixed' | 'parallax';  // only meaningful for 'image'
+  overlay?: {
+    color: string;    // hex color for the scrim, e.g. "#000000"
+    opacity: number;  // 0–1; typical values 0.3–0.6
   };
+    // overlay renders as a semi-transparent layer between the background and the zone content.
+    // Essential for image + light-text combinations (the classic hero pattern).
+    // Works with all background types but is most useful with 'image' and 'gradient'.
+}
+
+interface PageSection {
+  id: string;         // client-generated UUID
+  columns: number;    // grid resolution for this section — positive integer, no upper limit
+  minHeight?: string; // CSS value — e.g. "100vh", "400px"; omit for auto height
+  padding?: 'none' | 'compact' | 'normal' | 'spacious';
+    // Controls vertical padding (padding-block) on the section:
+    //   none      → py-0  (flush sections, used for full-bleed image blocks)
+    //   compact   → py-8  (tight content rows, feature grids)
+    //   normal    → py-16 (default; body content sections)
+    //   spacious  → py-24 (hero sections, major transitions)
+    // Omitting padding defaults to 'normal'.
+  background?: SectionBackground;
   zones: PageZone[];  // ordered left-to-right; spans must sum to columns
 }
 
 interface SectionsPageContent {
   type: 'sections';
+  fontImport?: string;
+    // A Google Fonts (or other web font provider) @import URL.
+    // e.g. "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap"
+    // Injected as a <link> in the page <head> when this page is rendered.
+    // Does not affect other pages or the global theme.
+  fontVariables?: {
+    heading?: string;  // CSS font-family value, e.g. "'Playfair Display', Georgia, serif"
+    body?: string;     // CSS font-family value, e.g. "'Lato', system-ui, sans-serif"
+  };
+    // When set, these override --font-heading and --font-body CSS variables for this page only.
+    // Only meaningful when fontImport is also set (otherwise the font may not be available).
   sections: PageSection[];
 }
 ```
@@ -416,9 +468,38 @@ Each TipTap document:
   { "type": "doc", "content": [...nodes] }
 
 Available TipTap node types for scaffold content:
-  { "type": "heading", "attrs": { "level": 1|2|3 }, "content": [{ "type": "text", "text": "..." }] }
-  { "type": "paragraph", "content": [{ "type": "text", "text": "..." }] }
+
+  Headings:
+  { "type": "heading", "attrs": { "level": 1|2|3, "textAlign": "left"|"center"|"right" },
+    "content": [{ "type": "text", "text": "...", "marks": [...] }] }
+
+  Paragraphs:
+  { "type": "paragraph",
+    "attrs": { "textAlign": "left"|"center"|"right"|"justify", "dropCap": true|false },
+    "content": [{ "type": "text", "text": "...", "marks": [...] }] }
+    // textAlign "justify" produces newspaper-style full-width justification with automatic hyphenation.
+    // dropCap true applies an ornate enlarged initial letter to the first character of the paragraph.
+    //   Use dropCap on the opening paragraph of long-form content sections to signal literary quality.
+    //   Do not combine dropCap with textAlign "center" — the float interaction is undefined.
+
+  Lists:
   { "type": "bulletList", "content": [{ "type": "listItem", "content": [...] }] }
+  { "type": "orderedList", "content": [{ "type": "listItem", "content": [...] }] }
+
+  Horizontal rule:
+  { "type": "horizontalRule" }
+    // Use as a subtle section divider within a zone; prefer over empty paragraphs for spacing.
+
+Available text marks (applied in the "marks" array on text nodes):
+
+  Bold:          { "type": "bold" }
+  Italic:        { "type": "italic" }
+  Uppercase label (for section labels, eyebrows, captions):
+                 { "type": "textStyle", "attrs": { "textTransform": "uppercase", "letterSpacing": "wide" } }
+    // Produces the "ABOUT THE AUTHOR" / "CHAPTER ONE" editorial label style.
+    // textTransform values: "none" | "uppercase" | "lowercase" | "capitalize"
+    // letterSpacing values: "tight" | "normal" | "wide" | "wider"
+    // Can combine: uppercase + wide is the most common editorial pattern.
 
 CRITICAL: Do NOT produce empty text nodes ({ "type": "text", "text": "" }) — TipTap will discard
 them and silently break the document. Every text node must have non-empty text.
@@ -439,13 +520,37 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
   },
   "page": {
     "suggestedTitle": string, // proposed page title based on the source page
+    "fontImport": string | undefined,
+      // Google Fonts @import URL if the source page uses a recognisable web font
+      // e.g. "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap"
+      // Omit if the page uses system fonts or the font is unidentifiable.
+    "fontVariables": {
+      "heading": string | undefined,  // e.g. "'Playfair Display', Georgia, serif"
+      "body": string | undefined      // e.g. "'Lato', system-ui, sans-serif"
+    } | undefined,
     "sections": [
       {
         "columns": number,    // positive integer — grid resolution for this section
-        "minHeight": string | undefined,
-        "background": { "type": "none"|"color"|"image", "value": string, "attachment": "scroll"|"fixed"|"parallax" } | undefined,
+        "minHeight": string | undefined,   // e.g. "100vh" for hero; omit for auto
+        "padding": "none" | "compact" | "normal" | "spacious" | undefined,
+        "background": {
+          "type": "none" | "color" | "gradient" | "image",
+          "value": string | undefined,
+            // color    → hex string, e.g. "#1a2b3c"
+            // gradient → CSS gradient, e.g. "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)"
+            // image    → "media://placeholder"
+          "attachment": "scroll" | "fixed" | "parallax" | undefined,
+          "overlay": { "color": string, "opacity": number } | undefined
+            // overlay.color → hex, e.g. "#000000"
+            // overlay.opacity → 0–1, e.g. 0.45
+        } | undefined,
         "zones": [            // ordered array, left to right; spans must sum to columns
-          { "id": string, "span": number, "content": { "type": "doc", "content": [...] } }
+          {
+            "id": string,
+            "span": number,
+            "scheme": "inherit" | "light" | "dark" | undefined,
+            "content": { "type": "doc", "content": [...] }
+          }
         ]
       }
       // … one entry per section
@@ -459,6 +564,63 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
 ```
 
 The system prompt is assembled in `MulConverterService.buildSystemPrompt()` and kept as a constant — it is not user-editable in v1.
+
+### Aesthetic Vocabulary — Guidance for the AI
+
+The system prompt must explicitly teach the AI when and how to use each aesthetic tool. Raw schema documentation is insufficient; the AI needs design intent, not just field names. The following guidance belongs in Section 3 of the system prompt:
+
+```
+[SECTION 3B — Aesthetic tools and when to use them]
+
+BACKGROUNDS
+  Use "gradient" for sections whose source page has a gradient hero, a dark tech aesthetic,
+  or any depth-layered background. Prefer CSS linear-gradient with 2–3 stops.
+  Example: "linear-gradient(160deg, #0d1b2a 0%, #1b263b 60%, #415a77 100%)"
+
+  Use "image" with type "media://placeholder" for any section the source page builds around
+  a background photograph. Always pair with an overlay when the zone text must be light-on-dark:
+    overlay: { "color": "#000000", "opacity": 0.45 }
+  Adjust opacity: 0.3 for subtle texture, 0.6+ for full legibility.
+
+  Use overlay on gradient backgrounds when zone text needs extra contrast beyond the gradient alone.
+
+PADDING
+  Match the source page's visual breathing room:
+    spacious → viewport-height heroes, major brand statements
+    normal   → standard body sections (default; omit if unsure)
+    compact  → feature grids, testimonial rows, tight content bands
+    none     → flush image blocks, map embeds, full-bleed elements
+
+ZONE SCHEME
+  Set zone.scheme: "light" when the section background is dark (gradient or dark color) and
+  the zone content needs white text. Set "dark" for zones on light/pale backgrounds that need
+  to explicitly force dark text. "inherit" or omitting scheme is correct for neutral sections.
+
+FONT IMPORT
+  Read the source page's font-family declarations in the extracted CSS. If you identify a
+  Google Fonts typeface, emit the Google Fonts URL in fontImport and the CSS font-family
+  values in fontVariables. This is one of the strongest brand-identity signals available.
+  If the page uses system fonts (Georgia, Arial, system-ui, etc.), omit fontImport entirely.
+
+TEXT ALIGNMENT
+  Center-align headings in hero sections (h1, h2 in spacious sections with dark backgrounds).
+  Left-align all body text and headings in content sections by default.
+  Use "justify" on long-form body paragraphs only — it signals editorial authority,
+  appropriate for literary or journalistic pages. Always combine with dropCap on the first
+  paragraph of a long-form content section.
+
+DROP CAPS
+  Apply dropCap: true to the first paragraph of any zone that contains extended prose and
+  where the source page has an editorial, literary, or magazine character. Drop caps signal
+  craft and are one of the clearest typographic identity markers for author and publishing sites.
+  Do not apply to list items, short paragraph stubs, or placeholder-only zones.
+
+UPPERCASE LABELS
+  Use the textStyle mark with textTransform: "uppercase" and letterSpacing: "wide" for
+  section eyebrows (short label text above a headline) and caption-style text. This pattern
+  ("ABOUT THE AUTHOR", "FEATURED WORK", "CHAPTER ONE") is a strong editorial voice marker.
+  Match it to the source page's typographic hierarchy.
+```
 
 ### Structured Output Enforcement
 
@@ -610,10 +772,10 @@ Browser (owner)
 ## Future Work (v2+)
 
 - **Vision mode**: Optionally take a screenshot via a configurable screenshot API (urlbox.io, htmlcsstoimage.com) and send the image to a vision-capable model alongside the HTML data. Significantly better for visually unusual pages that don't expose colors in CSS, or pages that rely on background images for layout identity.
-- **Font pairing extraction**: Read `font-family` declarations from extracted CSS; map to available font pairings or generate a Google Fonts URL for custom pairings.
 - **Section background image upload**: After scaffold creation, prompt the owner to upload images from the Media Library to fill `"media://placeholder"` background slots in the generated sections.
 - **Conversion history**: Store past `MulResult` entries so the owner can revisit or re-apply a previous analysis without re-fetching.
 - **Palette editing UI**: A color-picker interface for adjusting individual slots before saving, rather than raw hex inputs.
 - **Export / share**: Export a palette as a JSON file that another AECMS instance can import.
 - **Section responsive overrides**: Per-section `collapseBelow` setting to control at which breakpoint columns collapse — for cases where a 2-column section should remain 2-column on tablet.
+- **Human editor controls for AI properties**: UI controls in the section editor for gradient backgrounds, overlay opacity, zone scheme, drop caps, letter spacing, and text transform. These properties are handled by the renderer and steward-preserved by the editor in v1 but have no explicit controls. Add incrementally.
 - **Freeform canvas positioning**: Absolute x/y placement of blocks. Requires a full breakpoint system to remain responsive; out of scope for AECMS's lightweight positioning as a CMS, not a visual builder.
