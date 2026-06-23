@@ -1,23 +1,29 @@
 'use client';
 
-import { parsePageContent } from '@/lib/pageContent';
+import { parseAnyPageContent, isSectionsContent } from '@/lib/pageContent';
 import { NoSidebarLayout } from './layouts/NoSidebarLayout';
 import { SidebarLeftLayout } from './layouts/SidebarLeftLayout';
 import { SidebarRightLayout } from './layouts/SidebarRightLayout';
 import { SplitComparisonLayout } from './layouts/SplitComparisonLayout';
-import type { Page } from '@/types';
+import { SectionsLayout } from './layouts/SectionsLayout';
+import type { Page, PageContent } from '@/types';
 
 interface PageRendererProps {
   page: Page;
 }
 
 export function PageRenderer({ page }: PageRendererProps) {
-  const content = parsePageContent(page.content);
+  const content = parseAnyPageContent(page.content);
 
-  switch (content.layout) {
-    case 'sidebar_left':     return <SidebarLeftLayout zones={content.zones} />;
-    case 'sidebar_right':    return <SidebarRightLayout zones={content.zones} />;
-    case 'split_comparison': return <SplitComparisonLayout zones={content.zones} />;
-    default:                 return <NoSidebarLayout zones={content.zones} />;
+  if (isSectionsContent(content)) {
+    return <SectionsLayout content={content} />;
+  }
+
+  const legacy = content as PageContent;
+  switch (legacy.layout) {
+    case 'sidebar_left':     return <SidebarLeftLayout zones={legacy.zones} />;
+    case 'sidebar_right':    return <SidebarRightLayout zones={legacy.zones} />;
+    case 'split_comparison': return <SplitComparisonLayout zones={legacy.zones} />;
+    default:                 return <NoSidebarLayout zones={legacy.zones} />;
   }
 }
