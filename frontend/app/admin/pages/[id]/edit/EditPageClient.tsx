@@ -212,7 +212,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         </div>
         <div className="flex items-center gap-3">
           <a
-            href={`/admin/pages/${pageId}/preview`}
+            href={`/preview/${pageId}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border rounded-lg hover:bg-surface-raised transition-colors"

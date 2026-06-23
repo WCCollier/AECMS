@@ -93,9 +93,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       if (!userId) {
-        // sessionStorage was cleared (browser restart) — tokens may still be valid,
-        // but we have no user context. Redirect to login; the stored tokens will
-        // auto-fill the refresh flow on the next successful login.
+        // sessionStorage is missing (new tab or browser restart).
+        // Fall back to decoding the userId from the JWT payload — no signature
+        // verification needed here; the server validates on the API call below.
+        // Do NOT call clearAdminSession(): localStorage is shared across tabs,
+        // and wiping it here would destroy the session in the original tab.
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          userId = payload.sub ?? null;
+        } catch { /* malformed token — fall through to redirect */ }
+      }
+
+      if (!userId) {
+        // Token is malformed and we can't determine user identity.
         clearAdminSession();
         router.push('/admin/login');
         return;

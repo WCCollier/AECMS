@@ -117,39 +117,54 @@ function SpanDiagram({ section, onUpdate }: SpanDiagramProps) {
   }
 
   return (
-    <div ref={diagramRef} className="relative flex h-7 flex-1 min-w-0 gap-0 select-none">
-      {section.zones.map((zone, i) => (
-        <div
-          key={zone.id}
-          onMouseEnter={() => setHoveredZone(i)}
-          onMouseLeave={() => setHoveredZone(null)}
-          className="relative flex items-center justify-center bg-foreground/10 border border-foreground/20 rounded text-xs text-foreground/50 transition-colors hover:bg-foreground/15"
-          style={{ flex: zone.span, minWidth: 0 }}
-        >
-          <span>{zone.span}</span>
+    <div className="flex-1 min-w-0 select-none flex flex-col gap-0.5">
+      {/* Column ruler — one cell per column unit, aligned to the zone blocks below */}
+      <div className="flex h-2">
+        {Array.from({ length: section.columns }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-1 flex items-center justify-center border-l border-foreground/20 last:border-r"
+          >
+            <span className="text-[7px] text-foreground/30 leading-none">{i + 1}</span>
+          </div>
+        ))}
+      </div>
 
-          {section.zones.length > 1 && hoveredZone === i && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); handleRemoveZone(i); }}
-              className="absolute top-0.5 right-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full bg-red-500/80 text-white text-[9px] leading-none hover:bg-red-600"
-              title="Remove zone"
-            >×</button>
-          )}
+      {/* Zone blocks — ref here so gutter drag clientWidth matches the ruler width */}
+      <div ref={diagramRef} className="relative flex h-7 gap-0">
+        {section.zones.map((zone, i) => (
+          <div
+            key={zone.id}
+            onMouseEnter={() => setHoveredZone(i)}
+            onMouseLeave={() => setHoveredZone(null)}
+            className="relative flex items-center justify-center bg-foreground/10 border border-foreground/20 rounded text-xs text-foreground/50 transition-colors hover:bg-foreground/15"
+            style={{ flex: zone.span, minWidth: 0 }}
+          >
+            <span>{zone.span}</span>
 
-          {i < section.zones.length - 1 && (
-            <div
-              className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize z-10 translate-x-1/2 flex items-center justify-center hover:bg-accent/20 rounded"
-              onPointerDown={(e) => handleGutterPointerDown(e, i)}
-              onPointerMove={(e) => handleGutterPointerMove(e, i)}
-              onPointerUp={() => { gutterDrag.current = null; }}
-              onPointerCancel={() => { gutterDrag.current = null; }}
-            >
-              <div className="w-px h-4 bg-foreground/40" />
-            </div>
-          )}
-        </div>
-      ))}
+            {section.zones.length > 1 && hoveredZone === i && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleRemoveZone(i); }}
+                className="absolute top-0.5 right-0.5 w-3.5 h-3.5 flex items-center justify-center rounded-full bg-red-500/80 text-white text-[9px] leading-none hover:bg-red-600"
+                title="Remove zone — its columns merge into the adjacent zone"
+              >×</button>
+            )}
+
+            {i < section.zones.length - 1 && (
+              <div
+                className="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize z-10 translate-x-1/2 flex items-center justify-center hover:bg-accent/20 rounded"
+                onPointerDown={(e) => handleGutterPointerDown(e, i)}
+                onPointerMove={(e) => handleGutterPointerMove(e, i)}
+                onPointerUp={() => { gutterDrag.current = null; }}
+                onPointerCancel={() => { gutterDrag.current = null; }}
+              >
+                <div className="w-px h-4 bg-foreground/40" />
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -464,7 +479,7 @@ export function SectionEditor({
             </div>
             <WidgetSizeProvider size="large">
               <TipTapEditor
-                content={zone.content ? JSON.stringify(zone.content) : ''}
+                content={zoneHasContent(zone) ? JSON.stringify(zone.content) : ''}
                 onChange={(val) => handleZoneContentChange(idx, val)}
                 placeholder="Start writing…"
               />

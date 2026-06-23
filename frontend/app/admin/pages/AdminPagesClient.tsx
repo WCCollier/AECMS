@@ -127,7 +127,7 @@ export function AdminPagesClient() {
                             </a>
                           ) : (
                             <a
-                              href={`/admin/pages/${p.id}/preview`}
+                              href={`/preview/${p.id}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               title="Preview draft"
