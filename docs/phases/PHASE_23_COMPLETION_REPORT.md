@@ -1,7 +1,7 @@
 # Phase 23 Completion Report: Mul Converter
 
-**Status**: Built — Part 1 (awaiting testbed QA → deploy), Part 2 (awaiting testbed QA → merge to main → deploy), Part 3 (📋 planned — begins after Part 2 deploys)
-**Branch**: `feature/phase-23-part-2` @ `0e1026d` (pushed to GitHub)  
+**Status**: ✅ ALL THREE PARTS BUILT — Part 1 + 2 on `feature/phase-23-part-2` (awaiting testbed QA → deploy); Part 3 on `feature/phase-23-part-3` (built `216d158`, awaiting merge after Part 2 deploys)
+**Branches**: `feature/phase-23-part-2` @ `7c7d6e7`; `feature/phase-23-part-3` @ `216d158`
 **PRD**: `docs/prd/13-mul-converter.md` v1.7  
 **Plan**: `docs/phases/PHASE_23_PLAN.md`  
 **Tests**: 190 backend + 125 frontend unit tests passing (315 total)
@@ -403,9 +403,9 @@ The following were added beyond the original plan items (A–O), driven by PRD v
 
 ---
 
-## Part 3: Planned (begins after Part 2 deploys)
+## Part 3: Built (`feature/phase-23-part-3` @ `216d158`)
 
-Part 3 is a frontend-only evolution with no backend changes. Full specification in `docs/phases/PHASE_23_PLAN.md` items P–V and `docs/prd/13-mul-converter.md` Part 3 section (PRD v1.7).
+Part 3 extended both frontend and backend. Full specification in `docs/phases/PHASE_23_PLAN.md` items P–V and `docs/prd/13-mul-converter.md` Part 3 section (PRD v1.7).
 
 ### Key architectural decisions
 
@@ -435,6 +435,41 @@ The HTML extractor gains `extractAnimationSignals()` producing a structured obje
 **SectionBackgroundPanel:**
 The background flyout is promoted to a slide-in drawer with three sub-sections: Background (None/Color/Gradient/Image with live preview), Overlay (None/Solid/Gradient with named presets), Transition (icon+label picker with descriptions). Transition value `'none'` is labelled "Scroll" in the UI for clarity.
 
+### Part 3 — What was built
+
+**Item P + Q — Schema changes** (`frontend/types/index.ts`):
+- `SectionBackground.attachment` marked `@deprecated`; read-time fallback in renderer
+- `transition` field added: `'none' | 'fixed' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'parallax'`
+- `overlay.gradient` added: optional CSS gradient string with alpha stops for directional vignettes
+
+**Item R — Two-pass renderer** (`frontend/components/pages/layouts/SectionsLayout.tsx`):
+- Pass 1: fixed-position background stack — all sections with `transition !== 'none'` become `position: fixed; inset: 0` layers, z-ordered with earlier sections higher
+- Pass 2: transparent scroll spacers in normal flow for fixed-stack sections; inline sections render normally
+- Scroll listener drives per-transition animations: opacity (fade), clip-path (wipe-v/wipe-left/wipe-right), translateY (slide-up/parallax)
+- Parallax: image div in layer gets `±10%` translateY drift; overlay div (sibling) stays planted; image oversized 20% top+bottom (prevents black bars)
+- `transition:'fixed'` snaps layer to hidden once spacer fully scrolls out (clean handoff to next layer)
+- `|| vh` spacerHeight fallback handles zero-height narrow sections
+
+**Item S — SectionBackgroundPanel** (`frontend/components/admin/SectionBackgroundPanel.tsx`):
+- Slide-in drawer from right edge (w-80), replacing the old BackgroundFlyout
+- Sub-section 1 Background: type selector + color picker / gradient textarea+presets+swatch preview / image URL+thumbnail
+- Sub-section 2 Overlay: None/Solid/Gradient mode; solid = hex+opacity+preview; gradient = 5 named presets (Bottom/Top/Dual/Radial/Side) + text edit + preview on checkerboard
+- Sub-section 3 Transition: 8-option radio list with icon + label + one-line description; only shown for image/gradient background types
+- SectionEditor updated: BackgroundFlyout removed; new `Layers` icon BG button; 60vh + 75vh added to min-height dropdown
+
+**Item T — AnimationSignals** (`backend/src/mul-converter/`):
+- `AnimationSignals` interface added to `mul-converter.types.ts` (10 fields)
+- `extractAnimationSignals(html)` added to `html-extractor.ts`: detects fixed-background, scroll timelines, keyframes, opacity/transform transitions, sticky elements, high-z stacks, library fingerprints (AOS/GSAP/Locomotive/Framer/ScrollReveal), overlay gradients, motion class names
+- `PageData.animationSignals` populated by `extractPageData()`
+- `buildUserMessage()` updated in all three providers (anthropic, openai, xai) to include Animation signals block
+
+**Item U — System prompt Section 3C** (`backend/src/mul-converter/system-prompt.ts`):
+- `attachment` field replaced with `transition` in Section 3 schema documentation (full vocabulary + descriptions)
+- `overlay` schema extended with `gradient` field + examples
+- Section 3C decision tree added: 10 rules mapping AnimationSignals to transition choices
+- Overlay default rules: bottom vignette for image bg with heading zones; always overlay for parallax
+- `minHeight: "60vh"` rule for any image bg with transition
+
 ---
 
 ## Deployment Sequence
@@ -443,6 +478,7 @@ The background flyout is promoted to a slide-in drawer with three sub-sections: 
 2. **Ship aesthetic vocabulary**: `git checkout deploy && git merge main --no-edit && git push origin deploy && git checkout main`
 3. **Testbed QA — Part 2** (Mul Converter on `feature/phase-23-part-2`): configure a text provider, analyze a public URL, verify palette result, verify page draft creation, verify custom palette appears in Appearance panel
 4. **Merge Part 2 to main**: `git checkout main && git merge feature/phase-23-part-2 --no-edit`
-5. **Ship Part 2 to deploy**: `git checkout deploy && git merge main --no-edit && git push origin deploy && git checkout main`
-6. **Post-deploy**: seed `mul.convert` capability against production DB: `npx prisma db seed` via Cloud SQL proxy (idempotent — also covers `media.manage` from Phase 22)
-7. **Build Part 3** on a new feature branch after Part 2 is live
+5. **Testbed QA — Part 3** (on `feature/phase-23-part-3`): open page editor, add image bg section, set fade/parallax transition, verify scroll animation; test SectionBackgroundPanel all sub-sections; run Mul Converter against an animated site, verify `transition` appears in scaffold
+6. **Merge Part 3 to main**: `git checkout main && git merge feature/phase-23-part-3 --no-edit`
+7. **Ship Parts 2 + 3 to deploy**: `git checkout deploy && git merge main --no-edit && git push origin deploy && git checkout main`
+8. **Post-deploy**: seed `mul.convert` capability against production DB: `npx prisma db seed` via Cloud SQL proxy (idempotent — also covers `media.manage` from Phase 22)
