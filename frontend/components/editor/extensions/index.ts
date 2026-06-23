@@ -11,6 +11,7 @@ import { ArticleEmbedNode } from './article-embed';
 import { ProductEmbedNode } from './product-embed';
 import { RssEmbedNode } from './rss-embed';
 import { SearchResultsEmbedNode } from './search-results-embed';
+import { DropCapExtension, EnhancedTextStyle } from './typographic';
 
 export { CalloutNode } from './callout';
 export { VideoEmbedNode } from './video-embed';
@@ -22,10 +23,15 @@ export { ProductEmbedNode } from './product-embed';
 export { RssEmbedNode } from './rss-embed';
 export { SearchResultsEmbedNode } from './search-results-embed';
 export { conditionalDisplayAttribute, SHOW_WHEN_OPTIONS, SHOW_WHEN_LABELS } from './conditionalDisplay';
+export { DropCapExtension, EnhancedTextStyle } from './typographic';
+
+const TEXT_ALIGN_TYPES = ['heading', 'paragraph'];
 
 const baseExtensions = [
   StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
-  TextAlign.configure({ types: ['heading', 'paragraph'] }),
+  TextAlign.configure({ types: TEXT_ALIGN_TYPES, alignments: ['left', 'center', 'right', 'justify'] }),
+  EnhancedTextStyle,
+  DropCapExtension,
   Link.configure({
     openOnClick: false,
     HTMLAttributes: { class: 'text-accent underline hover:text-accent-hover' },
@@ -64,7 +70,9 @@ export function getEditorExtensions() {
 export function getDisplayExtensions() {
   return [
     StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    TextAlign.configure({ types: TEXT_ALIGN_TYPES, alignments: ['left', 'center', 'right', 'justify'] }),
+    EnhancedTextStyle,
+    DropCapExtension,
     Link.configure({
       openOnClick: true,
       HTMLAttributes: { class: 'text-accent underline hover:text-accent-hover' },

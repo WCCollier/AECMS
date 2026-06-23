@@ -7,7 +7,7 @@ import {
   Undo, Redo, Link as LinkIcon, Unlink, Heading1, Heading2, Heading3,
   Minus, ImagePlus, X, Upload, Info, Video, Twitter, GalleryHorizontal,
   FileText, ShoppingBag, Square, Rss, LibraryBig,
-  AlignLeft, AlignCenter, AlignRight,
+  AlignLeft, AlignCenter, AlignRight, AlignJustify, Type,
 } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
@@ -310,6 +310,16 @@ export function TipTapEditor({
         </MenuButton>
         <MenuButton onClick={() => editor.chain().focus().setTextAlign('right').run()} isActive={editor.isActive({ textAlign: 'right' })} title="Align right">
           <AlignRight className="w-4 h-4" />
+        </MenuButton>
+        <MenuButton onClick={() => editor.chain().focus().setTextAlign('justify').run()} isActive={editor.isActive({ textAlign: 'justify' })} title="Justify (newspaper)">
+          <AlignJustify className="w-4 h-4" />
+        </MenuButton>
+        <MenuButton
+          onClick={() => editor.chain().focus().toggleDropCap().run()}
+          isActive={editor.isActive({ dropCap: true })}
+          title="Drop cap (opening paragraph flourish)"
+        >
+          <Type className="w-4 h-4" />
         </MenuButton>
 
         <MenuDivider />

@@ -769,10 +769,96 @@ Browser (owner)
 
 ---
 
+---
+
+## Part 2B — Bitmap-Imitating Layer (Image Generation)
+
+After the core scaffold generation (Part 2) is stable, a progressive-enhancement layer can replace `"media://placeholder"` slots with AI-generated images that approximate the mood and composition of the originals. This is an optional feature gated by a separate image provider configuration.
+
+### Concept
+
+The semantic text model already sees enough to write an image brief — alt text, figure captions, DOM context (`.hero__bg`, `.banner`, `og:image`), and surrounding headline text. Each `"media://placeholder"` in the generated scaffold corresponds to one image brief the model can produce as part of its output. A separate image generation model then renders each brief into a real bitmap. The generated image is uploaded to the Media Library (GCS public bucket) and a `Media` record is created — the section background references a real `media://uuid` from day one.
+
+The generated images are new original works. They are **inspired by** (not reproductions of) the source: the brief describes mood, composition, and subject matter inferred from DOM context, not pixel-level copying. This is legally clean.
+
+### Data Flow
+
+```
+MulConverterService.analyze(url)
+  │ ... existing text analysis + scaffold generation ...
+  │
+  ├── for each section with background.type === "image":
+  │     AI output includes: imageBriefs[id] = { description, aspectRatio, style }
+  │
+  ├── [if image provider configured]
+  │     for each imageBrief:
+  │       → POST to image generation API (brief → bitmap)
+  │       → Upload bitmap to GCS public bucket
+  │       → Create Media record in DB
+  │       → Replace "media://placeholder" with "media://{newUuid}" in sections
+  │
+  └── Return MulResult (with real media refs if image generation ran)
+```
+
+### AI Output Extension
+
+The scaffold generation prompt gains a new output field when image generation is enabled:
+
+```json
+"imageBriefs": {
+  "<zone-or-section-id>": {
+    "description": "A dramatic mountain landscape at golden hour, warm amber and purple tones, photorealistic",
+    "aspectRatio": "16:9",
+    "style": "photorealistic | illustration | abstract"
+  }
+}
+```
+
+The section that declares `background.type: "image"` and `background.value: "media://placeholder"` uses the matching `id` as its key in `imageBriefs`.
+
+### Image Provider Abstraction
+
+```typescript
+interface ImageProvider {
+  generate(brief: ImageBrief): Promise<Buffer>; // returns PNG/JPEG bytes
+}
+
+class DallE3Provider implements ImageProvider { ... }     // OpenAI DALL-E 3
+class StabilityProvider implements ImageProvider { ... }  // Stability AI SDXL
+class FluxProvider implements ImageProvider { ... }       // Flux via fal.ai
+```
+
+Provider selected by `mul.image_provider` ISM key. The module uses REST/fetch — no image SDK hard dependency.
+
+### New ISM Keys (namespace: `mul.*`)
+
+| Key | Encrypted | Description |
+|-----|-----------|-------------|
+| `mul.image_provider` | No | `dalle3` \| `stability` \| `flux` — omit to disable image generation |
+| `mul.image_api_key_enc` | Yes | API key for the image provider (may be same as text provider for OpenAI) |
+
+### Settings Panel Extension
+
+The MulSettingsPanel gains an optional "Image Generation" section (collapsed by default, shown only if `mul.image_provider` is set or owner expands it):
+
+- Image provider radio: `DALL-E 3` | `Stability AI` | `Flux (fal.ai)` | `Disabled`
+- API Key: password input (separate from text model key; may be left blank to share the text key for DALL-E 3)
+- Info note: "Image generation adds ~10–20s per image. Images are saved to your Media Library."
+
+### Latency and Cost Notes
+
+- DALL-E 3: ~8–15s per image, ~$0.04–0.08 per image (1024×1024)
+- Stability AI SDXL: ~3–8s per image, ~$0.002–0.006 per image
+- Flux (fal.ai): ~2–5s, competitive pricing, highest quality
+
+For a typical 3-section scaffold with 2 background images, total generation adds ~15–30s. The UI should show per-image progress in the "Analyzing…" step.
+
+---
+
 ## Future Work (v2+)
 
 - **Vision mode**: Optionally take a screenshot via a configurable screenshot API (urlbox.io, htmlcsstoimage.com) and send the image to a vision-capable model alongside the HTML data. Significantly better for visually unusual pages that don't expose colors in CSS, or pages that rely on background images for layout identity.
-- **Section background image upload**: After scaffold creation, prompt the owner to upload images from the Media Library to fill `"media://placeholder"` background slots in the generated sections.
+- **Media Library image picker for placeholders**: After scaffold creation without image generation, a picker lets the owner drag Media Library assets into `"media://placeholder"` slots inline in the ResultsPanel.
 - **Conversion history**: Store past `MulResult` entries so the owner can revisit or re-apply a previous analysis without re-fetching.
 - **Palette editing UI**: A color-picker interface for adjusting individual slots before saving, rather than raw hex inputs.
 - **Export / share**: Export a palette as a JSON file that another AECMS instance can import.

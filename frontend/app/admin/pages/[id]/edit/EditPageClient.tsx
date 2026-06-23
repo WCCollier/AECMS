@@ -17,7 +17,7 @@ import {
   legacyToSections,
   LAYOUT_LABELS,
 } from '@/lib/pageContent';
-import type { Page, PageLayout, PageContent, PageSection } from '@/types';
+import type { Page, PageLayout, PageContent, PageSection, SectionsPageContent } from '@/types';
 
 const LAYOUT_OPTIONS: PageLayout[] = ['no_sidebar', 'sidebar_left', 'sidebar_right', 'split_comparison'];
 
@@ -43,8 +43,11 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [layoutChangeWarning, setLayoutChangeWarning] = useState(false);
   const [pendingLayout, setPendingLayout] = useState<PageLayout | null>(null);
 
-  // Sections mode state
+  // Sections mode state — fontImport/fontVariables are AI-set fields; the editor
+  // captures and re-emits them faithfully without exposing UI controls for them yet.
   const [sections, setSections] = useState<PageSection[]>([]);
+  const [fontImport, setFontImport] = useState<string | undefined>(undefined);
+  const [fontVariables, setFontVariables] = useState<SectionsPageContent['fontVariables']>(undefined);
 
   const [showInNav, setShowInNav] = useState(true);
   const [parentId, setParentId] = useState<string | null>(null);
@@ -75,6 +78,8 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
     if (isSectionsContent(parsed)) {
       setContentMode('sections');
       setSections(parsed.sections);
+      setFontImport(parsed.fontImport);
+      setFontVariables(parsed.fontVariables);
     } else {
       setContentMode('legacy');
       setLayout((parsed as PageContent).layout);
@@ -155,9 +160,14 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
     setSaving(true);
     setError(null);
     try {
-      const pageContent =
+      const pageContent: SectionsPageContent | { layout: PageLayout; zones: PageContent['zones'] } =
         contentMode === 'sections'
-          ? { type: 'sections', sections }
+          ? {
+              type: 'sections',
+              ...(fontImport ? { fontImport } : {}),
+              ...(fontVariables ? { fontVariables } : {}),
+              sections,
+            }
           : { layout, zones };
 
       const body: Record<string, unknown> = {

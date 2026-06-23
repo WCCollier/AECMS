@@ -243,7 +243,7 @@ function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
             <div>
               <p className="text-xs font-medium mb-1.5">Type</p>
               <div className="flex gap-1">
-                {(['none', 'color', 'image'] as const).map(t => (
+                {(['none', 'color', 'gradient', 'image'] as const).map(t => (
                   <button
                     key={t}
                     type="button"
@@ -252,7 +252,7 @@ function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
                       bg.type === t ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
                     }`}
                   >
-                    {t === 'none' ? 'None' : t === 'color' ? 'Color' : 'Image'}
+                    {t === 'none' ? 'None' : t === 'color' ? 'Color' : t === 'gradient' ? 'Gradient' : 'Image'}
                   </button>
                 ))}
               </div>
@@ -273,8 +273,46 @@ function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
                     value={bg.value ?? ''}
                     onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
                     className="flex-1 text-xs px-2 py-1 border border-border rounded font-mono bg-background"
-                    placeholder="#ffffff or rgba(…)"
+                    placeholder="#ffffff"
                   />
+                </div>
+              </div>
+            )}
+
+            {bg.type === 'gradient' && (
+              <div>
+                <p className="text-xs font-medium mb-1.5">Gradient</p>
+                <input
+                  type="text"
+                  value={bg.value ?? ''}
+                  onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
+                  className="w-full text-xs px-2 py-1.5 border border-border rounded font-mono bg-background"
+                  placeholder="linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
+                />
+                {bg.value && (
+                  <div className="mt-1.5 h-5 rounded border border-border" style={{ background: bg.value }} />
+                )}
+              </div>
+            )}
+
+            {bg.type !== 'none' && (
+              <div>
+                <p className="text-xs font-medium mb-1.5">Overlay</p>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={bg.overlay?.color ?? '#000000'}
+                    onChange={(e) => onUpdate({ ...bg, overlay: { color: e.target.value, opacity: bg.overlay?.opacity ?? 0 } })}
+                    className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
+                  />
+                  <input
+                    type="range"
+                    min={0} max={1} step={0.05}
+                    value={bg.overlay?.opacity ?? 0}
+                    onChange={(e) => onUpdate({ ...bg, overlay: { color: bg.overlay?.color ?? '#000000', opacity: parseFloat(e.target.value) } })}
+                    className="flex-1"
+                  />
+                  <span className="text-[10px] text-foreground/50 w-8 text-right">{Math.round((bg.overlay?.opacity ?? 0) * 100)}%</span>
                 </div>
               </div>
             )}
@@ -428,10 +466,22 @@ export function SectionEditor({
         />
 
         <select
+          value={section.padding ?? 'normal'}
+          onChange={(e) => onUpdate({ ...section, padding: e.target.value as import('@/types').SectionPadding })}
+          className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
+          title="Section padding"
+        >
+          <option value="none">No pad</option>
+          <option value="compact">Compact</option>
+          <option value="normal">Normal</option>
+          <option value="spacious">Spacious</option>
+        </select>
+
+        <select
           value={heightValue}
           onChange={(e) => onUpdate({ ...section, minHeight: e.target.value || undefined })}
           className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
-          title="Section height"
+          title="Section min-height"
         >
           <option value="">Auto</option>
           <option value="50vh">50vh</option>
@@ -468,14 +518,29 @@ export function SectionEditor({
           >
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-foreground/25 select-none">Span {zone.span}</span>
-              <button
-                type="button"
-                onClick={() => handleSplitZone(idx)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground/40 hover:text-foreground/70 flex items-center gap-0.5"
-                title="Split zone"
-              >
-                <CopyPlus className="w-3 h-3" />
-              </button>
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                <select
+                  value={zone.scheme ?? 'inherit'}
+                  onChange={(e) => {
+                    const scheme = e.target.value as import('@/types').ZoneScheme;
+                    onUpdate({ ...section, zones: section.zones.map((z, i) => i === idx ? { ...z, scheme } : z) });
+                  }}
+                  className="text-[10px] px-1 py-0.5 border border-border rounded bg-background cursor-pointer"
+                  title="Zone text colour scheme"
+                >
+                  <option value="inherit">inherit</option>
+                  <option value="light">light</option>
+                  <option value="dark">dark</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => handleSplitZone(idx)}
+                  className="text-foreground/40 hover:text-foreground/70 flex items-center gap-0.5"
+                  title="Split zone"
+                >
+                  <CopyPlus className="w-3 h-3" />
+                </button>
+              </div>
             </div>
             <WidgetSizeProvider size="large">
               <TipTapEditor

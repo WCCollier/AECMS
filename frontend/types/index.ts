@@ -80,30 +80,55 @@ export interface PageContent {
   };
 }
 
-// Section-based page content (Phase 23 Part 1)
+// Section-based page content (Phase 23)
 export interface SectionBackground {
-  type: 'none' | 'color' | 'image';
+  type: 'none' | 'color' | 'gradient' | 'image';
   value?: string;
-  attachment?: 'scroll' | 'fixed' | 'parallax';
+  // color    → hex string e.g. "#1a2b3c"
+  // gradient → CSS gradient string e.g. "linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
+  // image    → "media://uuid" or "media://placeholder"
+  attachment?: 'scroll' | 'fixed' | 'parallax'; // image only
+  overlay?: {
+    color: string;   // hex e.g. "#000000"
+    opacity: number; // 0–1
+  };
 }
+
+export type ZoneScheme = 'inherit' | 'light' | 'dark';
+// inherit (default) — uses page foreground CSS variable
+// light — white foreground (for zones on dark backgrounds)
+// dark  — near-black foreground (for zones on light backgrounds)
 
 export interface PageZone {
   id: string;
   span: number;
+  scheme?: ZoneScheme;
   content: object;
 }
+
+export type SectionPadding = 'none' | 'compact' | 'normal' | 'spacious';
+// none      → py-0  (flush / full-bleed)
+// compact   → py-8  (tight feature rows)
+// normal    → py-16 (default body sections)
+// spacious  → py-24 (hero / major transitions)
 
 export interface PageSection {
   id: string;
   /** Always equals sum(zone.span). Stored for schema consistency; never exposed as a raw input to editors. */
   columns: number;
   minHeight?: string;
+  padding?: SectionPadding;
   background?: SectionBackground;
   zones: PageZone[];
 }
 
 export interface SectionsPageContent {
   type: 'sections';
+  fontImport?: string;       // Google Fonts (or other) @import URL — injected in page <head>
+  fontVariables?: {
+    heading?: string;        // CSS font-family value — overrides --font-heading for this page
+    body?: string;           // CSS font-family value — overrides --font-body for this page
+  };
   sections: PageSection[];
 }
 

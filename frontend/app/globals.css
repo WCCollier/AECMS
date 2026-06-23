@@ -163,3 +163,52 @@ body {
   --tw-prose-th-borders:   var(--color-border);
   --tw-prose-td-borders:   var(--color-border);
 }
+
+/* ── Zone colour schemes ─────────────────────────────────── */
+/* Applied by SectionsLayout when zone.scheme is set.        */
+.zone-scheme-light {
+  --color-foreground:   #f8f8f8;
+  --color-muted:        rgba(248, 248, 248, 0.65);
+  --color-border:       rgba(248, 248, 248, 0.18);
+  color: var(--color-foreground);
+}
+.zone-scheme-dark {
+  --color-foreground:   #1a1a1a;
+  --color-muted:        rgba(26, 26, 26, 0.65);
+  --color-border:       rgba(26, 26, 26, 0.18);
+  color: var(--color-foreground);
+}
+
+/* ── Drop caps ───────────────────────────────────────────── */
+/* Applied via TipTap paragraph attribute dropCap: true.     */
+.prose-article p.drop-cap::first-letter,
+.prose-page p.drop-cap::first-letter {
+  font-family: var(--font-heading, Georgia, serif);
+  font-size: 4em;
+  font-weight: 700;
+  line-height: 0.8;
+  float: left;
+  margin: 0.05em 0.12em 0 0;
+  color: var(--color-accent);
+}
+
+/* ── Justified text ──────────────────────────────────────── */
+/* TipTap TextAlign extension sets data-text-align="justify" */
+.ProseMirror p[style*="text-align: justify"],
+.prose-article p[style*="text-align: justify"],
+.prose-page p[style*="text-align: justify"] {
+  text-align: justify;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  text-wrap: pretty;
+}
+
+/* ── TipTap text-transform / letter-spacing marks ───────── */
+/* Applied via TextStyle extension attrs on text nodes.      */
+[data-text-transform="uppercase"] { text-transform: uppercase; }
+[data-text-transform="lowercase"] { text-transform: lowercase; }
+[data-text-transform="capitalize"] { text-transform: capitalize; }
+[data-letter-spacing="tight"]  { letter-spacing: -0.04em; }
+[data-letter-spacing="normal"] { letter-spacing: 0; }
+[data-letter-spacing="wide"]   { letter-spacing: 0.08em; }
+[data-letter-spacing="wider"]  { letter-spacing: 0.16em; }
