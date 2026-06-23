@@ -66,6 +66,7 @@ Specific rules:
 **Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
 **Phase 25**: 📋 PLANNED - Cloud SQL → Neon migration: replace Cloud SQL (~$10/mo) with Neon Postgres free tier; one-line deploy.yml change + GCP Secret update; saves ~$10/month at near-zero effort. Plan: docs/phases/PHASE_25_PLAN.md
 **Phase 26**: 📋 PLANNED - SEO toolkit: per-content meta fields, Open Graph, JSON-LD structured data (Book/Article/Person/Service/BreadcrumbList), dynamic sitemap, robots.txt, SEO admin panel, book-specific fields (ISBN, Amazon/Goodreads sameAs). PRD: docs/prd/15-seo-toolkit.md. Plan: docs/phases/PHASE_26_PLAN.md
+**Phase 27**: 📋 PLANNED - Design Library: manual palette creation (10-slot color picker, contrast warnings), page template library (save/browse/create-from-template), export/import (AecmsPalette + AecmsTemplate JSON formats), Mul Converter → save-as-template integration. Community-shareable design artifacts with no platform infrastructure. PRD: docs/prd/16-design-library.md. Plan: docs/phases/PHASE_27_PLAN.md
 **Phase 31**: 💡 CONCEPT - Native mobile app: Expo/React Native app that targets any AECMS instance, reads the site manifest, applies the active theme natively, and renders articles/shop/account. Two models: single-site white-label (owner publishes their own app) and multi-site reader. PRD: docs/prd/14-mobile-app.md
 
 **Session 2026-06-18 improvements** (not phase-tracked):
@@ -318,10 +319,12 @@ Small, self-contained features that don't constitute major phase-level work live
 - `docs/phases/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, PayPal flat-rate, tax settings, reporting
 - `docs/phases/PHASE_25_PLAN.md` - Cloud SQL → Neon migration: ~$10/mo savings, one-line deploy change
 - `docs/phases/PHASE_26_PLAN.md` - SEO toolkit: 11 items, generateMetadata, JSON-LD, sitemap, robots, book fields
+- `docs/phases/PHASE_27_PLAN.md` - Design Library: manual palette creation, page templates, export/import, Mul Converter integration
 - `docs/prd/13-mul-converter.md` - Mul Converter PRD: full design spec (access control, data flow, AI provider abstraction, system prompt, custom palette system)
 - `docs/prd/14-mobile-app.md` - Mobile App PRD (Phase 31): Expo/React Native app, discovery manifest, theme mapping, two distribution models, IAP compliance notes
 - `docs/prd/15-seo-toolkit.md` - SEO Toolkit PRD (Phase 26): meta fields, OG tags, JSON-LD (Book/Article/Person/Service), sitemap, robots.txt, book ISBN/sameAs fields
-- `docs/prd/` - 15 PRD documents with full specifications
+- `docs/prd/16-design-library.md` - Design Library PRD (Phase 27): manual palettes, AecmsPalette/AecmsTemplate formats, template.manage capability, community sharing model
+- `docs/prd/` - 16 PRD documents with full specifications
 
 ## Notes for Claude
 
