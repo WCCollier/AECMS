@@ -51,6 +51,8 @@ const ENV_KEY_MAP: Record<string, string> = {
   // SEO
   'seo.site_name':                     'SITE_NAME',
   'seo.canonical_domain':              'APP_URL',
+  // Appearance (no env fallback — custom palettes are DB-only)
+  // mul.* keys (no env fallback — always configured via admin UI)
 };
 
 @Injectable()

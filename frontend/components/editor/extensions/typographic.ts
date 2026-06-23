@@ -37,7 +37,7 @@ export const DropCapExtension = Extension.create({
     return {
       toggleDropCap:
         () =>
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line
         ({ commands, editor }: { commands: any; editor: any }) => {
           const isActive = editor.isActive({ dropCap: true });
           return commands.updateAttributes('paragraph', { dropCap: !isActive });

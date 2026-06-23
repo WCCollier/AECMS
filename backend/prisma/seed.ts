@@ -80,6 +80,9 @@ async function main() {
     // System — Appearance (Owner-only by default; split so it can be delegated to Admin)
     { name: 'system.appearance',   category: 'system',    scope: 'backstage', description: 'Change site visual theme (colour palette and typography)' },
 
+    // Mul Converter (Owner-only — AI tool with external API key spend)
+    { name: 'mul.convert',         category: 'system',    scope: 'backstage', description: 'Run the Mul Converter AI tool to extract palettes and page layouts from external URLs' },
+
     // Digital Delivery (Admin by default; separate from product editing)
     { name: 'digital.deliver',     category: 'ecommerce', scope: 'backstage', description: 'Manage digital delivery — extend/regenerate download tokens, create admin grants' },
 
