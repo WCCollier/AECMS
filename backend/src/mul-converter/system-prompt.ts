@@ -47,8 +47,23 @@ Section schema:
     value: hex color string (for type "color"), e.g. "#1a2b3c"
            or CSS gradient string (for type "gradient"), e.g. "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)"
            or "media://placeholder" (for type "image") — owner will replace with a real upload
-    attachment: "scroll" | "fixed" | "parallax"
-    overlay: { "color": hex, "opacity": 0–1 } — semi-transparent scrim over background
+    transition: "none" | "fixed" | "fade" | "wipe-v" | "wipe-left" | "wipe-right" | "slide-up" | "parallax"
+      — "none"       background scrolls naturally with content (plain web behaviour; default for color/gradient)
+      — "fixed"      background plants in viewport; content scrolls through it like a window
+      — "fade"       background crossfades into the next section below as this section exits
+      — "wipe-v"     vertical clip-path wipe downward
+      — "wipe-left"  lateral clip that reveals from the right edge
+      — "wipe-right" lateral clip that reveals from the left edge
+      — "slide-up"   background translates upward off screen
+      — "parallax"   background image drifts at ~50% scroll speed (image only; requires minHeight ≥ 60vh)
+    overlay (optional):
+      solid form:    { "color": hex, "opacity": 0–1 }
+      gradient form: { "color": "#000000", "opacity": 1, "gradient": "<CSS gradient with rgba stops>" }
+      Use gradient overlays for dramatic directional vignettes. Omit "gradient" for a flat scrim.
+      Gradient examples:
+        bottom vignette: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)"
+        top vignette:    "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 60%)"
+        dual vignette:   "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.5) 100%)"
   zones: ordered array of zone objects, left to right
     Each zone: { "id": "<string>", "span": <positive integer>, "scheme": "inherit"|"light"|"dark", "content": <TipTapDoc> }
     CONSTRAINT: all span values in a section must sum exactly to columns
@@ -124,6 +139,56 @@ DROP CAPS
 UPPERCASE LABELS
   Use the textStyle mark with textTransform: "uppercase" and letterSpacing: "wide" for section eyebrows (short label text above a headline) and caption-style text. This pattern ("ABOUT THE AUTHOR", "FEATURED WORK", "CHAPTER ONE") is a strong editorial voice marker.
 
+[SECTION 3C — Scroll transition decision tree]
+Use the Animation Signals provided in the user message to select the correct transition value. Apply the FIRST matching rule:
+
+  1. hasFixedBackground = true  OR  motionClassNames contains "parallax"
+     → background.transition = "parallax"
+     → background.minHeight must be "60vh" or more
+
+  2. libraryFingerprints contains "aos" OR "framer-motion" OR "scrollreveal"
+     → background.transition = "fade"
+     (These libraries almost universally fade elements in and out on scroll.)
+
+  3. libraryFingerprints contains "gsap"
+     → background.transition = "slide-up"
+     (GSAP sites typically slide elements into view.)
+
+  4. libraryFingerprints contains "locomotive"
+     → background.transition = "parallax"
+     (Locomotive Scroll is a parallax-first library.)
+
+  5. DOM structure shows alternating image+text section pairs (img next to a content div, repeating)
+     → alternate "wipe-left" and "wipe-right" across those sections
+
+  6. hasScrollTimeline = true  OR  hasOpacityTransition = true  (without library fingerprint)
+     → background.transition = "fade"
+
+  7. hasTransformTransition = true  (without library fingerprint)
+     → background.transition = "slide-up"
+
+  8. hasHighZIndexStack = true (multiple z-index > 10 elements — suggests the site stacks layers)
+     → background.transition = "fixed"
+
+  9. Photography-forward site (image backgrounds on multiple sections, no strong motion signals)
+     → background.transition = "fade"
+
+  10. No motion signals, structural or editorial layout
+     → background.transition = "none" for most sections; "fixed" for a striking hero section only
+
+OVERLAY DEFAULTS (apply after transition is set):
+  — Any image background with transition != "none" and a zone containing heading text:
+    → add bottom vignette overlay by default: gradient "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)"
+    → set zone.scheme = "light" on the heading zone
+
+  — Any image background with transition = "parallax":
+    → always add an overlay; prefer dual vignette or bottom vignette
+
+  — Gradient backgrounds: only add overlay if zone text needs extra contrast beyond the gradient
+
+IMPORTANT: Assign minHeight = "60vh" to any section with an image background and transition != "none".
+This ensures there is room for the animation to play.
+
 [SECTION 4 — Output format]
 Return ONLY a valid JSON object matching this schema. No prose, no markdown, no code fences.
 
@@ -150,8 +215,8 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
         "background": {
           "type": "none" | "color" | "gradient" | "image",
           "value": string | null,
-          "attachment": "scroll" | "fixed" | "parallax" | null,
-          "overlay": { "color": string, "opacity": number } | null
+          "transition": "none" | "fixed" | "fade" | "wipe-v" | "wipe-left" | "wipe-right" | "slide-up" | "parallax" | null,
+          "overlay": { "color": string, "opacity": number, "gradient": string | null } | null
         } | null,
         "zones": [
           {

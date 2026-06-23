@@ -322,6 +322,20 @@ export class MulConverterService {
   }
 
   private buildUserMessage(pageData: PageData): string {
+    const sig = pageData.animationSignals;
+    const sigLines = [
+      `fixed-background: ${sig.hasFixedBackground}`,
+      `scroll-timeline: ${sig.hasScrollTimeline}`,
+      `keyframes: ${sig.hasKeyframes}`,
+      `opacity-transition: ${sig.hasOpacityTransition}`,
+      `transform-transition: ${sig.hasTransformTransition}`,
+      `sticky-elements: ${sig.hasStickyElements}`,
+      `high-z-stack: ${sig.hasHighZIndexStack}`,
+      sig.libraryFingerprints.length ? `libraries: ${sig.libraryFingerprints.join(', ')}` : null,
+      sig.overlayGradients.length ? `overlay-gradients: ${sig.overlayGradients.join(' | ')}` : null,
+      sig.motionClassNames.length ? `motion-classes: ${sig.motionClassNames.join(', ')}` : null,
+    ].filter(Boolean).join('\n');
+
     return `Analyze this webpage and produce a palette + page scaffold.
 
 URL: ${pageData.url}
@@ -333,6 +347,9 @@ ${pageData.colors.slice(0, 30).join(', ')}
 
 DOM structure (top elements):
 ${pageData.domStructure}
+
+Animation signals (from page CSS/JS):
+${sigLines}
 
 ${pageData.imageUrls.length > 0 ? `Source image URLs (for reference mode):\n${pageData.imageUrls.join('\n')}` : ''}`;
   }

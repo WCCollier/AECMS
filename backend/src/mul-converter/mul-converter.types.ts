@@ -1,3 +1,16 @@
+export interface AnimationSignals {
+  hasFixedBackground: boolean;       // background-attachment: fixed detected in CSS
+  hasScrollTimeline: boolean;        // animation-timeline or scroll() detected
+  hasKeyframes: boolean;             // @keyframes present
+  hasOpacityTransition: boolean;     // transition/animation referencing opacity
+  hasTransformTransition: boolean;   // transition/animation referencing transform
+  hasStickyElements: boolean;        // position: sticky detected
+  hasHighZIndexStack: boolean;       // z-index > 10 on multiple elements (stacked backgrounds)
+  libraryFingerprints: string[];     // e.g. ['aos', 'gsap', 'locomotive', 'framer-motion']
+  overlayGradients: string[];        // gradient strings extracted from likely overlay elements
+  motionClassNames: string[];        // class names: parallax, fade, scroll-reveal, etc.
+}
+
 export interface PageData {
   url: string;
   title: string;
@@ -6,6 +19,7 @@ export interface PageData {
   domStructure: string;      // lightweight structural summary
   imageUrls: string[];       // candidate source images (og:image, hero imgs)
   ogImage?: string;
+  animationSignals: AnimationSignals;
 }
 
 export interface MulPalette {

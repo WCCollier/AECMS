@@ -1,4 +1,4 @@
-import type { PageData } from './mul-converter.types';
+import type { PageData, AnimationSignals } from './mul-converter.types';
 
 const COLOR_RE = /#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6,8})\b|rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+)?\s*\)|hsla?\(\s*[\d.]+\s*,\s*[\d.]+%\s*,\s*[\d.]+%(?:\s*,\s*[\d.]+)?\s*\)/g;
 
@@ -123,11 +123,63 @@ function extractImageUrls(html: string, ogImage?: string): string[] {
   return urls.slice(0, 8);
 }
 
+function extractAnimationSignals(html: string): AnimationSignals {
+  // Collect all CSS text (style blocks + inline styles)
+  const styleBlocks = [...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map(m => m[1]).join('\n');
+  const inlineStyles = [...html.matchAll(/style="([^"]+)"/gi)].map(m => m[1]).join(';');
+  const allCss = styleBlocks + '\n' + inlineStyles;
+
+  // Collect all class names from HTML
+  const classNames = [...html.matchAll(/class="([^"]+)"/gi)]
+    .flatMap(m => m[1].split(/\s+/))
+    .filter(Boolean);
+
+  // Library fingerprints — check scripts and data attributes
+  const scriptContent = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(m => m[1]).join('\n');
+  const fingerprints: string[] = [];
+  if (/\baos\b/i.test(html) || /data-aos/i.test(html)) fingerprints.push('aos');
+  if (/gsap|TweenLite|TweenMax/i.test(scriptContent + html)) fingerprints.push('gsap');
+  if (/locomotive[- ]?scroll/i.test(scriptContent + html)) fingerprints.push('locomotive');
+  if (/framer[- ]?motion/i.test(scriptContent + html)) fingerprints.push('framer-motion');
+  if (/scrollreveal/i.test(scriptContent + html)) fingerprints.push('scrollreveal');
+  if (/swiper/i.test(html)) fingerprints.push('swiper');
+
+  // Motion class names — look for scroll/animation-related class tokens
+  const MOTION_PATTERN = /parallax|fade|scroll[-_]reveal|scroll[-_]anim|animate|entrance|aos|reveal|in-view|motion/i;
+  const motionClasses = [...new Set(classNames.filter(c => MOTION_PATTERN.test(c)))].slice(0, 20);
+
+  // Overlay gradients — gradient strings from elements that look like overlays
+  // Look for gradient values applied to ::before/::after or overlay/scrim class elements
+  const gradientRe = /(?:linear|radial|conic)-gradient\([^;{}]+\)/gi;
+  const allGradients = [...allCss.matchAll(gradientRe)].map(m => m[0]);
+  // Filter to ones with rgba alpha (likely overlays, not decorative gradients)
+  const overlayGradients = [...new Set(
+    allGradients.filter(g => /rgba\s*\([^)]+,\s*0?\.?\d+\s*\)/.test(g))
+  )].slice(0, 5);
+
+  // z-index stacking — more than 2 high z-index rules → likely stacked layers
+  const highZMatches = [...allCss.matchAll(/z-index\s*:\s*(\d+)/gi)].filter(m => parseInt(m[1]) > 10);
+
+  return {
+    hasFixedBackground:     /background-attachment\s*:\s*fixed/i.test(allCss),
+    hasScrollTimeline:      /animation-timeline|scroll\(\)/i.test(allCss),
+    hasKeyframes:           /@keyframes/i.test(styleBlocks),
+    hasOpacityTransition:   /(?:transition|animation)[^;{]*opacity/i.test(allCss),
+    hasTransformTransition: /(?:transition|animation)[^;{]*transform/i.test(allCss),
+    hasStickyElements:      /position\s*:\s*sticky/i.test(allCss),
+    hasHighZIndexStack:     highZMatches.length >= 2,
+    libraryFingerprints:    fingerprints,
+    overlayGradients,
+    motionClassNames:       motionClasses,
+  };
+}
+
 export function extractPageData(url: string, html: string): PageData {
   const colors = extractColors(html);
   const domStructure = extractDomStructure(html);
   const { title, description, ogImage } = extractMeta(html);
   const imageUrls = extractImageUrls(html, ogImage);
+  const animationSignals = extractAnimationSignals(html);
 
-  return { url, title, description, colors, domStructure, imageUrls, ogImage };
+  return { url, title, description, colors, domStructure, imageUrls, ogImage, animationSignals };
 }

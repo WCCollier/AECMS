@@ -66,6 +66,20 @@ export class OpenAIMulProvider implements MulProvider {
   }
 
   protected buildUserMessage(data: PageData): string {
+    const sig = data.animationSignals;
+    const sigLines = [
+      `fixed-background: ${sig.hasFixedBackground}`,
+      `scroll-timeline: ${sig.hasScrollTimeline}`,
+      `keyframes: ${sig.hasKeyframes}`,
+      `opacity-transition: ${sig.hasOpacityTransition}`,
+      `transform-transition: ${sig.hasTransformTransition}`,
+      `sticky-elements: ${sig.hasStickyElements}`,
+      `high-z-stack: ${sig.hasHighZIndexStack}`,
+      sig.libraryFingerprints.length ? `libraries: ${sig.libraryFingerprints.join(', ')}` : null,
+      sig.overlayGradients.length ? `overlay-gradients: ${sig.overlayGradients.join(' | ')}` : null,
+      sig.motionClassNames.length ? `motion-classes: ${sig.motionClassNames.join(', ')}` : null,
+    ].filter(Boolean).join('\n');
+
     return `Analyze this webpage and produce a palette + page scaffold.
 
 URL: ${data.url}
@@ -77,6 +91,9 @@ ${data.colors.slice(0, 30).join(', ')}
 
 DOM structure (top elements):
 ${data.domStructure}
+
+Animation signals (from page CSS/JS):
+${sigLines}
 
 ${data.imageUrls.length > 0 ? `Source image URLs (for reference mode):
 ${data.imageUrls.join('\n')}` : ''}`;

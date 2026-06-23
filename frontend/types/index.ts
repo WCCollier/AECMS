@@ -87,10 +87,23 @@ export interface SectionBackground {
   // color    → hex string e.g. "#1a2b3c"
   // gradient → CSS gradient string e.g. "linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
   // image    → "media://uuid" or "media://placeholder"
-  attachment?: 'scroll' | 'fixed' | 'parallax'; // image only
+  /** @deprecated Use `transition` instead. Read-time fallback applied by renderer. */
+  attachment?: 'scroll' | 'fixed' | 'parallax';
+  /** Scroll transition behaviour for this section's background.
+   *  'none' (default) — inline rendering, scrolls naturally with content.
+   *  'fixed'          — fixed in viewport (window-pane), no animation.
+   *  'fade'           — crossfades into section below as spacer exits viewport.
+   *  'wipe-v'         — vertical clip-path wipe.
+   *  'wipe-left'      — lateral clip, reveals from right.
+   *  'wipe-right'     — lateral clip, reveals from left.
+   *  'slide-up'       — translates upward off screen.
+   *  'parallax'       — image drifts at ~50% scroll speed; overlay stays planted.
+   */
+  transition?: 'none' | 'fixed' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'parallax';
   overlay?: {
-    color: string;   // hex e.g. "#000000"
-    opacity: number; // 0–1
+    color: string;    // hex e.g. "#000000"
+    opacity: number;  // 0–1 (used only when no gradient)
+    gradient?: string; // CSS gradient with alpha stops, e.g. "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)"
   };
 }
 
