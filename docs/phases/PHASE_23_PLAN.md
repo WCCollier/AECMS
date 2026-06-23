@@ -246,6 +246,144 @@ Implement the `background` field on each section:
 
 ---
 
+---
+
+## Part 3: Scroll-Driven Background Transitions + Gradient Overlays
+
+**Status**: 📋 Planned — begins after Part 2 passes testbed QA and deploys
+
+Part 3 is a renderer and schema evolution with no backend changes. It gives every section background a declared exit transition (fade, clip wipe, slide), extends the overlay system from solid-color scrims to gradient masks, and restructures the renderer's background layer so transitions can be expressed cleanly with CSS scroll-driven animations. These properties are core page-design vocabulary for both hand-built pages and Mul Converter scaffolds; Phase 27 will make them portable via the template export format.
+
+---
+
+### P — Schema: `background.transition` field
+
+Introduce a `transition` field alongside the existing `attachment` on `SectionBackground`:
+
+```typescript
+transition?: 'none' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'slide-left' | 'slide-right' | 'parallax'
+```
+
+`transition` describes how this section's background exits as the user scrolls it off-screen. `attachment` retains its existing meaning (`'scroll' | 'fixed'`). `'parallax'`, previously a value on `attachment`, moves here — it describes scroll-speed behaviour, not CSS background-attachment. Existing stored data using `attachment: 'parallax'` should be read gracefully (treat as `transition: 'parallax'`) during the transition period.
+
+Default when omitted: `'none'` (hard edge, current behaviour — no regression).
+
+**Files**: `frontend/types/index.ts`, `backend/src/pages/pages.service.ts` (validation update)
+
+---
+
+### Q — Schema: gradient overlay
+
+Extend `SectionBackground.overlay` to support gradient masks alongside the existing solid-color scrim:
+
+```typescript
+overlay?: {
+  color?: string          // hex — solid color scrim (existing)
+  opacity?: number        // 0–1  — applies only to solid color mode
+  gradient?: string       // CSS gradient string — when present, overrides color+opacity
+}
+```
+
+When `gradient` is set, the overlay div renders `background: <gradient>` directly — alpha is baked into the gradient stops, so no separate opacity field is needed. When only `color` is set, existing behaviour is preserved.
+
+Useful gradient patterns:
+- **Bottom vignette** (text at bottom of hero): `linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75) 100%)`
+- **Top vignette**: `linear-gradient(to top, transparent 30%, rgba(0,0,0,0.75) 100%)`
+- **Dual vignette** (framed image): `linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.5) 100%)`
+- **Radial vignette** (centre focus): `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%)`
+- **Side fade** (text panel beside image): `linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)`
+
+**Files**: `frontend/types/index.ts`
+
+---
+
+### R — Renderer restructure: separate background layers
+
+Extract section backgrounds from inline CSS on the section `div` to dedicated child `div`s with `position: absolute; inset: 0`. This decouples the background from the content box and enables scroll-driven animation without affecting layout.
+
+Structure per section:
+
+```tsx
+<div className="relative ..." style={{ minHeight, ...layoutOnly }}>
+  {/* Layer 1: background image or gradient */}
+  <div aria-hidden className="absolute inset-0 -z-10" style={bgStyle} data-transition={transition} />
+
+  {/* Layer 2: overlay (solid or gradient) */}
+  {overlay && <div aria-hidden className="absolute inset-0 -z-10" style={overlayStyle} />}
+
+  {/* Layer 3: zone grid — always above backgrounds */}
+  <div className="relative z-0" style={gridStyle}>
+    {zones}
+  </div>
+</div>
+```
+
+Apply CSS scroll-driven transitions to Layer 1 based on `transition` value:
+
+| `transition` | CSS mechanism | `animation-range` |
+|---|---|---|
+| `none` | — | — |
+| `fade` | `opacity 1→0` | `exit 0% exit 100%` |
+| `wipe-v` | `clip-path inset(0% 0 0 0 → 100% 0 0 0)` | `exit 0% exit 100%` |
+| `wipe-left` | `clip-path inset(0 0% 0 0 → 0 100% 0 0)` | `exit 0% exit 100%` |
+| `wipe-right` | `clip-path inset(0 0 0 0% → 0 0 0 100%)` | `exit 0% exit 100%` |
+| `slide-up` | `transform: translateY(0 → -30%)` | `exit 0% exit 100%` |
+| `parallax` | `transform: translateY(-15% → 15%)` | `cover 0% cover 100%` |
+
+All transitions use `animation-timeline: view()` on the background layer div. The `view()` timeline is anchored to the parent section's scroll position through the DOM. A small JS `IntersectionObserver` fallback covers Safari where `animation-timeline` is not supported.
+
+**Edge case — narrow sections**: If a section's content height is less than the viewport height, the `exit` phase begins immediately after the `entry` phase, giving the background little dwell time at full opacity. Mitigate by starting `animation-range` at `contain 50%` for sections without an explicit `minHeight`, so the fade begins only after the section midpoint has passed the viewport centre.
+
+**Files**: `frontend/components/pages/layouts/SectionsLayout.tsx`
+
+---
+
+### S — SectionEditor: transition picker + gradient overlay editor
+
+**Transition picker** — added to the background flyout, visible only when `background.type` is `'image'` or `'gradient'`:
+
+- Radio group: None / Fade / Wipe Down / Wipe Left / Wipe Right / Slide Up / Parallax
+- Small inline description per option (one sentence)
+- `'parallax'` option replaces the previous "Parallax" value in the attachment dropdown
+
+**Gradient overlay editor** — extends the existing overlay UI:
+
+- Toggle: Solid color | Gradient
+- Solid: existing color picker + opacity slider
+- Gradient: CSS gradient text input + live preview swatch strip showing the gradient; preset buttons for the five named patterns above (Bottom Vignette, Top Vignette, Dual Vignette, Radial Vignette, Side Fade)
+
+**Files**: `frontend/components/admin/SectionEditor.tsx`
+
+---
+
+### T — System prompt additions (Section 3C)
+
+Extend `buildSystemPrompt()` with Section 3C covering transitions and gradient overlays:
+
+- Instruct AI to set `transition: 'fade'` on hero sections with background images — the default for any section that has a background image and is the primary visual element of the page
+- Instruct AI to use `transition: 'wipe-left'` or `'wipe-right'` for alternating content+image sections (magazine-style)
+- Instruct AI to prefer `transition: 'parallax'` for sections where the source page had a depth or motion aesthetic
+- Instruct AI to use gradient overlays instead of (or alongside) solid overlays when the zone text is short and the photo should breathe; bottom vignette is the default for hero sections with a headline at the bottom
+- Provide example gradient strings for the five named patterns
+
+---
+
+### U — Part 3 acceptance criteria
+
+1. `SectionBackground.transition` stored and round-tripped correctly; omitted field renders as `'none'` (no regression)
+2. `overlay.gradient` renders correctly; `overlay.color` + `overlay.opacity` behave exactly as before (no regression)
+3. Renderer background layer is a child `div`, not inline CSS on the section container
+4. `fade` transition visibly fades the background image as the section exits the viewport
+5. `wipe-left` and `wipe-right` transitions clip the background laterally on scroll
+6. `parallax` transition produces visible background drift at a different speed from content
+7. Narrow-section edge case handled: no jarring flash on sections whose height is less than 50vh
+8. Safari fallback: transitions degrade gracefully to `none` without JS errors
+9. SectionEditor transition picker saves to section JSON and is reflected in the live renderer
+10. Gradient overlay preset buttons produce correctly rendered output
+11. System prompt emits `transition` and `overlay.gradient` fields in AI-generated scaffolds
+
+---
+
 ## Out of Scope for Phase 23
 
 - Vision/screenshot mode (v2)
@@ -254,6 +392,7 @@ Implement the `background` field on each section:
 - Palette editing beyond the hex input fields in `PaletteResult`
 - Section responsive breakpoint overrides
 - Freeform/absolute canvas positioning
+- True simultaneous crossfade (two adjacent backgrounds both visible at the boundary simultaneously — requires full fixed-position layer stack; a deeper renderer restructure for a future phase)
 
 ---
 
