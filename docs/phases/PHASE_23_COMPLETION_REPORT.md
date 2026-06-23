@@ -1,8 +1,8 @@
 # Phase 23 Completion Report: Mul Converter
 
 **Status**: Built — Part 1 (awaiting testbed QA → deploy), Part 2 (awaiting testbed QA → merge to main → deploy)  
-**Branch**: `feature/phase-23-part-2` (pushed to GitHub)  
-**PRD**: `docs/prd/13-mul-converter.md` v1.2  
+**Branch**: `feature/phase-23-part-2` @ `f707bb4` (pushed to GitHub)  
+**PRD**: `docs/prd/13-mul-converter.md` v1.3  
 **Plan**: `docs/phases/PHASE_23_PLAN.md`  
 **Tests**: 190 backend + 125 frontend unit tests passing (315 total)
 
@@ -310,8 +310,8 @@ The overall test suite still passes at 315 tests (190 backend + 125 frontend), a
 | 12 | "Create Page Draft" creates `draft` page with `type: 'sections'` content | ✅ |
 | 13 | "Save Both" does both in sequence | ✅ (parallel, not sequential — improvement) |
 | 14 | All error states (SSRF, timeout, AI error) show user-facing message without crashing | ✅ |
-| 15 | Non-Owner navigating directly to `/admin/mul-converter` sees restricted experience | ⚠️ Partial — sidebar link hidden; direct URL access shows hanging spinner rather than clean "Access Restricted" message |
-| 16 | Unit tests pass | ⚠️ Pre-existing 315 tests pass; no new Mul Converter-specific tests added |
+| 15 | Non-Owner navigating directly to `/admin/mul-converter` sees restricted experience | ⚠️ Partial — sidebar link correctly hidden; direct URL shows hanging spinner rather than clean "Access Restricted" (see Known Issue #1) |
+| 16 | Unit tests pass | ⚠️ 315 pre-existing tests pass; no Mul Converter-specific tests yet (see Known Issue #2) |
 
 ---
 
@@ -339,10 +339,8 @@ The following were added beyond the original plan items (A–O), driven by PRD v
 |---|------|----------|-------|
 | 1 | No page-level capability gate at `/admin/mul-converter` — direct URL access by non-Owner shows hanging spinner instead of "Access Restricted" | Low | Sidebar link is hidden; only affects direct URL navigation by non-Owner admins |
 | 2 | Unit tests not written for MulConverterModule | Medium | Recommended: write after testbed QA confirms real AI response shapes |
-| 3 | Provider-native optimization | ✅ Implemented | `analyzeNative()` uses Responses API; falls back to two-step on failure |
-| 4 | xAI image provider (`XAIImageProvider` / Aurora) | ✅ Implemented | Thin subclass of `GptImage1Provider`; `api.x.ai/v1`; `grok-2-aurora` default |
-| 5 | Preview iframe height 400px vs PRD spec 500px | Cosmetic | No functional impact |
-| 6 | `mul.convert` needs to be seeded to production DB after Part 2 deploys | Operational | Owner can run `npx prisma db seed` against production via Cloud SQL proxy |
+| 3 | Preview iframe height 400px vs PRD spec 500px | Cosmetic | No functional impact |
+| 4 | `mul.convert` needs to be seeded to production DB after Part 2 deploys | Operational | Owner can run `npx prisma db seed` against production via Cloud SQL proxy |
 
 ---
 
@@ -396,6 +394,12 @@ The following were added beyond the original plan items (A–O), driven by PRD v
 | `frontend/app/admin/mul-converter/components/AiNotes.tsx` | Confidence + notes + imagePromptStyle |
 | `frontend/app/admin/mul-converter/components/ActionBar.tsx` | Save palette / Create draft / Save both |
 | `frontend/app/admin/settings/appearance/AppearanceClient.tsx` | Custom palettes display + delete |
+| `backend/src/mul-converter/image-providers/xai-image.provider.ts` | New — `XAIImageProvider` (thin subclass of `GptImage1Provider`, `api.x.ai/v1`, `grok-2-aurora`) |
+| `backend/src/mul-converter/image-providers/gpt-image1.provider.ts` | `baseUrl` promoted to `protected` to enable XAI subclass |
+| `backend/src/mul-converter/mul-converter.service.ts` | `analyzeNative()` method; native detection in `analyze()`; xAI case in `buildImageProvider()`; `loadConfig()` xAI image key |
+| `backend/src/mul-converter/system-prompt.ts` | Section 6 (native mode addendum); `nativeMode` parameter on `buildSystemPrompt()` |
+| `backend/src/mul-converter/mul-converter.types.ts` | `'xai'` added to `MulConfig.imageProvider` union |
+| `frontend/app/admin/mul-converter/components/MulSettingsPanel.tsx` | xAI (Aurora) added to image provider radio; native optimization hint |
 
 ---
 
