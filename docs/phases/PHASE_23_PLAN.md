@@ -256,19 +256,19 @@ Part 3 is a renderer and schema evolution with no backend changes. It implements
 
 ---
 
-### P — Schema: `background.transition` field
+### P — Schema: `background.transition` field + `attachment` removal
 
-Introduce a `transition` field on `SectionBackground`. Remove `'parallax'` from `attachment` — it moves here:
+Introduce `transition` on `SectionBackground` and **remove `attachment` entirely**:
 
 ```typescript
 transition?: 'none' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'slide-left' | 'slide-right' | 'parallax'
-
-attachment?: 'scroll' | 'fixed'   // 'parallax' removed from this union
+// attachment removed — with the fixed-position background stack all backgrounds
+// are viewport-fixed by architecture; the field has no remaining meaning.
 ```
 
-`transition` describes how this section's background exits as the user scrolls it off-screen. `attachment` retains its CSS `background-attachment` meaning for non-transitioning backgrounds only. Default when omitted: `'none'` (hard edge — no regression on existing content).
+Default when omitted: `'none'` (hard edge — no regression).
 
-Read-time fallback: if stored data contains `attachment: 'parallax'`, treat it as `transition: 'parallax'` with `attachment: 'scroll'`.
+Read-time fallback: if stored data contains `attachment: 'parallax'`, treat as `transition: 'parallax'`; any other `attachment` value is silently ignored.
 
 **Files**: `frontend/types/index.ts`, `backend/src/pages/pages.service.ts` (validation update)
 
@@ -395,21 +395,94 @@ Sections shorter than the viewport height complete `entry` and `exit` phases in 
 
 ---
 
-### S — SectionEditor: transition picker + gradient overlay editor
+### S — SectionEditor: Section Background & Overlay Panel
 
-**Transition picker** — in the background flyout, visible when `background.type` is `'image'` or `'gradient'`:
+The existing background flyout in the section header bar is promoted to a **Section Background Panel** — a wider slide-in drawer (or large popover, ≥320px) triggered by the ⚙ background button. The flyout approach becomes too cramped once transition and gradient overlay controls are added. The panel has three collapsible sub-sections.
 
-- Radio group: None / Fade / Wipe Down / Wipe Left / Wipe Right / Slide Up / Parallax
-- One-line description per option
-- `'parallax'` replaces the old `attachment: 'parallax'` option in the attachment dropdown; attachment dropdown now only shows Scroll / Fixed
+---
 
-**Gradient overlay editor** — extends existing overlay UI:
+#### S1 — Background sub-section
 
-- Toggle: Solid color | Gradient
-- Solid mode: existing hex picker + opacity slider (unchanged)
-- Gradient mode: free CSS gradient text input + live swatch preview strip; five preset buttons (Bottom Vignette, Top Vignette, Dual Vignette, Radial Vignette, Side Fade) populate the input
+**Type selector** (always visible, radio/tab bar):
 
-**Files**: `frontend/components/admin/SectionEditor.tsx`
+```
+[ None ]  [ Color ]  [ Gradient ]  [ Image ]
+```
+
+**When type = Color:**
+- Hex input + color swatch picker
+- Live updates section background immediately (no save button; changes apply on panel close)
+
+**When type = Gradient:**
+- CSS gradient text input (full width) — accepts any valid CSS gradient string
+- Live gradient preview strip (full width, ~40px tall) beneath the input; updates as user types
+- Preset row — 6 labeled buttons that populate the input:
+  - Linear top→bottom (dark→transparent)
+  - Linear bottom→top
+  - Linear left→right
+  - Radial center
+  - Diagonal (135°)
+  - Custom (clears to blank)
+- Each preset shows a tiny swatch icon
+
+**When type = Image:**
+- Current background thumbnail (if set), 80×50px, with "×" clear button
+- "Choose from Media Library" button — opens existing MediaLibraryPicker modal
+- "Upload image" button — opens file picker, uploads to media library, sets as background
+- Once set, thumbnail updates immediately
+
+---
+
+#### S2 — Overlay sub-section (shown when type ≠ None)
+
+**Mode selector** (radio):
+
+```
+[ None ]  [ Solid ]  [ Gradient ]
+```
+
+**When mode = Solid:**
+- Hex color input + swatch picker
+- Opacity slider (0–100%) with numeric readout
+- Live preview: the section editor shows the overlay at the configured opacity over the background
+
+**When mode = Gradient:**
+- CSS gradient text input (full width)
+- Live preview strip beneath (same pattern as gradient background)
+- Preset buttons — 5 named patterns with visual swatch icons:
+  - **Bottom vignette** — `linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75) 100%)`
+  - **Top vignette** — `linear-gradient(to top, transparent 30%, rgba(0,0,0,0.75) 100%)`
+  - **Dual vignette** — `linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.5) 100%)`
+  - **Radial vignette** — `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%)`
+  - **Side fade (L→R)** — `linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)`
+
+Each preset button shows a small directional gradient icon. Clicking populates the input and updates the live preview.
+
+---
+
+#### S3 — Transition sub-section (shown when type = Image or Gradient)
+
+**Transition picker** — icon + label radio grid (2 or 3 columns):
+
+| Icon | Label | Value | One-line description |
+|---|---|---|---|
+| ◻ | None | `none` | Hard cut to next section |
+| ◑ | Fade | `fade` | Dissolves into next background |
+| ↑▬ | Wipe Down | `wipe-v` | Clips upward off the screen |
+| ←▬ | Wipe Left | `wipe-left` | Clips to the left, reveals next from right |
+| ▬→ | Wipe Right | `wipe-right` | Clips to the right, reveals next from left |
+| ↑↑ | Slide Up | `slide-up` | Background slides upward off screen |
+| ≋ | Parallax | `parallax` | Background drifts at half scroll speed |
+
+Descriptions appear as a single line of muted text beneath the selected option.
+
+**Note**: `attachment` (scroll/fixed) is removed entirely — the new fixed-position stack architecture makes it redundant. Any stored `attachment: 'parallax'` is read gracefully as `transition: 'parallax'`.
+
+---
+
+**Panel close behaviour:** Changes are applied live to the in-editor section preview as the user adjusts controls. No explicit "Save" button inside the panel — the section data is saved when the page is saved via the existing Save button in the page header.
+
+**Files**: `frontend/components/admin/SectionEditor.tsx`, `frontend/components/admin/SectionBackgroundPanel.tsx` (new component)
 
 ---
 

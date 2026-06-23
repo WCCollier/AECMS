@@ -1,6 +1,6 @@
 # PRD 13: Mul Converter
 
-**Version**: 1.5  
+**Version**: 1.6  
 **Status**: Draft  
 **Phase**: 23  
 **Author**: WCCollier
@@ -1017,7 +1017,7 @@ The overlay div is a child of the background composite layer — not a sibling a
 
 ### `background.transition` vocabulary
 
-`'parallax'` moves from `attachment` to `transition`. `attachment` is simplified to `'scroll' | 'fixed'` only.
+`attachment` is **removed entirely** from `SectionBackground`. With the fixed-position background stack all backgrounds are viewport-fixed by architecture — the field has no remaining meaning. `'parallax'` was previously a value on `attachment`; it moves to `transition`. Read-time fallback: stored `attachment: 'parallax'` → `transition: 'parallax'`; all other `attachment` values silently ignored. The schema references to `attachment` in Part 1 and Part 2 sections of this document reflect the pre-Part-3 schema and should be treated as superseded.
 
 | Value | Visual effect | Best use |
 |---|---|---|
