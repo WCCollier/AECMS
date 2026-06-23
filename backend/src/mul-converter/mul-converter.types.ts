@@ -49,7 +49,7 @@ export interface MulConfig {
   textProvider: 'anthropic' | 'openai' | 'xai';
   textModel: string;
   textApiKey: string;
-  imageProvider?: 'openai' | 'flux' | 'stability';
+  imageProvider?: 'openai' | 'xai' | 'flux' | 'stability';
   imageModel?: string;
   imageApiKey?: string;
   imageReferenceMode?: 'brief-only' | 'reference';

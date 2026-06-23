@@ -13,11 +13,12 @@ import { AnthropicMulProvider } from './providers/anthropic-mul.provider';
 import { OpenAIMulProvider } from './providers/openai-mul.provider';
 import { XAIMulProvider } from './providers/xai-mul.provider';
 import { GptImage1Provider } from './image-providers/gpt-image1.provider';
+import { XAIImageProvider } from './image-providers/xai-image.provider';
 import { FluxProvider } from './image-providers/flux.provider';
 import { StabilityProvider } from './image-providers/stability.provider';
 import type { MulProvider } from './providers/mul-provider.interface';
 import type { ImageProvider } from './image-providers/image-provider.interface';
-import type { MulConfig, MulResult } from './mul-converter.types';
+import type { MulConfig, MulResult, PageData } from './mul-converter.types';
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB
 const FETCH_TIMEOUT_MS = 10_000;
@@ -90,8 +91,22 @@ export class MulConverterService {
     const pageData = extractPageData(url, html);
 
     const config = await this.loadConfig();
-    const systemPrompt = buildSystemPrompt(config);
 
+    // Provider-native optimization: when text and image use the same platform,
+    // use the Responses API to handle analysis + image generation in one conversation.
+    const isNative = Boolean(config.imageProvider) &&
+      (config.textProvider === config.imageProvider) &&
+      ['openai', 'xai'].includes(config.textProvider);
+
+    if (isNative) {
+      try {
+        return await this.analyzeNative(pageData, config, userId);
+      } catch (err) {
+        this.logger.warn(`Native optimization failed (${err.message}), falling back to two-step`);
+      }
+    }
+
+    const systemPrompt = buildSystemPrompt(config);
     const textProvider = this.buildTextProvider(config);
     const result = await textProvider.analyze(pageData, systemPrompt);
 
@@ -194,6 +209,7 @@ export class MulConverterService {
 
     const imgProvider = (imageProvider || '') as MulConfig['imageProvider'] | '' | 'disabled';
     const imgApiKey = imgProvider === 'openai' ? openaiKey
+      : imgProvider === 'xai' ? xaiKey
       : imgProvider === 'flux' ? falKey
       : imgProvider === 'stability' ? stabilityKey
       : '';
@@ -227,10 +243,105 @@ export class MulConverterService {
     if (!config.imageProvider || !config.imageApiKey) return null;
     switch (config.imageProvider) {
       case 'openai':    return new GptImage1Provider(config.imageApiKey, config.imageModel);
+      case 'xai':       return new XAIImageProvider(config.imageApiKey, config.imageModel);
       case 'flux':      return new FluxProvider(config.imageApiKey, config.imageModel);
       case 'stability': return new StabilityProvider(config.imageApiKey, config.imageModel);
       default:          return null;
     }
+  }
+
+  private async analyzeNative(pageData: PageData, config: MulConfig, userId: string): Promise<MulResult> {
+    const baseUrl = config.textProvider === 'xai' ? 'https://api.x.ai/v1' : 'https://api.openai.com/v1';
+    const systemPrompt = buildSystemPrompt(config, true);
+    const userContent = this.buildUserMessage(pageData);
+
+    const body = {
+      model: config.textModel,
+      tools: [{ type: 'image_generation' }],
+      input: [
+        { role: 'developer', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+    };
+
+    const res = await fetch(`${baseUrl}/responses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${config.textApiKey}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(180_000),
+    });
+
+    if (!res.ok) throw new Error(`Responses API returned HTTP ${res.status}`);
+
+    const json = await res.json() as any;
+    const output: any[] = json.output ?? [];
+
+    // Extract JSON analysis from the message output
+    const msgOutput = output.find((o: any) => o.type === 'message');
+    const jsonText = msgOutput?.content?.find((c: any) => c.type === 'output_text')?.text;
+    if (!jsonText) throw new Error('Responses API returned no text output');
+
+    let parsed: unknown;
+    try { parsed = JSON.parse(jsonText); } catch { throw new Error('Responses API text output is not valid JSON'); }
+
+    const result = this.validateNativeResult(parsed);
+
+    // Extract images from image_generation_call outputs — match by order to sections with image backgrounds
+    const imageOutputs = output.filter((o: any) => o.type === 'image_generation_call' && o.result);
+    if (imageOutputs.length > 0) {
+      const imageSections = (result.page.sections as any[])
+        .filter((s: any) => s.background?.type === 'image' && s.background?.value === 'media://placeholder');
+
+      for (let i = 0; i < Math.min(imageSections.length, imageOutputs.length); i++) {
+        try {
+          const buffer = Buffer.from(imageOutputs[i].result, 'base64');
+          const mockFile: Express.Multer.File = {
+            fieldname: 'file',
+            originalname: `mul-native-${imageSections[i].id}.png`,
+            encoding: '7bit',
+            mimetype: 'image/png',
+            buffer,
+            size: buffer.byteLength,
+            stream: null as any,
+            destination: '',
+            filename: '',
+            path: '',
+          };
+          const media = await this.mediaService.upload(mockFile, userId, undefined, undefined);
+          this.replaceMediaPlaceholder(result, imageSections[i].id, media.id);
+        } catch (err) {
+          this.logger.warn(`Native image upload failed for section ${imageSections[i].id}: ${err.message}`);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  private buildUserMessage(pageData: PageData): string {
+    return `Analyze this webpage and produce a palette + page scaffold.
+
+URL: ${pageData.url}
+Title: ${pageData.title}
+Description: ${pageData.description}
+
+Extracted CSS colors (by frequency):
+${pageData.colors.slice(0, 30).join(', ')}
+
+DOM structure (top elements):
+${pageData.domStructure}
+
+${pageData.imageUrls.length > 0 ? `Source image URLs (for reference mode):\n${pageData.imageUrls.join('\n')}` : ''}`;
+  }
+
+  private validateNativeResult(raw: unknown): MulResult {
+    if (typeof raw !== 'object' || raw === null) throw new Error('AI response is not a valid object.');
+    const r = raw as any;
+    if (!r.palette?.colors || !r.page?.sections) throw new Error('AI response missing required fields.');
+    return r as MulResult;
   }
 
   private async generateAndAttachImages(

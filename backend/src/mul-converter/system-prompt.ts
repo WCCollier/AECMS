@@ -1,6 +1,9 @@
 import type { MulConfig } from './mul-converter.types';
 
-export function buildSystemPrompt(config: Pick<MulConfig, 'imageProvider' | 'imageModel' | 'imageReferenceMode'>): string {
+export function buildSystemPrompt(
+  config: Pick<MulConfig, 'imageProvider' | 'imageModel' | 'imageReferenceMode'>,
+  nativeMode = false,
+): string {
   const hasImages = Boolean(config.imageProvider);
   const referenceMode = config.imageReferenceMode === 'reference';
 
@@ -191,5 +194,8 @@ Apply that declared style consistently to all prompts in the "imageBriefs" field
 If the model name is unfamiliar to you, note this explicitly in "approach" and fall back to universal best practices: subject-first descriptions, clear style declaration, explicit lighting and mood descriptors, technical specs as trailing descriptors. Aspect ratio is always a separate structured field — never embed it in the prompt string.
 
 Write an imageBrief for every section that uses background.type === "image". ${referenceMode ? 'Reference mode is ENABLED: populate imageSourceUrl from the source page image URLs when available.' : 'Reference mode is disabled: always set imageSourceUrl to null.'}
+` : ''}${nativeMode ? `
+[SECTION 6 — Native image generation]
+After emitting the complete JSON response, call the image_generation tool exactly once for each section that has background.type === "image", in the same order those sections appear in the sections array. Use the prompt from the corresponding imageBriefs entry for each call. Do not emit any text between image_generation calls.
 ` : ''}`;
 }

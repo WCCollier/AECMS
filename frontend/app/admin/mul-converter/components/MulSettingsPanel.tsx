@@ -13,6 +13,7 @@ const TEXT_PROVIDERS = [
 const IMAGE_PROVIDERS = [
   { value: '',          label: 'Disabled' },
   { value: 'openai',   label: 'OpenAI',         defaultModel: 'gpt-image-1' },
+  { value: 'xai',      label: 'xAI (Aurora)',   defaultModel: 'grok-2-aurora' },
   { value: 'flux',     label: 'Flux (fal.ai)',   defaultModel: 'flux-kontext-pro' },
   { value: 'stability',label: 'Stability AI',    defaultModel: 'stable-diffusion-xl-1024-v1-0' },
 ];
@@ -237,7 +238,12 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
                     </p>
                   )}
                 </div>
-                <p className="text-xs text-muted">Image generation adds ~10–30s per image. Generated images are saved to your Media Library.</p>
+                <p className="text-xs text-muted">
+                  Image generation adds ~10–30s per image. Generated images are saved to your Media Library.
+                  {imageProvider && imageProvider === textProvider && (
+                    <span className="ml-1 text-accent/80">Native optimization active — analysis and images run in one conversation.</span>
+                  )}
+                </p>
               </div>
             )}
           </div>

@@ -158,9 +158,9 @@ Keys are read lazily via `SettingsService.getEffective()`. No env fallbacks defi
 - `OpenAIMulProvider` (`providers/openai-mul.provider.ts`): thin `fetch` POST to `https://api.openai.com/v1/chat/completions`; `response_format: { type: 'json_object' }`; extracts `choices[0].message.content`; parses JSON; validates required fields; 120s timeout
 - `XAIMulProvider` (`providers/xai-mul.provider.ts`): extends `OpenAIMulProvider` with `baseUrl = 'https://api.x.ai/v1'`; no other differences — xAI's API is OpenAI-wire-compatible
 
-**Note on xAI image generation:** xAI (Grok) supports image generation via the Aurora model. This was decided during the pre-build design session and belongs in the PRD — but it was not captured in the v1.2 PRD revision. The PRD has been updated to v1.3 to document `XAIImageProvider` as a thin subclass of `GptImage1Provider` (same OpenAI-wire-compatible API shape, `baseUrl = 'https://api.x.ai/v1'`, `mul.xai_api_key_enc` shared with the text layer). Implementation is deferred; the code path is fully analogous to the existing `GptImage1Provider`.
+**`XAIImageProvider` implemented.** `xai-image.provider.ts` extends `GptImage1Provider` with `baseUrl = 'https://api.x.ai/v1'` and `defaultModel = 'grok-2-aurora'`. xAI's images endpoint follows the OpenAI images API shape (`/v1/images/generations`, `b64_json` response format), so the subclass requires no other overrides. `mul.xai_api_key_enc` is shared with the xAI text layer automatically via the per-platform key logic in `loadConfig()`. The `'xai'` case is wired into `buildImageProvider()` in the service.
 
-**PRD compliance:** Full (v1.3 scope, with `XAIImageProvider` and xAI-native optimization documented but not yet implemented — see Known Issues).
+**PRD compliance:** Full (v1.3 scope).
 
 ---
 
@@ -271,11 +271,13 @@ The overall test suite still passes at 315 tests (190 backend + 125 frontend), a
 
 ### Provider-Native Optimization (OpenAI + xAI)
 
-**Deferred:** The PRD v1.3 specifies provider-native optimization for two cases:
-- **OpenAI-native**: when both layers are `openai`, use Responses API conversation mode (analysis + image generation in one context)
-- **xAI-native**: when both layers are `xai`, use Grok's multi-turn API for the same purpose
+**Implemented.** When `text_provider === image_provider` and both are `openai` or `xai`, `MulConverterService.analyze()` routes to `analyzeNative()` instead of the two-step path:
 
-Neither was implemented. The service always follows the two-step path (text analysis → image generation as separate calls) regardless of provider combination. These were pre-build design decisions that were not captured in the v1.2 PRD revision; the PRD has been updated to v1.3 to document both. Both are targeted enhancements to `MulConverterService.analyze()` that don't affect any other code path.
+- Single POST to `/v1/responses` (OpenAI) or `api.x.ai/v1/responses` (xAI) with `tools: [{ type: 'image_generation' }]`
+- System prompt includes Section 6 (native mode addendum) instructing the model to call `image_generation` once per `background.type === 'image'` section, in section order, after emitting the JSON analysis
+- Response parsing: JSON extracted from `output[].type === 'message'` text; images extracted from `output[].type === 'image_generation_call'` results; images matched to sections by order
+- Images uploaded via `MediaService.upload()` → `media://placeholder` replaced with `media://{uuid}` in sections JSON
+- Automatic fallback to two-step path if the Responses API call fails (network error, unsupported endpoint, non-200 response) — no user-visible difference
 
 ---
 
@@ -322,8 +324,10 @@ The following were added beyond the original plan items (A–O), driven by PRD v
 | xAI (Grok) as third text provider | PRD v1.2 | ✅ Built |
 | 10 per-platform ISM keys (vs 3 in original plan) | PRD v1.2 | ✅ Built |
 | Image generation layer — GPT-Image-1, FLUX, Stability | PRD v1.2 Part 2B | ✅ Built |
+| xAI image provider — Aurora model | PRD v1.3 | ✅ Built |
 | `imagePromptStyle` self-optimization (Section 5 of system prompt) | PRD v1.2 | ✅ Built |
 | Reference mode (opt-in) — `imageSourceUrl` in briefs | PRD v1.2 | ✅ Built |
+| Provider-native optimization — OpenAI Responses API + xAI equivalent | PRD v1.3 | ✅ Built |
 | Aesthetic vocabulary (gradients, overlays, drop caps, zone scheme, fontImport, padding, justify, letter spacing) | Part 1 extension (`02b5644`) | ✅ Built |
 | System prompt Section 3B — design guidance for aesthetic tools | PRD v1.2 | ✅ Built |
 
@@ -335,8 +339,8 @@ The following were added beyond the original plan items (A–O), driven by PRD v
 |---|------|----------|-------|
 | 1 | No page-level capability gate at `/admin/mul-converter` — direct URL access by non-Owner shows hanging spinner instead of "Access Restricted" | Low | Sidebar link is hidden; only affects direct URL navigation by non-Owner admins |
 | 2 | Unit tests not written for MulConverterModule | Medium | Recommended: write after testbed QA confirms real AI response shapes |
-| 3 | Provider-native optimization not implemented (OpenAI-native + xAI-native) | Low | Functional parity maintained; both documented in PRD v1.3; deferred to follow-up |
-| 4 | xAI image provider (`XAIImageProvider` / Aurora model) not implemented | Low | Documented in PRD v1.3; thin subclass of GptImage1Provider; deferred to follow-up |
+| 3 | Provider-native optimization | ✅ Implemented | `analyzeNative()` uses Responses API; falls back to two-step on failure |
+| 4 | xAI image provider (`XAIImageProvider` / Aurora) | ✅ Implemented | Thin subclass of `GptImage1Provider`; `api.x.ai/v1`; `grok-2-aurora` default |
 | 5 | Preview iframe height 400px vs PRD spec 500px | Cosmetic | No functional impact |
 | 6 | `mul.convert` needs to be seeded to production DB after Part 2 deploys | Operational | Owner can run `npx prisma db seed` against production via Cloud SQL proxy |
 

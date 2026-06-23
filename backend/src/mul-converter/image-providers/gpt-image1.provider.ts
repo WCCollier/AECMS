@@ -12,9 +12,10 @@ const ASPECT_TO_SIZE: Record<string, string> = {
 };
 
 export class GptImage1Provider implements ImageProvider {
-  private readonly logger = new Logger(GptImage1Provider.name);
+  protected readonly logger = new Logger(GptImage1Provider.name);
+  protected readonly baseUrl: string = 'https://api.openai.com/v1';
 
-  constructor(private readonly apiKey: string, private readonly model = 'gpt-image-1') {}
+  constructor(protected readonly apiKey: string, protected readonly model = 'gpt-image-1') {}
 
   async generate(brief: ImageBrief): Promise<Buffer> {
     const size = ASPECT_TO_SIZE[brief.aspectRatio] ?? '1024x1024';
@@ -27,15 +28,13 @@ export class GptImage1Provider implements ImageProvider {
       response_format: 'b64_json',
     };
 
-    // Reference mode: pass imageSourceUrl as additional context via prompt injection
-    // (gpt-image-1 via chat completions supports image inputs; via images endpoint, prompt only)
     if (brief.imageSourceUrl) {
       body.prompt = `Style and composition reference: ${brief.imageSourceUrl}\n\n${brief.prompt}`;
     }
 
     let res: Response;
     try {
-      res = await fetch('https://api.openai.com/v1/images/generations', {
+      res = await fetch(`${this.baseUrl}/images/generations`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
