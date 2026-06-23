@@ -13,7 +13,7 @@ const TEXT_PROVIDERS = [
 const IMAGE_PROVIDERS = [
   { value: '',          label: 'Disabled' },
   { value: 'openai',   label: 'OpenAI',         defaultModel: 'gpt-image-1' },
-  { value: 'xai',      label: 'xAI (Aurora)',   defaultModel: 'grok-2-aurora' },
+  { value: 'xai',      label: 'xAI (Aurora)',   defaultModel: 'grok-imagine-image-quality' },
   { value: 'flux',     label: 'Flux (fal.ai)',   defaultModel: 'flux-kontext-pro' },
   { value: 'stability',label: 'Stability AI',    defaultModel: 'stable-diffusion-xl-1024-v1-0' },
 ];
