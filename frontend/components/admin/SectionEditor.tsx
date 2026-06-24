@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { GripVertical, Plus, Trash2, CopyPlus, Settings } from 'lucide-react';
+import { GripVertical, Plus, Trash2, CopyPlus, Layers } from 'lucide-react';
 import { TipTapEditor } from '@/components/editor/TipTapEditor';
 import { WidgetSizeProvider } from '@/contexts/WidgetSizeContext';
 import type { PageSection, PageZone, SectionBackground } from '@/types';
@@ -215,143 +215,132 @@ function TemplatePicker({ section, onApply }: TemplatePickerProps) {
 
 interface BackgroundFlyoutProps {
   background?: SectionBackground;
+  open: boolean;
+  onClose: () => void;
   onUpdate: (bg: SectionBackground) => void;
 }
 
-function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
-  const [open, setOpen] = useState(false);
+function BackgroundFlyout({ background, open, onClose, onUpdate }: BackgroundFlyoutProps) {
   const bg = background ?? { type: 'none' as const };
-  const hasActive = bg.type !== 'none';
+
+  if (!open) return null;
 
   return (
-    <div className="relative flex-shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        title="Section background"
-        className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors ${
-          hasActive ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-        }`}
-      >
-        <Settings className="w-3 h-3" />
-        <span>BG</span>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg p-3 w-56 space-y-3">
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-20" onClick={onClose} />
+      {/* Panel — fixed top-right, below backstage header */}
+      <div className="fixed top-14 right-4 z-30 bg-surface border border-border rounded-lg shadow-xl p-3 w-64 space-y-3">
+        <div>
+          <p className="text-xs font-medium mb-1.5">Type</p>
+          <div className="flex gap-1">
+            {(['none', 'color', 'gradient', 'image'] as const).map(t => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => onUpdate({ ...bg, type: t })}
+                className={`px-2 py-0.5 rounded text-xs border transition-colors ${
+                  bg.type === t ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
+                }`}
+              >
+                {t === 'none' ? 'None' : t === 'color' ? 'Color' : t === 'gradient' ? 'Gradient' : 'Image'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {bg.type === 'color' && (
+          <div>
+            <p className="text-xs font-medium mb-1.5">Color</p>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={bg.value ?? '#ffffff'}
+                onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
+                className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
+              />
+              <input
+                type="text"
+                value={bg.value ?? ''}
+                onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
+                className="flex-1 text-xs px-2 py-1 border border-border rounded font-mono bg-background"
+                placeholder="#ffffff"
+              />
+            </div>
+          </div>
+        )}
+
+        {bg.type === 'gradient' && (
+          <div>
+            <p className="text-xs font-medium mb-1.5">Gradient</p>
+            <input
+              type="text"
+              value={bg.value ?? ''}
+              onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
+              className="w-full text-xs px-2 py-1.5 border border-border rounded font-mono bg-background"
+              placeholder="linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
+            />
+            {bg.value && (
+              <div className="mt-1.5 h-5 rounded border border-border" style={{ background: bg.value }} />
+            )}
+          </div>
+        )}
+
+        {bg.type !== 'none' && (
+          <div>
+            <p className="text-xs font-medium mb-1.5">Overlay</p>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={bg.overlay?.color ?? '#000000'}
+                onChange={(e) => onUpdate({ ...bg, overlay: { color: e.target.value, opacity: bg.overlay?.opacity ?? 0 } })}
+                className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
+              />
+              <input
+                type="range"
+                min={0} max={1} step={0.05}
+                value={bg.overlay?.opacity ?? 0}
+                onChange={(e) => onUpdate({ ...bg, overlay: { color: bg.overlay?.color ?? '#000000', opacity: parseFloat(e.target.value) } })}
+                className="flex-1"
+              />
+              <span className="text-[10px] text-foreground/50 w-8 text-right">{Math.round((bg.overlay?.opacity ?? 0) * 100)}%</span>
+            </div>
+          </div>
+        )}
+
+        {bg.type === 'image' && (
+          <>
             <div>
-              <p className="text-xs font-medium mb-1.5">Type</p>
+              <p className="text-xs font-medium mb-1.5">Image URL</p>
+              <input
+                type="url"
+                value={bg.value ?? ''}
+                onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
+                className="w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
+                placeholder="https://…"
+              />
+            </div>
+            <div>
+              <p className="text-xs font-medium mb-1.5">Attachment</p>
               <div className="flex gap-1">
-                {(['none', 'color', 'gradient', 'image'] as const).map(t => (
+                {(['scroll', 'fixed', 'parallax'] as const).map(a => (
                   <button
-                    key={t}
+                    key={a}
                     type="button"
-                    onClick={() => onUpdate({ ...bg, type: t })}
+                    onClick={() => onUpdate({ ...bg, attachment: a })}
                     className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                      bg.type === t ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
+                      (bg.attachment ?? 'scroll') === a ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
                     }`}
                   >
-                    {t === 'none' ? 'None' : t === 'color' ? 'Color' : t === 'gradient' ? 'Gradient' : 'Image'}
+                    {a.charAt(0).toUpperCase() + a.slice(1)}
                   </button>
                 ))}
               </div>
             </div>
-
-            {bg.type === 'color' && (
-              <div>
-                <p className="text-xs font-medium mb-1.5">Color</p>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={bg.value ?? '#ffffff'}
-                    onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                    className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
-                  />
-                  <input
-                    type="text"
-                    value={bg.value ?? ''}
-                    onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                    className="flex-1 text-xs px-2 py-1 border border-border rounded font-mono bg-background"
-                    placeholder="#ffffff"
-                  />
-                </div>
-              </div>
-            )}
-
-            {bg.type === 'gradient' && (
-              <div>
-                <p className="text-xs font-medium mb-1.5">Gradient</p>
-                <input
-                  type="text"
-                  value={bg.value ?? ''}
-                  onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                  className="w-full text-xs px-2 py-1.5 border border-border rounded font-mono bg-background"
-                  placeholder="linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
-                />
-                {bg.value && (
-                  <div className="mt-1.5 h-5 rounded border border-border" style={{ background: bg.value }} />
-                )}
-              </div>
-            )}
-
-            {bg.type !== 'none' && (
-              <div>
-                <p className="text-xs font-medium mb-1.5">Overlay</p>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={bg.overlay?.color ?? '#000000'}
-                    onChange={(e) => onUpdate({ ...bg, overlay: { color: e.target.value, opacity: bg.overlay?.opacity ?? 0 } })}
-                    className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
-                  />
-                  <input
-                    type="range"
-                    min={0} max={1} step={0.05}
-                    value={bg.overlay?.opacity ?? 0}
-                    onChange={(e) => onUpdate({ ...bg, overlay: { color: bg.overlay?.color ?? '#000000', opacity: parseFloat(e.target.value) } })}
-                    className="flex-1"
-                  />
-                  <span className="text-[10px] text-foreground/50 w-8 text-right">{Math.round((bg.overlay?.opacity ?? 0) * 100)}%</span>
-                </div>
-              </div>
-            )}
-
-            {bg.type === 'image' && (
-              <>
-                <div>
-                  <p className="text-xs font-medium mb-1.5">Image URL</p>
-                  <input
-                    type="url"
-                    value={bg.value ?? ''}
-                    onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                    className="w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
-                    placeholder="https://…"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs font-medium mb-1.5">Attachment</p>
-                  <div className="flex gap-1">
-                    {(['scroll', 'fixed', 'parallax'] as const).map(a => (
-                      <button
-                        key={a}
-                        type="button"
-                        onClick={() => onUpdate({ ...bg, attachment: a })}
-                        className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                          (bg.attachment ?? 'scroll') === a ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-                        }`}
-                      >
-                        {a.charAt(0).toUpperCase() + a.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -376,6 +365,8 @@ export function SectionEditor({
   onUpdate,
   onDelete,
 }: SectionEditorProps) {
+  const [bgOpen, setBgOpen] = useState(false);
+
   function applyTemplate(template: TemplateSpec) {
     if (sectionHasContent(section) && !window.confirm('Apply template? Existing zone content will be removed.')) return;
     onUpdate({
@@ -460,11 +451,6 @@ export function SectionEditor({
           <Plus className="w-3.5 h-3.5" />
         </button>
 
-        <BackgroundFlyout
-          background={section.background}
-          onUpdate={(bg) => onUpdate({ ...section, background: bg })}
-        />
-
         <select
           value={section.padding ?? 'normal'}
           onChange={(e) => onUpdate({ ...section, padding: e.target.value as import('@/types').SectionPadding })}
@@ -500,6 +486,14 @@ export function SectionEditor({
         )}
       </div>
 
+      {/* Background flyout — fixed-positioned, controlled from zone BG buttons */}
+      <BackgroundFlyout
+        open={bgOpen}
+        onClose={() => setBgOpen(false)}
+        background={section.background}
+        onUpdate={(bg) => onUpdate({ ...section, background: bg })}
+      />
+
       {/* Zone editors */}
       <div
         className="p-3 bg-background"
@@ -514,11 +508,26 @@ export function SectionEditor({
           <div
             key={zone.id}
             style={{ gridColumn: `span ${zone.span}` }}
-            className="min-w-0 relative group"
+            className="min-w-0 relative"
           >
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-foreground/25 select-none">Span {zone.span}</span>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+              <div className="flex items-center gap-1">
+                {/* BG button — controls section-level background */}
+                <button
+                  type="button"
+                  onClick={() => setBgOpen(true)}
+                  title="Section background &amp; overlay"
+                  className={`flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded border transition-colors ${
+                    section.background && section.background.type !== 'none'
+                      ? 'border-accent bg-accent/10 text-accent'
+                      : 'border-border hover:bg-surface-raised text-foreground/50 hover:text-foreground'
+                  }`}
+                >
+                  <Layers className="w-3 h-3" />
+                  <span>BG</span>
+                </button>
+                {/* Zone text colour scheme */}
                 <select
                   value={zone.scheme ?? 'inherit'}
                   onChange={(e) => {
@@ -526,12 +535,13 @@ export function SectionEditor({
                     onUpdate({ ...section, zones: section.zones.map((z, i) => i === idx ? { ...z, scheme } : z) });
                   }}
                   className="text-[10px] px-1 py-0.5 border border-border rounded bg-background cursor-pointer"
-                  title="Zone text colour scheme"
+                  title="Text colour — choose Light for white text on a dark background, Dark for dark text on a light background, or Inherit to follow the site default"
                 >
                   <option value="inherit">inherit</option>
-                  <option value="light">light</option>
-                  <option value="dark">dark</option>
+                  <option value="light">light text</option>
+                  <option value="dark">dark text</option>
                 </select>
+                {/* Split zone */}
                 <button
                   type="button"
                   onClick={() => handleSplitZone(idx)}
