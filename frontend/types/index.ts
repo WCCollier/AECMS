@@ -415,6 +415,8 @@ export interface Media {
   original_filename: string;
   mime_type: string;
   size: number;
+  width?: number | null;
+  height?: number | null;
   url: string;
   alt_text: string | null;
   caption: string | null;

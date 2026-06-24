@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, ChevronDown, ChevronRight } from 'lucide-react';
-import type { SectionBackground } from '@/types';
+import { X, ChevronDown, ChevronRight, Sun, Moon, Minus } from 'lucide-react';
+import { MediaPicker } from '@/components/admin/MediaPicker';
+import type { SectionBackground, PageZone, ZoneScheme } from '@/types';
 
 // ── Gradient overlay presets ────────────────────────────────────────────────
 
@@ -51,12 +52,28 @@ const TRANSITION_OPTIONS: TransitionOption[] = [
   { value: 'parallax',   label: 'Parallax',  icon: '〰', description: 'Image drifts at ~50% scroll speed' },
 ];
 
+// ── Zone scheme option definitions ─────────────────────────────────────────
+
+interface ZoneSchemeOption {
+  value: ZoneScheme;
+  label: string;
+  icon: React.ReactNode;
+  title: string;
+}
+
+const ZONE_SCHEME_OPTIONS: ZoneSchemeOption[] = [
+  { value: 'inherit', label: 'Auto',  icon: <Minus className="w-3 h-3" />,  title: 'Auto — follows the site-wide colour scheme' },
+  { value: 'light',   label: 'Light', icon: <Sun  className="w-3 h-3" />,   title: 'Light text — use on dark backgrounds' },
+  { value: 'dark',    label: 'Dark',  icon: <Moon className="w-3 h-3" />,   title: 'Dark text — use on light backgrounds' },
+];
+
 // ── Collapsible sub-section ─────────────────────────────────────────────────
 
-function SubSection({ title, children, defaultOpen = true }: {
+function SubSection({ title, children, defaultOpen = true, tooltip }: {
   title: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  tooltip?: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -64,6 +81,7 @@ function SubSection({ title, children, defaultOpen = true }: {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        title={tooltip}
         className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-foreground/70 hover:text-foreground transition-colors"
       >
         {title}
@@ -82,14 +100,18 @@ function SubSection({ title, children, defaultOpen = true }: {
 export interface SectionBackgroundPanelProps {
   open: boolean;
   background?: SectionBackground;
+  zones?: PageZone[];
   onUpdate: (bg: SectionBackground) => void;
+  onZonesUpdate?: (zones: PageZone[]) => void;
   onClose: () => void;
 }
 
 export function SectionBackgroundPanel({
   open,
   background,
+  zones,
   onUpdate,
+  onZonesUpdate,
   onClose,
 }: SectionBackgroundPanelProps) {
   const bg: SectionBackground = background ?? { type: 'none' };
@@ -131,7 +153,13 @@ export function SectionBackgroundPanel({
     }
   }
 
+  function setZoneScheme(zoneIdx: number, scheme: ZoneScheme) {
+    if (!zones || !onZonesUpdate) return;
+    onZonesUpdate(zones.map((z, i) => (i === zoneIdx ? { ...z, scheme } : z)));
+  }
+
   const showTransition = bg.type === 'image' || bg.type === 'gradient';
+  const hasZones = zones && zones.length > 0 && onZonesUpdate;
 
   return (
     <>
@@ -141,8 +169,8 @@ export function SectionBackgroundPanel({
         onClick={onClose}
       />
 
-      {/* Slide-in drawer */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-80 bg-surface border-l border-border shadow-xl flex flex-col overflow-hidden">
+      {/* Slide-in drawer — w-96 = 384px */}
+      <div className="fixed right-0 top-0 bottom-0 z-50 w-96 bg-surface border-l border-border shadow-xl flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-raised flex-shrink-0">
           <span className="text-sm font-semibold">Section Background</span>
@@ -163,13 +191,13 @@ export function SectionBackgroundPanel({
             {/* Type selector */}
             <div>
               <p className="text-[11px] text-foreground/50 mb-1.5">Type</p>
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-4 gap-1.5">
                 {(['none', 'color', 'gradient', 'image'] as const).map((t) => (
                   <button
                     key={t}
                     type="button"
                     onClick={() => update({ type: t, value: bg.value })}
-                    className={`py-1 rounded text-[11px] border transition-colors capitalize ${
+                    className={`py-1.5 rounded text-[11px] border transition-colors capitalize ${
                       bg.type === t
                         ? 'border-accent bg-accent/10 text-accent'
                         : 'border-border hover:bg-surface-raised'
@@ -241,23 +269,32 @@ export function SectionBackgroundPanel({
               </div>
             )}
 
-            {/* Image URL */}
+            {/* Image — media picker */}
             {bg.type === 'image' && (
-              <div>
-                <p className="text-[11px] text-foreground/50 mb-1.5">Image URL</p>
-                <input
-                  type="url"
-                  value={bg.value ?? ''}
-                  onChange={(e) => update({ value: e.target.value })}
-                  className="w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
-                  placeholder="https://… or media://uuid"
+              <div className="space-y-2">
+                <p className="text-[11px] text-foreground/50">
+                  Select or upload an image. Larger, landscape images work best as section backgrounds.
+                </p>
+                <MediaPicker
+                  value={bg.value && bg.value.startsWith('http') ? bg.value : undefined}
+                  onChange={(url) => update({ value: url ?? '' })}
+                  mimeFilter="image/*"
+                  showDimensions
+                  compact
                 />
-                {bg.value && bg.value.startsWith('http') && (
-                  <div
-                    className="mt-2 h-20 rounded border border-border bg-cover bg-center"
-                    style={{ backgroundImage: `url(${bg.value})` }}
+                {/* Fallback: paste an external URL */}
+                <details className="mt-1">
+                  <summary className="text-[10px] text-foreground/40 cursor-pointer hover:text-foreground/60 select-none">
+                    Or paste an external URL
+                  </summary>
+                  <input
+                    type="url"
+                    value={bg.value ?? ''}
+                    onChange={(e) => update({ value: e.target.value })}
+                    className="mt-1.5 w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
+                    placeholder="https://…"
                   />
-                )}
+                </details>
               </div>
             )}
           </SubSection>
@@ -404,6 +441,47 @@ export function SectionBackgroundPanel({
                   Tip: set a min-height of 60vh or more for image backgrounds with transitions so they have room to animate.
                 </p>
               )}
+            </SubSection>
+          )}
+
+          {/* ── 4. Zone Text ──────────────────────────────────────── */}
+          {hasZones && (
+            <SubSection
+              title="Zone Text"
+              defaultOpen={false}
+              tooltip="Set the text colour scheme for each zone to match the section background. Use Light text on dark backgrounds, Dark text on light ones."
+            >
+              <p className="text-[11px] text-foreground/50 -mt-1 mb-2 leading-relaxed">
+                Match text colour to the background. <strong className="text-foreground/70">Light</strong> on dark backgrounds,{' '}
+                <strong className="text-foreground/70">Dark</strong> on light ones.
+              </p>
+              <div className="space-y-2">
+                {zones.map((zone, idx) => (
+                  <div key={zone.id} className="flex items-center gap-2">
+                    <span className="text-[11px] text-foreground/50 w-14 flex-shrink-0">
+                      {zones.length === 1 ? 'Text' : `Zone ${idx + 1}`}
+                    </span>
+                    <div className="flex gap-1 flex-1">
+                      {ZONE_SCHEME_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setZoneScheme(idx, opt.value)}
+                          title={opt.title}
+                          className={`flex-1 flex items-center justify-center gap-1 py-1 rounded border text-[11px] transition-colors ${
+                            (zone.scheme ?? 'inherit') === opt.value
+                              ? 'border-accent bg-accent/10 text-accent'
+                              : 'border-border hover:bg-surface-raised text-foreground/60'
+                          }`}
+                        >
+                          {opt.icon}
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </SubSection>
           )}
 

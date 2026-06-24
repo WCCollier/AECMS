@@ -6,15 +6,17 @@ interface UseMediaOptions {
   page?: number;
   limit?: number;
   search?: string;
+  mimeFilter?: string;
 }
 
 export function useMedia(options: UseMediaOptions = {}) {
-  const { page = 1, limit = 20, search } = options;
+  const { page = 1, limit = 20, search, mimeFilter } = options;
 
   const params = new URLSearchParams();
   params.set('page', page.toString());
   params.set('limit', limit.toString());
   if (search) params.set('search', search);
+  if (mimeFilter) params.set('mime_type', mimeFilter);
 
   const { data, error, isLoading, mutate } = useSWR<PaginatedResponse<Media>>(
     `/media?${params.toString()}`,

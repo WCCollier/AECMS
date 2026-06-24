@@ -337,7 +337,7 @@ export function SectionEditor({
           value={section.padding ?? 'normal'}
           onChange={(e) => onUpdate({ ...section, padding: e.target.value as import('@/types').SectionPadding })}
           className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
-          title="Section padding"
+          title="Padding — vertical space between the section edge and its content&#10;No pad: flush/full-bleed&#10;Compact: tight feature rows&#10;Normal: standard body sections&#10;Spacious: heroes and major statements"
         >
           <option value="none">No pad</option>
           <option value="compact">Compact</option>
@@ -349,7 +349,7 @@ export function SectionEditor({
           value={heightValue}
           onChange={(e) => onUpdate({ ...section, minHeight: e.target.value || undefined })}
           className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
-          title="Section min-height"
+          title="Min-height — section will be at least this tall even if content is shorter&#10;Auto: shrinks to content&#10;50vh: half the screen&#10;60vh: three-fifths screen&#10;75vh: three-quarters screen&#10;100vh: full screen (classic hero)"
         >
           <option value="">Auto</option>
           <option value="50vh">50vh</option>
@@ -389,19 +389,6 @@ export function SectionEditor({
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-foreground/25 select-none">Span {zone.span}</span>
               <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                <select
-                  value={zone.scheme ?? 'inherit'}
-                  onChange={(e) => {
-                    const scheme = e.target.value as import('@/types').ZoneScheme;
-                    onUpdate({ ...section, zones: section.zones.map((z, i) => i === idx ? { ...z, scheme } : z) });
-                  }}
-                  className="text-[10px] px-1 py-0.5 border border-border rounded bg-background cursor-pointer"
-                  title="Zone text colour scheme"
-                >
-                  <option value="inherit">inherit</option>
-                  <option value="light">light</option>
-                  <option value="dark">dark</option>
-                </select>
                 <button
                   type="button"
                   onClick={() => handleSplitZone(idx)}
@@ -427,7 +414,9 @@ export function SectionEditor({
       <SectionBackgroundPanel
         open={bgPanelOpen}
         background={section.background}
+        zones={section.zones}
         onUpdate={(bg) => onUpdate({ ...section, background: bg })}
+        onZonesUpdate={(zones) => onUpdate({ ...section, zones })}
         onClose={() => setBgPanelOpen(false)}
       />
     </div>
