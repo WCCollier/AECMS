@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { GripVertical, Plus, Trash2, CopyPlus, Layers } from 'lucide-react';
+import { GripVertical, Plus, Trash2, CopyPlus, Layers, FolderOpen } from 'lucide-react';
 import { TipTapEditor } from '@/components/editor/TipTapEditor';
 import { WidgetSizeProvider } from '@/contexts/WidgetSizeContext';
+import { MediaPicker } from '@/components/admin/MediaPicker';
 import type { PageSection, PageZone, SectionBackground } from '@/types';
 
 // ── Template definitions ───────────────────────────────────────────────────────
@@ -213,6 +214,113 @@ function TemplatePicker({ section, onApply }: TemplatePickerProps) {
 
 // ── Background Flyout ──────────────────────────────────────────────────────────
 
+// ── Image background picker (modal) ───────────────────────────────────────────
+
+function ImageBgPicker({
+  value,
+  bg,
+  onUpdate,
+}: {
+  value?: string;
+  bg: SectionBackground;
+  onUpdate: (bg: SectionBackground) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  return (
+    <>
+      {/* Thumbnail + browse button */}
+      <div>
+        <p className="text-xs font-medium mb-1.5">Image</p>
+        {value ? (
+          <div className="relative group/img mb-2">
+            <div
+              className="h-20 rounded border border-border bg-cover bg-center"
+              style={{ backgroundImage: `url(${value})` }}
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setPickerOpen(true)}
+                className="text-[10px] px-2 py-1 bg-white/20 hover:bg-white/30 text-white rounded border border-white/30 transition-colors"
+              >
+                Change
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdate({ ...bg, value: '' })}
+                className="text-[10px] px-2 py-1 bg-white/20 hover:bg-white/30 text-white rounded border border-white/30 transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => setPickerOpen(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs border border-border rounded hover:bg-surface-raised transition-colors text-foreground/60 hover:text-foreground"
+        >
+          <FolderOpen className="w-3.5 h-3.5" />
+          {value ? 'Browse library…' : 'Choose from library…'}
+        </button>
+        <details className="mt-1.5">
+          <summary className="text-[10px] text-foreground/40 cursor-pointer hover:text-foreground/60 select-none">Or paste a URL</summary>
+          <input
+            type="url"
+            value={value ?? ''}
+            onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
+            className="mt-1.5 w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
+            placeholder="https://…"
+          />
+        </details>
+      </div>
+
+      {/* Attachment */}
+      <div>
+        <p className="text-xs font-medium mb-1.5">Attachment</p>
+        <div className="flex gap-1">
+          {(['scroll', 'fixed', 'parallax'] as const).map(a => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => onUpdate({ ...bg, attachment: a })}
+              className={`px-2 py-0.5 rounded text-xs border transition-colors ${
+                (bg.attachment ?? 'scroll') === a ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
+              }`}
+            >
+              {a.charAt(0).toUpperCase() + a.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Media picker modal */}
+      {pickerOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-background border border-foreground/20 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-base font-semibold mb-4">Choose Background Image</h3>
+            <MediaPicker
+              value={value}
+              onChange={(url) => {
+                if (url) {
+                  onUpdate({ ...bg, value: url });
+                  setPickerOpen(false);
+                }
+              }}
+              onClose={() => setPickerOpen(false)}
+              mimeFilter="image/*"
+              showDimensions
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── Background flyout ──────────────────────────────────────────────────────────
+
 interface BackgroundFlyoutProps {
   background?: SectionBackground;
   onUpdate: (bg: SectionBackground) => void;
@@ -318,35 +426,7 @@ function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
         )}
 
         {bg.type === 'image' && (
-          <>
-            <div>
-              <p className="text-xs font-medium mb-1.5">Image URL</p>
-              <input
-                type="url"
-                value={bg.value ?? ''}
-                onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                className="w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
-                placeholder="https://…"
-              />
-            </div>
-            <div>
-              <p className="text-xs font-medium mb-1.5">Attachment</p>
-              <div className="flex gap-1">
-                {(['scroll', 'fixed', 'parallax'] as const).map(a => (
-                  <button
-                    key={a}
-                    type="button"
-                    onClick={() => onUpdate({ ...bg, attachment: a })}
-                    className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                      (bg.attachment ?? 'scroll') === a ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-                    }`}
-                  >
-                    {a.charAt(0).toUpperCase() + a.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </>
+          <ImageBgPicker value={bg.value} onUpdate={onUpdate} bg={bg} />
         )}
           </div>
         </>
