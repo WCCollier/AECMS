@@ -1,10 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { GripVertical, Plus, Trash2, CopyPlus, Layers, FolderOpen } from 'lucide-react';
+import { GripVertical, Plus, Trash2, CopyPlus, Layers } from 'lucide-react';
 import { TipTapEditor } from '@/components/editor/TipTapEditor';
 import { WidgetSizeProvider } from '@/contexts/WidgetSizeContext';
-import { MediaPicker } from '@/components/admin/MediaPicker';
+import { SectionBackgroundPanel } from '@/components/admin/SectionBackgroundPanel';
 import type { PageSection, PageZone, SectionBackground } from '@/types';
 
 // ── Template definitions ───────────────────────────────────────────────────────
@@ -212,229 +212,6 @@ function TemplatePicker({ section, onApply }: TemplatePickerProps) {
   );
 }
 
-// ── Background Flyout ──────────────────────────────────────────────────────────
-
-// ── Image background picker (modal) ───────────────────────────────────────────
-
-function ImageBgPicker({
-  value,
-  bg,
-  onUpdate,
-}: {
-  value?: string;
-  bg: SectionBackground;
-  onUpdate: (bg: SectionBackground) => void;
-}) {
-  const [pickerOpen, setPickerOpen] = useState(false);
-
-  return (
-    <>
-      {/* Thumbnail + browse button */}
-      <div>
-        <p className="text-xs font-medium mb-1.5">Image</p>
-        {value ? (
-          <div className="relative group/img mb-2">
-            <div
-              className="h-20 rounded border border-border bg-cover bg-center"
-              style={{ backgroundImage: `url(${value})` }}
-            />
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity rounded flex items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPickerOpen(true)}
-                className="text-[10px] px-2 py-1 bg-white/20 hover:bg-white/30 text-white rounded border border-white/30 transition-colors"
-              >
-                Change
-              </button>
-              <button
-                type="button"
-                onClick={() => onUpdate({ ...bg, value: '' })}
-                className="text-[10px] px-2 py-1 bg-white/20 hover:bg-white/30 text-white rounded border border-white/30 transition-colors"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          className="w-full flex items-center justify-center gap-1.5 py-1.5 text-xs border border-border rounded hover:bg-surface-raised transition-colors text-foreground/60 hover:text-foreground"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-          {value ? 'Browse library…' : 'Choose from library…'}
-        </button>
-        <details className="mt-1.5">
-          <summary className="text-[10px] text-foreground/40 cursor-pointer hover:text-foreground/60 select-none">Or paste a URL</summary>
-          <input
-            type="url"
-            value={value ?? ''}
-            onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-            className="mt-1.5 w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
-            placeholder="https://…"
-          />
-        </details>
-      </div>
-
-      {/* Attachment */}
-      <div>
-        <p className="text-xs font-medium mb-1.5">Attachment</p>
-        <div className="flex gap-1">
-          {(['scroll', 'fixed', 'parallax'] as const).map(a => (
-            <button
-              key={a}
-              type="button"
-              onClick={() => onUpdate({ ...bg, attachment: a })}
-              className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                (bg.attachment ?? 'scroll') === a ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-              }`}
-            >
-              {a.charAt(0).toUpperCase() + a.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Media picker modal */}
-      {pickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-background border border-foreground/20 rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-base font-semibold mb-4">Choose Background Image</h3>
-            <MediaPicker
-              value={value}
-              onChange={(url) => {
-                if (url) {
-                  onUpdate({ ...bg, value: url });
-                  setPickerOpen(false);
-                }
-              }}
-              onClose={() => setPickerOpen(false)}
-              mimeFilter="image/*"
-              showDimensions
-            />
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-// ── Background flyout ──────────────────────────────────────────────────────────
-
-interface BackgroundFlyoutProps {
-  background?: SectionBackground;
-  onUpdate: (bg: SectionBackground) => void;
-}
-
-function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
-  const [open, setOpen] = useState(false);
-  const bg = background ?? { type: 'none' as const };
-  const hasActive = bg.type !== 'none';
-
-  return (
-    <div className="relative flex-shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        title="Section background &amp; overlay"
-        className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors ${
-          hasActive ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-        }`}
-      >
-        <Layers className="w-3 h-3" />
-        <span>BG</span>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg p-3 w-56 space-y-3">
-        <div>
-          <p className="text-xs font-medium mb-1.5">Type</p>
-          <div className="flex gap-1">
-            {(['none', 'color', 'gradient', 'image'] as const).map(t => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => onUpdate({ ...bg, type: t })}
-                className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                  bg.type === t ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-                }`}
-              >
-                {t === 'none' ? 'None' : t === 'color' ? 'Color' : t === 'gradient' ? 'Gradient' : 'Image'}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {bg.type === 'color' && (
-          <div>
-            <p className="text-xs font-medium mb-1.5">Color</p>
-            <div className="flex gap-2 items-center">
-              <input
-                type="color"
-                value={bg.value ?? '#ffffff'}
-                onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
-              />
-              <input
-                type="text"
-                value={bg.value ?? ''}
-                onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                className="flex-1 text-xs px-2 py-1 border border-border rounded font-mono bg-background"
-                placeholder="#ffffff"
-              />
-            </div>
-          </div>
-        )}
-
-        {bg.type === 'gradient' && (
-          <div>
-            <p className="text-xs font-medium mb-1.5">Gradient</p>
-            <input
-              type="text"
-              value={bg.value ?? ''}
-              onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-              className="w-full text-xs px-2 py-1.5 border border-border rounded font-mono bg-background"
-              placeholder="linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
-            />
-            {bg.value && (
-              <div className="mt-1.5 h-5 rounded border border-border" style={{ background: bg.value }} />
-            )}
-          </div>
-        )}
-
-        {bg.type !== 'none' && (
-          <div>
-            <p className="text-xs font-medium mb-1.5">Overlay</p>
-            <div className="flex gap-2 items-center">
-              <input
-                type="color"
-                value={bg.overlay?.color ?? '#000000'}
-                onChange={(e) => onUpdate({ ...bg, overlay: { color: e.target.value, opacity: bg.overlay?.opacity ?? 0 } })}
-                className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
-              />
-              <input
-                type="range"
-                min={0} max={1} step={0.05}
-                value={bg.overlay?.opacity ?? 0}
-                onChange={(e) => onUpdate({ ...bg, overlay: { color: bg.overlay?.color ?? '#000000', opacity: parseFloat(e.target.value) } })}
-                className="flex-1"
-              />
-              <span className="text-[10px] text-foreground/50 w-8 text-right">{Math.round((bg.overlay?.opacity ?? 0) * 100)}%</span>
-            </div>
-          </div>
-        )}
-
-        {bg.type === 'image' && (
-          <ImageBgPicker value={bg.value} onUpdate={onUpdate} bg={bg} />
-        )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 // ── Main SectionEditor ─────────────────────────────────────────────────────────
 
 interface SectionEditorProps {
@@ -456,6 +233,8 @@ export function SectionEditor({
   onUpdate,
   onDelete,
 }: SectionEditorProps) {
+  const [bgPanelOpen, setBgPanelOpen] = useState(false);
+
   function applyTemplate(template: TemplateSpec) {
     if (sectionHasContent(section) && !window.confirm('Apply template? Existing zone content will be removed.')) return;
     onUpdate({
@@ -540,10 +319,19 @@ export function SectionEditor({
           <Plus className="w-3.5 h-3.5" />
         </button>
 
-        <BackgroundFlyout
-          background={section.background}
-          onUpdate={(bg) => onUpdate({ ...section, background: bg })}
-        />
+        <button
+          type="button"
+          onClick={() => setBgPanelOpen(true)}
+          title="Section background, overlay &amp; transition"
+          className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors flex-shrink-0 ${
+            section.background && section.background.type !== 'none'
+              ? 'border-accent bg-accent/10 text-accent'
+              : 'border-border hover:bg-surface-raised'
+          }`}
+        >
+          <Layers className="w-3 h-3" />
+          <span>BG</span>
+        </button>
 
         <select
           value={section.padding ?? 'normal'}
@@ -561,10 +349,12 @@ export function SectionEditor({
           value={heightValue}
           onChange={(e) => onUpdate({ ...section, minHeight: e.target.value || undefined })}
           className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
-          title="Min-height — section will be at least this tall even if content is shorter&#10;Auto: shrinks to content&#10;50vh: half the screen&#10;100vh: full screen (classic hero)"
+          title="Min-height — section will be at least this tall even if content is shorter&#10;Auto: shrinks to content&#10;50vh: half the screen&#10;60vh: three-fifths screen&#10;75vh: three-quarters screen&#10;100vh: full screen (classic hero)"
         >
           <option value="">Auto</option>
           <option value="50vh">50vh</option>
+          <option value="60vh">60vh</option>
+          <option value="75vh">75vh</option>
           <option value="100vh">100vh</option>
         </select>
 
@@ -594,26 +384,11 @@ export function SectionEditor({
           <div
             key={zone.id}
             style={{ gridColumn: `span ${zone.span}` }}
-            className="min-w-0 relative"
+            className="min-w-0 relative group"
           >
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-foreground/25 select-none">Span {zone.span}</span>
-              <div className="flex items-center gap-1">
-                {/* Zone text colour scheme */}
-                <select
-                  value={zone.scheme ?? 'inherit'}
-                  onChange={(e) => {
-                    const scheme = e.target.value as import('@/types').ZoneScheme;
-                    onUpdate({ ...section, zones: section.zones.map((z, i) => i === idx ? { ...z, scheme } : z) });
-                  }}
-                  className="text-[10px] px-1 py-0.5 border border-border rounded bg-background cursor-pointer"
-                  title="Text colour — choose Light for white text on a dark background, Dark for dark text on a light background, or Inherit to follow the site default"
-                >
-                  <option value="inherit">inherit</option>
-                  <option value="light">light text</option>
-                  <option value="dark">dark text</option>
-                </select>
-                {/* Split zone */}
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => handleSplitZone(idx)}
@@ -634,6 +409,16 @@ export function SectionEditor({
           </div>
         ))}
       </div>
+
+      {/* Background / overlay / transition panel (slide-in drawer) */}
+      <SectionBackgroundPanel
+        open={bgPanelOpen}
+        background={section.background}
+        zones={section.zones}
+        onUpdate={(bg) => onUpdate({ ...section, background: bg })}
+        onZonesUpdate={(zones) => onUpdate({ ...section, zones })}
+        onClose={() => setBgPanelOpen(false)}
+      />
     </div>
   );
 }

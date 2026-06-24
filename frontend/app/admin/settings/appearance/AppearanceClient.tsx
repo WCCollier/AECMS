@@ -4,11 +4,11 @@ import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import { Save, Loader2, Palette, Type, ExternalLink, Plus, Trash2, BookOpen } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
-import { PALETTES, FONT_PAIRINGS, buildCssOverrides, getPaletteById, getFontPairingById } from '@/lib/themes';
+import { PALETTES, FONT_PAIRINGS, buildCssOverrides, getPaletteById, getFontPairingById, type ThemePalette } from '@/lib/themes';
 import { CURATED_FONTS, type FontEntry } from '@/lib/fonts';
 
 export function AppearanceClient() {
-  const { data: currentTheme } = useSWR<{ palette: string; fontPairing: string }>(
+  const { data: currentTheme, mutate: mutateTheme } = useSWR<{ palette: string; fontPairing: string; customPalettes?: ThemePalette[] }>(
     '/settings-public/theme',
     (url: string) => adminApi.get(url).then((r) => r.data),
   );
@@ -18,6 +18,7 @@ export function AppearanceClient() {
     (url: string) => adminApi.get(url).then((r) => r.data),
   );
   const customFonts: FontEntry[] = fontsData?.customFonts ?? [];
+  const customPalettes: ThemePalette[] = currentTheme?.customPalettes ?? [];
 
   const [selectedPalette, setSelectedPalette] = useState('midnight');
   const [selectedFont, setSelectedFont] = useState('default');
@@ -63,7 +64,7 @@ export function AppearanceClient() {
     }
   };
 
-  const palette = getPaletteById(selectedPalette);
+  const palette = getPaletteById(selectedPalette, customPalettes);
   const fontPairing = getFontPairingById(selectedFont);
   const previewCss = buildCssOverrides(palette, fontPairing);
 
@@ -137,44 +138,61 @@ export function AppearanceClient() {
           <h2 className="text-sm font-semibold text-neutral-200">Color Palette</h2>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {PALETTES.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => { setSelectedPalette(p.id); setDirty(true); setSaved(false); }}
-              className={`relative rounded-xl overflow-hidden border-2 transition-all text-left ${
-                p.id === selectedPalette
-                  ? 'border-blue-500 shadow-lg shadow-blue-500/20'
-                  : 'border-neutral-700 hover:border-neutral-500'
-              }`}
-              style={{ background: p.colors.background }}
-            >
-              {/* Colour swatch preview */}
-              <div className="p-3">
-                <div className="flex gap-1.5 mb-2">
-                  <div className="w-4 h-4 rounded-full" style={{ background: p.colors.accent }} />
-                  <div className="w-4 h-4 rounded-full" style={{ background: p.colors['accent-hover'] }} />
-                  <div className="w-4 h-4 rounded-full" style={{ background: p.colors.muted }} />
-                </div>
-                <div className="text-xs font-medium mb-0.5" style={{ color: p.colors.foreground }}>
-                  {p.name}
-                </div>
-                <div className="text-[10px]" style={{ color: p.colors.muted }}>
-                  {p.scheme}
-                </div>
-                {/* Small UI elements preview */}
-                <div className="mt-2 rounded px-1.5 py-0.5 text-[10px] font-medium w-fit" style={{ background: p.colors.accent, color: p.colors['accent-foreground'] }}>
-                  Button
-                </div>
+          {[...PALETTES, ...customPalettes].map((p) => {
+            const isCustom = !PALETTES.find((bp) => bp.id === p.id);
+            return (
+              <div key={p.id} className="relative">
+                <button
+                  onClick={() => { setSelectedPalette(p.id); setDirty(true); setSaved(false); }}
+                  className={`relative w-full rounded-xl overflow-hidden border-2 transition-all text-left ${
+                    p.id === selectedPalette
+                      ? 'border-blue-500 shadow-lg shadow-blue-500/20'
+                      : 'border-neutral-700 hover:border-neutral-500'
+                  }`}
+                  style={{ background: p.colors.background }}
+                >
+                  <div className="p-3">
+                    <div className="flex gap-1.5 mb-2">
+                      <div className="w-4 h-4 rounded-full" style={{ background: p.colors.accent }} />
+                      <div className="w-4 h-4 rounded-full" style={{ background: p.colors['accent-hover'] }} />
+                      <div className="w-4 h-4 rounded-full" style={{ background: p.colors.muted }} />
+                    </div>
+                    <div className="text-xs font-medium mb-0.5" style={{ color: p.colors.foreground }}>
+                      {p.name}
+                    </div>
+                    <div className="text-[10px]" style={{ color: p.colors.muted }}>
+                      {p.scheme}
+                      {isCustom && <span className="ml-1 opacity-70">· Custom</span>}
+                    </div>
+                    <div className="mt-2 rounded px-1.5 py-0.5 text-[10px] font-medium w-fit" style={{ background: p.colors.accent, color: p.colors['accent-foreground'] }}>
+                      Button
+                    </div>
+                  </div>
+                  {p.id === selectedPalette && (
+                    <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                      <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 text-white fill-current">
+                        <path d="M1 5l3 3 5-5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+                {isCustom && (
+                  <button
+                    onClick={async () => {
+                      const updated = customPalettes.filter((cp) => cp.id !== p.id);
+                      await adminApi.patch('/settings/appearance', { customPalettes: updated });
+                      mutateTheme();
+                      if (selectedPalette === p.id) setSelectedPalette('midnight');
+                    }}
+                    className="absolute top-1 right-1 w-5 h-5 bg-red-900/80 hover:bg-red-600 text-white rounded-full text-xs flex items-center justify-center z-10"
+                    title="Delete custom palette"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
-              {p.id === selectedPalette && (
-                <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                  <svg viewBox="0 0 10 10" className="w-2.5 h-2.5 text-white fill-current">
-                    <path d="M1 5l3 3 5-5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                  </svg>
-                </div>
-              )}
-            </button>
-          ))}
+            );
+          })}
         </div>
       </section>
 

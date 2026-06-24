@@ -1,6 +1,6 @@
 # PRD 13: Mul Converter
 
-**Version**: 1.1  
+**Version**: 1.7  
 **Status**: Draft  
 **Phase**: 23  
 **Author**: WCCollier
@@ -76,9 +76,15 @@ This capability gates all Mul Converter routes (settings + analysis).
          │
          ▼
 [Step 1 — Configure (first time only)]
-  Provider: Anthropic | OpenAI
-  Model: text field (e.g. claude-sonnet-4-6, gpt-4o)
-  API Key: password field → saved encrypted in ISM as mul.api_key_enc
+  TEXT MODEL
+    Provider: Anthropic | OpenAI | xAI
+    Model: text field (e.g. claude-sonnet-4-6, gpt-4o, grok-4)
+    API Key: password field → saved encrypted in ISM (per platform, shared if same as image provider)
+  IMAGE GENERATION (optional)
+    Provider: Disabled | OpenAI | Flux (fal.ai) | Stability AI
+    Model: text field (e.g. gpt-image-1, flux-kontext-pro)
+    API Key: password field → reuses text key if same platform; otherwise separate ISM key
+    Mode: Brief-only | + Reference images (opt-in — see Image Generation section)
          │
          ▼
 [Step 2 — Enter Target URL]
@@ -385,22 +391,37 @@ This text-only extraction approach makes the AI task well-defined and avoids vis
 
 ```typescript
 interface MulProvider {
-  analyze(data: PageData, outputSchema: MulOutputSchema): Promise<MulResult>;
+  analyze(data: PageData, systemPrompt: string): Promise<MulResult>;
 }
 
-class AnthropicMulProvider implements MulProvider { ... }
-class OpenAIMulProvider      implements MulProvider { ... }
+class AnthropicMulProvider implements MulProvider { ... }  // Claude models
+class OpenAIMulProvider      implements MulProvider { ... }  // GPT-4o, etc.
+class XAIMulProvider         implements MulProvider { ... }  // Grok models (OpenAI-compatible API)
 ```
 
-Provider is selected at request time by reading `mul.provider` from ISM. The module **does not require** the Anthropic or OpenAI SDK to be present in the container — both providers are implemented as thin HTTP clients (using `fetch`/`axios`) so neither SDK is a hard dependency. This keeps the Docker image lean and keeps provider support additive.
+Provider is selected at request time by reading `mul.text_provider` from ISM. The module **does not require** any provider SDK to be present in the container — all providers are implemented as thin HTTP clients (`fetch`/`axios`) so no SDK is a hard dependency. xAI's API is OpenAI-compatible (same request shape, different base URL and key), so `XAIMulProvider` is a thin subclass of `OpenAIMulProvider`.
+
+**Provider-native optimization**: When the text layer and image layer use the same platform, the service can collapse both operations into a single API conversation context. The model sees the source page and the image briefs it just wrote, producing better compositional fidelity than two separate calls. This optimization is transparent to the user — it activates automatically when both providers match.
+
+- **OpenAI-native**: When `text_provider === 'openai'` and `image_provider === 'openai'`, use the OpenAI Responses API conversation mode (analysis + image generation in one context window).
+- **xAI-native**: When `text_provider === 'xai'` and `image_provider === 'xai'`, use Grok's equivalent multi-turn API to handle analysis and Aurora image generation in one context window. xAI's API is OpenAI-wire-compatible, so the implementation is a thin configuration variant of the OpenAI-native path (different base URL and model names; same request/response shape).
 
 ### ISM Keys (namespace: `mul.*`)
 
+Keys are per-platform, not per-layer. When the text model and image model use the same platform (e.g. both OpenAI), one key covers both.
+
 | Key | Encrypted | Description |
 |-----|-----------|-------------|
-| `mul.provider` | No | `anthropic` \| `openai` |
-| `mul.model` | No | e.g. `claude-sonnet-4-6`, `gpt-4o` |
-| `mul.api_key_enc` | Yes (`_enc`) | API key for the chosen provider |
+| `mul.text_provider` | No | `anthropic` \| `openai` \| `xai` |
+| `mul.text_model` | No | e.g. `claude-sonnet-4-6`, `gpt-4o`, `grok-4` |
+| `mul.anthropic_api_key_enc` | Yes | API key for Anthropic (falls back to `ANTHROPIC_API_KEY` env var if unset) |
+| `mul.openai_api_key_enc` | Yes | API key for OpenAI — shared by text layer and image layer when both use OpenAI |
+| `mul.xai_api_key_enc` | Yes | API key for xAI (Grok models) |
+| `mul.image_provider` | No | `openai` \| `xai` \| `flux` \| `stability` — omit or `disabled` to disable image generation |
+| `mul.image_model` | No | e.g. `gpt-image-1`, `grok-2-aurora`, `flux-kontext-pro`, `stable-diffusion-xl-1024-v1-0` |
+| `mul.fal_api_key_enc` | Yes | API key for fal.ai (FLUX models) |
+| `mul.stability_api_key_enc` | Yes | API key for Stability AI |
+| `mul.image_reference_mode` | No | `brief-only` (default) \| `reference` — see Image Generation section |
 
 ---
 
@@ -556,6 +577,26 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
       // … one entry per section
     ]
   },
+  "imagePromptStyle": {       // only present when image generation is enabled
+    "model": string,          // the image model name as configured
+    "approach": string,       // the AI's declared prompt strategy for this model
+    "exampleFormat": string   // one concrete example of the prompt format to be used
+  } | undefined,
+  "imageBriefs": {            // only present when image generation is enabled
+    "<section-or-zone-id>": {
+      "prompt": string,       // the image generation prompt, styled per imagePromptStyle
+      "aspectRatio": string,  // e.g. "16:9", "1:1", "3:2"
+      "style": "photorealistic" | "illustration" | "abstract",
+      "imageSourceUrl": string | undefined
+        // Only present when mul.image_reference_mode === "reference".
+        // The URL of the source image from the target page (og:image, hero img src, etc.)
+        // passed to the image generation API as a composition/style reference.
+        // Never stored in AECMS. Only transmitted transiently to the image provider.
+        // Owner must enable reference mode explicitly; UI shows:
+        //   "Reference mode sends images from the source URL to your image provider.
+        //    Only enable if you own or have rights to the source images."
+    }
+  } | undefined,
   "metadata": {
     "confidence": "high" | "medium" | "low",
     "notes": string           // 1–2 sentences: what you inferred and any caveats
@@ -563,7 +604,12 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
 }
 ```
 
-The system prompt is assembled in `MulConverterService.buildSystemPrompt()` and kept as a constant — it is not user-editable in v1.
+The system prompt is assembled in `MulConverterService.buildSystemPrompt(config: MulConfig)` and is parameterized on the active configuration — it is not user-editable in v1. Key runtime parameters injected into the prompt:
+
+- `{image_provider}` / `{image_model}` — inserted into Section 5 when image generation is enabled; omitted entirely when disabled
+- `{image_reference_mode}` — determines whether `imageSourceUrl` should be populated in briefs
+
+This parameterization is the mechanism that keeps the system open to new and upgraded image models without code changes: the master AI's training knowledge of any named model informs its brief vocabulary automatically.
 
 ### Aesthetic Vocabulary — Guidance for the AI
 
@@ -620,6 +666,43 @@ UPPERCASE LABELS
   section eyebrows (short label text above a headline) and caption-style text. This pattern
   ("ABOUT THE AUTHOR", "FEATURED WORK", "CHAPTER ONE") is a strong editorial voice marker.
   Match it to the source page's typographic hierarchy.
+```
+
+### Image Prompt Self-Optimization (Section 5 of system prompt)
+
+When image generation is enabled, the system prompt includes a Section 5 that instructs the master AI to **declare its prompting strategy for the configured image model before writing any image briefs**. This produces an `imagePromptStyle` field in the output JSON:
+
+```json
+"imagePromptStyle": {
+  "model": "flux-kontext-pro",
+  "approach": "Dense comma-separated visual descriptors. Lead with subject and composition, then artistic style, then lighting, then camera/technical specs. Aspect ratio is a separate field — omit from the prompt string itself. Negative prompts are not used in this context.",
+  "exampleFormat": "coastal cliffside at sunset, cinematic photography, golden backlighting, wide angle 24mm, atmospheric haze, warm amber and violet tones"
+}
+```
+
+**Why this matters:**
+
+- **Self-adapting vocabulary**: DALL-E 3, FLUX Kontext, and Stability SDXL each respond differently to prompt styles. DALL-E 3 handles natural language well; FLUX Kontext prefers dense descriptor lists; Stability has its own emphasis syntax. The master AI calibrates to whichever model is configured.
+- **Future-proof**: New image models (DALL-E 4, FLUX 3, Imagen 4, etc.) require no code changes. The master AI applies whatever it knows from its training about the configured model. If the model is unknown, it notes this and applies universal best practices.
+- **Inspectable**: The `imagePromptStyle` field is returned in the `MulResult` and shown in the UI (collapsed by default) so the owner can understand why briefs are written the way they are.
+- **Not stored**: `imagePromptStyle` is an ephemeral reasoning artifact. It is returned to the client for display but is not saved into the page content JSON.
+
+The Section 5 system prompt text (injected only when `image_provider` is configured):
+
+```
+[SECTION 5 — Image brief optimization]
+Before writing any imageBriefs, emit an "imagePromptStyle" field. In it:
+  1. State the image model name: "{image_model}"
+  2. Describe how that model responds best to prompts — vocabulary, syntax, ordering,
+     what to emphasize, what to avoid. Draw on your knowledge of this model.
+  3. Provide one concrete example of the prompt format you will use.
+
+Apply that declared style consistently to all prompts in the "imageBriefs" field.
+
+If the model name is unfamiliar to you, note this explicitly in "approach" and fall back
+to universal best practices: subject-first descriptions, clear style declaration,
+explicit lighting and mood descriptors, technical specs as trailing descriptors.
+Aspect ratio is always a separate structured field — never embed it in the prompt string.
 ```
 
 ### Structured Output Enforcement
@@ -691,27 +774,53 @@ The preview uses a sandboxed `<iframe>` pointing directly to the target URL (no 
 
 ### Settings Panel
 
-The settings panel is a collapsible `<details>` section at the top. On first visit (when `mul.provider` is unset), it is pre-expanded with a banner: "Configure your AI provider before running your first analysis."
+The settings panel is a collapsible `<details>` section at the top. On first visit (when `mul.text_provider` is unset), it is pre-expanded with a banner: "Configure your AI provider before running your first analysis."
 
-Provider radio: `Anthropic` | `OpenAI`  
-Model input: text field, pre-filled with a sensible default based on selected provider (`claude-sonnet-4-6` for Anthropic, `gpt-4o` for OpenAI)  
-API Key: password-style input; shows `••••••••` if a key is already saved  
+**Text Model group:**
+- Provider radio: `Anthropic` | `OpenAI` | `xAI`
+- Model: text field, pre-filled with a sensible default per provider (`claude-sonnet-4-6` / `gpt-4o` / `grok-4`)
+- API Key: password-style input; shows `••••••••` if already saved; Anthropic can be left blank if `ANTHROPIC_API_KEY` is set in the environment
+
+**Image Generation group** (collapsed by default; expands when owner clicks "Enable image generation"):
+- Provider radio: `Disabled` | `OpenAI` | `xAI` | `Flux (fal.ai)` | `Stability AI`
+- Model: text field, pre-filled with default per provider (`gpt-image-1` / `grok-2-aurora` / `flux-kontext-pro`)
+- API Key: hidden when provider matches the text provider (key is shared automatically — applies to both OpenAI↔OpenAI and xAI↔xAI); otherwise separate password input
+- Mode toggle: `Brief-only` | `+ Reference images`
+  - Reference mode disclosure: *"Reference mode passes images from the source URL to your image provider for style reference. Only enable if you own or have rights to the source images."*
+- Info note: "Image generation adds ~10–30s. Generated images are saved to your Media Library."
+
 Save button: `PATCH /mul/settings`
 
 ---
 
 ## LLM Model Recommendations
 
-The user supplies their own model. The system prompt is text-only (no image attachments in v1), so any sufficiently capable text model works. Guidance shown in the settings panel:
+The user supplies their own model and API key. The system prompt is text-only (no image attachments in v1), so any sufficiently capable text model works. Guidance shown in the settings panel:
+
+### Text (Semantic) Layer
 
 | Provider | Recommended Model | Notes |
 |----------|------------------|-------|
-| Anthropic | `claude-sonnet-4-6` | Best balance of speed, cost, and layout reasoning. Strong structured output via tool use. |
-| Anthropic | `claude-opus-4-8` | Highest quality for complex pages; noticeably more expensive. |
-| OpenAI | `gpt-4o` | Equivalent quality to Sonnet 4.6; supports strict JSON schema. |
+| Anthropic | `claude-sonnet-4-6` | Best balance of speed, cost, and layout reasoning. Strong structured output via tool use. Default recommendation. |
+| Anthropic | `claude-opus-4-8` | Highest quality for complex pages and nuanced aesthetic inference; noticeably more expensive. |
+| OpenAI | `gpt-4o` | Equivalent quality to Sonnet 4.6; supports strict JSON schema output. |
 | OpenAI | `gpt-4o-mini` | Faster and cheaper; acceptable for simple pages with straightforward color schemes. |
+| xAI | `grok-4` | 1M-token context window; strong reasoning; lowest reported hallucination rate among frontier models as of mid-2026. OpenAI-compatible API — easy integration. |
+
+### Image Generation Layer
+
+| Provider | Recommended Model | Mode | Notes |
+|----------|------------------|------|-------|
+| OpenAI | `gpt-image-1` | Brief-only or Reference | Natural language prompts. Shares API key with OpenAI text layer. Best for owners already using OpenAI. OpenAI-native optimization applies automatically when both layers are OpenAI. |
+| xAI | `grok-2-aurora` | Brief-only or Reference | xAI's Aurora image generation model. Shares API key with xAI text layer (`mul.xai_api_key_enc`). xAI-native optimization applies automatically when both layers are xAI/Grok. Best for owners already using Grok as the text model. |
+| Flux (fal.ai) | `flux-kontext-pro` | Brief-only or Reference | Best quality for reference-conditioned generation. Descriptor-list prompts. Separate fal.ai key required. |
+| Flux (fal.ai) | `flux-schnell` | Brief-only | Fastest and cheapest; good for layout scaffolding where photorealism isn't critical. |
+| Stability AI | `stable-diffusion-xl-1024-v1-0` | Brief-only | Wide model ecosystem; separate Stability key required. |
+| Disabled | — | — | Default. Scaffold uses `media://placeholder` slots the owner fills manually. |
 
 **Why not require a vision model?** The text-based HTML extraction is sufficient for most palette and layout inferences. The dominant CSS colors are explicitly present in the source; the DOM structure gives enough layout signal. Vision adds marginal value at higher cost and API complexity. A vision enhancement path is reserved for v2 (see Future Work).
+
+**Image prompt self-optimization**: The text model calibrates its image brief vocabulary to the configured image model automatically (see *Image Prompt Self-Optimization* above). Owners do not need to learn provider-specific prompt syntax — the master AI handles this.
 
 ---
 
@@ -728,10 +837,18 @@ MulConverterService.analyze(url)
   │  1. SSRF-validate URL
   │  2. Fetch HTML (timeout 10s, max 2MB)
   │  3. Extract: colors, DOM structure, meta
-  │  4. Read provider/model/key from ISM
-  │  5. Build system prompt + user message
-  │  6. Call AI provider (Anthropic or OpenAI)
+  │  4. Read text_provider/text_model + image_provider/image_model from ISM
+  │  5. Build system prompt (parameterized on image_provider/model if enabled)
+  │  6. Call text AI provider (Anthropic, OpenAI, or xAI)
+  │     → Response includes: palette, page sections, imagePromptStyle?, imageBriefs?
   │  7. Parse + validate structured JSON response
+  │  [if image_provider configured]
+  │  8. For each imageBrief: call image provider → bitmap
+  │     → Upload to GCS → create Media record → replace media://placeholder with media://uuid
+  │  [if text_provider === image_provider === 'openai']
+  │  8′. Use OpenAI Responses API conversation mode (steps 6+8 merged into one API call)
+  │  [if text_provider === image_provider === 'xai']
+  │  8″. Use Grok multi-turn API conversation mode (steps 6+8 merged; xAI-native optimization)
   ▼
   Return MulResult to controller → HTTP 200
 
@@ -802,56 +919,168 @@ MulConverterService.analyze(url)
 
 ### AI Output Extension
 
-The scaffold generation prompt gains a new output field when image generation is enabled:
+The scaffold generation prompt gains two new output fields when image generation is enabled: `imagePromptStyle` (see *Image Prompt Self-Optimization* above) and `imageBriefs`.
 
 ```json
+"imagePromptStyle": {
+  "model": "flux-kontext-pro",
+  "approach": "Dense comma-separated visual descriptors. Lead with subject and composition, then artistic style, then lighting, then technical/camera details. Avoid negative prompts. Aspect ratio is a separate field.",
+  "exampleFormat": "coastal cliffside at dusk, cinematic photography, warm amber backlighting, 24mm wide angle, atmospheric haze, violet and gold tones"
+},
 "imageBriefs": {
   "<zone-or-section-id>": {
-    "description": "A dramatic mountain landscape at golden hour, warm amber and purple tones, photorealistic",
-    "aspectRatio": "16:9",
-    "style": "photorealistic | illustration | abstract"
+    "prompt": "...",         // written in the style declared by imagePromptStyle
+    "aspectRatio": "16:9",  // e.g. "16:9", "1:1", "3:2", "4:3"
+    "style": "photorealistic | illustration | abstract",
+    "imageSourceUrl": "https://source-site.com/hero.jpg"
+      // Only populated when mul.image_reference_mode === "reference".
+      // Passed to the image provider as a composition/mood reference; never stored.
   }
 }
 ```
 
-The section that declares `background.type: "image"` and `background.value: "media://placeholder"` uses the matching `id` as its key in `imageBriefs`.
+The section that declares `background.type: "image"` and `background.value: "media://placeholder"` uses the matching `id` as its key in `imageBriefs`. The master AI extracts candidate `imageSourceUrl` values from the page during its analysis pass (from `og:image`, prominent `<img>` tags, hero element backgrounds) — no extra network fetch is required.
 
 ### Image Provider Abstraction
 
 ```typescript
+interface ImageBrief {
+  prompt: string;
+  aspectRatio: string;
+  style: 'photorealistic' | 'illustration' | 'abstract';
+  imageSourceUrl?: string;  // populated in reference mode
+}
+
 interface ImageProvider {
   generate(brief: ImageBrief): Promise<Buffer>; // returns PNG/JPEG bytes
 }
 
-class DallE3Provider implements ImageProvider { ... }     // OpenAI DALL-E 3
-class StabilityProvider implements ImageProvider { ... }  // Stability AI SDXL
-class FluxProvider implements ImageProvider { ... }       // Flux via fal.ai
+class GptImage1Provider  implements ImageProvider { ... }  // OpenAI gpt-image-1
+class XAIImageProvider   implements ImageProvider { ... }  // xAI Aurora (thin subclass of GptImage1Provider; different base URL + model)
+class FluxProvider       implements ImageProvider { ... }  // FLUX models via fal.ai
+class StabilityProvider  implements ImageProvider { ... }  // Stability AI SDXL
 ```
 
-Provider selected by `mul.image_provider` ISM key. The module uses REST/fetch — no image SDK hard dependency.
+Provider selected by `mul.image_provider` ISM key. All providers use REST/fetch — no image SDK hard dependency. When `imageSourceUrl` is present and the provider supports reference conditioning (OpenAI Responses API, xAI Aurora, FLUX Kontext), it is passed as a reference input. Providers that don't support reference conditioning ignore the field and use `prompt` only.
 
-### New ISM Keys (namespace: `mul.*`)
+**Reference mode and OpenAI**: When both `mul.text_provider` and `mul.image_provider` are `openai`, the Responses API conversation mode handles both analysis and reference-conditioned image generation in one context — no separate image API call is needed. The text model's vision understanding of the source page feeds directly into the image generation step.
 
-| Key | Encrypted | Description |
-|-----|-----------|-------------|
-| `mul.image_provider` | No | `dalle3` \| `stability` \| `flux` — omit to disable image generation |
-| `mul.image_api_key_enc` | Yes | API key for the image provider (may be same as text provider for OpenAI) |
+**Reference mode and xAI**: When both `mul.text_provider` and `mul.image_provider` are `xai`, the same principle applies using Grok's multi-turn API. `XAIImageProvider` is a thin subclass of `GptImage1Provider` with `baseUrl = 'https://api.x.ai/v1'` — xAI's image generation endpoint follows the OpenAI images API shape. The `mul.xai_api_key_enc` key is shared by both layers automatically (per-platform key sharing).
 
-### Settings Panel Extension
+### ISM Keys (Part 2B additions)
 
-The MulSettingsPanel gains an optional "Image Generation" section (collapsed by default, shown only if `mul.image_provider` is set or owner expands it):
+Part 2B uses the same per-platform key structure defined in the main ISM Keys table above. No new key slots are needed — `mul.image_provider`, `mul.image_model`, `mul.image_reference_mode`, and the per-platform API keys are all defined there.
 
-- Image provider radio: `DALL-E 3` | `Stability AI` | `Flux (fal.ai)` | `Disabled`
-- API Key: password input (separate from text model key; may be left blank to share the text key for DALL-E 3)
-- Info note: "Image generation adds ~10–20s per image. Images are saved to your Media Library."
+### Settings Panel
+
+Image generation settings are integrated into the main MulSettingsPanel as described in the *Settings Panel* section above. No separate panel extension is needed.
 
 ### Latency and Cost Notes
 
-- DALL-E 3: ~8–15s per image, ~$0.04–0.08 per image (1024×1024)
+- GPT-Image-1 / OpenAI: ~8–15s per image, ~$0.04–0.08 per image (1024×1024)
+- xAI Aurora: comparable to GPT-Image-1; pricing subject to xAI's published rates
 - Stability AI SDXL: ~3–8s per image, ~$0.002–0.006 per image
 - Flux (fal.ai): ~2–5s, competitive pricing, highest quality
 
 For a typical 3-section scaffold with 2 background images, total generation adds ~15–30s. The UI should show per-image progress in the "Analyzing…" step.
+
+---
+
+---
+
+## Part 3: Scroll-Driven Background Transitions + Gradient Overlays
+
+Part 3 implements true simultaneous crossfade between section backgrounds, a full transition vocabulary, gradient overlay masks, and enriched HTML signal extraction for the Mul Converter. No production pages currently use the sections format, so there is no backward compatibility burden.
+
+### Renderer architecture: true crossfade via fixed-position background stack
+
+The renderer splits into two independent passes:
+
+**Pass 1 — Fixed background stack.** All section background composites are rendered as `position: fixed; inset: 0` layers, z-ordered so that earlier sections in the page sit above later ones (section 0 = highest z-index). Scroll-driven animation (`animation-timeline: view()`, anchored to each section's content spacer) drives opacity, clip-path, or transform on each layer as its corresponding section exits the viewport.
+
+**Pass 2 — Transparent content sections.** Content sections are normal document-flow divs with no background CSS. They provide scroll height, anchor animation timelines, and render zone grids above the background stack.
+
+This produces **true simultaneous crossfade**: as section A's composite fades from opacity 1→0, section B's composite (already at full opacity at a lower z-index) is revealed beneath it. At the midpoint of the transition both composites are visible simultaneously — a genuine dissolve, not a sequential fade-to-nothing.
+
+### Composite unit: background image + overlay
+
+The overlay div is a child of the background composite layer — not a sibling at the same level. When the composite transitions (fades, clips, slides), the overlay rides it as a single inseparable unit. No synchronization is needed because there is nothing to synchronize: the scrim belongs to its background.
+
+```
+<div class="fixed-bg-layer" style="z-index: N; ...scroll-driven animation...">
+  <div class="bg-image" />      ← image
+  <div class="bg-overlay" />    ← overlay rides the composite
+</div>
+```
+
+**Parallax exception.** For `transition: 'parallax'`, the image drifts at ~50% scroll speed while the overlay must remain planted (otherwise the gradient shifts relative to the zone text, breaking legibility). Image and overlay are siblings inside the fixed layer; `transform` is applied only to the image div. The image is oversized by 20% top/bottom to prevent black bars at drift extremes.
+
+### `background.transition` vocabulary
+
+`attachment` is **removed entirely** from `SectionBackground`. With the fixed-position background stack all backgrounds are viewport-fixed by architecture — the field has no remaining meaning. `'parallax'` was previously a value on `attachment`; it moves to `transition`. Read-time fallback: stored `attachment: 'parallax'` → `transition: 'parallax'`; all other `attachment` values silently ignored. The schema references to `attachment` in Part 1 and Part 2 sections of this document reflect the pre-Part-3 schema and should be treated as superseded.
+
+The fixed-position stack is opt-in — only engaged when `transition !== 'none'`.
+
+| Value | Rendering | Visual effect | Best use |
+|---|---|---|---|
+| `'none'` (default) | Inline on section div | Background scrolls naturally with content | Normal web behaviour; plain sites |
+| `'fixed'` | Fixed stack, no exit animation | Content scrolls over planted background (window-pane). Replaces old `attachment: 'fixed'` | Subtle depth without motion |
+| `'fade'` | Fixed stack | Composite dissolves into section below | Hero image sections; default for image backgrounds |
+| `'wipe-v'` | Fixed stack | Vertical clip wipe upward | Structured transitions |
+| `'wipe-left'` | Fixed stack | Clips left, reveals next from right | Alternating image+text, magazine style |
+| `'wipe-right'` | Fixed stack | Clips right, reveals next from left | Reverse magazine alternation |
+| `'slide-up'` | Fixed stack | Composite translates upward off screen | Motion-heavy, scroll-storytelling |
+| `'parallax'` | Fixed stack | Image drifts at ~50% scroll speed; overlay planted | Photography-forward, depth aesthetics |
+
+### Gradient overlay patterns
+
+When `overlay.gradient` is set, alpha is baked into the gradient stops; no separate `opacity` field is needed.
+
+| Pattern | CSS | Use |
+|---|---|---|
+| Bottom vignette | `linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75) 100%)` | Hero with headline at the bottom — default |
+| Top vignette | `linear-gradient(to top, transparent 30%, rgba(0,0,0,0.75) 100%)` | Caption above a photo |
+| Dual vignette | `linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.5) 100%)` | Framed / cinematic section |
+| Radial vignette | `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%)` | Centre-focus portrait or product shot |
+| Side fade | `linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)` | Text panel beside an image, left-aligned |
+
+### Enriched HTML extraction: `AnimationSignals`
+
+The HTML extractor adds `extractAnimationSignals(html)` producing an `AnimationSignals` struct passed to the AI alongside colors and DOM structure:
+
+```typescript
+interface AnimationSignals {
+  hasFixedBackground: boolean      // background-attachment: fixed in CSS
+  hasScrollTimeline: boolean       // animation-timeline or scroll() detected
+  hasKeyframes: boolean            // @keyframes present
+  hasOpacityTransition: boolean    // transition/animation involving opacity
+  hasTransformTransition: boolean  // transition/animation involving transform
+  hasStickyElements: boolean       // position: sticky
+  hasHighZIndexStack: boolean      // z-index > 10 on multiple elements
+  libraryFingerprints: string[]    // ['aos', 'gsap', 'locomotive', 'framer-motion']
+  overlayGradients: string[]       // extracted gradient strings from overlay elements
+  motionClassNames: string[]       // class names: parallax, fade, scroll-reveal, etc.
+}
+```
+
+Library detection is by data-attribute and class-name fingerprint — no script parsing required. This gives the model concrete observable evidence rather than requiring it to guess from palette alone.
+
+### System prompt Section 3C: signal-to-tool decision tree
+
+The system prompt teaches the model to map `AnimationSignals` to transition and overlay choices — **semantic equivalence, not literal CSS replication**:
+
+- `hasFixedBackground` or `motionClassNames` contains `"parallax"` → `transition: 'parallax'`
+- `libraryFingerprints` contains `"aos"`, `"framer-motion"`, or `"locomotive"` → `transition: 'fade'` (these libraries predominantly use opacity reveals)
+- `libraryFingerprints` contains `"gsap"` → `transition: 'slide-up'` (GSAP commonly animates translateY)
+- DOM shows alternating image+text pairs → alternate `'wipe-left'` / `'wipe-right'`
+- Photography-forward page, no specific signal → `transition: 'fade'`
+- No motion signals, structural/editorial layout → `transition: 'fixed'` (planted background with scrolling content) or `transition: 'none'` (background scrolls with content — use for simple/light sites)
+- Simple informational page, minimal visual design → `transition: 'none'`
+- `overlayGradients` non-empty → adopt detected gradient direction and alpha
+- Hero section with image background and zone heading → bottom vignette gradient overlay by default
+- Full-zone body text → solid overlay at 0.4–0.6 opacity
+- Decorative / no zone text → no overlay
+- Any image background with `transition !== 'none'` → `minHeight: "60vh"`
 
 ---
 

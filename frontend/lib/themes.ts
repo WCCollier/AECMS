@@ -215,7 +215,11 @@ export const FONT_PAIRINGS: FontPairing[] = [
   },
 ];
 
-export function getPaletteById(id: string): ThemePalette {
+export function getPaletteById(id: string, customPalettes?: ThemePalette[]): ThemePalette {
+  if (customPalettes) {
+    const custom = customPalettes.find((p) => p.id === id);
+    if (custom) return custom;
+  }
   return PALETTES.find((p) => p.id === id) ?? PALETTES[0];
 }
 

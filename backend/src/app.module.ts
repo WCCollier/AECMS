@@ -27,6 +27,7 @@ import { SettingsModule } from './settings/settings.module';
 import { ExternalFeedsModule } from './external-feeds/external-feeds.module';
 import { SetupModule } from './setup/setup.module';
 import { UsersModule } from './users/users.module';
+import { MulConverterModule } from './mul-converter/mul-converter.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { UsersModule } from './users/users.module';
     ExternalFeedsModule,
     SetupModule,
     UsersModule,
+    MulConverterModule,
   ],
   controllers: [AppController],
   providers: [AppService],
