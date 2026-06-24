@@ -2,6 +2,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import TextAlign from '@tiptap/extension-text-align';
+import FontFamily from '@tiptap/extension-font-family';
 import { CalloutNode } from './callout';
 import { VideoEmbedNode } from './video-embed';
 import { XEmbedNode } from './x-embed';
@@ -31,6 +32,7 @@ const baseExtensions = [
   StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
   TextAlign.configure({ types: TEXT_ALIGN_TYPES, alignments: ['left', 'center', 'right', 'justify'] }),
   EnhancedTextStyle,
+  FontFamily,
   DropCapExtension,
   Link.configure({
     openOnClick: false,
@@ -72,6 +74,7 @@ export function getDisplayExtensions() {
     StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
     TextAlign.configure({ types: TEXT_ALIGN_TYPES, alignments: ['left', 'center', 'right', 'justify'] }),
     EnhancedTextStyle,
+    FontFamily,
     DropCapExtension,
     Link.configure({
       openOnClick: true,

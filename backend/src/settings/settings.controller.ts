@@ -36,6 +36,14 @@ export class PublicSettingsController {
     try { return JSON.parse(raw); } catch { return { palette: 'midnight', fontPairing: 'default' }; }
   }
 
+  @Get('fonts')
+  @ApiOperation({ summary: 'Get custom font library entries (curated fonts are client-side constants)' })
+  async getFonts() {
+    const raw = await this.settingsService.get('appearance.fonts');
+    if (!raw) return { customFonts: [] };
+    try { return { customFonts: JSON.parse(raw) }; } catch { return { customFonts: [] }; }
+  }
+
   @Get('general')
   @ApiOperation({ summary: 'Get general site settings (title, tagline, homepage mode)' })
   async getGeneral() {
@@ -207,10 +215,11 @@ export class SettingsController {
 
   @Patch('appearance')
   @RequiresCapability('system.appearance')
-  @ApiOperation({ summary: 'Update appearance settings (theme key only) — requires system.appearance' })
+  @ApiOperation({ summary: 'Update appearance settings — requires system.appearance' })
   async updateAppearance(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const ALLOWED_KEYS = new Set(['theme', 'appearance.fonts']);
     const allowed = Object.fromEntries(
-      Object.entries(dto.updates).filter(([k]) => k === 'theme'),
+      Object.entries(dto.updates).filter(([k]) => ALLOWED_KEYS.has(k)),
     );
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'Appearance saved' };

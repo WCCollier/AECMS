@@ -43,8 +43,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [layoutChangeWarning, setLayoutChangeWarning] = useState(false);
   const [pendingLayout, setPendingLayout] = useState<PageLayout | null>(null);
 
-  // Sections mode state — fontImport/fontVariables are AI-set fields; the editor
-  // captures and re-emits them faithfully without exposing UI controls for them yet.
+  // Sections mode state
   const [sections, setSections] = useState<PageSection[]>([]);
   const [fontImport, setFontImport] = useState<string | undefined>(undefined);
   const [fontVariables, setFontVariables] = useState<SectionsPageContent['fontVariables']>(undefined);
@@ -396,7 +395,10 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
       ) : (
         <SectionsPageEditor
           sections={sections}
+          fontImport={fontImport}
+          fontVariables={fontVariables}
           onChange={(s) => { setSections(s); setDirty(true); }}
+          onFontChange={(fi, fv) => { setFontImport(fi); setFontVariables(fv); setDirty(true); }}
         />
       )}
 

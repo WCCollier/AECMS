@@ -181,6 +181,7 @@ body {
 
 /* ── Drop caps ───────────────────────────────────────────── */
 /* Applied via TipTap paragraph attribute dropCap: true.     */
+.ProseMirror p.drop-cap::first-letter,
 .prose-article p.drop-cap::first-letter,
 .prose-page p.drop-cap::first-letter {
   font-family: var(--font-heading, Georgia, serif);
@@ -212,3 +213,18 @@ body {
 [data-letter-spacing="normal"] { letter-spacing: 0; }
 [data-letter-spacing="wide"]   { letter-spacing: 0.08em; }
 [data-letter-spacing="wider"]  { letter-spacing: 0.16em; }
+
+/* ── TipTap per-run font-family ─────────────────────────── */
+/* FontFamily extension writes inline style="font-family:…"  */
+.ProseMirror span[style*="font-family"],
+.prose-article span[style*="font-family"],
+.prose-page span[style*="font-family"] {
+  /* inherits the inline style; rule ensures specificity */
+  font-family: inherit;
+}
+/* Heading-font utility applied to whole paragraph spans      */
+.ProseMirror p span[style*="font-family"],
+.prose-article p span[style*="font-family"],
+.prose-page p span[style*="font-family"] {
+  font-family: inherit; /* overridden by inline style */
+}

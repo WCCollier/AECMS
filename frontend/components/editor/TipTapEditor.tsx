@@ -16,6 +16,7 @@ import { LinkModal } from './LinkModal';
 import { MediaGalleryField } from '@/components/widgets/MediaGallery/MediaGalleryField';
 import type { GalleryEntry } from '@/components/widgets/MediaGallery/MediaGalleryField';
 import type { MediaItem } from '@/types';
+import { CURATED_FONTS } from '@/lib/fonts';
 
 interface TipTapEditorProps {
   content: string;
@@ -317,10 +318,68 @@ export function TipTapEditor({
         <MenuButton
           onClick={() => editor.chain().focus().toggleDropCap().run()}
           isActive={editor.isActive({ dropCap: true })}
-          title="Drop cap (opening paragraph flourish)"
+          title="Drop cap — place cursor in a paragraph and click to toggle"
         >
           <Type className="w-4 h-4" />
         </MenuButton>
+
+        {/* Label style: uppercase + wide-tracking preset */}
+        <MenuButton
+          onClick={() => {
+            const isLabel = editor.getAttributes('textStyle').textTransform === 'uppercase';
+            if (isLabel) {
+              editor.chain().focus().setMark('textStyle', { textTransform: null, letterSpacing: null }).run();
+            } else {
+              editor.chain().focus().setMark('textStyle', { textTransform: 'uppercase', letterSpacing: 'wide' }).run();
+            }
+          }}
+          isActive={editor.getAttributes('textStyle').textTransform === 'uppercase'}
+          title="Label style — UPPERCASE + wide tracking (eyebrows, captions)"
+        >
+          <span className="text-[10px] font-bold tracking-wider leading-none">AA</span>
+        </MenuButton>
+
+        {/* Letter spacing fine-control */}
+        <select
+          value={editor.getAttributes('textStyle').letterSpacing ?? ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            editor.chain().focus().setMark('textStyle', { letterSpacing: val || null }).run();
+          }}
+          className="text-[10px] h-7 px-1 border border-border rounded bg-background cursor-pointer"
+          title="Letter spacing"
+        >
+          <option value="">Tracking</option>
+          <option value="tight">Tight</option>
+          <option value="normal">Normal</option>
+          <option value="wide">Wide</option>
+          <option value="wider">Wider</option>
+        </select>
+
+        {/* Per-run font family — draws from curated library */}
+        <select
+          value={editor.getAttributes('textStyle').fontFamily ?? ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (!val) {
+              editor.chain().focus().unsetFontFamily().run();
+            } else {
+              editor.chain().focus().setFontFamily(val).run();
+            }
+          }}
+          className="text-[10px] h-7 px-1 border border-border rounded bg-background cursor-pointer max-w-[140px] truncate"
+          title="Per-run font family (font must be imported via Page Fonts to render correctly)"
+        >
+          <option value="">Font family</option>
+          {CURATED_FONTS.filter(f => !f.isSystem).flatMap(f => [
+            { label: `${f.name} (heading)`, value: f.headingFamily },
+            { label: `${f.name} (body)`, value: f.bodyFamily },
+          ]).filter((opt, idx, arr) => arr.findIndex(o => o.value === opt.value) === idx)
+            .map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))
+          }
+        </select>
 
         <MenuDivider />
 
