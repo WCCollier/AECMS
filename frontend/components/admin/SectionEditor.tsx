@@ -215,22 +215,31 @@ function TemplatePicker({ section, onApply }: TemplatePickerProps) {
 
 interface BackgroundFlyoutProps {
   background?: SectionBackground;
-  open: boolean;
-  onClose: () => void;
   onUpdate: (bg: SectionBackground) => void;
 }
 
-function BackgroundFlyout({ background, open, onClose, onUpdate }: BackgroundFlyoutProps) {
+function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
+  const [open, setOpen] = useState(false);
   const bg = background ?? { type: 'none' as const };
-
-  if (!open) return null;
+  const hasActive = bg.type !== 'none';
 
   return (
-    <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-20" onClick={onClose} />
-      {/* Panel — fixed top-right, below backstage header */}
-      <div className="fixed top-14 right-4 z-30 bg-surface border border-border rounded-lg shadow-xl p-3 w-64 space-y-3">
+    <div className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        title="Section background &amp; overlay"
+        className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors ${
+          hasActive ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
+        }`}
+      >
+        <Layers className="w-3 h-3" />
+        <span>BG</span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg p-3 w-56 space-y-3">
         <div>
           <p className="text-xs font-medium mb-1.5">Type</p>
           <div className="flex gap-1">
@@ -339,8 +348,10 @@ function BackgroundFlyout({ background, open, onClose, onUpdate }: BackgroundFly
             </div>
           </>
         )}
-      </div>
-    </>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
@@ -365,8 +376,6 @@ export function SectionEditor({
   onUpdate,
   onDelete,
 }: SectionEditorProps) {
-  const [bgOpen, setBgOpen] = useState(false);
-
   function applyTemplate(template: TemplateSpec) {
     if (sectionHasContent(section) && !window.confirm('Apply template? Existing zone content will be removed.')) return;
     onUpdate({
@@ -451,6 +460,11 @@ export function SectionEditor({
           <Plus className="w-3.5 h-3.5" />
         </button>
 
+        <BackgroundFlyout
+          background={section.background}
+          onUpdate={(bg) => onUpdate({ ...section, background: bg })}
+        />
+
         <select
           value={section.padding ?? 'normal'}
           onChange={(e) => onUpdate({ ...section, padding: e.target.value as import('@/types').SectionPadding })}
@@ -486,14 +500,6 @@ export function SectionEditor({
         )}
       </div>
 
-      {/* Background flyout — fixed-positioned, controlled from zone BG buttons */}
-      <BackgroundFlyout
-        open={bgOpen}
-        onClose={() => setBgOpen(false)}
-        background={section.background}
-        onUpdate={(bg) => onUpdate({ ...section, background: bg })}
-      />
-
       {/* Zone editors */}
       <div
         className="p-3 bg-background"
@@ -513,20 +519,6 @@ export function SectionEditor({
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] text-foreground/25 select-none">Span {zone.span}</span>
               <div className="flex items-center gap-1">
-                {/* BG button — controls section-level background */}
-                <button
-                  type="button"
-                  onClick={() => setBgOpen(true)}
-                  title="Section background &amp; overlay"
-                  className={`flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] rounded border transition-colors ${
-                    section.background && section.background.type !== 'none'
-                      ? 'border-accent bg-accent/10 text-accent'
-                      : 'border-border hover:bg-surface-raised text-foreground/50 hover:text-foreground'
-                  }`}
-                >
-                  <Layers className="w-3 h-3" />
-                  <span>BG</span>
-                </button>
                 {/* Zone text colour scheme */}
                 <select
                   value={zone.scheme ?? 'inherit'}
