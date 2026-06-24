@@ -349,7 +349,7 @@ export function TipTapEditor({
           className="text-[10px] h-7 px-1 border border-border rounded bg-background cursor-pointer"
           title="Letter spacing"
         >
-          <option value="">Tracking</option>
+          <option value="" disabled>Spacing</option>
           <option value="tight">Tight</option>
           <option value="normal">Normal</option>
           <option value="wide">Wide</option>
@@ -370,7 +370,7 @@ export function TipTapEditor({
           className="text-[10px] h-7 px-1 border border-border rounded bg-background cursor-pointer max-w-[140px] truncate"
           title="Per-run font family (font must be imported via Page Fonts to render correctly)"
         >
-          <option value="">Font family</option>
+          <option value="" disabled>Font</option>
           {CURATED_FONTS.filter(f => !f.isSystem).flatMap(f => [
             { label: `${f.name} (heading)`, value: f.headingFamily },
             { label: `${f.name} (body)`, value: f.bodyFamily },

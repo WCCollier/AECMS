@@ -26,6 +26,8 @@ export function TagChipStrip({
   const { tags } = useTags();
   const [input, setInput] = useState('');
   const [open, setOpen] = useState(false);
+  const [logicTooltip, setLogicTooltip] = useState(false);
+  const logicTooltipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -86,10 +88,17 @@ export function TagChipStrip({
 
       {/* ALL / ANY toggle — shown when ≥2 chips (or always in modal) */}
       {showToggle && (
-        <div className="relative group">
+        <div className="relative">
           <button
             type="button"
             onClick={() => onLogicChange(tagLogic === 'and' ? 'or' : 'and')}
+            onMouseEnter={() => {
+              logicTooltipTimer.current = setTimeout(() => setLogicTooltip(true), 500);
+            }}
+            onMouseLeave={() => {
+              if (logicTooltipTimer.current) clearTimeout(logicTooltipTimer.current);
+              setLogicTooltip(false);
+            }}
             className="relative flex items-center w-16 h-6 rounded-full border border-foreground/20 bg-foreground/5 cursor-pointer select-none overflow-hidden"
             aria-label={`Tag match mode: ${tagLogic === 'and' ? 'ALL' : 'ANY'}`}
           >
@@ -115,12 +124,14 @@ export function TagChipStrip({
               ANY
             </span>
           </button>
-          {/* Tooltip — 500ms hover delay via CSS */}
-          <div className="pointer-events-none absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-56 px-2.5 py-1.5 text-[11px] leading-snug bg-background border border-border rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-150 [transition-delay:0ms] group-hover:[transition-delay:500ms] z-50 text-center text-foreground/70">
-            <strong className="text-foreground">ALL</strong> — results must have every selected tag
-            <br />
-            <strong className="text-foreground">ANY</strong> — results must have at least one
-          </div>
+          {/* Tooltip — React-state driven, left-anchored to avoid clipping */}
+          {logicTooltip && (
+            <div className="pointer-events-none absolute bottom-full mb-2 left-0 w-44 px-2.5 py-1.5 text-[11px] leading-snug bg-background border border-border rounded-lg shadow-lg z-50 text-foreground/70">
+              <strong className="text-foreground">ALL</strong> — must match every tag
+              <br />
+              <strong className="text-foreground">ANY</strong> — must match at least one
+            </div>
+          )}
         </div>
       )}
 

@@ -469,7 +469,7 @@ export function SectionEditor({
           value={section.padding ?? 'normal'}
           onChange={(e) => onUpdate({ ...section, padding: e.target.value as import('@/types').SectionPadding })}
           className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
-          title="Section padding"
+          title="Padding — vertical space between the section edge and its content&#10;No pad: flush/full-bleed&#10;Compact: tight feature rows&#10;Normal: standard body sections&#10;Spacious: heroes and major statements"
         >
           <option value="none">No pad</option>
           <option value="compact">Compact</option>
@@ -481,7 +481,7 @@ export function SectionEditor({
           value={heightValue}
           onChange={(e) => onUpdate({ ...section, minHeight: e.target.value || undefined })}
           className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
-          title="Section min-height"
+          title="Min-height — section will be at least this tall even if content is shorter&#10;Auto: shrinks to content&#10;50vh: half the screen&#10;100vh: full screen (classic hero)"
         >
           <option value="">Auto</option>
           <option value="50vh">50vh</option>
