@@ -39,6 +39,7 @@ export interface RegisterData {
   password: string;
   firstName?: string;
   lastName?: string;
+  captchaToken?: string;
 }
 
 // Media widget type — shared across Articles, Products (and future Pages)
