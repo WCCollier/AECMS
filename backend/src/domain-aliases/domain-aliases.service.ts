@@ -3,11 +3,12 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { DomainAlias, UserRole } from '@prisma/client';
+import { DomainAlias } from '@prisma/client';
 import { CreateDomainAliasDto, UpdateDomainAliasDto } from './dto';
+// Note: ownership of individual aliases is enforced by the controller-level domain.manage
+// capability gate — anyone reaching these methods is already authorised to manage all aliases.
 import * as crypto from 'crypto';
 import * as dns from 'dns';
 import { promisify } from 'util';
@@ -127,14 +128,8 @@ export class DomainAliasesService {
     id: string,
     dto: UpdateDomainAliasDto,
     userId: string,
-    userRole: UserRole,
   ): Promise<DomainAlias> {
     const alias = await this.findById(id);
-
-    // Check ownership (only owner or site owner can modify)
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
-      throw new ForbiddenException('You can only modify your own domain aliases');
-    }
 
     // If trying to activate, must be verified first
     if (dto.is_active === true && !alias.verified_at) {
@@ -155,13 +150,8 @@ export class DomainAliasesService {
   /**
    * Verify domain ownership via DNS TXT record
    */
-  async verify(id: string, userId: string, userRole: UserRole): Promise<DomainAlias> {
+  async verify(id: string, userId: string): Promise<DomainAlias> {
     const alias = await this.findById(id);
-
-    // Check ownership
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
-      throw new ForbiddenException('You can only verify your own domain aliases');
-    }
 
     if (alias.verified_at) {
       throw new BadRequestException('Domain is already verified');
@@ -216,13 +206,8 @@ export class DomainAliasesService {
   /**
    * Remove a domain alias
    */
-  async remove(id: string, userId: string, userRole: UserRole): Promise<void> {
+  async remove(id: string, userId: string): Promise<void> {
     const alias = await this.findById(id);
-
-    // Check ownership
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
-      throw new ForbiddenException('You can only delete your own domain aliases');
-    }
 
     await this.prisma.domainAlias.delete({
       where: { id },
@@ -232,13 +217,8 @@ export class DomainAliasesService {
   /**
    * Regenerate verification token
    */
-  async regenerateToken(id: string, userId: string, userRole: UserRole): Promise<DomainAlias> {
+  async regenerateToken(id: string, userId: string): Promise<DomainAlias> {
     const alias = await this.findById(id);
-
-    // Check ownership
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
-      throw new ForbiddenException('You can only modify your own domain aliases');
-    }
 
     if (alias.verified_at) {
       throw new BadRequestException('Cannot regenerate token for already verified domain');

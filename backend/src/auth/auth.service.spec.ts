@@ -27,6 +27,8 @@ describe('AuthService', () => {
     first_name: 'Test',
     last_name: 'User',
     role: UserRole.member,
+    role_name: 'member',
+    approved_at: null,
     email_verified: true,
     created_at: new Date(),
     updated_at: new Date(),
@@ -36,14 +38,28 @@ describe('AuthService', () => {
     user: {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
     },
     refreshToken: {
       findFirst: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
+    },
+    siteSettings: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    capability: {
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
+    roleCapability: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    userCapability: {
+      findMany: jest.fn().mockResolvedValue([]),
     },
   };
 

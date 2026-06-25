@@ -1,8 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DomainAliasesService } from './domain-aliases.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { ConflictException, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('DomainAliasesService', () => {
   let service: DomainAliasesService;
@@ -150,25 +149,29 @@ describe('DomainAliasesService', () => {
         'alias-1',
         { target_route: '/new-route' },
         'user-1',
-        UserRole.owner,
       );
 
       expect(result.target_route).toBe('/new-route');
     });
 
-    it('should throw ForbiddenException if not owner', async () => {
+    it('should allow any domain.manage holder to update any alias', async () => {
       mockPrismaService.domainAlias.findUnique.mockResolvedValue(mockDomainAlias);
+      mockPrismaService.domainAlias.update.mockResolvedValue({
+        ...mockDomainAlias,
+        target_route: '/new',
+      });
 
-      await expect(
-        service.update('alias-1', { target_route: '/new' }, 'other-user', UserRole.admin),
-      ).rejects.toThrow(ForbiddenException);
+      // Access control is enforced by the controller-level domain.manage guard,
+      // not by the service — any caller reaching here is already authorised.
+      const result = await service.update('alias-1', { target_route: '/new' }, 'other-user');
+      expect(result.target_route).toBe('/new');
     });
 
     it('should throw BadRequestException if activating unverified domain', async () => {
       mockPrismaService.domainAlias.findUnique.mockResolvedValue(mockDomainAlias);
 
       await expect(
-        service.update('alias-1', { is_active: true }, 'user-1', UserRole.owner),
+        service.update('alias-1', { is_active: true }, 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -178,19 +181,20 @@ describe('DomainAliasesService', () => {
       mockPrismaService.domainAlias.findUnique.mockResolvedValue(mockDomainAlias);
       mockPrismaService.domainAlias.delete.mockResolvedValue(mockDomainAlias);
 
-      await service.remove('alias-1', 'user-1', UserRole.owner);
+      await service.remove('alias-1', 'user-1');
 
       expect(mockPrismaService.domainAlias.delete).toHaveBeenCalledWith({
         where: { id: 'alias-1' },
       });
     });
 
-    it('should throw ForbiddenException if not owner', async () => {
+    it('should allow any domain.manage holder to remove any alias', async () => {
       mockPrismaService.domainAlias.findUnique.mockResolvedValue(mockDomainAlias);
+      mockPrismaService.domainAlias.delete.mockResolvedValue(mockDomainAlias);
 
-      await expect(
-        service.remove('alias-1', 'other-user', UserRole.admin),
-      ).rejects.toThrow(ForbiddenException);
+      // Access control is enforced by the controller-level domain.manage guard.
+      await service.remove('alias-1', 'other-user');
+      expect(mockPrismaService.domainAlias.delete).toHaveBeenCalled();
     });
   });
 
@@ -213,7 +217,7 @@ describe('DomainAliasesService', () => {
         verification_token: 'new-token',
       });
 
-      const result = await service.regenerateToken('alias-1', 'user-1', UserRole.owner);
+      const result = await service.regenerateToken('alias-1', 'user-1');
 
       expect(mockPrismaService.domainAlias.update).toHaveBeenCalled();
     });
@@ -223,7 +227,7 @@ describe('DomainAliasesService', () => {
       mockPrismaService.domainAlias.findUnique.mockResolvedValue(verifiedAlias);
 
       await expect(
-        service.regenerateToken('alias-1', 'user-1', UserRole.owner),
+        service.regenerateToken('alias-1', 'user-1'),
       ).rejects.toThrow(BadRequestException);
     });
   });

@@ -1,5 +1,3 @@
-import { UserRole } from '@prisma/client';
-
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
@@ -8,7 +6,7 @@ export interface AuthResponse {
     email: string;
     firstName?: string;
     lastName?: string;
-    role: UserRole;
+    role: string;
     emailVerified?: boolean;
   };
 }
@@ -25,7 +23,7 @@ export interface AdminLoginResponse {
 export interface TokenPayload {
   sub: string;
   email: string;
-  role: UserRole;
+  role: string;
   jti?: string;
   scope?: string;         // 'pre_2fa' for pre-auth tokens
   session_type?: 'customer' | 'backstage';

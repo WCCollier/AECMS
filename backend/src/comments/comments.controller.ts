@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { CommentsService } from './comments.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { CreateCommentDto, UpdateCommentDto, QueryCommentsDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
@@ -21,7 +22,10 @@ import { RequiresCapability } from '../capabilities/decorators/requires-capabili
 @ApiTags('comments')
 @Controller('comments')
 export class CommentsController {
-  constructor(private readonly commentsService: CommentsService) {}
+  constructor(
+    private readonly commentsService: CommentsService,
+    private readonly capabilitiesService: CapabilitiesService,
+  ) {}
 
   /**
    * Create a new comment (requires authentication)
@@ -126,8 +130,8 @@ export class CommentsController {
   @ApiResponse({ status: 403, description: 'Cannot delete others comments' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   async remove(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
-    const isAdmin = req.user.role === 'admin' || req.user.role === 'owner';
-    return this.commentsService.remove(id, req.user.id, isAdmin);
+    const canDeleteAny = await this.capabilitiesService.userHasCapability(req.user.id, 'comment.delete');
+    return this.commentsService.remove(id, req.user.id, canDeleteAny);
   }
 
   // ==================== ADMIN ENDPOINTS ====================

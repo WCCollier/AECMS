@@ -160,6 +160,23 @@ export class SettingsService {
           after: { [key]: isEnc ? REDACTED : value },
         },
       });
+
+      // Toggle-on backfill: when approval requirement is first enabled, auto-approve
+      // all currently email-verified users so they are not retroactively locked out.
+      if (key === 'general.require_registration_approval' && value === 'true') {
+        const oldValue = existing?.value;
+        if (oldValue !== 'true') {
+          const result = await this.prisma.user.updateMany({
+            where: {
+              email_verified: true,
+              approved_at: null,
+              deleted_at: null,
+            },
+            data: { approved_at: new Date(), approved_by: userId },
+          });
+          this.logger.log(`[registration-approval] backfilled ${result.count} existing verified users`);
+        }
+      }
     }
   }
 }

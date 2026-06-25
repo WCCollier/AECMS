@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Body,
   Param,
@@ -10,6 +11,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { IsString, IsNotEmpty, MinLength } from 'class-validator';
 import {
   ApiTags,
   ApiOperation,
@@ -21,7 +23,13 @@ import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
 import { UpdateUserRoleDto } from '../auth/dto/update-user-role.dto';
-import { UserRole } from '@prisma/client';
+
+class RejectRegistrationDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(1)
+  reason!: string;
+}
 
 @ApiTags('users')
 @Controller('users')
@@ -53,6 +61,29 @@ export class UsersController {
     @Param('id') id: string,
     @Body() dto: UpdateUserRoleDto,
   ) {
-    return this.authService.updateUserRole(req.user.id, id, dto.role as UserRole);
+    return this.authService.updateUserRole(req.user.id, id, dto.role as any);
+  }
+
+  @Get('pending')
+  @RequiresCapability('registration.approve')
+  @ApiOperation({ summary: 'List pending registrations (email-verified, not yet approved)' })
+  listPending() {
+    return this.authService.listPendingRegistrations();
+  }
+
+  @Post(':id/approve')
+  @HttpCode(HttpStatus.OK)
+  @RequiresCapability('registration.approve')
+  @ApiOperation({ summary: 'Approve a pending registration' })
+  approveRegistration(@Request() req: any, @Param('id') id: string) {
+    return this.authService.approveRegistration(req.user.id, id);
+  }
+
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  @RequiresCapability('registration.approve')
+  @ApiOperation({ summary: 'Reject a pending registration (requires reason; soft-deletes account)' })
+  rejectRegistration(@Request() req: any, @Param('id') id: string, @Body() dto: RejectRegistrationDto) {
+    return this.authService.rejectRegistration(req.user.id, id, dto.reason);
   }
 }

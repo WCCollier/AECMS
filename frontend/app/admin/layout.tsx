@@ -19,6 +19,8 @@ import {
   Images,
   Users,
   Wand2,
+  Shield,
+  UserCheck,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import adminApi from '@/lib/adminApi';
@@ -48,6 +50,8 @@ const navItems: { href: string; label: string; icon: React.ElementType; required
   { href: '/admin/media', label: 'Media', icon: Images, requiredCap: 'media.upload' },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/users', label: 'Users', icon: Users, requiredCap: 'user.assign_role' },
+  { href: '/admin/roles', label: 'Roles', icon: Shield, requiredCap: 'role.manage' },
+  { href: '/admin/registrations', label: 'Registrations', icon: UserCheck, requiredCap: 'registration.approve' },
   { href: '/admin/audit-log', label: 'Audit Log', icon: ClipboardList, requiredCap: 'system.view_audit' },
   { href: '/admin/domains', label: 'Domains', icon: Globe, requiredCap: 'domain.manage' },
   { href: '/admin/settings/appearance', label: 'Appearance', icon: Paintbrush, requiredCap: 'system.appearance' },

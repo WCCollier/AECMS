@@ -59,8 +59,11 @@ Specific rules:
 **Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
 **Phase 21**: ✅ COMPLETE - Deployability + first live deployment (merged with Phase 19): SEED_PROFILE system, setup wizard, GcpKeyProvider, Dockerfiles, GitHub Actions CI/CD, Cloud Run, content migration, generic distribution prep (2026-06-21)
 **Phase 22**: ✅ COMPLETE - All items A–N (2026-06-21). Key additions: TipTap alignment, Node 22, Next.js 15.3.9 security upgrade, new-owner wizard/Owner's Manual, CSV export, MediaSyncService (TipTap→join table), PageMedia join table, bulk upload/replace/delete, /admin/media (Media Library + Digital Files tabs), /admin/users (role management, user.assign_role-gated)
-**Phase 23**: 🚧 IN PROGRESS (awaiting testbed QA + deploy) - Mul Converter + Section Background System. Part 1 ✅ built (2026-06-21): section-based page schema (SectionsPageContent, PageSection, PageZone, SectionBackground), SectionEditor UI, SectionsPageEditor (dnd-kit reorder), SectionsLayout renderer, legacyToSections upgrade action, backend span validation. Part 2 ✅ built (2026-06-23): MulConverterModule (3 endpoints), HTML extraction pipeline, Anthropic/OpenAI/xAI text providers, GPT-Image-1/xAI-Aurora/FLUX/Stability image providers, provider-native optimization, custom palettes, /admin/mul-converter UI. Part 3 ✅ built (2026-06-23): true crossfade renderer (fixed-position background stack, composite image+overlay unit), full transition vocabulary (none/fixed/fade/wipe-v/wipe-left/wipe-right/slide-up/parallax), gradient overlays, AnimationSignals HTML extractor, Section 3C decision tree, SectionBackgroundPanel slide-in drawer. PRD: docs/prd/13-mul-converter.md v1.7. Plan: docs/phases/PHASE_23_PLAN.md
+**Phase 23**: 🚧 IN PROGRESS (awaiting full QA + deploy) - Mul Converter + Section Background System. Part 1 ✅: section-based page schema, SectionEditor, SectionsLayout renderer (2026-06-21). Part 2 ✅: MulConverterModule (3 endpoints), HTML extraction pipeline, Anthropic/OpenAI/xAI text providers, GPT-Image-1/xAI-Aurora/FLUX/Stability image providers, /admin/mul-converter UI (2026-06-23). Part 3 ✅: true crossfade renderer, full transition vocabulary, gradient overlays, SectionBackgroundPanel (2026-06-23). QA session (2026-06-25): fixed proxy timeout (Next.js proxyTimeout → 3600s), page fetch timeout (10s→30s), Save Both 400 (JSON.stringify + span validation downgraded to warning), capability sync (FR-002), patience hint, API key placeholders, layout preview background badges with color swatches + popovers, page-creation redirect to /edit. System prompt rewrite: sections = single rows, columns = derived sum. PRD: docs/prd/13-mul-converter.md v1.7. Plan: docs/phases/PHASE_23_PLAN.md
 
+**FR-002**: ✅ DEPLOYED (2026-06-25) - Owner capability sync on login: every Owner backstage login upserts all capabilities from `capability-definitions.ts` and assigns them all to the owner — ensures the owner always holds the full set after upgrades without manual seeding. `seed-minimal.js` also always runs on container start (idempotent). Docs: docs/feature-requests/FR-002-owner-capability-sync.md
+**FR-003**: 🚧 ON MAIN (Deploy 1, 2026-06-25) - Role Manager: `roles` table (name PK, label, RoleProtection enum) replaces `UserRole` enum as the source of truth. 4 canonical rows seeded (owner=full, admin/member=none, guest=constrained). `role_name` column added to `users` + `role_capabilities`; old `role` enum column kept nullable for Deploy 2 cleanup. New `RolesModule` (7 endpoints, gated on `role.manage` cap). `/admin/roles` UI: capability checkbox matrix grouped by scope/category, new-role form, delete guard, Guest constrained banner. Role dropdown in `/admin/users` now fetches from live catalogue. Deploy 2 (future): drop old `role` enum columns. Docs: docs/feature-requests/FR-003-role-manager.md
+**FR-004**: ✅ ON MAIN (2026-06-25) - Registration Controls: `general.default_role` setting replaces hardcoded `'member'` at registration; `'admin'`+`'member'` removed from `RESERVED_NAMES`; delete guard reads setting dynamically. `general.require_registration_approval` toggle (Owner-only via `registration.configure`); email-verified users held pending; approvers (`registration.approve`, Owner+Admin default) notified by email on verification; approval panel at `/admin/registrations`; rejection requires reason + soft-deletes; toggle-on backfills `approved_at` for existing verified users. Docs: docs/feature-requests/FR-004-registration-controls.md
 **FR-001 Deploy 1**: ✅ LIVE (2026-06-22) - Tag-filtered search: multi-tag AND/OR query params on /articles and /products backends, TagChipStrip with typeahead + ALL/ANY toggle on catalogue pages, bookmarkable URLs (?tags=,?tag_logic=), SearchResultsEmbed TipTap node. Category taxonomy removed: data migration promoted all categories to tags; category display code stripped from all customer-facing pages; tile tag chips clickable; tags above body text on detail pages. Docs: docs/feature-requests/FR-001-tag-search-and-collection-embed.md
 **FR-001 Deploy 2**: ✅ LIVE (2026-06-22) - UnifiedSearchInput component (contenteditable div, inline tag chips, ALL/ANY slide toggle, magnifying-glass/× button), ViewModeToggle relocated above grid with result count, SearchResultsEmbed infinite scroll via zone-trailing detection + displayMode override, category DB tables dropped (categories/article_categories/product_categories), CategoriesModule removed. Docs: docs/feature-requests/FR-001-tag-search-and-collection-embed.md
 **Phase 24**: 📋 PLANNED - Sales tax collection and accounting infrastructure: Stripe Tax integration, product tax codes, PayPal tax handling, tax settings UI, order receipts with tax breakdown, reporting dashboard for filing
@@ -83,7 +86,7 @@ Specific rules:
 - Secrets migrated from .env to ISM via migration script
 
 **Test Status**: 125 frontend + 190 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 138 total (+POST /settings/test-storage, +POST /settings/favicon)
+**API Endpoints**: 145 total (+7 RolesModule: GET/POST /roles, PATCH/DELETE /roles/:name, GET/PUT /roles/:name/capabilities, GET /roles/:name/members)
 
 ## API Endpoint Summary
 
@@ -104,10 +107,11 @@ Specific rules:
 | Digital Products | 11 |
 | Kindle | 7 |
 | Domain Aliases | 10 |
+| Roles | 7 |
 
 ## Key Architecture Decisions
 
-- **User Roles**: Owner > Admin > Member > Guest (default shipped bundles, not architectural constraints)
+- **User Roles**: Owner > Admin > Member > Guest — stored in the `roles` table (string PK); these are live DB rows, not a hardcoded enum. Canonical roles are protection-flagged: Owner=full (immutable), Guest=constrained (customer caps only, not deletable), Admin/Member=none (freely editable/deletable). Custom roles can be created through the Role Manager.
 - **Session Model**: Two fully independent sessions per user — see below
 - **Visibility**: public, logged_in_only, admin_only
 - **Granular Permissions**: Per-content author_can_edit/delete, admin_can_edit/delete flags
@@ -145,7 +149,7 @@ Backstage access is **capability-scoped, not role-hardcoded**:
 | `'backstage'` | Requires admin dashboard | `JwtAuthGuard → BackstageGuard → CapabilityGuard` |
 | `'customer'` | Available in customer-facing experience | `JwtAuthGuard → CapabilityGuard` (no BackstageGuard) |
 
-Current counts: **35 backstage** + **12 customer** = **47 total capabilities**.
+Current counts: **38 backstage** + **12 customer** = **50 total capabilities** (role.manage in FR-003; registration.configure + registration.approve added in FR-004).
 
 **Backstage additions (post-Phase 15):** `system.appearance` (Owner-only; gates `PATCH /settings/appearance`), `digital.deliver` (Admin+Owner; gates token extend/regenerate/admin-grant).
 

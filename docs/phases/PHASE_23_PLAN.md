@@ -11,9 +11,10 @@
 | Part 1 — Page Schema (A–C) | ✅ Built | Sections content model, SectionEditor, SectionsLayout renderer |
 | Part 2 — Mul Converter (D–O) | ✅ Built | Full AI pipeline, 3 providers, /admin/mul-converter UI |
 | Part 3 — BG Transitions (P–V) | ✅ Built | Fixed-position stack, transition vocab, overlays, SectionBackgroundPanel |
-| Part 4 — Schema evolution (W–X) | ✅ Built | Two-tier rendering model + prompt file architecture (this session) |
+| Part 4 — Schema evolution (W–X) | ✅ Built | Two-tier rendering model + prompt file architecture |
+| QA fixes (2026-06-25) | ✅ Built | Proxy timeout, fetch timeout, Save Both 400 (2 causes), capability sync (FR-002), patience hint, API key placeholders, background badge swatches + popovers, page-creation redirect to /edit, system prompt rewrite (sections=single rows, columns=derived) |
 | Part 5 — Aesthetic vocab + editor polish (Y–AF) | 📋 Planned | Zone align, inline text color, zone content max-width, zone full-bleed, section border, section visibility, parent picker nav-hidden hint, zoom (Ken Burns) movement |
-| QA | 🚧 In progress | Owner testing BG panel + aesthetic tools; Mul Converter QA pending |
+| QA | 🚧 In progress | Current deploy build in progress; full Mul Converter flow QA pending |
 | Deploy | ⏳ Pending | After QA passes; `git merge main → deploy` |
 
 ---

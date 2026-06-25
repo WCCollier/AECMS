@@ -64,6 +64,16 @@ export class AuthService {
     const verificationToken = this.generateVerificationToken();
     const verificationExpires = new Date(Date.now() + this.verificationTokenExpiry);
 
+    // Resolve default registration role from settings (fallback: 'member')
+    const defaultRoleSetting = await this.prisma.siteSettings.findUnique({
+      where: { key: 'general.default_role' },
+    });
+    const defaultRole = defaultRoleSetting?.value ?? 'member';
+    const canonicalRoles: string[] = ['owner', 'admin', 'member', 'guest'];
+    const roleEnumValue: UserRole = canonicalRoles.includes(defaultRole)
+      ? (defaultRole as UserRole)
+      : UserRole.member;
+
     // Create user with email_verified = false
     const user = await this.prisma.user.create({
       data: {
@@ -72,7 +82,8 @@ export class AuthService {
         password_hash: passwordHash,
         first_name: registerDto.firstName,
         last_name: registerDto.lastName,
-        role: UserRole.member,
+        role: roleEnumValue,
+        role_name: defaultRole,
         email_verified: false,
         email_verification_token: verificationToken,
         email_verification_expires: verificationExpires,
@@ -120,6 +131,9 @@ export class AuthService {
       );
     }
 
+    // Check registration approval gate
+    await this.assertApproved(user);
+
     // Update last login
     await this.prisma.user.update({
       where: { id: user.id },
@@ -128,8 +142,8 @@ export class AuthService {
       },
     });
 
-    // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.role, undefined, 'customer');
+    // Generate tokens (prefer role_name for JWT; falls back to legacy role enum)
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, undefined, 'customer');
 
     // Store refresh token
     await this.storeRefreshToken(user.id, tokens.refreshToken, undefined, 'customer');
@@ -171,14 +185,18 @@ export class AuthService {
       throw new UnauthorizedException('Email not verified');
     }
 
+    // Check registration approval gate
+    await this.assertApproved(user);
+
     // Owner always has backstage access; others must hold at least one backstage-scoped capability
-    if (user.role !== 'owner') {
+    const effectiveRole = user.role_name ?? user.role;
+    if (effectiveRole !== 'owner') {
       const backstageCap = await this.prisma.capability.findFirst({
         where: {
           scope: 'backstage',
           OR: [
             { user_capabilities: { some: { user_id: user.id } } },
-            { role_capabilities: { some: { role: user.role, enabled: true } } },
+            { role_capabilities: { some: { role_name: effectiveRole, enabled: true } } },
           ],
         },
       });
@@ -198,7 +216,7 @@ export class AuthService {
     }
 
     // 2FA not yet set up — grant backstage access with 7-day tokens and flag setup required
-    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, '7d', 'backstage');
     await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
 
     if (user.role === UserRole.owner) {
@@ -252,7 +270,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid authenticator code');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, '7d', 'backstage');
     const storedToken = await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
     const revoked = await this.revokeOtherBackstageSessions(user.id, storedToken.id);
 
@@ -382,7 +400,7 @@ export class AuthService {
       const tokens = await this.generateTokens(
         storedToken.user.id,
         storedToken.user.email,
-        storedToken.user.role,
+        storedToken.user.role_name ?? storedToken.user.role,
         refreshExpiry,
         sessionType,
       );
@@ -483,15 +501,16 @@ export class AuthService {
   }
 
   async hasBackstageAccess(userId: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, role_name: true } });
     if (!user) return false;
-    if (user.role === 'owner') return true;
+    const effectiveRole = user.role_name ?? user.role;
+    if (effectiveRole === 'owner') return true;
     const cap = await this.prisma.capability.findFirst({
       where: {
         scope: 'backstage',
         OR: [
           { user_capabilities: { some: { user_id: userId } } },
-          { role_capabilities: { some: { role: user.role, enabled: true } } },
+          { role_capabilities: { some: { role_name: effectiveRole, enabled: true } } },
         ],
       },
     });
@@ -530,6 +549,15 @@ export class AuthService {
         email_verification_expires: null,
       },
     });
+
+    // If approval gate is on, notify all approvers and return a distinct message
+    const requireApproval = await this.isApprovalRequired();
+    if (requireApproval) {
+      await this.notifyApprovers(user.email, user.first_name).catch((e) =>
+        console.error('[auth] notifyApprovers failed:', e?.message),
+      );
+      return { message: 'Email verified. Your account is awaiting admin approval. You will receive an email once it is reviewed.' };
+    }
 
     return { message: 'Email verified successfully. You can now log in.' };
   }
@@ -674,11 +702,12 @@ export class AuthService {
   /**
    * Generate access and refresh tokens. refreshExpiryOverride allows the admin
    * back-door to enforce a fixed 7-day expiry independent of global config.
+   * role accepts either a UserRole enum value or a string role_name.
    */
   private async generateTokens(
     userId: string,
     email: string,
-    role: UserRole,
+    role: UserRole | string,
     refreshExpiryOverride?: string,
     sessionType: 'customer' | 'backstage' = 'customer',
   ): Promise<{ accessToken: string; refreshToken: string }> {
@@ -815,6 +844,7 @@ export class AuthService {
           first_name: true,
           last_name: true,
           role: true,
+          role_name: true,
           email_verified: true,
           created_at: true,
         },
@@ -822,12 +852,22 @@ export class AuthService {
       this.prisma.user.count({ where }),
     ]);
 
-    return { data: users, total, page, limit, pages: Math.ceil(total / limit) };
+    const normalized = users.map(({ role_name, role, ...rest }) => ({
+      ...rest,
+      role: role_name ?? role,
+    }));
+    return { data: normalized, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async updateUserRole(actorId: string, targetId: string, newRole: UserRole): Promise<{ message: string }> {
+  async updateUserRole(actorId: string, targetId: string, newRole: string): Promise<{ message: string }> {
     if (actorId === targetId) {
       throw new ForbiddenException('Cannot change your own role');
+    }
+
+    // Validate the role exists in the roles table
+    const roleExists = await this.prisma.role.findUnique({ where: { name: newRole } });
+    if (!roleExists) {
+      throw new NotFoundException(`Role '${newRole}' not found`);
     }
 
     const target = await this.prisma.user.findFirst({
@@ -835,8 +875,16 @@ export class AuthService {
     });
     if (!target) throw new NotFoundException('User not found');
 
-    const oldRole = target.role;
-    await this.prisma.user.update({ where: { id: targetId }, data: { role: newRole } });
+    const oldRole = target.role_name ?? target.role;
+
+    // Write both role_name (new) and role enum (legacy compat — only for canonical roles)
+    const canonicalRoles: string[] = ['owner', 'admin', 'member', 'guest'];
+    const updateData: Record<string, unknown> = { role_name: newRole };
+    if (canonicalRoles.includes(newRole)) {
+      updateData.role = newRole as UserRole;
+    }
+
+    await this.prisma.user.update({ where: { id: targetId }, data: updateData });
 
     await this.auditLog.log({
       event_type: 'user.role_changed',
@@ -845,6 +893,176 @@ export class AuthService {
     });
 
     return { message: `Role changed from ${oldRole} to ${newRole}` };
+  }
+
+  // ── Registration Approval ─────────────────────────────────────────────────
+
+  private async isApprovalRequired(): Promise<boolean> {
+    const row = await this.prisma.siteSettings.findUnique({
+      where: { key: 'general.require_registration_approval' },
+    });
+    return row?.value === 'true';
+  }
+
+  private async assertApproved(user: { id: string; role: UserRole | string; role_name: string; approved_at: Date | null }): Promise<void> {
+    // Owner is always exempt from the approval gate
+    const effectiveRole = user.role_name ?? user.role;
+    if (effectiveRole === 'owner') return;
+
+    const requireApproval = await this.isApprovalRequired();
+    if (!requireApproval) return;
+
+    if (!user.approved_at) {
+      throw new UnauthorizedException(
+        'Your registration is pending approval. You will receive an email when it is reviewed.',
+      );
+    }
+  }
+
+  async listPendingRegistrations() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        email_verified: true,
+        approved_at: null,
+        deleted_at: null,
+        role_name: { not: 'owner' },
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        first_name: true,
+        last_name: true,
+        role_name: true,
+        email_verified: true,
+        created_at: true,
+      },
+      orderBy: { created_at: 'asc' },
+    });
+    return { data: users, total: users.length };
+  }
+
+  async approveRegistration(actorId: string, targetId: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: targetId, deleted_at: null, email_verified: true, approved_at: null },
+    });
+    if (!user) throw new NotFoundException('Pending registration not found');
+
+    await this.prisma.user.update({
+      where: { id: targetId },
+      data: { approved_at: new Date(), approved_by: actorId },
+    });
+
+    await this.auditLog.log({
+      event_type: 'user.registration_approved',
+      user_id: actorId,
+      metadata: { target_id: targetId, target_email: user.email },
+    });
+
+    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    await this.emailProvider.send({
+      to: user.email,
+      subject: 'Your account has been approved',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #333;">Welcome!</h1>
+          <p>Hi ${user.first_name || 'there'},</p>
+          <p>Your account registration has been approved. You can now log in at:</p>
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${appUrl}/login"
+               style="background-color: #4F46E5; color: white; padding: 12px 24px;
+                      text-decoration: none; border-radius: 6px; display: inline-block;">
+              Log In Now
+            </a>
+          </p>
+        </div>
+      `,
+      text: `Hi ${user.first_name || 'there'},\n\nYour account has been approved. Log in at: ${appUrl}/login`,
+    }).catch((e) => console.error('[auth] approval email failed:', e?.message));
+
+    return { message: 'Registration approved' };
+  }
+
+  async rejectRegistration(actorId: string, targetId: string, reason: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: targetId, deleted_at: null, email_verified: true, approved_at: null },
+    });
+    if (!user) throw new NotFoundException('Pending registration not found');
+
+    await this.auditLog.log({
+      event_type: 'user.registration_rejected',
+      user_id: actorId,
+      metadata: { target_id: targetId, target_email: user.email, reason },
+    });
+
+    await this.prisma.user.update({
+      where: { id: targetId },
+      data: { deleted_at: new Date() },
+    });
+
+    return { message: 'Registration rejected' };
+  }
+
+  private async notifyApprovers(applicantEmail: string, applicantName?: string | null): Promise<void> {
+    // Find all users who hold the registration.approve capability
+    const cap = await this.prisma.capability.findUnique({
+      where: { name: 'registration.approve' },
+    });
+    if (!cap) return;
+
+    const approverIds = new Set<string>();
+
+    // Via role assignment
+    const roleCaps = await this.prisma.roleCapability.findMany({
+      where: { capability_id: cap.id },
+      select: { role_name: true },
+    });
+    if (roleCaps.length > 0) {
+      const roleNames = [...new Set(roleCaps.map((rc) => rc.role_name).filter(Boolean))];
+      const roleUsers = await this.prisma.user.findMany({
+        where: { role_name: { in: roleNames }, deleted_at: null, email_verified: true },
+        select: { id: true },
+      });
+      roleUsers.forEach((u) => approverIds.add(u.id));
+    }
+
+    // Via direct user capability grants
+    const userCaps = await this.prisma.userCapability.findMany({
+      where: { capability_id: cap.id },
+      select: { user_id: true },
+    });
+    userCaps.forEach((uc) => approverIds.add(uc.user_id));
+
+    if (approverIds.size === 0) return;
+
+    const approvers = await this.prisma.user.findMany({
+      where: { id: { in: [...approverIds] }, deleted_at: null },
+      select: { email: true },
+    });
+
+    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    const displayName = applicantName ? `${applicantName} (${applicantEmail})` : applicantEmail;
+
+    for (const approver of approvers) {
+      await this.emailProvider.send({
+        to: approver.email,
+        subject: `New registration pending approval — ${applicantEmail}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">New registration pending approval</h2>
+            <p><strong>${displayName}</strong> has verified their email and is waiting for account approval.</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${appUrl}/admin/registrations"
+                 style="background-color: #4F46E5; color: white; padding: 12px 24px;
+                        text-decoration: none; border-radius: 6px; display: inline-block;">
+                Review Pending Registrations
+              </a>
+            </p>
+          </div>
+        `,
+        text: `New registration pending approval: ${displayName}\n\nReview at: ${appUrl}/admin/registrations`,
+      }).catch((e) => console.error('[auth] approver notification email failed:', e?.message));
+    }
   }
 
   /**

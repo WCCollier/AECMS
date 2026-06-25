@@ -62,6 +62,11 @@ const capabilities = [
   { name: 'digital.deliver',     category: 'ecommerce', scope: 'backstage', description: 'Manage digital delivery — extend/regenerate download tokens' },
   // Mul Converter
   { name: 'mul.convert',         category: 'system',    scope: 'backstage', description: 'Run the Mul Converter AI tool to extract palettes and page layouts from external URLs' },
+  // Role Management
+  { name: 'role.manage',         category: 'system',    scope: 'backstage', description: 'Create, edit, and delete roles and their capability assignments' },
+  // Registration Controls
+  { name: 'registration.configure', category: 'system', scope: 'backstage', description: 'Configure registration policy: default role and approval requirement' },
+  { name: 'registration.approve',   category: 'users',  scope: 'backstage', description: 'Review and approve or reject pending user registrations' },
   // Customer-facing capabilities
   { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
   { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
@@ -91,7 +96,7 @@ const adminBackstageCaps = [
   'media.upload', 'media.delete', 'product.create', 'product.edit.own', 'product.edit',
   'product.delete.own', 'product.delete', 'order.view.all', 'order.edit',
   'user.edit', 'comment.view.all', 'comment.moderate', 'comment.delete',
-  'review.moderate', 'digital.deliver',
+  'review.moderate', 'digital.deliver', 'registration.approve',
 ];
 
 const defaultSettings = [
@@ -100,18 +105,24 @@ const defaultSettings = [
   { key: 'general.timezone',      value: 'America/New_York' },
   { key: 'general.date_format',   value: 'MMM D, YYYY' },
   { key: 'general.homepage_mode', value: 'latest_articles' },
+  { key: 'general.default_role',                   value: 'member' },
+  { key: 'general.require_registration_approval',  value: 'false' },
 ];
 
 async function assignCapsToRole(role, capNames) {
   let count = 0;
+  const canonicalRoles = ['admin', 'member', 'guest'];
+  const isCanonical = canonicalRoles.includes(role);
   for (const capName of capNames) {
     const cap = await prisma.capability.findUnique({ where: { name: capName } });
     if (!cap) continue;
     const existing = await prisma.roleCapability.findFirst({
-      where: { role, capability_id: cap.id },
+      where: { role_name: role, capability_id: cap.id },
     });
     if (!existing) {
-      await prisma.roleCapability.create({ data: { role, capability_id: cap.id } });
+      const data = { role_name: role, capability_id: cap.id };
+      if (isCanonical) data.role = role;
+      await prisma.roleCapability.create({ data });
       count++;
     }
   }
@@ -137,6 +148,22 @@ async function main() {
     await prisma.capability.delete({ where: { id: legacy.id } });
     console.log('[seed-minimal] ✓ Removed legacy system.configure capability');
   }
+
+  console.log('[seed-minimal] Seeding roles...');
+  const roleDefs = [
+    { name: 'owner',  label: 'Owner',  protection: 'full' },
+    { name: 'admin',  label: 'Admin',  protection: 'none' },
+    { name: 'member', label: 'Member', protection: 'none' },
+    { name: 'guest',  label: 'Guest',  protection: 'constrained' },
+  ];
+  for (const r of roleDefs) {
+    await prisma.role.upsert({
+      where: { name: r.name },
+      update: { label: r.label, protection: r.protection },
+      create: r,
+    });
+  }
+  console.log('[seed-minimal] ✓ roles upserted');
 
   console.log('[seed-minimal] Seeding role capabilities...');
   const adminCount  = await assignCapsToRole('admin',  [...adminBackstageCaps, ...memberCustomerCaps]);
