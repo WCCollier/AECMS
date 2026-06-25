@@ -1,4 +1,9 @@
 import type { MulConfig } from './mul-converter.types';
+import { ROLE_PROMPT } from './prompts/01-role.prompt';
+import { PALETTE_SCHEMA_PROMPT } from './prompts/02-palette-schema.prompt';
+import { PAGE_SCHEMA_PROMPT } from './prompts/03-page-schema.prompt';
+import { AESTHETIC_TOOLS_PROMPT } from './prompts/04-aesthetic-tools.prompt';
+import { SIGNAL_MAPPING_PROMPT } from './prompts/05-signal-mapping.prompt';
 
 export function buildSystemPrompt(
   config: Pick<MulConfig, 'imageProvider' | 'imageModel' | 'imageReferenceMode'>,
@@ -9,185 +14,15 @@ export function buildSystemPrompt(
 
   return `You are a design analysis assistant for AECMS, a content management system.
 
-[SECTION 1 — What we need]
-Given raw page data from a target URL (HTML structure, extracted CSS colors, page metadata), produce two things:
-  (a) A color palette that replicates the visual identity of the target site
-  (b) A page layout scaffold that approximates the spatial layout of the target page
+${ROLE_PROMPT}
 
-[SECTION 2 — Color palette schema]
-A palette contains exactly 10 named color slots:
-  background        — the page background (dominant, typically darkest or lightest)
-  surface           — a slightly elevated surface (cards, panels) — 10–15% lighter/darker than background
-  surface-raised    — a further step up (nested cards, hover states)
-  foreground        — primary text color — must contrast ≥ 4.5:1 against background
-  muted             — secondary/subdued text — must contrast ≥ 3:1 against background
-  border            — subtle divider lines — typically 2–3 steps from background
-  accent            — the dominant brand/interactive color (button fills, links, highlights)
-  accent-hover      — 10% darker than accent (for button hover states)
-  accent-dim        — 20% darker than accent (for active/pressed states)
-  accent-foreground — text color used ON TOP of accent — must contrast ≥ 4.5:1 against accent
+${PALETTE_SCHEMA_PROMPT}
 
-All values must be valid CSS hex colors (e.g. #1a2b3c). Do not use rgb(), hsl(), or named colors.
+${PAGE_SCHEMA_PROMPT}
 
-[SECTION 3 — Page layout system]
-AECMS pages are built from a vertical stack of sections. Each section defines a CSS grid with a chosen resolution (columns), and contains an ordered array of zones that span across that grid. This lets you express any column arrangement within a section.
+${AESTHETIC_TOOLS_PROMPT}
 
-Section schema:
-  columns: positive integer — the grid resolution for this section
-           Choose whatever resolution naturally fits the layout:
-             columns:1  → single full-width zone
-             columns:2  → halves, or any 2-unit split
-             columns:3  → thirds, or 1+2, 2+1
-             columns:4  → quarters, or 1+3, 3+1, 2+2, 1+2+1, etc.
-             columns:12 → Bootstrap-style fine-grained control when needed
-  minHeight (optional): CSS string — use "100vh" for a full-viewport hero, omit for auto height
-  padding (optional): "none" | "compact" | "normal" | "spacious"
-  background (optional):
-    type: "none" | "color" | "gradient" | "image"
-    value: hex color string (for type "color"), e.g. "#1a2b3c"
-           or CSS gradient string (for type "gradient"), e.g. "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)"
-           or "media://placeholder" (for type "image") — owner will replace with a real upload
-    transition: "none" | "fixed" | "fade" | "wipe-v" | "wipe-left" | "wipe-right" | "slide-up" | "parallax"
-      — "none"       background scrolls naturally with content (plain web behaviour; default for color/gradient)
-      — "fixed"      background plants in viewport; content scrolls through it like a window
-      — "fade"       background crossfades into the next section below as this section exits
-      — "wipe-v"     vertical clip-path wipe downward
-      — "wipe-left"  lateral clip that reveals from the right edge
-      — "wipe-right" lateral clip that reveals from the left edge
-      — "slide-up"   background translates upward off screen
-      — "parallax"   background image drifts at ~50% scroll speed (image only; requires minHeight ≥ 60vh)
-    overlay (optional):
-      solid form:    { "color": hex, "opacity": 0–1 }
-      gradient form: { "color": "#000000", "opacity": 1, "gradient": "<CSS gradient with rgba stops>" }
-      Use gradient overlays for dramatic directional vignettes. Omit "gradient" for a flat scrim.
-      Gradient examples:
-        bottom vignette: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)"
-        top vignette:    "linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 60%)"
-        dual vignette:   "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.5) 100%)"
-  zones: ordered array of zone objects, left to right
-    Each zone: { "id": "<string>", "span": <positive integer>, "scheme": "inherit"|"light"|"dark", "content": <TipTapDoc> }
-    CONSTRAINT: all span values in a section must sum exactly to columns
-
-Zone layout examples (columns → zone spans):
-  columns:3 → [{span:1},{span:2}]          (1/3 left + 2/3 right)
-  columns:4 → [{span:1},{span:2},{span:1}]  (narrow + feature + narrow)
-  columns:2 → [{span:1},{span:1}]           (two equal halves)
-  columns:1 → [{span:1}]                   (full width)
-
-Each TipTap document:
-  { "type": "doc", "content": [...nodes] }
-
-Available TipTap node types for scaffold content:
-
-  Headings:
-  { "type": "heading", "attrs": { "level": 1|2|3, "textAlign": "left"|"center"|"right" }, "content": [{ "type": "text", "text": "..." }] }
-
-  Paragraphs:
-  { "type": "paragraph", "attrs": { "textAlign": "left"|"center"|"right"|"justify", "dropCap": true|false }, "content": [{ "type": "text", "text": "...", "marks": [...] }] }
-
-  Lists:
-  { "type": "bulletList", "content": [{ "type": "listItem", "content": [...] }] }
-
-  Horizontal rule:
-  { "type": "horizontalRule" }
-
-Available text marks:
-  Bold:    { "type": "bold" }
-  Italic:  { "type": "italic" }
-  Label style (uppercase, wide-tracked):
-           { "type": "textStyle", "attrs": { "textTransform": "uppercase", "letterSpacing": "wide" } }
-
-CRITICAL: Do NOT produce empty text nodes ({ "type": "text", "text": "" }). Every text node must have non-empty text.
-
-Scaffold content means structural placeholders that show WHERE things go, not real content from the source page. Use square-bracket labels: "[Hero headline]", "[Supporting paragraph]", "[CTA button]". Aim for 3–7 sections for a typical landing page.
-
-[SECTION 3B — Aesthetic tools and when to use them]
-
-BACKGROUNDS
-  Use "gradient" for sections whose source page has a gradient hero, a dark tech aesthetic, or any depth-layered background. Prefer CSS linear-gradient with 2–3 stops.
-  Example: "linear-gradient(160deg, #0d1b2a 0%, #1b263b 60%, #415a77 100%)"
-
-  Use "image" with value "media://placeholder" for any section the source page builds around a background photograph. Always pair with an overlay when zone text must be light-on-dark:
-    overlay: { "color": "#000000", "opacity": 0.45 }
-  Adjust opacity: 0.3 for subtle texture, 0.6+ for full legibility.
-
-  Use overlay on gradient backgrounds when zone text needs extra contrast beyond the gradient alone.
-
-PADDING
-  Match the source page's visual breathing room:
-    spacious → viewport-height heroes, major brand statements
-    normal   → standard body sections (default; omit if unsure)
-    compact  → feature grids, testimonial rows, tight content bands
-    none     → flush image blocks, map embeds, full-bleed elements
-
-ZONE SCHEME
-  Set zone.scheme: "light" when the section background is dark (gradient or dark color) and the zone content needs white text. Set "dark" for zones on light/pale backgrounds that need to explicitly force dark text. "inherit" or omitting scheme is correct for neutral sections.
-
-FONT IMPORT
-  Read the source page's font-family declarations in the extracted CSS. If you identify a Google Fonts typeface, emit the Google Fonts URL in fontImport and the CSS font-family values in fontVariables. This is one of the strongest brand-identity signals available.
-  If the page uses system fonts (Georgia, Arial, system-ui, etc.), omit fontImport entirely.
-
-TEXT ALIGNMENT
-  Center-align headings in hero sections (h1, h2 in spacious sections with dark backgrounds).
-  Left-align all body text and headings in content sections by default.
-  Use "justify" on long-form body paragraphs only — it signals editorial authority, appropriate for literary or journalistic pages. Always combine with dropCap on the first paragraph of a long-form content section.
-
-DROP CAPS
-  Apply dropCap: true to the first paragraph of any zone that contains extended prose and where the source page has an editorial, literary, or magazine character. Drop caps signal craft and are one of the clearest typographic identity markers for author and publishing sites.
-  Do not apply to list items, short paragraph stubs, or placeholder-only zones.
-
-UPPERCASE LABELS
-  Use the textStyle mark with textTransform: "uppercase" and letterSpacing: "wide" for section eyebrows (short label text above a headline) and caption-style text. This pattern ("ABOUT THE AUTHOR", "FEATURED WORK", "CHAPTER ONE") is a strong editorial voice marker.
-
-[SECTION 3C — Scroll transition decision tree]
-Use the Animation Signals provided in the user message to select the correct transition value. Apply the FIRST matching rule:
-
-  1. hasFixedBackground = true  OR  motionClassNames contains "parallax"
-     → background.transition = "parallax"
-     → background.minHeight must be "60vh" or more
-
-  2. libraryFingerprints contains "aos" OR "framer-motion" OR "scrollreveal"
-     → background.transition = "fade"
-     (These libraries almost universally fade elements in and out on scroll.)
-
-  3. libraryFingerprints contains "gsap"
-     → background.transition = "slide-up"
-     (GSAP sites typically slide elements into view.)
-
-  4. libraryFingerprints contains "locomotive"
-     → background.transition = "parallax"
-     (Locomotive Scroll is a parallax-first library.)
-
-  5. DOM structure shows alternating image+text section pairs (img next to a content div, repeating)
-     → alternate "wipe-left" and "wipe-right" across those sections
-
-  6. hasScrollTimeline = true  OR  hasOpacityTransition = true  (without library fingerprint)
-     → background.transition = "fade"
-
-  7. hasTransformTransition = true  (without library fingerprint)
-     → background.transition = "slide-up"
-
-  8. hasHighZIndexStack = true (multiple z-index > 10 elements — suggests the site stacks layers)
-     → background.transition = "fixed"
-
-  9. Photography-forward site (image backgrounds on multiple sections, no strong motion signals)
-     → background.transition = "fade"
-
-  10. No motion signals, structural or editorial layout
-     → background.transition = "none" for most sections; "fixed" for a striking hero section only
-
-OVERLAY DEFAULTS (apply after transition is set):
-  — Any image background with transition != "none" and a zone containing heading text:
-    → add bottom vignette overlay by default: gradient "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)"
-    → set zone.scheme = "light" on the heading zone
-
-  — Any image background with transition = "parallax":
-    → always add an overlay; prefer dual vignette or bottom vignette
-
-  — Gradient backgrounds: only add overlay if zone text needs extra contrast beyond the gradient
-
-IMPORTANT: Assign minHeight = "60vh" to any section with an image background and transition != "none".
-This ensures there is room for the animation to play.
+${SIGNAL_MAPPING_PROMPT}
 
 [SECTION 4 — Output format]
 Return ONLY a valid JSON object matching this schema. No prose, no markdown, no code fences.
@@ -215,7 +50,10 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
         "background": {
           "type": "none" | "color" | "gradient" | "image",
           "value": string | null,
-          "transition": "none" | "fixed" | "fade" | "wipe-v" | "wipe-left" | "wipe-right" | "slide-up" | "parallax" | null,
+          "mode": "traditional" | "animated",
+          "imageSize": "cover" | "fit-width" | null,
+          "movement": "fixed" | "parallax" | null,
+          "exit": "none" | "fade" | "wipe-v" | "wipe-left" | "wipe-right" | "slide-up" | null,
           "overlay": { "color": string, "opacity": number, "gradient": string | null } | null
         } | null,
         "zones": [
@@ -247,6 +85,12 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
     "notes": string
   }
 }
+
+Output format rules:
+  — mode "traditional": set imageSize if applicable; set movement and exit to null.
+  — mode "animated": set both movement and exit explicitly; set imageSize to null.
+  — type "none": set mode "traditional", movement null, exit null, imageSize null, overlay null.
+  — value field: hex string for type "color"; CSS gradient for type "gradient"; "media://placeholder" for type "image"; null for type "none".
 ${hasImages ? `
 [SECTION 5 — Image brief optimization]
 Before writing any imageBriefs, emit an "imagePromptStyle" field. In it:
