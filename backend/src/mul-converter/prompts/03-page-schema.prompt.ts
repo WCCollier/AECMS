@@ -1,28 +1,37 @@
 // PRD source: docs/prd/13-mul-converter.md § "Page layout system" + § "Background rendering model"
 
 export const PAGE_SCHEMA_PROMPT = `[SECTION 3 — Page layout system]
-AECMS pages are built from a vertical stack of sections. Each section defines a CSS grid with a chosen resolution (columns), and contains an ordered array of zones that span across that grid. This lets you express any column arrangement within a section.
+AECMS pages are built from a vertical stack of sections. Each section is a SINGLE HORIZONTAL ROW of one or more zones tiled left-to-right. There is no wrapping within a section. To place content on a new visual row, use a new section.
 
-Section schema:
-  columns: positive integer — the grid resolution for this section
-           Choose whatever resolution naturally fits the layout:
-             columns:1  → single full-width zone
-             columns:2  → halves, or any 2-unit split
-             columns:3  → thirds, or 1+2, 2+1
-             columns:4  → quarters, or 1+3, 3+1, 2+2, 1+2+1, etc.
-             columns:12 → Bootstrap-style fine-grained control when needed
+Section design process — always in this order:
+  1. Decide the zones: how many, and how wide each one should be relative to the others.
+  2. Assign each zone a "span" integer expressing its relative width.
+  3. Set "columns" to the sum of all zone spans. This is a DERIVED value — you do not choose it freely.
+
+  columns: DERIVED — always equals sum(zone.span for all zones in this section).
+           Do not pick columns first. Design your zones, then sum their spans.
+
+  zones: ordered array of zone objects, left to right
+    Each zone: { "id": "<string>", "span": <positive integer>, "scheme": "inherit"|"light"|"dark", "content": <TipTapDoc> }
+
   minHeight (optional): CSS string — use "100vh" for a full-viewport hero, omit for auto height
   padding (optional): "none" | "compact" | "normal" | "spacious"
   background (optional): — see Background schema below
-  zones: ordered array of zone objects, left to right
-    Each zone: { "id": "<string>", "span": <positive integer>, "scheme": "inherit"|"light"|"dark", "content": <TipTapDoc> }
-    CONSTRAINT: all span values in a section must sum exactly to columns
 
-Zone layout examples (columns → zone spans):
-  columns:3 → [{span:1},{span:2}]          (1/3 left + 2/3 right)
-  columns:4 → [{span:1},{span:2},{span:1}]  (narrow + feature + narrow)
-  columns:2 → [{span:1},{span:1}]           (two equal halves)
-  columns:1 → [{span:1}]                   (full width)
+Zone layout examples (zones → derived columns):
+  [{span:1}]                           → columns:1   (single full-width zone)
+  [{span:1},{span:1}]                  → columns:2   (two equal halves)
+  [{span:2},{span:1}]                  → columns:3   (2/3 left + 1/3 right)
+  [{span:1},{span:2},{span:1}]         → columns:4   (narrow + wide + narrow)
+  [{span:3},{span:1},{span:1},{span:1}]→ columns:6   (wide feature + 3 equal cards)
+  [{span:1},{span:1},{span:1},{span:1}]→ columns:4   (four equal quarters)
+  [{span:5},{span:3},{span:4}]         → columns:12  (fine-grained asymmetric split)
+
+WRONG — do not do this:
+  columns:4 with zones [{span:4},{span:1},{span:1},{span:1},{span:1}]  ← sum is 8, not 4. INVALID.
+  If you want a full-width zone above four equal zones, use TWO sections:
+    Section A: [{span:1}]                                  → columns:1  (full-width row)
+    Section B: [{span:1},{span:1},{span:1},{span:1}]       → columns:4  (four-quarter row)
 
 [SECTION 3A — Background schema]
 The background field has a TWO-TIER rendering architecture. The top-level field is "mode":
