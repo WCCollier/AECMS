@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { Search, AlertCircle, Loader2, ExternalLink, Info } from 'lucide-react';
@@ -38,6 +38,7 @@ export function MulConverterClient() {
   const [url, setUrl] = useState('');
   const [previewUrl, setPreviewUrl] = useState('');
   const [phase, setPhase] = useState<Phase>('url');
+  const [useImages, setUseImages] = useState(false);
   const [analyzeStep, setAnalyzeStep] = useState<AnalyzeStep>(null);
   const [imageProgress, setImageProgress] = useState<{ current: number; total: number } | null>(null);
   const [result, setResult] = useState<MulResult | null>(null);
@@ -48,6 +49,13 @@ export function MulConverterClient() {
 
   const settings = settingsData ?? {} as MulSettings;
   const customPalettes = themeData?.customPalettes ?? [];
+
+  // Auto-enable images on first load if a provider is configured; user can toggle per-run
+  const hasImageProvider = Boolean(settings['mul.image_provider']) && settings['mul.image_provider'] !== 'disabled';
+  useEffect(() => {
+    if (settingsData) setUseImages(hasImageProvider);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!settingsData]);
 
   const handleLoadPreview = () => {
     if (!url) return;
@@ -67,7 +75,7 @@ export function MulConverterClient() {
 
     // Simulate progress steps (real work happens server-side in one call)
     const stepTimer = setTimeout(() => setAnalyzeStep('analyzing'), 1500);
-    const hasImages = Boolean(settings['mul.image_provider']);
+    const hasImages = useImages && hasImageProvider;
 
     try {
       if (hasImages) {
@@ -75,12 +83,12 @@ export function MulConverterClient() {
           clearTimeout(stepTimer);
           setAnalyzeStep('generating');
         }, 4000);
-        const res = await adminApi.post<MulResult>('/mul/analyze', { url });
+        const res = await adminApi.post<MulResult>('/mul/analyze', { url, generateImages: true });
         clearTimeout(imageTimer);
         setResult(res.data);
         setEditPalette(res.data.palette);
       } else {
-        const res = await adminApi.post<MulResult>('/mul/analyze', { url });
+        const res = await adminApi.post<MulResult>('/mul/analyze', { url, generateImages: false });
         clearTimeout(stepTimer);
         setResult(res.data);
         setEditPalette(res.data.palette);
@@ -180,13 +188,25 @@ export function MulConverterClient() {
               >
                 ← Try a different URL
               </button>
-              <button
-                onClick={handleAnalyze}
-                className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-hover text-accent-foreground text-sm font-medium rounded transition-colors"
-              >
-                <Search size={14} />
-                Looks right — Analyze
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => hasImageProvider && setUseImages(!useImages)}
+                  title={hasImageProvider ? undefined : 'Configure an image provider in AI Provider Settings'}
+                  className={`flex items-center gap-1.5 text-xs transition-colors ${hasImageProvider ? 'cursor-pointer' : 'cursor-default opacity-40'} ${useImages && hasImageProvider ? 'text-accent' : 'text-muted'}`}
+                >
+                  <span className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${useImages && hasImageProvider ? 'bg-accent' : 'bg-border'}`}>
+                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${useImages && hasImageProvider ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                  </span>
+                  Images
+                </button>
+                <button
+                  onClick={handleAnalyze}
+                  className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-hover text-accent-foreground text-sm font-medium rounded transition-colors"
+                >
+                  <Search size={14} />
+                  Looks right — Analyze
+                </button>
+              </div>
             </div>
           )}
         </div>

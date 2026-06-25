@@ -1,8 +1,20 @@
 # Phase 23 Plan: Mul Converter
 
-**Status**: 🚧 IN PROGRESS — Part 1 built (2026-06-21), pending testbed QA before Part 1 deploy  
+**Status**: 🚧 IN PROGRESS — Parts 1–3 built and merged to `main`; pending full QA before deploy  
 **PRD**: `docs/prd/13-mul-converter.md`  
 **Dependencies**: Phase 20 (Appearance/themes), Phase 15 (ISM), Phase 11 (Page zone-layout)
+
+### Build summary (as of 2026-06-25)
+
+| Part | Status | Notes |
+|---|---|---|
+| Part 1 — Page Schema (A–C) | ✅ Built | Sections content model, SectionEditor, SectionsLayout renderer |
+| Part 2 — Mul Converter (D–O) | ✅ Built | Full AI pipeline, 3 providers, /admin/mul-converter UI |
+| Part 3 — BG Transitions (P–V) | ✅ Built | Fixed-position stack, transition vocab, overlays, SectionBackgroundPanel |
+| Part 4 — Schema evolution (W–X) | ✅ Built | Two-tier rendering model + prompt file architecture (this session) |
+| Part 5 — Aesthetic vocab + editor polish (Y–AF) | 📋 Planned | Zone align, inline text color, zone content max-width, zone full-bleed, section border, section visibility, parent picker nav-hidden hint, zoom (Ken Burns) movement |
+| QA | 🚧 In progress | Owner testing BG panel + aesthetic tools; Mul Converter QA pending |
+| Deploy | ⏳ Pending | After QA passes; `git merge main → deploy` |
 
 ---
 
@@ -250,13 +262,13 @@ Implement the `background` field on each section:
 
 ## Part 3: Scroll-Driven Background Transitions + Gradient Overlays
 
-**Status**: 📋 Planned — begins after Part 2 passes testbed QA and deploys
-
-Part 3 is a renderer and schema evolution with no backend changes. It implements true simultaneous crossfade between section backgrounds, a full transition vocabulary (fade, clip wipes, slide, parallax), gradient overlay masks, and an enriched HTML extraction pipeline that gives the Mul Converter enough signal to select transitions intelligently. No production pages currently use the sections format, so there is no backward compatibility concern for schema changes.
+**Status**: ✅ Built (2026-06-23) — further evolved by Part 4 below
 
 ---
 
-### P — Schema: `background.transition` field + `attachment` removal
+### P — Schema: `background.transition` field + `attachment` removal ✅ (superseded by W)
+
+> **Note**: The `transition` single-field model was built as planned, then superseded in Part 4 (item W) by the two-tier `mode`/`movement`/`exit` model. The backward-compat resolvers in the renderer handle sections saved with the old `transition` field. The implementation below describes what was built; see item W for the evolved schema.
 
 Introduce `transition` on `SectionBackground` and **remove `attachment` entirely**:
 
@@ -286,7 +298,7 @@ Read-time fallback: stored `attachment: 'parallax'` → `transition: 'parallax'`
 
 ---
 
-### Q — Schema: gradient overlay
+### Q — Schema: gradient overlay ✅
 
 Extend `SectionBackground.overlay` to support gradient masks:
 
@@ -311,7 +323,7 @@ Named patterns (offered as presets in the editor, emittable by the AI):
 
 ---
 
-### R — Renderer restructure: true crossfade architecture
+### R — Renderer restructure: true crossfade architecture ✅
 
 The renderer splits into two independent render passes. Background composites (image + overlay) are lifted out of their section containers and rendered as a fixed-position stack. Content sections become transparent scroll spacers with no background CSS of their own.
 
@@ -407,7 +419,7 @@ Sections shorter than the viewport height complete `entry` and `exit` phases in 
 
 ---
 
-### S — SectionEditor: Section Background & Overlay Panel
+### S — SectionEditor: Section Background & Overlay Panel ✅
 
 The existing background flyout in the section header bar is promoted to a **Section Background Panel** — a wider slide-in drawer (or large popover, ≥320px) triggered by the ⚙ background button. The flyout approach becomes too cramped once transition and gradient overlay controls are added. The panel has three collapsible sub-sections.
 
@@ -501,7 +513,7 @@ Descriptions appear as a single line of muted text beneath the selected option.
 
 ---
 
-### T — Enriched HTML extractor: animation signal extraction
+### T — Enriched HTML extractor: animation signal extraction ✅
 
 Add `extractAnimationSignals(html)` to `html-extractor.ts`. Scan `<style>` block text and `class=""` attribute values for the following patterns and return a structured `AnimationSignals` object on `PageData`:
 
@@ -536,7 +548,7 @@ Pass `AnimationSignals` to the AI via the `buildUserMessage()` content block (al
 
 ---
 
-### U — System prompt Section 3C: signal-to-tool decision tree
+### U — System prompt Section 3C: signal-to-tool decision tree ✅ (superseded by X)
 
 Replace the stub Section 3C with a full signal-to-tool decision tree that the model applies after reading `AnimationSignals`:
 
@@ -608,7 +620,7 @@ MINHEIGHT RULE:
 
 ---
 
-### V — Part 3 acceptance criteria
+### V — Part 3 acceptance criteria 🚧 QA in progress
 
 1. `background.transition` stored and round-tripped; omitted renders as `'none'` (no regression)
 2. `attachment: 'parallax'` in stored data read gracefully as `transition: 'parallax'`
@@ -624,6 +636,302 @@ MINHEIGHT RULE:
 12. SectionEditor transition picker and gradient overlay presets save correctly and render live
 13. `extractAnimationSignals()` correctly detects AOS, `background-attachment: fixed`, opacity transitions, and overlay gradients from sample HTML fixtures
 14. Mul Converter AI output includes `transition` and `overlay.gradient` fields informed by detected signals
+
+---
+
+---
+
+## Part 4: Schema Evolution + Prompt File Architecture
+
+**Status**: ✅ Built (2026-06-25)
+
+Part 4 refines the background rendering model from the single `transition` field introduced in Part 3 into a hierarchical two-tier system, and restructures the Mul Converter system prompt into composable files with a documented sync workflow.
+
+---
+
+### W — Background model: Traditional/Animated two-tier + Movement × Exit axes ✅
+
+The single `transition` field conflated two orthogonal concerns: *how the background moves while displayed* and *how it exits at the section boundary*. This item separates them into a proper hierarchy.
+
+**Schema changes** (all in `frontend/types/index.ts`):
+
+```typescript
+mode?:     'traditional' | 'animated'
+movement?: 'fixed' | 'parallax'     // Animated only
+exit?:     'none' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up'  // Animated only
+```
+
+- `mode: 'traditional'` — inline background on section div; no fixed stack; `imageSize` applies
+- `mode: 'animated'` — fixed-position slide stack; `movement` and `exit` both required
+- `movement` and `exit` are fully independent — any combination is valid
+- Old `transition` and `attachment` deprecated but retained; backward-compat resolvers in renderer
+- Exported types: `BgMode`, `BgMovement`, `BgExit`
+
+**Renderer changes** (`SectionsLayout.tsx`):
+- `resolveTransition()` replaced by `resolveMode()` / `resolveMovement()` / `resolveExit()`
+- `needsFixedStack()` checks `mode === 'animated'`
+- Scroll handler split into two independent passes: movement axis (parallax drift on image child) then exit axis (fade/wipe/slide/snap) evaluated per section
+
+**SectionBackgroundPanel UI** (`SectionBackgroundPanel.tsx`):
+- Transition sub-section restructured into Traditional / Animated taxonomy with centered rule dividers
+- Animated section shows two independent pickers simultaneously: Movement (Fixed, Parallax) and Exit (None, Fade, Wipe ↓/←/→, Slide ↑)
+- Session-restore: `lastMovement` / `lastExit` local state preserves prior Animated selection when toggling back from Traditional within a single panel open/close cycle
+- One click on either Animated picker atomically activates Animated mode and auto-fills the other picker's default
+- Cover/Fit Width sub-option only shown when `mode === 'traditional'` + `type === 'image'`
+
+**Files**: `frontend/types/index.ts`, `frontend/components/pages/layouts/SectionsLayout.tsx`, `frontend/components/admin/SectionBackgroundPanel.tsx`
+
+---
+
+### X — System prompt file architecture ✅
+
+Restructures `buildSystemPrompt()` from a single monolithic template string into composable named files.
+
+**Structure**:
+```
+backend/src/mul-converter/prompts/
+  01-role.prompt.ts          — role statement, task definition
+  02-palette-schema.prompt.ts — 10-slot palette schema + color rules
+  03-page-schema.prompt.ts   — section/zone/TipTap schema; mode/movement/exit vocabulary
+  04-aesthetic-tools.prompt.ts — padding, overlay, fonts, alignment, drop caps, labels
+  05-signal-mapping.prompt.ts — AnimationSignals → mode/movement/exit two-axis decision tree
+```
+
+Each file exports a string constant and carries a header comment citing its PRD source section. Dynamic sections (image briefs, native image generation) remain inline in `system-prompt.ts` as they are conditional on runtime flags.
+
+**Source of truth**: `docs/prd/13-mul-converter.md` — the relevant PRD section is the authoritative description for each prompt file. When schema or behavior changes: update the PRD first, then use a frontier LLM to sync the affected prompt file against the updated PRD section.
+
+**Files**: `backend/src/mul-converter/prompts/` (new), `backend/src/mul-converter/system-prompt.ts`
+
+---
+
+---
+
+## Part 5: Aesthetic Vocabulary Additions
+
+**Status**: 📋 Planned — to be built before Mul Converter testbed QA, while the schema and editor are hot
+
+Three targeted additions that close gaps the Mul Converter (and users) will hit immediately when composing pages. Each is independent and can be built and deployed in isolation.
+
+---
+
+### Y — Zone vertical alignment
+
+**Gap**: In multi-column sections (Half/Half, Two-thirds/Third, etc.), there is no way to align a zone's content vertically against its siblings. The CSS grid defaults to `align-items: start`, so a short zone of text doesn't center against a tall image in the adjacent zone.
+
+**Schema addition** (`frontend/types/index.ts`):
+
+```typescript
+type ZoneAlign = 'start' | 'center' | 'end';
+// Added to PageZone:
+align?: ZoneAlign;  // default 'start' if absent
+```
+
+**Editor**: Add three icon buttons to the zone header row in `SectionEditor.tsx`, alongside the existing Auto/Light/Dark scheme buttons:
+
+| Icon | Value | Title |
+|---|---|---|
+| ⬆ | `start` | Align content to top of zone |
+| ↕ | `center` | Center content vertically in zone |
+| ⬇ | `end` | Align content to bottom of zone |
+
+**Renderer** (`SectionsLayout.tsx`): Apply `align-self: {align}` to each zone's grid cell div. The outer grid's `align-items` remains unset (defaults to `stretch`); each zone independently controls its own alignment via `align-self`.
+
+**Mul Converter**: `03-page-schema.prompt.ts` updated to describe `align` and when to use it (e.g., text-left / image-right hero with centered text = `align: 'center'` on the text zone).
+
+**Files**: `frontend/types/index.ts`, `frontend/components/admin/SectionEditor.tsx`, `frontend/components/pages/layouts/SectionsLayout.tsx`, `backend/src/mul-converter/prompts/03-page-schema.prompt.ts`
+
+---
+
+### Z — Inline text color (TipTap)
+
+**Gap**: TipTap's `textStyle` extension is already loaded (it powers letter-spacing and font-family), but there is no color input in the toolbar. Users cannot set colored headings or accent text; the Mul Converter cannot output branded text colors.
+
+**Implementation**: Add a color `<input type="color">` to the TipTap toolbar, positioned after the label-style button group:
+
+```tsx
+<input
+  type="color"
+  value={editor.getAttributes('textStyle').color ?? '#000000'}
+  onChange={(e) => {
+    editor.chain().focus().setMark('textStyle', { color: e.target.value }).run();
+  }}
+  title="Text color"
+  className="w-7 h-7 p-0.5 border border-border rounded cursor-pointer bg-background"
+/>
+```
+
+A "clear color" button (×) beside it calls `editor.chain().focus().unsetMark('textStyle', { color: null }).run()` to remove just the color mark without disturbing other textStyle attributes.
+
+**Renderer** (`RichTextContent.tsx` / TipTap output): `textStyle` marks already render as `<span style="...">` in TipTap HTML output — color will appear as `color: #xxxxxx` in the inline style. No renderer change needed.
+
+**Mul Converter**: `04-aesthetic-tools.prompt.ts` updated to describe the `color` textStyle attribute and when to use it (accent headings, brand-colored labels — sparingly, maximum one color per section).
+
+**Files**: `frontend/components/editor/TipTapEditor.tsx`, `backend/src/mul-converter/prompts/04-aesthetic-tools.prompt.ts`
+
+---
+
+### AA — Zone content max-width (reading column)
+
+**Gap**: Zone content currently stretches to fill the full grid column minus `px-[5%]` padding. On full-width sections on wide viewports, body text runs far beyond comfortable reading line length (~65–80 characters). The only current workaround is to fake a narrow column using empty "spacer" zones, which wastes zones and breaks down on mobile.
+
+**Schema addition** (`frontend/types/index.ts`):
+
+```typescript
+type ZoneWidth = 'full' | 'reading' | 'narrow';
+// Added to PageZone:
+contentWidth?: ZoneWidth;  // default 'full' if absent
+```
+
+| Value | Rendered as | Intended use |
+|---|---|---|
+| `full` | No max-width constraint (current behavior) | Widgets, images, multi-column layouts |
+| `reading` | `max-w-2xl mx-auto` (~672px) | Body text, article sections |
+| `narrow` | `max-w-lg mx-auto` (~512px) | Pull quotes, captions, centered call-to-action |
+
+**Editor** (`SectionEditor.tsx`): Add a width-mode selector to the zone header, as a compact `<select>` or icon-button trio (alongside scheme buttons):
+
+```
+[ ↔ Full ]  [ ⇔ Reading ]  [ ↕ Narrow ]
+```
+
+Shown on all zones regardless of span. A `reading` or `narrow` constraint on a zone that is already a narrow grid column is harmless — it does nothing visible but costs nothing to store.
+
+**Renderer** (`SectionsLayout.tsx`): Wrap `RichTextContent` (and any zone content) in a div that applies the appropriate class:
+
+```tsx
+const WIDTH_CLASSES: Record<ZoneWidth, string> = {
+  full:    '',
+  reading: 'max-w-2xl mx-auto w-full',
+  narrow:  'max-w-lg mx-auto w-full',
+};
+```
+
+Applied inside the `px-[5%]` zone wrapper so padding still provides a minimum gutter on narrow viewports.
+
+**Mul Converter**: `03-page-schema.prompt.ts` updated to describe `contentWidth` and when to use it. General rule: hero sections → `full`; body/article sections → `reading`; sub-headings, captions, CTAs in otherwise full-width sections → `narrow`.
+
+**Files**: `frontend/types/index.ts`, `frontend/components/admin/SectionEditor.tsx`, `frontend/components/pages/layouts/SectionsLayout.tsx`, `backend/src/mul-converter/prompts/03-page-schema.prompt.ts`
+
+---
+
+### AB — Zone full-bleed
+
+**Gap**: All zones have `px-[5%]` padding hardcoded in the renderer. There is no way to make a zone's content extend edge-to-edge — for example, an image that should fill its grid column with no gutter.
+
+**Schema addition** (`frontend/types/index.ts`):
+
+```typescript
+// Added to PageZone:
+fullBleed?: boolean;  // default false
+```
+
+**Editor** (`SectionEditor.tsx`): Add a toggle button to the zone header (alongside scheme and align buttons). Icon: `⇤⇥` or similar edge-to-edge symbol. Active state highlights in accent color.
+
+**Renderer** (`SectionsLayout.tsx`): When `fullBleed` is true, omit the `px-[5%]` class on that zone's wrapper div. The grid cell itself provides the boundary — content fills it completely.
+
+`fullBleed` and `contentWidth` compose cleanly: `fullBleed` removes the outer padding; `contentWidth` constrains the inner content. A full-bleed zone with `contentWidth: 'reading'` gives edge-to-edge background with a centered reading column inside — a common editorial pattern.
+
+**Files**: `frontend/types/index.ts`, `frontend/components/admin/SectionEditor.tsx`, `frontend/components/pages/layouts/SectionsLayout.tsx`
+
+---
+
+### AC — Section top/bottom border divider
+
+**Gap**: There is no way to add a visual divider between sections. Sections butt up against each other with only padding as separation. Ruled dividers (thin horizontal lines) are common in editorial and structured layouts.
+
+**Schema addition** (`frontend/types/index.ts`):
+
+```typescript
+type SectionBorder = 'none' | 'top' | 'bottom' | 'both';
+// Added to PageSection:
+border?: SectionBorder;  // default 'none'
+```
+
+**Editor** (`SectionEditor.tsx`): Add a compact `<select>` in the section header bar:
+
+```
+[ No border ▾ ]  →  options: None / Top / Bottom / Both
+```
+
+Border color inherits from the theme's `--border` CSS variable — no color picker needed.
+
+**Renderer** (`SectionsLayout.tsx`): Apply `border-t border-border`, `border-b border-border`, or both to the section's wrapper div based on the `border` value.
+
+**Mul Converter**: `03-page-schema.prompt.ts` updated — use `border: 'bottom'` for section dividers that appear in the source page between content blocks.
+
+**Files**: `frontend/types/index.ts`, `frontend/components/admin/SectionEditor.tsx`, `frontend/components/pages/layouts/SectionsLayout.tsx`, `backend/src/mul-converter/prompts/03-page-schema.prompt.ts`
+
+---
+
+### AD — Section visibility
+
+**Gap**: There is no way to control who sees a section. Useful cases: a promotional section visible only to logged-in members; a section being drafted that should be invisible to all visitors until ready.
+
+**Design rationale**: Page-level login gating creates inelegant browsing — visitors hit a wall at the slug and must redirect or see an error. Section-level visibility is the preferred model: a page is always reachable at its URL, and the builder chooses which sections to show or withhold based on auth state. Public visitors see the page's public skeleton; logged-in members see additional sections appear in place. This is more welcoming and avoids the dead-end UX of a locked page.
+
+**Schema addition** (`frontend/types/index.ts`):
+
+```typescript
+type SectionVisibility = 'public' | 'logged_in' | 'draft';
+// Added to PageSection:
+visibility?: SectionVisibility;  // default 'public'
+```
+
+| Value | Who sees it | Editor display |
+|---|---|---|
+| `public` | Everyone | Normal opacity |
+| `logged_in` | Authenticated users only | Slight tint + lock icon label |
+| `draft` | Nobody (editor only) | Reduced opacity + "Draft" label |
+
+**Editor** (`SectionEditor.tsx`): Add a compact `<select>` in the section header bar (or a cycling icon button):
+
+```
+[ 👁 Public ▾ ]  →  options: Public / Members only / Draft
+```
+
+When `draft` or `logged_in`, the section card in the editor renders a visual indicator so the builder can see its state at a glance.
+
+**Renderer** (`SectionsLayout.tsx`): The renderer receives the current user's auth state as a prop (already available via the page render context). Filtering logic:
+
+- `public` → always rendered
+- `logged_in` → rendered only when user is authenticated; skipped for guests
+- `draft` → never rendered in the customer-facing renderer (editor-only visibility)
+
+Both the fixed-stack pass and the content pass must apply this check — a suppressed section contributes no DOM nodes at all, including no background layer in the fixed stack.
+
+**Mul Converter**: The AI always emits `visibility: 'public'` — the other values are editorial-intent fields the owner sets after reviewing the draft.
+
+**Files**: `frontend/types/index.ts`, `frontend/components/admin/SectionEditor.tsx`, `frontend/components/pages/layouts/SectionsLayout.tsx`
+
+---
+
+### AE — Parent page picker: gray out hidden-nav subtrees
+
+**Gap**: The parent page picker displays all pages as equally selectable. It gives no hint that choosing a parent whose `show_in_nav` is false (or whose own parent is hidden) means the edited page also won't appear in nav — because nav visibility requires the entire ancestor chain to have `show_in_nav: true`.
+
+**Behaviour**: When rendering the parent page tree in the picker:
+
+1. For each page node, determine if it is *effectively nav-hidden* — either its own `show_in_nav` is false, or any ancestor's `show_in_nav` is false (i.e., it sits inside a hidden subtree).
+2. Render effectively-hidden pages in muted/gray text (`text-foreground/40`) with a closed-eye icon.
+3. They remain selectable — this is a hint, not a block. The builder may deliberately want to structure the hierarchy now and enable nav visibility later.
+4. Tooltip on hover (or on the icon): *"Hidden from nav — '[topmost hidden ancestor name]' is not set to show in nav. This page won't appear in nav until that is changed."*
+
+**Implementation**: The picker already receives the full page tree. Add a pre-pass that walks the tree top-down, tracking a `inheritedHidden` flag — if a node has `show_in_nav: false` or its parent passed `inheritedHidden: true`, mark it hidden. Pass this flag into the tree node renderer to apply the gray style and tooltip.
+
+**Files**: The parent page picker component in `frontend/app/admin/pages/[id]/edit/` (or wherever the parent picker tree is rendered).
+
+---
+
+### AF — Zoom (Ken Burns) animated movement
+
+**Addition**: Add `'zoom'` to `BgMovement`. A slow scale animation on the background image while the section is in the viewport — the classic "living hero" effect.
+
+**Implementation**: Time-based rather than scroll-linked. A CSS `@keyframes` animation (`scale(1.0) → scale(1.1)`, 10s ease-in-out, infinite alternate) is applied to the image element inside the `FixedBackgroundLayer`. Because the fixed-stack layer is already hidden (opacity 0 / clipped) when its section is not active, the animation runs continuously but is only visible during the section's dwell time — no IntersectionObserver needed.
+
+Disabled for `type: 'color'` (nothing to scale); allowed but visually subtle on `type: 'gradient'`. Like parallax, disabled in the panel for non-image backgrounds.
+
+**Files**: `frontend/types/index.ts` (`BgMovement`), `frontend/components/admin/SectionBackgroundPanel.tsx` (Movement picker), `frontend/components/pages/layouts/SectionsLayout.tsx` (`FixedBackgroundLayer`)
 
 ---
 

@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { WidgetSizeProvider } from '@/contexts/WidgetSizeContext';
 import { RichTextContent } from '@/components/editor/RichTextContent';
-import type { SectionsPageContent, SectionBackground, SectionPadding, PageSection, ZoneScheme } from '@/types';
+import type { SectionsPageContent, SectionBackground, SectionPadding, PageSection, PageZone, ZoneScheme, ZoneAlign, ZoneWidth, SectionBorder, SectionVisibility, BgMovement, BgExit } from '@/types';
 
 const PADDING_CLASSES: Record<SectionPadding, string> = {
   none:      'py-0',
@@ -18,32 +18,86 @@ const ZONE_SCHEME_CLASSES: Record<ZoneScheme, string> = {
   dark:    'zone-scheme-dark',
 };
 
+const ZONE_ALIGN_STYLES: Record<ZoneAlign, React.CSSProperties> = {
+  start:  { alignSelf: 'start' },
+  center: { alignSelf: 'center' },
+  end:    { alignSelf: 'end' },
+};
+
+const ZONE_WIDTH_CLASSES: Record<ZoneWidth, string> = {
+  full:    '',
+  reading: 'max-w-2xl mx-auto w-full',
+  narrow:  'max-w-lg mx-auto w-full',
+};
+
+const BORDER_CLASSES: Record<SectionBorder, string> = {
+  none:   '',
+  top:    'border-t border-border',
+  bottom: 'border-b border-border',
+  both:   'border-t border-b border-border',
+};
+
 // ---------------------------------------------------------------------------
-// Read-time fallback: migrate deprecated `attachment` → `transition`
+// Read-time backward-compat resolution: maps deprecated transition/attachment
+// fields to the new mode/movement/exit model.
 // ---------------------------------------------------------------------------
-function resolveTransition(bg: SectionBackground | undefined): NonNullable<SectionBackground['transition']> {
+function resolveMode(bg: SectionBackground | undefined): 'traditional' | 'animated' {
+  if (!bg) return 'traditional';
+  if (bg.mode) return bg.mode;
+  // Legacy: transition='none' or no transition → traditional
+  if (!bg.transition || bg.transition === 'none') {
+    if (!bg.attachment || bg.attachment === 'scroll') return 'traditional';
+  }
+  return 'animated';
+}
+
+function resolveMovement(bg: SectionBackground | undefined): BgMovement {
+  if (!bg) return 'fixed';
+  if (bg.movement) return bg.movement;
+  // Legacy mapping
+  if (bg.transition === 'parallax' || bg.attachment === 'parallax') return 'parallax';
+  return 'fixed';
+}
+
+function resolveExit(bg: SectionBackground | undefined): BgExit {
   if (!bg) return 'none';
-  if (bg.transition) return bg.transition;
-  if (bg.attachment === 'parallax') return 'parallax';
-  if (bg.attachment === 'fixed') return 'fixed';
+  if (bg.exit) return bg.exit;
+  // Legacy mapping: transition values that represent exits
+  const t = bg.transition;
+  if (t === 'fade' || t === 'wipe-v' || t === 'wipe-left' || t === 'wipe-right' || t === 'slide-up') return t;
   return 'none';
 }
 
 function needsFixedStack(section: PageSection): boolean {
-  const t = resolveTransition(section.background);
-  return t !== 'none' && !!section.background && section.background.type !== 'none';
+  const mode = resolveMode(section.background);
+  return mode === 'animated' && !!section.background && section.background.type !== 'none';
 }
 
 // ---------------------------------------------------------------------------
-// Inline background style (for transition:'none' sections)
+// Resolve the effective value for a background, supporting both the new
+// per-type fields (colorValue/gradientValue/imageValue) and the legacy
+// single `value` field for sections saved before this change.
+// ---------------------------------------------------------------------------
+function resolveValue(bg: SectionBackground): string | undefined {
+  if (bg.type === 'color')    return bg.colorValue    ?? bg.value;
+  if (bg.type === 'gradient') return bg.gradientValue ?? bg.value;
+  if (bg.type === 'image')    return bg.imageValue    ?? bg.value;
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Inline background style — Traditional/Scroll sections, cover mode only.
+// Fit-width is handled separately in the render path using an <img> element
+// so that overlays are bounded by the image's natural height, not the section.
 // ---------------------------------------------------------------------------
 function buildInlineStyle(bg: SectionBackground): React.CSSProperties {
   if (bg.type === 'none') return {};
-  if (bg.type === 'color') return { backgroundColor: bg.value };
-  if (bg.type === 'gradient') return { background: bg.value };
-  if (bg.type === 'image' && bg.value) {
+  const v = resolveValue(bg);
+  if (bg.type === 'color') return { backgroundColor: v };
+  if (bg.type === 'gradient') return { background: v };
+  if (bg.type === 'image' && v) {
     return {
-      backgroundImage: `url(${bg.value})`,
+      backgroundImage: `url(${v})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
@@ -70,20 +124,28 @@ function ZoneGrid({ section }: { section: PageSection }) {
       className="relative"
       style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gap: '0' }}
     >
-      {section.zones.map((zone) => (
-        <div
-          key={zone.id}
-          style={{ gridColumn: `span ${zone.span}` }}
-          className={`px-[5%] min-w-0 ${ZONE_SCHEME_CLASSES[zone.scheme ?? 'inherit']}`}
-        >
-          <WidgetSizeProvider size="large">
-            <RichTextContent
-              content={zone.content ? JSON.stringify(zone.content) : ''}
-              className="prose-article prose-page"
-            />
-          </WidgetSizeProvider>
-        </div>
-      ))}
+      {section.zones.map((zone) => {
+        const alignStyle = ZONE_ALIGN_STYLES[zone.align ?? 'start'];
+        const widthClass = ZONE_WIDTH_CLASSES[zone.contentWidth ?? 'full'];
+        const paddingClass = zone.fullBleed ? '' : 'px-[5%]';
+        const schemeClass = ZONE_SCHEME_CLASSES[zone.scheme ?? 'inherit'];
+        return (
+          <div
+            key={zone.id}
+            style={{ gridColumn: `span ${zone.span}`, ...alignStyle }}
+            className={`${paddingClass} min-w-0 ${schemeClass}`}
+          >
+            <div className={widthClass}>
+              <WidgetSizeProvider size="large">
+                <RichTextContent
+                  content={zone.content ? JSON.stringify(zone.content) : ''}
+                  className="prose-article prose-page"
+                />
+              </WidgetSizeProvider>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -93,16 +155,21 @@ function ZoneGrid({ section }: { section: PageSection }) {
 // ---------------------------------------------------------------------------
 interface FixedLayerProps {
   section: PageSection;
-  transition: NonNullable<SectionBackground['transition']>;
+  movement: BgMovement;
+  exit: BgExit;
   zIndex: number;
 }
 
-function FixedBackgroundLayer({ section, transition, zIndex }: FixedLayerProps) {
+function FixedBackgroundLayer({ section, movement, exit, zIndex }: FixedLayerProps) {
   const bg = section.background!;
+  const v = resolveValue(bg);
 
   const baseStyle: React.CSSProperties = {
     position: 'fixed',
-    inset: 0,
+    top: 'var(--header-height, 0px)',
+    left: 0,
+    right: 0,
+    bottom: 0,
     zIndex,
     overflow: 'hidden',
   };
@@ -112,7 +179,7 @@ function FixedBackgroundLayer({ section, transition, zIndex }: FixedLayerProps) 
       <div
         aria-hidden
         data-section-layer={section.id}
-        style={{ ...baseStyle, backgroundColor: bg.value }}
+        style={{ ...baseStyle, backgroundColor: v }}
       />
     );
   }
@@ -122,15 +189,15 @@ function FixedBackgroundLayer({ section, transition, zIndex }: FixedLayerProps) 
       <div
         aria-hidden
         data-section-layer={section.id}
-        style={{ ...baseStyle, background: bg.value }}
+        style={{ ...baseStyle, background: v }}
       >
         {bg.overlay && <OverlayDiv overlay={bg.overlay} />}
       </div>
     );
   }
 
-  if (bg.type === 'image' && bg.value) {
-    if (transition === 'parallax') {
+  if (bg.type === 'image' && v) {
+    if (movement === 'parallax') {
       // Parallax: image and overlay are siblings so transform only moves the image
       return (
         <div aria-hidden data-section-layer={section.id} style={baseStyle}>
@@ -139,9 +206,39 @@ function FixedBackgroundLayer({ section, transition, zIndex }: FixedLayerProps) 
             style={{
               position: 'absolute',
               inset: '-10% 0',  // 20% oversized (10% each side) → prevents black bars
-              backgroundImage: `url(${bg.value})`,
+              backgroundImage: `url(${v})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
+              willChange: 'transform',
+            }}
+          />
+          {bg.overlay && (
+            <div
+              aria-hidden
+              className="absolute inset-0 pointer-events-none"
+              style={
+                bg.overlay.gradient
+                  ? { background: bg.overlay.gradient }
+                  : { backgroundColor: bg.overlay.color, opacity: bg.overlay.opacity }
+              }
+            />
+          )}
+        </div>
+      );
+    }
+
+    if (movement === 'zoom') {
+      // Ken Burns: slow scale animation on the image; overlay stays planted
+      return (
+        <div aria-hidden data-section-layer={section.id} style={{ ...baseStyle, overflow: 'hidden' }}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${v})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              animation: 'aecms-zoom-in 12s ease-in-out infinite alternate',
               willChange: 'transform',
             }}
           />
@@ -167,7 +264,7 @@ function FixedBackgroundLayer({ section, transition, zIndex }: FixedLayerProps) 
         data-section-layer={section.id}
         style={{
           ...baseStyle,
-          backgroundImage: `url(${bg.value})`,
+          backgroundImage: `url(${v})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           willChange: 'opacity, transform, clip-path',
@@ -186,12 +283,27 @@ function FixedBackgroundLayer({ section, transition, zIndex }: FixedLayerProps) 
 // ---------------------------------------------------------------------------
 export function SectionsLayout({ content }: { content: SectionsPageContent }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // Resolve transition for every section (once per render)
-  const resolved = content.sections.map((section) => ({
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem('access_token'));
+  }, []);
+
+  // Filter sections by visibility before any further processing
+  const visibleSections = content.sections.filter((section) => {
+    const v = section.visibility ?? 'public';
+    if (v === 'draft') return false;
+    if (v === 'logged_in' && !isLoggedIn) return false;
+    return true;
+  });
+
+  // Resolve rendering axes for every section (once per render)
+  const resolved = visibleSections.map((section) => ({
     section,
-    transition: resolveTransition(section.background),
-    inFixed: needsFixedStack(section),
+    mode:     resolveMode(section.background),
+    movement: resolveMovement(section.background),
+    exit:     resolveExit(section.background),
+    inFixed:  needsFixedStack(section),
   }));
 
   const fixedEntries = resolved.filter((r) => r.inFixed);
@@ -212,14 +324,17 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
     return () => { document.getElementById(id)?.remove(); };
   }, [content.fontImport]);
 
-  // Scroll-driven animation for fixed background layers
-  useEffect(() => {
+  // Scroll-driven animation for fixed background layers.
+  // useLayoutEffect fires before the browser paints so the initial transform
+  // is applied from frame one — eliminates the one-frame snap on page load.
+  useLayoutEffect(() => {
     if (fixedCount === 0) return;
 
     // Build per-section metadata from DOM
-    const entries = fixedEntries.map(({ section, transition }) => ({
+    const entries = fixedEntries.map(({ section, movement, exit }) => ({
       id: section.id,
-      transition,
+      movement,
+      exit,
       getLayer: () => document.querySelector<HTMLElement>(`[data-section-layer="${section.id}"]`),
       getSpacer: () => document.querySelector<HTMLElement>(`[data-section-spacer="${section.id}"]`),
       getParallaxImage: () => document.querySelector<HTMLElement>(`[data-section-parallax-image="${section.id}"]`),
@@ -240,9 +355,22 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
         // progress: 0 = section at/below viewport top, 1 = section fully scrolled off top
         const progress = Math.max(0, Math.min(1, (scrollY - spacerTop) / spacerHeight));
 
-        switch (entry.transition) {
-          case 'fixed':
-            // Window-pane: snap to hidden after fully scrolled
+        // ── Movement axis (parallax drift on image child) ────────────────
+        if (entry.movement === 'parallax') {
+          const img = entry.getParallaxImage();
+          if (img) {
+            const spacerCenter = spacerTop + spacerHeight / 2;
+            const vpCenter = scrollY + vh / 2;
+            const range = vh / 2 + spacerHeight / 2;
+            const t = Math.max(-1, Math.min(1, (vpCenter - spacerCenter) / range));
+            img.style.transform = `translateY(${-t * 10}%)`;
+          }
+        }
+
+        // ── Exit axis (what happens at the section boundary) ─────────────
+        switch (entry.exit) {
+          case 'none':
+            // Snap cut: layer visible until fully scrolled off, then hidden
             layer.style.opacity = progress >= 1 ? '0' : '1';
             layer.style.transform = '';
             layer.style.clipPath = '';
@@ -277,24 +405,6 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
             layer.style.transform = `translateY(-${progress * 100}%)`;
             layer.style.clipPath = '';
             break;
-
-          case 'parallax': {
-            // Layer itself fades out when spacer fully exits (clean handoff)
-            layer.style.opacity = progress >= 1 ? '0' : '1';
-            layer.style.clipPath = '';
-            layer.style.transform = '';
-
-            // Parallax drift on image only
-            const img = entry.getParallaxImage();
-            if (img) {
-              const spacerCenter = spacerTop + spacerHeight / 2;
-              const vpCenter = scrollY + vh / 2;
-              const range = vh / 2 + spacerHeight / 2;
-              const t = Math.max(-1, Math.min(1, (vpCenter - spacerCenter) / range));
-              img.style.transform = `translateY(${t * 10}%)`;
-            }
-            break;
-          }
         }
       }
     }
@@ -317,11 +427,12 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
   return (
     <div ref={rootRef} className="w-full" style={fontVarStyle}>
       {/* Pass 1 — fixed background stack (earlier section = higher z-index) */}
-      {fixedEntries.map(({ section, transition }, stackIndex) => (
+      {fixedEntries.map(({ section, movement, exit }, stackIndex) => (
         <FixedBackgroundLayer
           key={section.id}
           section={section}
-          transition={transition}
+          movement={movement}
+          exit={exit}
           zIndex={fixedCount - 1 - stackIndex}
         />
       ))}
@@ -330,6 +441,7 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
       {resolved.map(({ section, inFixed }) => {
         const paddingClass = PADDING_CLASSES[section.padding ?? 'normal'];
         const heightStyle = section.minHeight ? { minHeight: section.minHeight } : {};
+        const borderClass = BORDER_CLASSES[section.border ?? 'none'];
 
         if (inFixed) {
           // Transparent scroll spacer — lets fixed layers show through
@@ -337,7 +449,7 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
             <div
               key={section.id}
               data-section-spacer={section.id}
-              className={`relative ${paddingClass}`}
+              className={`relative ${paddingClass} ${borderClass}`}
               style={{ ...heightStyle, background: 'transparent', zIndex: contentZ }}
             >
               <ZoneGrid section={section} />
@@ -345,15 +457,43 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
           );
         }
 
-        // Inline section — normal rendering with background on the section div
         const bg = section.background;
+
+        // Fit-width: render image as a real <img> element so its natural height
+        // defines the geometry, then place the overlay as absolute inset-0 inside
+        // that same wrapper. Zone content flows below. CSS gradients have no
+        // intrinsic height, so a stacked background-image approach cannot constrain
+        // the overlay to the image area — a DOM structure change is required.
+        if (bg?.type === 'image' && bg.imageSize === 'fit-width') {
+          const v = resolveValue(bg);
+          return (
+            <div
+              key={section.id}
+              className={`relative ${borderClass}`}
+              style={{ ...heightStyle, zIndex: contentZ }}
+            >
+              {v && (
+                <div className="relative w-full">
+                  <img src={v} alt="" aria-hidden className="w-full h-auto block" />
+                  {bg.overlay && <OverlayDiv overlay={bg.overlay} />}
+                </div>
+              )}
+              {/* Padding wraps only the zone content, not the image */}
+              <div className={paddingClass}>
+                <ZoneGrid section={section} />
+              </div>
+            </div>
+          );
+        }
+
+        // Standard inline section — background applied as CSS on the section div
         const inlineStyle = bg && bg.type !== 'none' ? buildInlineStyle(bg) : {};
-        const hasOverlay = bg?.overlay != null;
+        const hasOverlay = bg?.overlay != null && bg.type !== 'none';
 
         return (
           <div
             key={section.id}
-            className={`relative ${paddingClass}`}
+            className={`relative ${paddingClass} ${borderClass}`}
             style={{ ...heightStyle, ...inlineStyle, position: 'relative', zIndex: contentZ }}
           >
             {hasOverlay && bg?.overlay && <OverlayDiv overlay={bg.overlay} />}

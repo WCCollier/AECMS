@@ -81,29 +81,50 @@ export interface PageContent {
 }
 
 // Section-based page content (Phase 23)
+export type BgMode     = 'traditional' | 'animated';
+export type BgMovement = 'fixed' | 'parallax' | 'zoom';
+export type BgExit     = 'none' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up';
+
 export interface SectionBackground {
   type: 'none' | 'color' | 'gradient' | 'image';
+
+  // Per-type value fields
+  colorValue?: string;    // hex e.g. "#1a2b3c"
+  gradientValue?: string; // CSS gradient string
+  imageValue?: string;    // /uploads/… or https://… URL
+
+  // ── Rendering mode ────────────────────────────────────────────────────────
+  // 'traditional' (default) — inline on section div, scrolls with content.
+  // 'animated'              — position:fixed slide stack, movement+exit apply.
+  mode?: BgMode;
+
+  // imageSize: only when mode==='traditional' and type==='image'
+  // 'cover' (default) — fills section, crops if needed.
+  // 'fit-width'       — 100% width at natural height, no cropping.
+  imageSize?: 'cover' | 'fit-width';
+
+  // movement: only when mode==='animated'
+  // 'fixed' (default) — background stays planted; content flows over it.
+  // 'parallax'        — image drifts upward at ~50% scroll speed; overlay planted.
+  movement?: BgMovement;
+
+  // exit: only when mode==='animated'
+  // 'none' (default) — snap cut when section exits viewport.
+  // others           — animated transition at the section boundary.
+  exit?: BgExit;
+
+  // ── Deprecated fields (backward-compat read only) ─────────────────────────
+  /** @deprecated Use colorValue/gradientValue/imageValue */
   value?: string;
-  // color    → hex string e.g. "#1a2b3c"
-  // gradient → CSS gradient string e.g. "linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
-  // image    → "media://uuid" or "media://placeholder"
-  /** @deprecated Use `transition` instead. Read-time fallback applied by renderer. */
-  attachment?: 'scroll' | 'fixed' | 'parallax';
-  /** Scroll transition behaviour for this section's background.
-   *  'none' (default) — inline rendering, scrolls naturally with content.
-   *  'fixed'          — fixed in viewport (window-pane), no animation.
-   *  'fade'           — crossfades into section below as spacer exits viewport.
-   *  'wipe-v'         — vertical clip-path wipe.
-   *  'wipe-left'      — lateral clip, reveals from right.
-   *  'wipe-right'     — lateral clip, reveals from left.
-   *  'slide-up'       — translates upward off screen.
-   *  'parallax'       — image drifts at ~50% scroll speed; overlay stays planted.
-   */
+  /** @deprecated Use mode/movement/exit */
   transition?: 'none' | 'fixed' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'parallax';
+  /** @deprecated Use mode */
+  attachment?: 'scroll' | 'fixed' | 'parallax';
+
   overlay?: {
-    color: string;    // hex e.g. "#000000"
-    opacity: number;  // 0–1 (used only when no gradient)
-    gradient?: string; // CSS gradient with alpha stops, e.g. "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 60%)"
+    color: string;
+    opacity: number;
+    gradient?: string;
   };
 }
 
@@ -112,10 +133,23 @@ export type ZoneScheme = 'inherit' | 'light' | 'dark';
 // light — white foreground (for zones on dark backgrounds)
 // dark  — near-black foreground (for zones on light backgrounds)
 
+export type ZoneAlign = 'start' | 'center' | 'end';
+// start (default) — aligns zone content to the top of the grid row
+// center          — vertically centers zone content in the row
+// end             — aligns zone content to the bottom of the row
+
+export type ZoneWidth = 'full' | 'reading' | 'narrow';
+// full    (default) — fills the zone column
+// reading           — max-w-2xl (~672px) centered, for body text
+// narrow            — max-w-lg  (~512px) centered, for captions/CTAs
+
 export interface PageZone {
   id: string;
   span: number;
   scheme?: ZoneScheme;
+  align?: ZoneAlign;
+  contentWidth?: ZoneWidth;
+  fullBleed?: boolean;
   content: object;
 }
 
@@ -125,12 +159,21 @@ export type SectionPadding = 'none' | 'compact' | 'normal' | 'spacious';
 // normal    → py-16 (default body sections)
 // spacious  → py-24 (hero / major transitions)
 
+export type SectionBorder = 'none' | 'top' | 'bottom' | 'both';
+
+export type SectionVisibility = 'public' | 'logged_in' | 'draft';
+// public    (default) — visible to everyone
+// logged_in           — visible only to authenticated users
+// draft               — never rendered in customer-facing view; visible in editor only
+
 export interface PageSection {
   id: string;
   /** Always equals sum(zone.span). Stored for schema consistency; never exposed as a raw input to editors. */
   columns: number;
   minHeight?: string;
   padding?: SectionPadding;
+  border?: SectionBorder;
+  visibility?: SectionVisibility;
   background?: SectionBackground;
   zones: PageZone[];
 }

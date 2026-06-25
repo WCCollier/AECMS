@@ -1,11 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { GripVertical, Plus, Trash2, CopyPlus, Layers } from 'lucide-react';
+import { GripVertical, Plus, Trash2, CopyPlus, Layers, Minus, Sun, Moon, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Maximize2, Eye, EyeOff, Lock } from 'lucide-react';
 import { TipTapEditor } from '@/components/editor/TipTapEditor';
 import { WidgetSizeProvider } from '@/contexts/WidgetSizeContext';
 import { SectionBackgroundPanel } from '@/components/admin/SectionBackgroundPanel';
-import type { PageSection, PageZone, SectionBackground } from '@/types';
+import type { PageSection, PageZone, SectionBackground, ZoneScheme, ZoneAlign, ZoneWidth, SectionBorder, SectionVisibility } from '@/types';
 
 // ── Template definitions ───────────────────────────────────────────────────────
 
@@ -274,6 +274,22 @@ export function SectionEditor({
     }
   }
 
+  function handleZoneSchemeChange(idx: number, scheme: ZoneScheme) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, scheme } : z)) });
+  }
+
+  function handleZoneAlignChange(idx: number, align: ZoneAlign) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, align } : z)) });
+  }
+
+  function handleZoneWidthChange(idx: number, contentWidth: ZoneWidth) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, contentWidth } : z)) });
+  }
+
+  function handleZoneFullBleedToggle(idx: number) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, fullBleed: !z.fullBleed } : z)) });
+  }
+
   function handleZoneContentChange(idx: number, value: string) {
     try {
       const parsed = JSON.parse(value);
@@ -288,8 +304,14 @@ export function SectionEditor({
 
   const heightValue = section.minHeight ?? '';
 
+  const visibility = section.visibility ?? 'public';
+
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div className={`border rounded-lg overflow-hidden ${
+      visibility === 'draft'     ? 'border-border opacity-50' :
+      visibility === 'logged_in' ? 'border-amber-500/40' :
+      'border-border'
+    }`}>
       {/* Section header bar */}
       <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
         {/* Drag handle */}
@@ -358,6 +380,33 @@ export function SectionEditor({
           <option value="100vh">100vh</option>
         </select>
 
+        <select
+          value={section.border ?? 'none'}
+          onChange={(e) => onUpdate({ ...section, border: e.target.value as SectionBorder })}
+          className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
+          title="Section border — adds a ruled divider line above, below, or both"
+        >
+          <option value="none">No border</option>
+          <option value="top">Border top</option>
+          <option value="bottom">Border bottom</option>
+          <option value="both">Border both</option>
+        </select>
+
+        <select
+          value={section.visibility ?? 'public'}
+          onChange={(e) => onUpdate({ ...section, visibility: e.target.value as SectionVisibility })}
+          className={`text-xs px-1.5 py-1 border rounded bg-background cursor-pointer flex-shrink-0 ${
+            (section.visibility ?? 'public') === 'public'
+              ? 'border-border'
+              : 'border-amber-500/60 text-amber-600'
+          }`}
+          title="Section visibility&#10;Public: visible to everyone&#10;Members only: visible to logged-in users&#10;Draft: invisible to all visitors (editor only)"
+        >
+          <option value="public">👁 Public</option>
+          <option value="logged_in">🔒 Members only</option>
+          <option value="draft">✎ Draft</option>
+        </select>
+
         {canDelete && (
           <button
             type="button"
@@ -386,13 +435,87 @@ export function SectionEditor({
             style={{ gridColumn: `span ${zone.span}` }}
             className="min-w-0 relative group"
           >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-foreground/25 select-none">Span {zone.span}</span>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+            <div className="flex items-center justify-between mb-1 gap-1 flex-wrap">
+              <span className="text-[10px] text-foreground/25 select-none flex-shrink-0">Span {zone.span}</span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {/* Text scheme */}
+                {([
+                  { value: 'inherit' as ZoneScheme, icon: <Minus className="w-3 h-3" />, title: 'Auto text colour — follows site scheme' },
+                  { value: 'light'   as ZoneScheme, icon: <Sun   className="w-3 h-3" />, title: 'Light text — use on dark backgrounds' },
+                  { value: 'dark'    as ZoneScheme, icon: <Moon  className="w-3 h-3" />, title: 'Dark text — use on light backgrounds' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleZoneSchemeChange(idx, opt.value)}
+                    title={opt.title}
+                    className={`p-0.5 rounded transition-colors ${
+                      (zone.scheme ?? 'inherit') === opt.value
+                        ? 'text-accent'
+                        : 'text-foreground/25 hover:text-foreground/60'
+                    }`}
+                  >
+                    {opt.icon}
+                  </button>
+                ))}
+
+                <span className="w-px h-3 bg-border flex-shrink-0" />
+
+                {/* Vertical alignment */}
+                {([
+                  { value: 'start'  as ZoneAlign, icon: <AlignStartVertical  className="w-3 h-3" />, title: 'Align content to top of row' },
+                  { value: 'center' as ZoneAlign, icon: <AlignCenterVertical className="w-3 h-3" />, title: 'Center content vertically in row' },
+                  { value: 'end'    as ZoneAlign, icon: <AlignEndVertical    className="w-3 h-3" />, title: 'Align content to bottom of row' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleZoneAlignChange(idx, opt.value)}
+                    title={opt.title}
+                    className={`p-0.5 rounded transition-colors ${
+                      (zone.align ?? 'start') === opt.value
+                        ? 'text-accent'
+                        : 'text-foreground/25 hover:text-foreground/60'
+                    }`}
+                  >
+                    {opt.icon}
+                  </button>
+                ))}
+
+                <span className="w-px h-3 bg-border flex-shrink-0" />
+
+                {/* Content max-width */}
+                <select
+                  value={zone.contentWidth ?? 'full'}
+                  onChange={(e) => handleZoneWidthChange(idx, e.target.value as ZoneWidth)}
+                  className="text-[10px] h-5 px-1 border border-border rounded bg-background cursor-pointer"
+                  title="Content width — constrains text inside the zone&#10;Full: fills the column&#10;Reading: ~672px centered (body text)&#10;Narrow: ~512px centered (captions, CTAs)"
+                >
+                  <option value="full">Full</option>
+                  <option value="reading">Reading</option>
+                  <option value="narrow">Narrow</option>
+                </select>
+
+                {/* Full-bleed toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleZoneFullBleedToggle(idx)}
+                  title="Full bleed — removes side padding for edge-to-edge content"
+                  className={`p-0.5 rounded transition-colors ${
+                    zone.fullBleed
+                      ? 'text-accent'
+                      : 'text-foreground/25 hover:text-foreground/60'
+                  }`}
+                >
+                  <Maximize2 className="w-3 h-3" />
+                </button>
+
+                <span className="w-px h-3 bg-border flex-shrink-0" />
+
                 <button
                   type="button"
                   onClick={() => handleSplitZone(idx)}
-                  className="text-foreground/40 hover:text-foreground/70 flex items-center gap-0.5"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground/25 hover:text-foreground/60"
                   title="Split zone"
                 >
                   <CopyPlus className="w-3 h-3" />

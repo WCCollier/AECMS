@@ -356,6 +356,24 @@ export function TipTapEditor({
           <option value="wider">Wider</option>
         </select>
 
+        {/* Inline text color */}
+        <div className="flex items-center gap-0.5" title="Text color">
+          <input
+            type="color"
+            value={editor.getAttributes('textStyle').color ?? '#000000'}
+            onChange={(e) => {
+              editor.chain().focus().setMark('textStyle', { color: e.target.value }).run();
+            }}
+            className="w-6 h-6 p-0.5 border border-border rounded cursor-pointer bg-background"
+          />
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().setMark('textStyle', { color: null }).run()}
+            className="text-[10px] text-foreground/40 hover:text-foreground leading-none px-0.5"
+            title="Clear text color"
+          >×</button>
+        </div>
+
         {/* Per-run font family — draws from curated library */}
         <select
           value={editor.getAttributes('textStyle').fontFamily ?? ''}

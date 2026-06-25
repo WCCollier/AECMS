@@ -4,18 +4,70 @@ import React, { useState, useEffect } from 'react';
 import { Save, Loader2, ChevronDown } from 'lucide-react';
 import type { MulSettings } from '../mul-converter.types';
 
-const TEXT_PROVIDERS = [
-  { value: 'anthropic', label: 'Anthropic', defaultModel: 'claude-sonnet-4-6' },
-  { value: 'openai',    label: 'OpenAI',    defaultModel: 'gpt-4o' },
-  { value: 'xai',       label: 'xAI (Grok)', defaultModel: 'grok-4' },
+type ModelOption = { value: string; label: string };
+
+const TEXT_PROVIDERS: { value: string; label: string; models: ModelOption[] }[] = [
+  {
+    value: 'anthropic', label: 'Anthropic',
+    models: [
+      { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 — Recommended' },
+      { value: 'claude-opus-4-8',           label: 'Claude Opus 4.8 — Most capable' },
+      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — Fastest' },
+    ],
+  },
+  {
+    value: 'openai', label: 'OpenAI',
+    models: [
+      { value: 'gpt-4o',       label: 'GPT-4o — Recommended' },
+      { value: 'gpt-4o-mini',  label: 'GPT-4o Mini — Fast' },
+      { value: 'gpt-4.1',      label: 'GPT-4.1' },
+      { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+      { value: 'o3',           label: 'o3 — Reasoning' },
+      { value: 'o4-mini',      label: 'o4-mini — Reasoning, fast' },
+    ],
+  },
+  {
+    value: 'xai', label: 'xAI (Grok)',
+    models: [
+      { value: 'grok-4',      label: 'Grok 4 — Recommended' },
+      { value: 'grok-3',      label: 'Grok 3' },
+      { value: 'grok-3-mini', label: 'Grok 3 Mini — Fast' },
+    ],
+  },
 ];
 
-const IMAGE_PROVIDERS = [
-  { value: '',          label: 'Disabled' },
-  { value: 'openai',   label: 'OpenAI',         defaultModel: 'gpt-image-1' },
-  { value: 'xai',      label: 'xAI (Aurora)',   defaultModel: 'grok-imagine-image-quality' },
-  { value: 'flux',     label: 'Flux (fal.ai)',   defaultModel: 'flux-kontext-pro' },
-  { value: 'stability',label: 'Stability AI',    defaultModel: 'stable-diffusion-xl-1024-v1-0' },
+const IMAGE_PROVIDERS: { value: string; label: string; models?: ModelOption[] }[] = [
+  { value: '', label: 'Disabled' },
+  {
+    value: 'openai', label: 'OpenAI',
+    models: [
+      { value: 'gpt-image-1', label: 'GPT Image 1' },
+    ],
+  },
+  {
+    value: 'xai', label: 'xAI (Aurora)',
+    models: [
+      { value: 'grok-imagine-image-quality', label: 'Aurora — Quality' },
+      { value: 'grok-imagine-image-speed',   label: 'Aurora — Speed' },
+    ],
+  },
+  {
+    value: 'flux', label: 'Flux (fal.ai)',
+    models: [
+      { value: 'fal-ai/flux/schnell',  label: 'FLUX Schnell — Fastest' },
+      { value: 'fal-ai/flux/dev',      label: 'FLUX Dev — Quality' },
+      { value: 'fal-ai/flux-pro',      label: 'FLUX Pro — Best quality' },
+      { value: 'flux-kontext-pro',     label: 'FLUX Kontext Pro — Editing' },
+    ],
+  },
+  {
+    value: 'stability', label: 'Stability AI',
+    models: [
+      { value: 'stable-image-ultra',            label: 'Stable Image Ultra — Best' },
+      { value: 'stable-image-core',             label: 'Stable Image Core' },
+      { value: 'stable-diffusion-xl-1024-v1-0', label: 'SDXL 1.0' },
+    ],
+  },
 ];
 
 interface Props {
@@ -32,23 +84,24 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
   const [textModel, setTextModel] = useState(settings['mul.text_model'] || 'claude-sonnet-4-6');
   const [textKey, setTextKey] = useState('');
 
-  const [imageEnabled, setImageEnabled] = useState(Boolean(settings['mul.image_provider']));
-  const [imageProvider, setImageProvider] = useState(settings['mul.image_provider'] || '');
+  const [imageProvider, setImageProvider] = useState(
+    settings['mul.image_provider'] === 'disabled' ? '' : (settings['mul.image_provider'] || ''),
+  );
   const [imageModel, setImageModel] = useState(settings['mul.image_model'] || '');
   const [imageKey, setImageKey] = useState('');
   const [referenceMode, setReferenceMode] = useState(settings['mul.image_reference_mode'] === 'reference');
 
   useEffect(() => {
     const def = TEXT_PROVIDERS.find((p) => p.value === textProvider);
-    if (def && !textModel) setTextModel(def.defaultModel);
+    if (def && !textModel) setTextModel(def.models[0]?.value ?? '');
   }, [textProvider]);
 
   useEffect(() => {
-    if (imageEnabled && imageProvider) {
+    if (imageProvider) {
       const def = IMAGE_PROVIDERS.find((p) => p.value === imageProvider);
-      if (def?.defaultModel && !imageModel) setImageModel(def.defaultModel);
+      if (def?.models?.length && !imageModel) setImageModel(def.models[0].value);
     }
-  }, [imageProvider, imageEnabled]);
+  }, [imageProvider]);
 
   const sameProvider = textProvider === imageProvider && Boolean(imageProvider);
 
@@ -57,8 +110,8 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
     const updates: Record<string, string> = {
       'mul.text_provider': textProvider,
       'mul.text_model': textModel,
-      'mul.image_provider': imageEnabled ? imageProvider : '',
-      'mul.image_model': imageEnabled ? imageModel : '',
+      'mul.image_provider': imageProvider,
+      'mul.image_model': imageModel,
       'mul.image_reference_mode': referenceMode ? 'reference' : 'brief-only',
     };
 
@@ -115,7 +168,7 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
                       key={p.value}
                       onClick={() => {
                         setTextProvider(p.value);
-                        setTextModel(p.defaultModel);
+                        setTextModel(p.models[0]?.value ?? '');
                       }}
                       className={`px-3 py-1.5 text-xs rounded border transition-colors ${
                         textProvider === p.value
@@ -130,13 +183,15 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
               </div>
               <div>
                 <label className="text-xs text-muted mb-1 block">Model</label>
-                <input
-                  type="text"
+                <select
                   value={textModel}
                   onChange={(e) => setTextModel(e.target.value)}
-                  placeholder="e.g. claude-sonnet-4-6"
-                  className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
-                />
+                  className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:border-accent"
+                >
+                  {(TEXT_PROVIDERS.find((p) => p.value === textProvider)?.models ?? []).map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs text-muted mb-1 block">API Key</label>
@@ -153,19 +208,10 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
 
           {/* Image Generation group */}
           <div>
-            <div className="flex items-center gap-3 mb-3">
-              <h3 className="text-xs font-semibold text-muted uppercase tracking-wide">Image Generation</h3>
-              <button
-                onClick={() => setImageEnabled(!imageEnabled)}
-                className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${imageEnabled ? 'bg-accent' : 'bg-border'}`}
-              >
-                <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${imageEnabled ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-              </button>
-              {imageEnabled && <span className="text-xs text-accent">Enabled</span>}
-            </div>
+            <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-3">Image Generation</h3>
+            <p className="text-xs text-muted mb-3">Configure a provider here. Use the toggle next to Analyze to enable/disable per run.</p>
 
-            {imageEnabled && (
-              <div className="space-y-3">
+            <div className="space-y-3">
                 <div>
                   <label className="text-xs text-muted mb-1 block">Provider</label>
                   <div className="flex flex-wrap gap-2">
@@ -174,7 +220,7 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
                         key={p.value}
                         onClick={() => {
                           setImageProvider(p.value);
-                          setImageModel(p.defaultModel ?? '');
+                          setImageModel(p.models?.[0]?.value ?? '');
                         }}
                         className={`px-3 py-1.5 text-xs rounded border transition-colors ${
                           imageProvider === p.value
@@ -189,13 +235,15 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
                 </div>
                 <div>
                   <label className="text-xs text-muted mb-1 block">Model</label>
-                  <input
-                    type="text"
+                  <select
                     value={imageModel}
                     onChange={(e) => setImageModel(e.target.value)}
-                    placeholder="e.g. gpt-image-1"
-                    className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
-                  />
+                    className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground focus:outline-none focus:border-accent"
+                  >
+                    {(IMAGE_PROVIDERS.find((p) => p.value === imageProvider)?.models ?? []).map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
                 </div>
                 {!sameProvider && imageProvider && (
                   <div>
@@ -245,7 +293,6 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
                   )}
                 </p>
               </div>
-            )}
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-border">

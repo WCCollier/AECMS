@@ -152,20 +152,67 @@ interface PageZone {
 
 interface SectionBackground {
   type: 'none' | 'color' | 'gradient' | 'image';
+
+  // Per-type value fields (preferred over deprecated `value` below)
+  colorValue?: string;    // hex, e.g. "#1a2b3c"
+  gradientValue?: string; // CSS gradient string
+  imageValue?: string;    // /uploads/… or https://… URL; "media://placeholder" for AI scaffolds
+
+  /** @deprecated — pre-Part-3 single value field; use colorValue/gradientValue/imageValue */
   value?: string;
-    // type 'color'    → hex string, e.g. "#1a2b3c"
-    // type 'gradient' → CSS gradient string, e.g. "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)"
-    //                   Any valid CSS gradient expression is accepted.
-    // type 'image'    → "media://uuid" for a Media Library asset, or
-    //                   "media://placeholder" for an AI-generated slot the owner will fill
-  attachment?: 'scroll' | 'fixed' | 'parallax';  // only meaningful for 'image'
+
+  // ── Rendering mode (two-tier model, replaces deprecated `transition`) ──────
+
+  mode?: 'traditional' | 'animated';
+    // 'traditional' (default) — background is set as an inline CSS property on the
+    //   section div and scrolls naturally with content. No fixed-position stack is engaged.
+    //   Broadest browser compatibility. imageSize sub-option applies here.
+    // 'animated' — background is rendered as a position:fixed layer in a stacked slide
+    //   system. movement and exit sub-fields control the two independent animation axes.
+    //   Only sections with mode:'animated' participate in the fixed-position stack.
+
+  imageSize?: 'cover' | 'fit-width';
+    // Only meaningful when mode === 'traditional' and type === 'image'.
+    // 'cover'     (default) — scales to fill the section, crops if needed.
+    // 'fit-width' — 100% width at natural height, no cropping. Use for sections that
+    //               grow dynamically (e.g. infinite-scroll feeds) where cover would
+    //               rescale the background image as height increases.
+
+  movement?: 'fixed' | 'parallax';
+    // Only meaningful when mode === 'animated'.
+    // How the background slide behaves while it occupies the viewport.
+    // 'fixed'    (default) — background stays planted; content scrolls over it (window-pane).
+    // 'parallax' — image drifts upward at ~50% scroll speed; overlay stays planted.
+    //              Image is oversized 20% top/bottom to prevent black bars at drift extremes.
+
+  exit?: 'none' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up';
+    // Only meaningful when mode === 'animated'.
+    // How the background slide gives way when the section boundary crosses the viewport.
+    // 'none'       (default) — snap cut; layer opacity snaps to 0 once section exits.
+    // 'fade'       — composite dissolves out, revealing the next slide beneath.
+    // 'wipe-v'     — vertical clip-path wipe upward.
+    // 'wipe-left'  — clip wipe from the right edge.
+    // 'wipe-right' — clip wipe from the left edge.
+    // 'slide-up'   — composite translates upward off screen.
+    // movement and exit are fully independent: any movement value can be combined
+    // with any exit value (e.g. Parallax + Fade, Fixed + Wipe ↓).
+
+  /** @deprecated — pre-Part-3 single transition field; see mode/movement/exit above */
+  transition?: 'none' | 'fixed' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'parallax';
+  /** @deprecated — pre-Part-3 attachment field; use mode instead */
+  attachment?: 'scroll' | 'fixed' | 'parallax';
+
   overlay?: {
-    color: string;    // hex color for the scrim, e.g. "#000000"
-    opacity: number;  // 0–1; typical values 0.3–0.6
+    color: string;      // hex color for the scrim, e.g. "#000000"
+    opacity: number;    // 0–1; typical values 0.3–0.6; ignored when gradient is set
+    gradient?: string;  // CSS gradient string; when set, alpha is baked into stops
   };
-    // overlay renders as a semi-transparent layer between the background and the zone content.
+    // overlay renders as a semi-transparent layer between the background and zone content.
     // Essential for image + light-text combinations (the classic hero pattern).
-    // Works with all background types but is most useful with 'image' and 'gradient'.
+    // In animated mode: overlay is a child of the background composite so it rides
+    // with the exit transition as a single inseparable unit (no synchronization needed).
+    // In parallax mode: overlay is a sibling of the image div so it stays planted
+    // while the image drifts, preserving gradient legibility over zone text.
 }
 
 interface PageSection {
@@ -1015,22 +1062,90 @@ The overlay div is a child of the background composite layer — not a sibling a
 
 **Parallax exception.** For `transition: 'parallax'`, the image drifts at ~50% scroll speed while the overlay must remain planted (otherwise the gradient shifts relative to the zone text, breaking legibility). Image and overlay are siblings inside the fixed layer; `transform` is applied only to the image div. The image is oversized by 20% top/bottom to prevent black bars at drift extremes.
 
-### `background.transition` vocabulary
+### Background rendering model: two-tier architecture
 
-`attachment` is **removed entirely** from `SectionBackground`. With the fixed-position background stack all backgrounds are viewport-fixed by architecture — the field has no remaining meaning. `'parallax'` was previously a value on `attachment`; it moves to `transition`. Read-time fallback: stored `attachment: 'parallax'` → `transition: 'parallax'`; all other `attachment` values silently ignored. The schema references to `attachment` in Part 1 and Part 2 sections of this document reflect the pre-Part-3 schema and should be treated as superseded.
+The background system has two fundamentally different rendering paths, reflected as a top-level `mode` field:
 
-The fixed-position stack is opt-in — only engaged when `transition !== 'none'`.
+**Traditional (`mode: 'traditional'`)** — background is set as an inline CSS property directly on the section `<div>`. The section scrolls as normal page content. No fixed-position stack is engaged. This is the default and has the broadest browser compatibility. The `imageSize` sub-option (Cover / Fit Width) applies here.
 
-| Value | Rendering | Visual effect | Best use |
+**Animated (`mode: 'animated'`)** — background is rendered as a `position: fixed` layer in a stacked slide system (z-ordered so earlier sections sit above later ones). A scroll listener drives all animation. Only sections with `mode: 'animated'` participate in the fixed stack. The section itself renders as a transparent scroll spacer; the fixed layer provides the visual.
+
+The fixed-position stack is **opt-in** — only engaged when `mode === 'animated'`.
+
+#### Animated sub-axes: movement and exit
+
+Animated backgrounds have two fully independent axes:
+
+**Movement** — how the slide behaves while the section occupies the viewport:
+
+| Value | Behaviour | Best use |
+|---|---|---|
+| `'fixed'` (default) | Background stays planted; content scrolls over it (window-pane) | Subtle depth without motion |
+| `'parallax'` | Image drifts upward at ~50% scroll speed; overlay stays planted | Photography-forward, depth aesthetics |
+
+**Exit** — how the slide gives way when the section boundary crosses the viewport:
+
+| Value | Behaviour | Best use |
+|---|---|---|
+| `'none'` (default) | Snap cut — layer opacity snaps to 0 once section exits | Clean cut between slides |
+| `'fade'` | Composite dissolves out, revealing next slide beneath | Hero image sections; smooth dissolves |
+| `'wipe-v'` | Vertical clip-path wipe upward | Structured, editorial transitions |
+| `'wipe-left'` | Clip wipe from the right edge | Alternating image+text, magazine style |
+| `'wipe-right'` | Clip wipe from the left edge | Reverse magazine alternation |
+| `'slide-up'` | Composite translates upward off screen | Motion-heavy, scroll-storytelling |
+
+Any movement value can be combined with any exit value. Examples:
+- `Fixed + Fade` — planted background dissolves to next (most common animated combo)
+- `Parallax + Fade` — drifting image dissolves at boundary
+- `Fixed + Wipe ↓` — planted background clips away vertically
+- `Parallax + None` — drift while displayed, snap cut at boundary
+
+#### Backward-compat mapping from deprecated `transition` field
+
+Existing sections saved with the old single `transition` field are read-time migrated:
+
+| Old `transition` | New `mode` | New `movement` | New `exit` |
 |---|---|---|---|
-| `'none'` (default) | Inline on section div | Background scrolls naturally with content | Normal web behaviour; plain sites |
-| `'fixed'` | Fixed stack, no exit animation | Content scrolls over planted background (window-pane). Replaces old `attachment: 'fixed'` | Subtle depth without motion |
-| `'fade'` | Fixed stack | Composite dissolves into section below | Hero image sections; default for image backgrounds |
-| `'wipe-v'` | Fixed stack | Vertical clip wipe upward | Structured transitions |
-| `'wipe-left'` | Fixed stack | Clips left, reveals next from right | Alternating image+text, magazine style |
-| `'wipe-right'` | Fixed stack | Clips right, reveals next from left | Reverse magazine alternation |
-| `'slide-up'` | Fixed stack | Composite translates upward off screen | Motion-heavy, scroll-storytelling |
-| `'parallax'` | Fixed stack | Image drifts at ~50% scroll speed; overlay planted | Photography-forward, depth aesthetics |
+| `'none'` | `'traditional'` | — | — |
+| `'fixed'` | `'animated'` | `'fixed'` | `'none'` |
+| `'parallax'` | `'animated'` | `'parallax'` | `'none'` |
+| `'fade'` | `'animated'` | `'fixed'` | `'fade'` |
+| `'wipe-v'` | `'animated'` | `'fixed'` | `'wipe-v'` |
+| `'wipe-left'` | `'animated'` | `'fixed'` | `'wipe-left'` |
+| `'wipe-right'` | `'animated'` | `'fixed'` | `'wipe-right'` |
+| `'slide-up'` | `'animated'` | `'fixed'` | `'slide-up'` |
+
+Old `attachment: 'parallax'` → `mode: 'animated'`, `movement: 'parallax'`, `exit: 'none'`. All other `attachment` values are silently ignored (they had no remaining meaning once the fixed stack was introduced in Part 3).
+
+### SectionBackgroundPanel UI flow (Transition sub-section)
+
+The Transition sub-section of the panel has three visually separated groups:
+
+```
+── Traditional ──────────────────────
+  [Scroll ↕]  (+ Cover/Fit Width sub-option when type=image)
+
+── Animated ─────────────────────────
+  Movement:  [Fixed ⬛]  [Parallax 〰]
+  Exit:      [None]  [Fade ◐]  [Wipe ↓ ▽]  [Wipe ← ◁]  [Wipe → ▷]  [Slide ↑ ⬆]
+```
+
+**Selection flow:**
+
+1. **Default state**: Scroll (Traditional) is highlighted. Movement and Exit pickers show all options unselected (visible but no highlight — communicates "not active" without hiding information).
+
+2. **Switching to Animated**: clicking any Movement or Exit option atomically:
+   - Removes Scroll's highlight
+   - Highlights the clicked option
+   - Auto-selects the default in the *other* picker if nothing is chosen there: `movement` defaults to `'fixed'`, `exit` defaults to `'none'`
+   - One click always produces a complete, valid animated profile
+
+3. **Switching back to Traditional**: clicking Scroll:
+   - Removes all Movement/Exit highlights
+   - Sets `mode: 'traditional'`
+   - Does **not** discard the current `movement`/`exit` values from local panel state
+
+4. **Session restore**: if the user switches Traditional → Animated → Traditional → Animated again within a single panel open/close cycle, the previous `movement` and `exit` selections are restored from local React state (`useState` initialized from the saved background if an animated profile exists, otherwise cold defaults of `fixed + none`). This state is not persisted beyond the panel's React lifecycle — closing and reopening the panel re-initializes from whatever `mode` is saved in the page data.
 
 ### Gradient overlay patterns
 
@@ -1069,18 +1184,66 @@ Library detection is by data-attribute and class-name fingerprint — no script 
 
 The system prompt teaches the model to map `AnimationSignals` to transition and overlay choices — **semantic equivalence, not literal CSS replication**:
 
-- `hasFixedBackground` or `motionClassNames` contains `"parallax"` → `transition: 'parallax'`
-- `libraryFingerprints` contains `"aos"`, `"framer-motion"`, or `"locomotive"` → `transition: 'fade'` (these libraries predominantly use opacity reveals)
-- `libraryFingerprints` contains `"gsap"` → `transition: 'slide-up'` (GSAP commonly animates translateY)
-- DOM shows alternating image+text pairs → alternate `'wipe-left'` / `'wipe-right'`
-- Photography-forward page, no specific signal → `transition: 'fade'`
-- No motion signals, structural/editorial layout → `transition: 'fixed'` (planted background with scrolling content) or `transition: 'none'` (background scrolls with content — use for simple/light sites)
-- Simple informational page, minimal visual design → `transition: 'none'`
+- `hasFixedBackground` or `motionClassNames` contains `"parallax"` → `mode: 'animated'`, `movement: 'parallax'`, `exit: 'none'`
+- `libraryFingerprints` contains `"aos"`, `"framer-motion"`, or `"locomotive"` → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'fade'` (these libraries predominantly use opacity reveals)
+- `libraryFingerprints` contains `"gsap"` → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'slide-up'` (GSAP commonly animates translateY)
+- DOM shows alternating image+text pairs → alternate `exit: 'wipe-left'` / `'wipe-right'`, `movement: 'fixed'`
+- Photography-forward page, no specific signal → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'fade'`
+- No motion signals, structural/editorial layout → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'none'` (planted background, snap cut) or `mode: 'traditional'` (scrolls with content — use for simple/light sites)
+- Simple informational page, minimal visual design → `mode: 'traditional'`
 - `overlayGradients` non-empty → adopt detected gradient direction and alpha
 - Hero section with image background and zone heading → bottom vignette gradient overlay by default
 - Full-zone body text → solid overlay at 0.4–0.6 opacity
 - Decorative / no zone text → no overlay
-- Any image background with `transition !== 'none'` → `minHeight: "60vh"`
+- Any image background with `mode: 'animated'` → `minHeight: "60vh"`
+
+---
+
+## System Prompt Architecture
+
+### Approach
+
+The Mul Converter system prompt is composed from a set of named TypeScript files in `backend/src/mul-converter/prompts/`. Each file exports a string constant covering one logical section of the prompt. `buildSystemPrompt()` in `system-prompt.ts` imports and concatenates these constants, then appends the dynamic image-generation sections inline (those sections are conditional on `hasImages` / `nativeMode` flags and cannot be static prose).
+
+**The PRD is the single source of truth** for sections 2–5. Each prompt file carries a header comment citing the specific PRD section it describes. When the page builder schema or aesthetic vocabulary changes:
+
+1. Update the PRD first (this file, the relevant section)
+2. Use a frontier LLM to diff the affected prompt file(s) against the updated PRD section and produce a revised prompt
+3. Review and commit the updated prompt file alongside the code change
+
+This is preferable to auto-generating prompt prose from TypeScript types because the prompt files contain *interpretive* content — semantic mappings, constraint explanations, combination guidance — that cannot be derived mechanically from the type system.
+
+**Why not the DB?** The structural sections (schema, constraints, signal mapping) are tightly coupled to the codebase. A mistaken DB edit would silently break every Mul Converter run until noticed. These are load-bearing infrastructure and belong under version control. The optional `mul.system_context` ISM key (owner-settable from Admin Settings) covers the subjective layer — brand voice, design preferences, site-specific aesthetic guidance — without touching the structural sections.
+
+**Why not individual code files as the source of truth?** The mapping from prompt sections to code files is unstable. A new aesthetic feature (e.g. `textShadow`) might touch `types/index.ts`, a renderer, a panel component, and a CSS utility — none of which is the single authoritative description of the capability. The PRD describes capabilities at the right abstraction level; code files describe implementation details.
+
+### Prompt file inventory
+
+| File | PRD source | Content |
+|---|---|---|
+| `prompts/01-role.prompt.ts` | § "What we need" | Role statement, task definition |
+| `prompts/02-palette-schema.prompt.ts` | § "Color palette schema" | 10-slot palette, color rules |
+| `prompts/03-page-schema.prompt.ts` | § "Page layout system", § "Background rendering model" | Section/zone/TipTap schema, `mode`/`movement`/`exit` vocabulary |
+| `prompts/04-aesthetic-tools.prompt.ts` | § "Aesthetic tools" in system prompt design | Padding, overlay, zone scheme, fonts, alignment, drop caps, labels |
+| `prompts/05-signal-mapping.prompt.ts` | § "SectionBackgroundPanel UI flow", § AnimationSignals decision tree | `AnimationSignals` → `mode`/`movement`/`exit` two-axis decision tree |
+
+Dynamic sections (image briefs, native image generation) are inline in `system-prompt.ts` because they are conditional on runtime flags and contain model-specific template values.
+
+### LLM sync workflow
+
+When a schema or behavior change is made:
+
+```
+1. Edit the PRD section that describes the changed capability
+2. Run:
+   "Here is the updated PRD section: <paste>
+    Here is the current prompt file: <paste>
+    Update the prompt file to match the PRD. Preserve tone and structure;
+    only change what the PRD says has changed."
+3. Review output, commit both the PRD change and the prompt file update together
+```
+
+The prompt file header comment makes step 2 self-documenting — it always points to the exact PRD section to paste.
 
 ---
 
@@ -1094,3 +1257,4 @@ The system prompt teaches the model to map `AnimationSignals` to transition and 
 - **Section responsive overrides**: Per-section `collapseBelow` setting to control at which breakpoint columns collapse — for cases where a 2-column section should remain 2-column on tablet.
 - **Human editor controls for AI properties**: UI controls in the section editor for gradient backgrounds, overlay opacity, zone scheme, drop caps, letter spacing, and text transform. These properties are handled by the renderer and steward-preserved by the editor in v1 but have no explicit controls. Add incrementally.
 - **Freeform canvas positioning**: Absolute x/y placement of blocks. Requires a full breakpoint system to remain responsive; out of scope for AECMS's lightweight positioning as a CMS, not a visual builder.
+- **Multi-layer section backgrounds** (Phase 28): `background` becomes `backgrounds: SectionBackground[]` — an ordered array of layers, each with its own `mode`/`movement`/`exit` axes, image/color/gradient, overlay, and drift rate. The fixed-position stack already accommodates multiple layers per section architecturally; the data model and scroll handler iteration are the only structural changes. Enables: multi-depth parallax (base color + texture PNG at 0.3× drift + cut-out foreground at 0.7× drift), simultaneous opposing exits (two layers wipe in opposite directions at the boundary), and transparent PNG cut-outs compositing over subsequent sections' backgrounds through the z-ordered stack. Panel UI: collapsed accordion per layer, "Add Layer" button at the bottom, same Background/Overlay/Transition sub-sections per card. Full plan: `docs/phases/PHASE_28_PLAN.md`.

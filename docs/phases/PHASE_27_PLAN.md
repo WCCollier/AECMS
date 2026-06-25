@@ -140,14 +140,31 @@ Use the W3C luminance formula (no external library needed — ~10 lines of math)
 - If file contains inline palette: show checkbox "Also import palette '{name}'" (default checked)
 - `POST /templates` to create template record; optionally `PATCH /settings/appearance` to add palette
 
-### L — Mul Converter ActionBar integration
+### L — Custom font management
+
+Location: `frontend/app/admin/settings/appearance/AppearanceClient.tsx` (new "Fonts" sub-section, below Palettes)
+
+**Problem:** `frontend/lib/fonts.ts` ships with 6 hardcoded Google Font pairings. There is no runtime UI to add new pairings, so users who want a font not in the curated list must edit source code, and the Mul Converter can only output fonts from the static list.
+
+**Add a custom font entry form:**
+- "Add Font Pairing" button → inline form
+- Fields: Display name, Google Fonts URL (the `<link>` href — user copies from fonts.google.com), Heading family (CSS `font-family` value), Body family (CSS `font-family` value)
+- Live preview: inject the URL into a `<link>` tag, render a sample sentence in the specified families
+- Save → appends to `appearance.custom_fonts` ISM key (JSON array of `FontEntry`-shaped objects, without `isSystem`)
+- Persisted custom fonts are merged with `CURATED_FONTS` everywhere both pickers draw from (Page Font Picker + TipTap per-run dropdown)
+
+**Storage:** `appearance.custom_fonts` — JSON array in `SiteSettings`, same mechanism as `appearance.custom_palettes`. No new backend model or endpoint required; uses existing `PATCH /settings/appearance`.
+
+**Mul Converter integration:** The system prompt's font guidance (§ "Page schema") is updated to describe that the AI may specify either a curated font id or a custom `FontEntry` object. When the converter outputs a custom font, the ActionBar "Save" flow appends it to `appearance.custom_fonts` before saving the page — same non-fatal pattern as palette save.
+
+### M — Mul Converter ActionBar integration
 
 - Add "Save as Template" checkbox to `ActionBar.tsx` (default unchecked)
 - When checked + Save Both / Create Page fires:
   - After page creation, `POST /templates` with result's sections, result's palette id (if palette was saved), and the Mul's `suggestedTitle` as template name
   - Non-fatal: template save failure doesn't roll back page creation
 
-### M — CLAUDE.md + completion report
+### N — CLAUDE.md + completion report
 
 - Add Phase 27 entry to CLAUDE.md status list
 - Link PRD in docs table
@@ -157,9 +174,10 @@ Use the W3C luminance formula (no external library needed — ~10 lines of math)
 
 ## Sequencing notes
 
-- **A–C** (backend) are prerequisites for H–L; can be built independently of D–G
+- **A–C** (backend) are prerequisites for H–M; can be built independently of D–G and L
 - **D–G** (manual palette + export/import) have zero backend dependencies — can ship first as a standalone increment if desired
-- **H–L** all depend on A–C
-- **L** depends on H (both use `POST /templates`)
+- **H–M** all depend on A–C
+- **L** (custom fonts) has zero backend dependencies — same standalone profile as D–G
+- **M** depends on H (both use `POST /templates`)
 
-The D–G cluster is small enough to consider shipping before the template infrastructure is ready — it completes the palette story started by the Mul Converter and has real standalone value.
+The D–G + L cluster (palette editor + custom fonts) is small enough to ship before the template infrastructure is ready — it completes the design-system story started by the Mul Converter and has real standalone value.

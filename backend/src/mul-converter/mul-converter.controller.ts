@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Patch,
   Post,
   Request,
@@ -21,6 +22,7 @@ import { UpdateSettingsDto } from '../settings/dto/update-settings.dto';
 @RequiresCapability('mul.convert')
 @Controller('mul')
 export class MulConverterController {
+  private readonly logger = new Logger(MulConverterController.name);
   constructor(private readonly mulService: MulConverterService) {}
 
   @Get('settings')
@@ -38,10 +40,18 @@ export class MulConverterController {
 
   @Post('analyze')
   @ApiOperation({ summary: 'Analyze a URL and return palette + page scaffold' })
-  async analyze(@Body() body: { url: string }, @Request() req: any) {
+  async analyze(@Body() body: { url: string; generateImages?: boolean }, @Request() req: any) {
+    this.logger.log(`analyze called: url=${body?.url} generateImages=${body?.generateImages} userId=${req.user?.id}`);
     if (!body.url) {
       throw new Error('url is required');
     }
-    return this.mulService.analyze(body.url, req.user.id);
+    try {
+      const result = await this.mulService.analyze(body.url, req.user.id, body.generateImages ?? true);
+      this.logger.log('analyze completed successfully');
+      return result;
+    } catch (err) {
+      this.logger.error(`analyze error: ${err.message}`, err.stack);
+      throw err;
+    }
   }
 }

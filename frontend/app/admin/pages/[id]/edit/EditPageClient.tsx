@@ -21,6 +21,71 @@ import type { Page, PageLayout, PageContent, PageSection, SectionsPageContent } 
 
 const LAYOUT_OPTIONS: PageLayout[] = ['no_sidebar', 'sidebar_left', 'sidebar_right', 'split_comparison'];
 
+// ── Parent picker helpers ──────────────────────────────────────────────────
+
+interface PageListItem { id: string; title: string; slug: string; parent_id: string | null; show_in_nav: boolean; }
+
+/** Depth-first list of pages for the parent dropdown, with indent prefix and nav-hidden flag. */
+function buildTreeOptions(pages: PageListItem[], excludeId: string) {
+  const descendants = new Set<string>();
+  const markDescendants = (id: string) => {
+    for (const p of pages) {
+      if (p.parent_id === id && !descendants.has(p.id)) {
+        descendants.add(p.id);
+        markDescendants(p.id);
+      }
+    }
+  };
+  markDescendants(excludeId);
+
+  const eligible = pages.filter(p => p.id !== excludeId && !descendants.has(p.id));
+  const result: Array<{ id: string; label: string; navHidden: boolean; topHiddenAncestorTitle: string | null }> = [];
+
+  // Pre-pass: build a map of which pages are effectively nav-hidden (self or ancestor hidden)
+  const effectivelyHidden = new Map<string, { hidden: boolean; topAncestorTitle: string | null }>();
+  const computeHidden = (pageId: string | null, inheritedHidden: boolean, topTitle: string | null): void => {
+    const children = eligible.filter(p => p.parent_id === pageId);
+    for (const child of children) {
+      const selfHidden = !child.show_in_nav;
+      const isHidden = inheritedHidden || selfHidden;
+      const ancestorTitle = inheritedHidden ? topTitle : (selfHidden ? child.title : null);
+      effectivelyHidden.set(child.id, { hidden: isHidden, topAncestorTitle: ancestorTitle });
+      computeHidden(child.id, isHidden, ancestorTitle);
+    }
+  };
+  computeHidden(null, false, null);
+
+  const walk = (parentId: string | null, depth: number) => {
+    const children = eligible.filter(p => p.parent_id === parentId);
+    for (const child of children) {
+      const indent = depth === 0 ? '' : '  '.repeat(depth - 1) + '└ ';
+      const hiddenInfo = effectivelyHidden.get(child.id);
+      result.push({
+        id: child.id,
+        label: indent + child.title,
+        navHidden: hiddenInfo?.hidden ?? false,
+        topHiddenAncestorTitle: hiddenInfo?.topAncestorTitle ?? null,
+      });
+      walk(child.id, depth + 1);
+    }
+  };
+  walk(null, 0);
+  return result;
+}
+
+/** Build the full URL path by chaining up through ancestor slugs. */
+function buildUrlPreview(parentId: string | null, pages: PageListItem[], ownSlug: string): string {
+  const parts: string[] = [ownSlug];
+  let cursor = parentId;
+  while (cursor) {
+    const p = pages.find(x => x.id === cursor);
+    if (!p) break;
+    parts.unshift(p.slug);
+    cursor = p.parent_id;
+  }
+  return '/' + parts.join('/');
+}
+
 interface EditPageClientProps {
   pageId: string;
 }
@@ -53,7 +118,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   const [metaTitle, setMetaTitle] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
   const [ogImageUrl, setOgImageUrl] = useState('');
-  const [allPages, setAllPages] = useState<Array<{ id: string; title: string }>>([]);
+  const [allPages, setAllPages] = useState<PageListItem[]>([]);
   const [pendingReorder, setPendingReorder] = useState<{ id: string; nav_order: number }[] | null>(null);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -108,7 +173,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
   };
 
   useEffect(() => {
-    adminApi.get('/pages?limit=100&status=published').then((res) => {
+    adminApi.get('/pages?limit=100').then((res) => {
       setAllPages((res.data?.data ?? []).filter((p: { id: string }) => p.id !== pageId));
     }).catch(() => {});
 
@@ -298,8 +363,17 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
               className="w-full text-sm px-3 py-1.5 border border-border rounded-lg bg-background"
             >
               <option value="">None (top-level)</option>
-              {allPages.map((p) => (
-                <option key={p.id} value={p.id}>{p.title}</option>
+              {buildTreeOptions(allPages, pageId).map((opt) => (
+                <option
+                  key={opt.id}
+                  value={opt.id}
+                  style={opt.navHidden ? { color: 'var(--foreground-muted, #999)' } : undefined}
+                  title={opt.navHidden && opt.topHiddenAncestorTitle
+                    ? `Hidden from nav — "${opt.topHiddenAncestorTitle}" is not set to show in nav`
+                    : undefined}
+                >
+                  {opt.navHidden ? '○ ' : ''}{opt.label}
+                </option>
               ))}
             </select>
           </div>
@@ -316,9 +390,7 @@ export function EditPageClient({ pageId }: EditPageClientProps) {
         </div>
         <p className="text-xs text-foreground/40">
           URL: <span className="font-mono text-foreground/60">
-            {parentId
-              ? `/${allPages.find(p => p.id === parentId)?.title?.toLowerCase().replace(/\s+/g, '-') ?? '…'}/${slug}`
-              : `/${slug}`}
+            {buildUrlPreview(parentId, allPages, slug)}
           </span>
         </p>
         <div className="border-t border-border pt-3">

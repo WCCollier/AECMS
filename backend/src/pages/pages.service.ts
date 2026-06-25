@@ -79,8 +79,8 @@ export class PagesService {
         author_can_delete: dto.author_can_delete ?? true,
         admin_can_edit: dto.admin_can_edit ?? true,
         admin_can_delete: dto.admin_can_delete ?? true,
-        show_in_nav: (dto as any).show_in_nav ?? true,
-        nav_order: (dto as any).nav_order ?? 0,
+        show_in_nav: dto.show_in_nav ?? true,
+        nav_order: dto.nav_order ?? 0,
         published_at: dto.status === 'published' ? new Date() : null,
       },
       include: {
@@ -433,8 +433,8 @@ export class PagesService {
       author_can_delete: dto.author_can_delete,
       admin_can_edit: dto.admin_can_edit,
       admin_can_delete: dto.admin_can_delete,
-      show_in_nav: (dto as any).show_in_nav,
-      nav_order: (dto as any).nav_order,
+      show_in_nav: dto.show_in_nav,
+      nav_order: dto.nav_order,
       published_at,
     };
 

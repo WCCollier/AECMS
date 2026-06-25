@@ -56,10 +56,14 @@ export class AnthropicMulProvider implements MulProvider {
 
     const toolUse = json.content?.find((c: any) => c.type === 'tool_use' && c.name === 'emit_result');
     if (!toolUse?.input) {
-      this.logger.warn('Anthropic response missing tool_use block', json);
+      this.logger.warn('Anthropic response missing tool_use block: ' + JSON.stringify(json.content?.slice(0, 2)));
       throw new UnprocessableEntityException('AI response could not be parsed. Try a recommended model.');
     }
 
+    this.logger.log(`stop_reason=${json.stop_reason} usage=${JSON.stringify(json.usage)}`);
+    this.logger.log('Raw tool input keys: ' + Object.keys(toolUse.input).join(', '));
+    this.logger.log('palette keys: ' + (toolUse.input.palette ? Object.keys(toolUse.input.palette).join(', ') : 'MISSING'));
+    this.logger.log('page keys: ' + (toolUse.input.page ? Object.keys(toolUse.input.page).join(', ') : 'MISSING'));
     return this.validateResult(toolUse.input);
   }
 

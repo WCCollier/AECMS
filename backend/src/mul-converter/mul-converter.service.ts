@@ -84,7 +84,7 @@ export class MulConverterService {
     await this.settings.set(allowed, userId);
   }
 
-  async analyze(url: string, userId: string): Promise<MulResult> {
+  async analyze(url: string, userId: string, generateImages = true): Promise<MulResult> {
     const parsed = validateTargetUrl(url);
 
     const html = await this.fetchHtml(parsed.toString());
@@ -94,7 +94,7 @@ export class MulConverterService {
 
     // Provider-native optimization: when text and image use the same platform,
     // use the Responses API to handle analysis + image generation in one conversation.
-    const isNative = Boolean(config.imageProvider) &&
+    const isNative = generateImages && Boolean(config.imageProvider) &&
       (config.textProvider === config.imageProvider) &&
       ['openai', 'xai'].includes(config.textProvider);
 
@@ -110,7 +110,7 @@ export class MulConverterService {
     const textProvider = this.buildTextProvider(config);
     const result = await textProvider.analyze(pageData, systemPrompt);
 
-    if (config.imageProvider && result.imageBriefs) {
+    if (generateImages && config.imageProvider && result.imageBriefs) {
       const imageProvider = this.buildImageProvider(config);
       if (imageProvider) {
         await this.generateAndAttachImages(result, imageProvider, userId);
@@ -368,37 +368,39 @@ ${pageData.imageUrls.length > 0 ? `Source image URLs (for reference mode):\n${pa
   ): Promise<void> {
     if (!result.imageBriefs) return;
 
-    for (const [id, brief] of Object.entries(result.imageBriefs)) {
-      try {
-        const buffer = await imageProvider.generate(brief);
+    // Run all image briefs in parallel so total wait = slowest single image, not sum of all
+    await Promise.all(
+      Object.entries(result.imageBriefs).map(async ([id, brief]) => {
+        try {
+          const buffer = await imageProvider.generate(brief);
 
-        const mockFile: Express.Multer.File = {
-          fieldname: 'file',
-          originalname: `mul-generated-${id}.png`,
-          encoding: '7bit',
-          mimetype: 'image/png',
-          buffer,
-          size: buffer.byteLength,
-          stream: null as any,
-          destination: '',
-          filename: '',
-          path: '',
-        };
+          const mockFile: Express.Multer.File = {
+            fieldname: 'file',
+            originalname: `mul-generated-${id}.png`,
+            encoding: '7bit',
+            mimetype: 'image/png',
+            buffer,
+            size: buffer.byteLength,
+            stream: null as any,
+            destination: '',
+            filename: '',
+            path: '',
+          };
 
-        const media = await this.mediaService.upload(
-          mockFile,
-          userId,
-          brief.prompt.slice(0, 120),
-          undefined,
-        );
+          const media = await this.mediaService.upload(
+            mockFile,
+            userId,
+            brief.prompt.slice(0, 120),
+            undefined,
+          );
 
-        // Replace "media://placeholder" with real uuid in sections
-        this.replaceMediaPlaceholder(result, id, media.id);
-      } catch (err) {
-        this.logger.warn(`Image generation failed for brief "${id}": ${err.message}`);
-        // Non-fatal: leave placeholder in place; user can fill manually
-      }
-    }
+          this.replaceMediaPlaceholder(result, id, media.id);
+        } catch (err) {
+          this.logger.warn(`Image generation failed for brief "${id}": ${err.message}`);
+          // Non-fatal: leave placeholder in place; user can fill manually
+        }
+      }),
+    );
   }
 
   private replaceMediaPlaceholder(result: MulResult, briefId: string, mediaId: string): void {

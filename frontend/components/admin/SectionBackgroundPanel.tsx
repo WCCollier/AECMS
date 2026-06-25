@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, ChevronDown, ChevronRight, Sun, Moon, Minus } from 'lucide-react';
 import { MediaPicker } from '@/components/admin/MediaPicker';
-import type { SectionBackground, PageZone, ZoneScheme } from '@/types';
+import type { SectionBackground, PageZone, ZoneScheme, BgMovement, BgExit } from '@/types';
 
 // ── Gradient overlay presets ────────────────────────────────────────────────
 
@@ -30,26 +30,24 @@ const GRADIENT_PRESETS = [
   },
 ];
 
-// ── Transition picker options ───────────────────────────────────────────────
+// ── Transition picker option types ─────────────────────────────────────────
 
-type TransitionValue = NonNullable<SectionBackground['transition']>;
+interface MovementOption { value: BgMovement; label: string; icon: string; description: string; }
+interface ExitOption     { value: BgExit;     label: string; icon: string; description: string; }
 
-interface TransitionOption {
-  value: TransitionValue;
-  label: string;
-  icon: string;
-  description: string;
-}
+const MOVEMENT_OPTIONS: MovementOption[] = [
+  { value: 'fixed',    label: 'Fixed',    icon: '⬛', description: 'Background stays planted; content flows over it' },
+  { value: 'parallax', label: 'Parallax', icon: '〰', description: 'Image drifts upward at ~50% scroll speed (images only)' },
+  { value: 'zoom',     label: 'Zoom',     icon: '⊕',  description: 'Slow Ken Burns scale-in while section is in view (images only)' },
+];
 
-const TRANSITION_OPTIONS: TransitionOption[] = [
-  { value: 'none',       label: 'Scroll',    icon: '↕', description: 'Scrolls naturally with content' },
-  { value: 'fixed',      label: 'Fixed',     icon: '⬛', description: 'Background plants; content flows through' },
-  { value: 'fade',       label: 'Fade',      icon: '◐', description: 'Dissolves into next section below' },
-  { value: 'wipe-v',     label: 'Wipe ↓',   icon: '▽', description: 'Vertical clip wipe' },
-  { value: 'wipe-left',  label: 'Wipe ←',   icon: '◁', description: 'Clip reveals from right edge' },
-  { value: 'wipe-right', label: 'Wipe →',   icon: '▷', description: 'Clip reveals from left edge' },
-  { value: 'slide-up',   label: 'Slide ↑',  icon: '⬆', description: 'Background slides upward off screen' },
-  { value: 'parallax',   label: 'Parallax',  icon: '〰', description: 'Image drifts at ~50% scroll speed' },
+const EXIT_OPTIONS: ExitOption[] = [
+  { value: 'none',       label: 'None',    icon: '✕',  description: 'Snap cut when section boundary passes the viewport' },
+  { value: 'fade',       label: 'Fade',    icon: '◐',  description: 'Dissolves out as the next section scrolls in' },
+  { value: 'wipe-v',     label: 'Wipe ↓',  icon: '▽',  description: 'Vertical clip wipe upward' },
+  { value: 'wipe-left',  label: 'Wipe ←',  icon: '◁',  description: 'Clip wipe from the right edge' },
+  { value: 'wipe-right', label: 'Wipe →',  icon: '▷',  description: 'Clip wipe from the left edge' },
+  { value: 'slide-up',   label: 'Slide ↑', icon: '⬆',  description: 'Background slides upward off screen' },
 ];
 
 // ── Zone scheme option definitions ─────────────────────────────────────────
@@ -106,6 +104,31 @@ export interface SectionBackgroundPanelProps {
   onClose: () => void;
 }
 
+// ── Backward-compat helpers (mirrors SectionsLayout) ───────────────────────
+
+function initMode(bg: SectionBackground): 'traditional' | 'animated' {
+  if (bg.mode) return bg.mode;
+  if (!bg.transition || bg.transition === 'none') {
+    if (!bg.attachment || bg.attachment === 'scroll') return 'traditional';
+  }
+  return 'animated';
+}
+
+function initMovement(bg: SectionBackground): BgMovement {
+  if (bg.movement) return bg.movement;
+  if (bg.transition === 'parallax' || bg.attachment === 'parallax') return 'parallax';
+  return 'fixed';
+}
+
+function initExit(bg: SectionBackground): BgExit {
+  if (bg.exit) return bg.exit;
+  const t = bg.transition;
+  if (t === 'fade' || t === 'wipe-v' || t === 'wipe-left' || t === 'wipe-right' || t === 'slide-up') return t;
+  return 'none';
+}
+
+// ── Main panel ──────────────────────────────────────────────────────────────
+
 export function SectionBackgroundPanel({
   open,
   background,
@@ -116,9 +139,16 @@ export function SectionBackgroundPanel({
 }: SectionBackgroundPanelProps) {
   const bg: SectionBackground = background ?? { type: 'none' };
 
-  // Derive current transition (fallback from deprecated attachment)
-  const currentTransition: TransitionValue =
-    bg.transition ?? (bg.attachment === 'parallax' ? 'parallax' : bg.attachment === 'fixed' ? 'fixed' : 'none');
+  // Derived current mode (Traditional vs Animated)
+  const currentMode = initMode(bg);
+
+  // Session-scoped last Animated selections — restored when switching back from Traditional
+  const [lastMovement, setLastMovement] = useState<BgMovement>(() => initMovement(bg));
+  const [lastExit, setLastExit] = useState<BgExit>(() => initExit(bg));
+
+  // Active animated selections (only meaningful when currentMode === 'animated')
+  const activeMovement: BgMovement = currentMode === 'animated' ? (bg.movement ?? lastMovement) : lastMovement;
+  const activeExit: BgExit         = currentMode === 'animated' ? (bg.exit     ?? lastExit)     : lastExit;
 
   // Overlay mode
   type OverlayMode = 'none' | 'solid' | 'gradient';
@@ -140,6 +170,28 @@ export function SectionBackgroundPanel({
 
   function update(patch: Partial<SectionBackground>) {
     onUpdate({ ...bg, ...patch });
+  }
+
+  function selectTraditional() {
+    // Preserve movement/exit in local state but set mode:traditional
+    update({ mode: 'traditional', movement: undefined, exit: undefined });
+  }
+
+  function selectMovement(movement: BgMovement) {
+    // Parallax is only valid for image backgrounds — silently fall back to fixed
+    const safeMovement: BgMovement = ((movement === 'parallax' || movement === 'zoom') && bg.type !== 'image') ? 'fixed' : movement;
+    setLastMovement(safeMovement);
+    const exitToUse = currentMode === 'animated' ? activeExit : lastExit;
+    setLastExit(exitToUse);
+    update({ mode: 'animated', movement: safeMovement, exit: exitToUse });
+  }
+
+  function selectExit(exit: BgExit) {
+    setLastExit(exit);
+    // Switching to Animated: default movement to lastMovement (or 'fixed' if first time)
+    const movementToUse = currentMode === 'animated' ? activeMovement : lastMovement;
+    setLastMovement(movementToUse);
+    update({ mode: 'animated', movement: movementToUse, exit });
   }
 
   function setOverlayMode(mode: OverlayMode) {
@@ -196,7 +248,7 @@ export function SectionBackgroundPanel({
                   <button
                     key={t}
                     type="button"
-                    onClick={() => update({ type: t, value: bg.value })}
+                    onClick={() => update({ type: t })}
                     className={`py-1.5 rounded text-[11px] border transition-colors capitalize ${
                       bg.type === t
                         ? 'border-accent bg-accent/10 text-accent'
@@ -216,14 +268,14 @@ export function SectionBackgroundPanel({
                 <div className="flex gap-2 items-center">
                   <input
                     type="color"
-                    value={bg.value ?? '#1a2b3c'}
-                    onChange={(e) => update({ value: e.target.value })}
+                    value={bg.colorValue ?? '#1a2b3c'}
+                    onChange={(e) => update({ colorValue: e.target.value })}
                     className="w-9 h-8 rounded cursor-pointer border border-border bg-transparent p-0.5 flex-shrink-0"
                   />
                   <input
                     type="text"
-                    value={bg.value ?? ''}
-                    onChange={(e) => update({ value: e.target.value })}
+                    value={bg.colorValue ?? ''}
+                    onChange={(e) => update({ colorValue: e.target.value })}
                     className="flex-1 text-xs px-2 py-1.5 border border-border rounded font-mono bg-background"
                     placeholder="#1a2b3c"
                   />
@@ -236,14 +288,14 @@ export function SectionBackgroundPanel({
               <div className="space-y-2">
                 <p className="text-[11px] text-foreground/50">CSS Gradient</p>
                 <textarea
-                  value={bg.value ?? ''}
-                  onChange={(e) => update({ value: e.target.value })}
+                  value={bg.gradientValue ?? ''}
+                  onChange={(e) => update({ gradientValue: e.target.value })}
                   rows={3}
                   className="w-full text-[11px] px-2 py-1.5 border border-border rounded font-mono bg-background resize-none"
                   placeholder="linear-gradient(135deg, #0f2027 0%, #2c5364 100%)"
                 />
-                {bg.value && (
-                  <div className="h-10 rounded border border-border" style={{ background: bg.value }} />
+                {bg.gradientValue && (
+                  <div className="h-10 rounded border border-border" style={{ background: bg.gradientValue }} />
                 )}
                 <div className="grid grid-cols-2 gap-1">
                   {[
@@ -255,7 +307,7 @@ export function SectionBackgroundPanel({
                     <button
                       key={p.label}
                       type="button"
-                      onClick={() => update({ value: p.value })}
+                      onClick={() => update({ gradientValue: p.value })}
                       className="flex items-center gap-1.5 px-2 py-1.5 rounded border border-border hover:bg-surface-raised text-[11px] text-left"
                     >
                       <span
@@ -276,8 +328,8 @@ export function SectionBackgroundPanel({
                   Select or upload an image. Larger, landscape images work best as section backgrounds.
                 </p>
                 <MediaPicker
-                  value={bg.value && bg.value.startsWith('http') ? bg.value : undefined}
-                  onChange={(url) => update({ value: url ?? '' })}
+                  value={bg.imageValue || undefined}
+                  onChange={(url) => update({ imageValue: url ?? '' })}
                   mimeFilter="image/*"
                   showDimensions
                   compact
@@ -289,8 +341,8 @@ export function SectionBackgroundPanel({
                   </summary>
                   <input
                     type="url"
-                    value={bg.value ?? ''}
-                    onChange={(e) => update({ value: e.target.value })}
+                    value={bg.imageValue ?? ''}
+                    onChange={(e) => update({ imageValue: e.target.value })}
                     className="mt-1.5 w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
                     placeholder="https://…"
                   />
@@ -412,23 +464,113 @@ export function SectionBackgroundPanel({
           {showTransition && (
             <SubSection title="Transition">
               <p className="text-[11px] text-foreground/50 -mt-1 mb-2">
-                How this section&apos;s background enters and exits as you scroll.
+                How this section&apos;s background scrolls and gives way to the next.
               </p>
+
+              {/* ── Traditional ── */}
+              <div className="flex items-center gap-2 mb-1">
+                <div className="flex-1 border-t border-border" />
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground/30">Traditional</p>
+                <div className="flex-1 border-t border-border" />
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={selectTraditional}
+                  className={`w-full flex items-center gap-3 px-2.5 py-2 rounded border text-left transition-colors ${
+                    currentMode === 'traditional'
+                      ? 'border-accent bg-accent/10 text-accent'
+                      : 'border-border hover:bg-surface-raised'
+                  }`}
+                >
+                  <span className="text-base w-5 text-center flex-shrink-0 leading-none">↕</span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium">Scroll</p>
+                    <p className="text-[10px] text-foreground/50 leading-tight">Scrolls naturally with the section content</p>
+                  </div>
+                </button>
+
+                {/* Cover / Fit Width sub-option — Traditional + image only */}
+                {currentMode === 'traditional' && bg.type === 'image' && (
+                  <div className="ml-8 mt-1 flex gap-1">
+                    {([
+                      { value: 'cover' as const,     label: 'Cover',     title: 'Scales to fill the full section — crops top/bottom if needed. Best for most backgrounds.' },
+                      { value: 'fit-width' as const, label: 'Fit Width', title: 'Full section width at natural height — no cropping. Use for sections that grow dynamically.' },
+                    ] as const).map((s) => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        title={s.title}
+                        onClick={() => update({ imageSize: s.value })}
+                        className={`flex-1 py-1 rounded text-[11px] border transition-colors ${
+                          (bg.imageSize ?? 'cover') === s.value
+                            ? 'border-accent bg-accent/10 text-accent'
+                            : 'border-border hover:bg-surface-raised text-foreground/60'
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Animated ── */}
+              <div className="flex items-center gap-2 mt-3 mb-1">
+                <div className="flex-1 border-t border-border" />
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground/30">Animated</p>
+                <div className="flex-1 border-t border-border" />
+              </div>
+
+              {/* Movement picker */}
+              <p className="text-[10px] text-foreground/40 mb-1">Movement — while displayed</p>
               <div className="space-y-1">
-                {TRANSITION_OPTIONS.map((opt) => (
+                {MOVEMENT_OPTIONS.map((opt) => {
+                  // Parallax requires an image — a gradient or color has no spatial depth to drift.
+                  const disabled = (opt.value === 'parallax' || opt.value === 'zoom') && bg.type !== 'image';
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => !disabled && selectMovement(opt.value)}
+                      disabled={disabled}
+                      title={disabled ? 'Requires an image background' : undefined}
+                      className={`w-full flex items-center gap-3 px-2.5 py-2 rounded border text-left transition-colors ${
+                        disabled
+                          ? 'border-border opacity-30 cursor-not-allowed'
+                          : currentMode === 'animated' && activeMovement === opt.value
+                          ? 'border-accent bg-accent/10 text-accent'
+                          : 'border-border hover:bg-surface-raised text-foreground/70'
+                      }`}
+                    >
+                      <span className="text-base w-5 text-center flex-shrink-0 leading-none">{opt.icon}</span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium">{opt.label}</p>
+                        <p className="text-[10px] text-foreground/50 leading-tight">
+                          {disabled ? 'Image backgrounds only' : opt.description}
+
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Exit picker */}
+              <p className="text-[10px] text-foreground/40 mt-3 mb-1">Exit — at section boundary</p>
+              <div className="space-y-1">
+                {EXIT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
-                    onClick={() => update({ transition: opt.value })}
+                    onClick={() => selectExit(opt.value)}
                     className={`w-full flex items-center gap-3 px-2.5 py-2 rounded border text-left transition-colors ${
-                      currentTransition === opt.value
+                      currentMode === 'animated' && activeExit === opt.value
                         ? 'border-accent bg-accent/10 text-accent'
-                        : 'border-border hover:bg-surface-raised'
+                        : 'border-border hover:bg-surface-raised text-foreground/70'
                     }`}
                   >
-                    <span className="text-base w-5 text-center flex-shrink-0 leading-none">
-                      {opt.icon}
-                    </span>
+                    <span className="text-base w-5 text-center flex-shrink-0 leading-none">{opt.icon}</span>
                     <div className="min-w-0">
                       <p className="text-xs font-medium">{opt.label}</p>
                       <p className="text-[10px] text-foreground/50 leading-tight">{opt.description}</p>
@@ -436,9 +578,10 @@ export function SectionBackgroundPanel({
                   </button>
                 ))}
               </div>
-              {(currentTransition !== 'none' && currentTransition !== 'fixed') && (
+
+              {currentMode === 'animated' && (
                 <p className="text-[10px] text-foreground/40 mt-2 leading-relaxed">
-                  Tip: set a min-height of 60vh or more for image backgrounds with transitions so they have room to animate.
+                  Tip: set a min-height of 60vh or more so the background has room to animate.
                 </p>
               )}
             </SubSection>
