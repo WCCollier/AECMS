@@ -20,6 +20,7 @@ import * as crypto from 'crypto';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
 import { AuditLogService } from '../audit/audit.service';
+import { CAPABILITY_DEFINITIONS } from '../capabilities/capability-definitions';
 
 @Injectable()
 export class AuthService {
@@ -200,6 +201,12 @@ export class AuthService {
     const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
     await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
 
+    if (user.role === UserRole.owner) {
+      this.syncOwnerCapabilities(user.id).catch((e) =>
+        console.error('[auth] syncOwnerCapabilities failed:', e?.message),
+      );
+    }
+
     await this.auditLog.log({ event_type: 'auth.login', user_id: user.id, metadata: { session_type: 'backstage', two_factor_setup_required: true } });
 
     return {
@@ -248,6 +255,12 @@ export class AuthService {
     const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
     const storedToken = await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
     const revoked = await this.revokeOtherBackstageSessions(user.id, storedToken.id);
+
+    if (user.role === UserRole.owner) {
+      this.syncOwnerCapabilities(user.id).catch((e) =>
+        console.error('[auth] syncOwnerCapabilities failed:', e?.message),
+      );
+    }
 
     await this.auditLog.log({ event_type: 'auth.2fa_success', user_id: user.id, metadata: { session_type: 'backstage' } });
     if (revoked > 0) {
@@ -832,5 +845,30 @@ export class AuthService {
     });
 
     return { message: `Role changed from ${oldRole} to ${newRole}` };
+  }
+
+  /**
+   * Upsert all defined capabilities and assign every one to the given Owner user.
+   * Called on every Owner backstage login so the Owner always holds the full
+   * capability set regardless of seed state, enabling them to delegate to other roles.
+   * Runs fire-and-forget (errors are logged but never surface to the login response).
+   */
+  async syncOwnerCapabilities(userId: string): Promise<void> {
+    for (const def of CAPABILITY_DEFINITIONS) {
+      const cap = await this.prisma.capability.upsert({
+        where: { name: def.name },
+        create: def,
+        update: { scope: def.scope, description: def.description },
+      });
+
+      const existing = await this.prisma.userCapability.findFirst({
+        where: { user_id: userId, capability_id: cap.id },
+      });
+      if (!existing) {
+        await this.prisma.userCapability.create({
+          data: { user_id: userId, capability_id: cap.id, granted_by: userId },
+        });
+      }
+    }
   }
 }
