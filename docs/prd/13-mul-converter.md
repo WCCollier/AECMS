@@ -1,6 +1,6 @@
 # PRD 13: Mul Converter
 
-**Version**: 1.0  
+**Version**: 1.7  
 **Status**: Draft  
 **Phase**: 23  
 **Author**: WCCollier
@@ -29,15 +29,29 @@ The Mul Converter depends on an expanded page schema — the **section-based con
 
 ---
 
+## Renderer-First Design Principle
+
+The AI speaks JSON directly. It does not go through the human section editor — it emits the full output schema and the backend saves it verbatim. This means **the renderer is the contract; the human editor is progressive UI built on top of it.**
+
+Concretely:
+
+- Every property documented in the AI output schema (gradients, overlays, drop caps, font imports, zone schemes, etc.) must be **handled by the page renderer** before Part 2 ships.
+- The human section editor does **not** need to expose UI controls for all of these properties on day one. It must, however, be a faithful steward: any property present in the stored JSON that the editor doesn't know how to display an explicit control for must be **passed through unchanged on save**. Unknown properties must never be silently dropped.
+- Human editor controls for AI-accessible properties can be added incrementally over subsequent phases. There is no requirement for parity between what the AI can produce and what the human can directly manipulate.
+
+This unlocks an important capability: an owner can run the Mul Converter to produce a richly styled page (gradient hero, custom fonts, drop cap opening paragraph, overlay scrim), open it in the section editor to adjust placeholder text, and save — without any of the AI-applied styling being lost, even though the editor has no controls for those properties yet.
+
+---
+
 ## Non-Goals (v1)
-ok
+
 - Automated content migration (text, images) from the source page
 - Semantic replication of navigation structure
-- Support for CSS animations, gradients as accent colors, or transparency effects in the palette
-- Font pairing extraction (deferred to v2; font names are read but not yet wired into the font pairing system)
+- Support for CSS animations or transparency effects in the palette color slots
 - Batch/multi-URL analysis
 - Conversion history or diff view
 - Freeform/absolute canvas positioning (see Page Schema Evolution below)
+- Human editor UI controls for every AI-accessible property (see Renderer-First Design below)
 
 ---
 
@@ -62,9 +76,15 @@ This capability gates all Mul Converter routes (settings + analysis).
          │
          ▼
 [Step 1 — Configure (first time only)]
-  Provider: Anthropic | OpenAI
-  Model: text field (e.g. claude-sonnet-4-6, gpt-4o)
-  API Key: password field → saved encrypted in ISM as mul.api_key_enc
+  TEXT MODEL
+    Provider: Anthropic | OpenAI | xAI
+    Model: text field (e.g. claude-sonnet-4-6, gpt-4o, grok-4)
+    API Key: password field → saved encrypted in ISM (per platform, shared if same as image provider)
+  IMAGE GENERATION (optional)
+    Provider: Disabled | OpenAI | Flux (fal.ai) | Stability AI
+    Model: text field (e.g. gpt-image-1, flux-kontext-pro)
+    API Key: password field → reuses text key if same platform; otherwise separate ISM key
+    Mode: Brief-only | + Reference images (opt-in — see Image Generation section)
          │
          ▼
 [Step 2 — Enter Target URL]
@@ -121,23 +141,108 @@ A new `type: 'sections'` page format runs alongside the existing `layout`/`zones
 interface PageZone {
   id: string;       // client-generated UUID
   span: number;     // positive integer; number of grid columns this zone occupies
+  scheme?: 'inherit' | 'light' | 'dark';  // text color context for this zone
+                    //   inherit (default) — uses the page foreground CSS variable
+                    //   light — forces light-on-dark text (white foreground)
+                    //   dark  — forces dark-on-light text (near-black foreground)
+                    // Use when a zone sits on a dark background section but the
+                    // zone itself needs its own text treatment.
   content: TipTapDoc;
 }
 
-interface PageSection {
-  id: string;       // client-generated UUID
-  columns: number;  // grid resolution for this section — positive integer, no upper limit
-  minHeight?: string;  // CSS value — e.g. "100vh", "400px"; omit for auto height
-  background?: {
-    type: 'none' | 'color' | 'image';
-    value?: string;       // hex string for 'color'; "media://uuid" for 'image'
-    attachment?: 'scroll' | 'fixed' | 'parallax';
+interface SectionBackground {
+  type: 'none' | 'color' | 'gradient' | 'image';
+
+  // Per-type value fields (preferred over deprecated `value` below)
+  colorValue?: string;    // hex, e.g. "#1a2b3c"
+  gradientValue?: string; // CSS gradient string
+  imageValue?: string;    // /uploads/… or https://… URL; "media://placeholder" for AI scaffolds
+
+  /** @deprecated — pre-Part-3 single value field; use colorValue/gradientValue/imageValue */
+  value?: string;
+
+  // ── Rendering mode (two-tier model, replaces deprecated `transition`) ──────
+
+  mode?: 'traditional' | 'animated';
+    // 'traditional' (default) — background is set as an inline CSS property on the
+    //   section div and scrolls naturally with content. No fixed-position stack is engaged.
+    //   Broadest browser compatibility. imageSize sub-option applies here.
+    // 'animated' — background is rendered as a position:fixed layer in a stacked slide
+    //   system. movement and exit sub-fields control the two independent animation axes.
+    //   Only sections with mode:'animated' participate in the fixed-position stack.
+
+  imageSize?: 'cover' | 'fit-width';
+    // Only meaningful when mode === 'traditional' and type === 'image'.
+    // 'cover'     (default) — scales to fill the section, crops if needed.
+    // 'fit-width' — 100% width at natural height, no cropping. Use for sections that
+    //               grow dynamically (e.g. infinite-scroll feeds) where cover would
+    //               rescale the background image as height increases.
+
+  movement?: 'fixed' | 'parallax';
+    // Only meaningful when mode === 'animated'.
+    // How the background slide behaves while it occupies the viewport.
+    // 'fixed'    (default) — background stays planted; content scrolls over it (window-pane).
+    // 'parallax' — image drifts upward at ~50% scroll speed; overlay stays planted.
+    //              Image is oversized 20% top/bottom to prevent black bars at drift extremes.
+
+  exit?: 'none' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up';
+    // Only meaningful when mode === 'animated'.
+    // How the background slide gives way when the section boundary crosses the viewport.
+    // 'none'       (default) — snap cut; layer opacity snaps to 0 once section exits.
+    // 'fade'       — composite dissolves out, revealing the next slide beneath.
+    // 'wipe-v'     — vertical clip-path wipe upward.
+    // 'wipe-left'  — clip wipe from the right edge.
+    // 'wipe-right' — clip wipe from the left edge.
+    // 'slide-up'   — composite translates upward off screen.
+    // movement and exit are fully independent: any movement value can be combined
+    // with any exit value (e.g. Parallax + Fade, Fixed + Wipe ↓).
+
+  /** @deprecated — pre-Part-3 single transition field; see mode/movement/exit above */
+  transition?: 'none' | 'fixed' | 'fade' | 'wipe-v' | 'wipe-left' | 'wipe-right' | 'slide-up' | 'parallax';
+  /** @deprecated — pre-Part-3 attachment field; use mode instead */
+  attachment?: 'scroll' | 'fixed' | 'parallax';
+
+  overlay?: {
+    color: string;      // hex color for the scrim, e.g. "#000000"
+    opacity: number;    // 0–1; typical values 0.3–0.6; ignored when gradient is set
+    gradient?: string;  // CSS gradient string; when set, alpha is baked into stops
   };
+    // overlay renders as a semi-transparent layer between the background and zone content.
+    // Essential for image + light-text combinations (the classic hero pattern).
+    // In animated mode: overlay is a child of the background composite so it rides
+    // with the exit transition as a single inseparable unit (no synchronization needed).
+    // In parallax mode: overlay is a sibling of the image div so it stays planted
+    // while the image drifts, preserving gradient legibility over zone text.
+}
+
+interface PageSection {
+  id: string;         // client-generated UUID
+  columns: number;    // grid resolution for this section — positive integer, no upper limit
+  minHeight?: string; // CSS value — e.g. "100vh", "400px"; omit for auto height
+  padding?: 'none' | 'compact' | 'normal' | 'spacious';
+    // Controls vertical padding (padding-block) on the section:
+    //   none      → py-0  (flush sections, used for full-bleed image blocks)
+    //   compact   → py-8  (tight content rows, feature grids)
+    //   normal    → py-16 (default; body content sections)
+    //   spacious  → py-24 (hero sections, major transitions)
+    // Omitting padding defaults to 'normal'.
+  background?: SectionBackground;
   zones: PageZone[];  // ordered left-to-right; spans must sum to columns
 }
 
 interface SectionsPageContent {
   type: 'sections';
+  fontImport?: string;
+    // A Google Fonts (or other web font provider) @import URL.
+    // e.g. "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap"
+    // Injected as a <link> in the page <head> when this page is rendered.
+    // Does not affect other pages or the global theme.
+  fontVariables?: {
+    heading?: string;  // CSS font-family value, e.g. "'Playfair Display', Georgia, serif"
+    body?: string;     // CSS font-family value, e.g. "'Lato', system-ui, sans-serif"
+  };
+    // When set, these override --font-heading and --font-body CSS variables for this page only.
+    // Only meaningful when fontImport is also set (otherwise the font may not be available).
   sections: PageSection[];
 }
 ```
@@ -333,22 +438,37 @@ This text-only extraction approach makes the AI task well-defined and avoids vis
 
 ```typescript
 interface MulProvider {
-  analyze(data: PageData, outputSchema: MulOutputSchema): Promise<MulResult>;
+  analyze(data: PageData, systemPrompt: string): Promise<MulResult>;
 }
 
-class AnthropicMulProvider implements MulProvider { ... }
-class OpenAIMulProvider      implements MulProvider { ... }
+class AnthropicMulProvider implements MulProvider { ... }  // Claude models
+class OpenAIMulProvider      implements MulProvider { ... }  // GPT-4o, etc.
+class XAIMulProvider         implements MulProvider { ... }  // Grok models (OpenAI-compatible API)
 ```
 
-Provider is selected at request time by reading `mul.provider` from ISM. The module **does not require** the Anthropic or OpenAI SDK to be present in the container — both providers are implemented as thin HTTP clients (using `fetch`/`axios`) so neither SDK is a hard dependency. This keeps the Docker image lean and keeps provider support additive.
+Provider is selected at request time by reading `mul.text_provider` from ISM. The module **does not require** any provider SDK to be present in the container — all providers are implemented as thin HTTP clients (`fetch`/`axios`) so no SDK is a hard dependency. xAI's API is OpenAI-compatible (same request shape, different base URL and key), so `XAIMulProvider` is a thin subclass of `OpenAIMulProvider`.
+
+**Provider-native optimization**: When the text layer and image layer use the same platform, the service can collapse both operations into a single API conversation context. The model sees the source page and the image briefs it just wrote, producing better compositional fidelity than two separate calls. This optimization is transparent to the user — it activates automatically when both providers match.
+
+- **OpenAI-native**: When `text_provider === 'openai'` and `image_provider === 'openai'`, use the OpenAI Responses API conversation mode (analysis + image generation in one context window).
+- **xAI-native**: When `text_provider === 'xai'` and `image_provider === 'xai'`, use Grok's equivalent multi-turn API to handle analysis and Aurora image generation in one context window. xAI's API is OpenAI-wire-compatible, so the implementation is a thin configuration variant of the OpenAI-native path (different base URL and model names; same request/response shape).
 
 ### ISM Keys (namespace: `mul.*`)
 
+Keys are per-platform, not per-layer. When the text model and image model use the same platform (e.g. both OpenAI), one key covers both.
+
 | Key | Encrypted | Description |
 |-----|-----------|-------------|
-| `mul.provider` | No | `anthropic` \| `openai` |
-| `mul.model` | No | e.g. `claude-sonnet-4-6`, `gpt-4o` |
-| `mul.api_key_enc` | Yes (`_enc`) | API key for the chosen provider |
+| `mul.text_provider` | No | `anthropic` \| `openai` \| `xai` |
+| `mul.text_model` | No | e.g. `claude-sonnet-4-6`, `gpt-4o`, `grok-4` |
+| `mul.anthropic_api_key_enc` | Yes | API key for Anthropic (falls back to `ANTHROPIC_API_KEY` env var if unset) |
+| `mul.openai_api_key_enc` | Yes | API key for OpenAI — shared by text layer and image layer when both use OpenAI |
+| `mul.xai_api_key_enc` | Yes | API key for xAI (Grok models) |
+| `mul.image_provider` | No | `openai` \| `xai` \| `flux` \| `stability` — omit or `disabled` to disable image generation |
+| `mul.image_model` | No | e.g. `gpt-image-1`, `grok-2-aurora`, `flux-kontext-pro`, `stable-diffusion-xl-1024-v1-0` |
+| `mul.fal_api_key_enc` | Yes | API key for fal.ai (FLUX models) |
+| `mul.stability_api_key_enc` | Yes | API key for Stability AI |
+| `mul.image_reference_mode` | No | `brief-only` (default) \| `reference` — see Image Generation section |
 
 ---
 
@@ -416,9 +536,38 @@ Each TipTap document:
   { "type": "doc", "content": [...nodes] }
 
 Available TipTap node types for scaffold content:
-  { "type": "heading", "attrs": { "level": 1|2|3 }, "content": [{ "type": "text", "text": "..." }] }
-  { "type": "paragraph", "content": [{ "type": "text", "text": "..." }] }
+
+  Headings:
+  { "type": "heading", "attrs": { "level": 1|2|3, "textAlign": "left"|"center"|"right" },
+    "content": [{ "type": "text", "text": "...", "marks": [...] }] }
+
+  Paragraphs:
+  { "type": "paragraph",
+    "attrs": { "textAlign": "left"|"center"|"right"|"justify", "dropCap": true|false },
+    "content": [{ "type": "text", "text": "...", "marks": [...] }] }
+    // textAlign "justify" produces newspaper-style full-width justification with automatic hyphenation.
+    // dropCap true applies an ornate enlarged initial letter to the first character of the paragraph.
+    //   Use dropCap on the opening paragraph of long-form content sections to signal literary quality.
+    //   Do not combine dropCap with textAlign "center" — the float interaction is undefined.
+
+  Lists:
   { "type": "bulletList", "content": [{ "type": "listItem", "content": [...] }] }
+  { "type": "orderedList", "content": [{ "type": "listItem", "content": [...] }] }
+
+  Horizontal rule:
+  { "type": "horizontalRule" }
+    // Use as a subtle section divider within a zone; prefer over empty paragraphs for spacing.
+
+Available text marks (applied in the "marks" array on text nodes):
+
+  Bold:          { "type": "bold" }
+  Italic:        { "type": "italic" }
+  Uppercase label (for section labels, eyebrows, captions):
+                 { "type": "textStyle", "attrs": { "textTransform": "uppercase", "letterSpacing": "wide" } }
+    // Produces the "ABOUT THE AUTHOR" / "CHAPTER ONE" editorial label style.
+    // textTransform values: "none" | "uppercase" | "lowercase" | "capitalize"
+    // letterSpacing values: "tight" | "normal" | "wide" | "wider"
+    // Can combine: uppercase + wide is the most common editorial pattern.
 
 CRITICAL: Do NOT produce empty text nodes ({ "type": "text", "text": "" }) — TipTap will discard
 them and silently break the document. Every text node must have non-empty text.
@@ -439,18 +588,62 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
   },
   "page": {
     "suggestedTitle": string, // proposed page title based on the source page
+    "fontImport": string | undefined,
+      // Google Fonts @import URL if the source page uses a recognisable web font
+      // e.g. "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap"
+      // Omit if the page uses system fonts or the font is unidentifiable.
+    "fontVariables": {
+      "heading": string | undefined,  // e.g. "'Playfair Display', Georgia, serif"
+      "body": string | undefined      // e.g. "'Lato', system-ui, sans-serif"
+    } | undefined,
     "sections": [
       {
         "columns": number,    // positive integer — grid resolution for this section
-        "minHeight": string | undefined,
-        "background": { "type": "none"|"color"|"image", "value": string, "attachment": "scroll"|"fixed"|"parallax" } | undefined,
+        "minHeight": string | undefined,   // e.g. "100vh" for hero; omit for auto
+        "padding": "none" | "compact" | "normal" | "spacious" | undefined,
+        "background": {
+          "type": "none" | "color" | "gradient" | "image",
+          "value": string | undefined,
+            // color    → hex string, e.g. "#1a2b3c"
+            // gradient → CSS gradient, e.g. "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)"
+            // image    → "media://placeholder"
+          "attachment": "scroll" | "fixed" | "parallax" | undefined,
+          "overlay": { "color": string, "opacity": number } | undefined
+            // overlay.color → hex, e.g. "#000000"
+            // overlay.opacity → 0–1, e.g. 0.45
+        } | undefined,
         "zones": [            // ordered array, left to right; spans must sum to columns
-          { "id": string, "span": number, "content": { "type": "doc", "content": [...] } }
+          {
+            "id": string,
+            "span": number,
+            "scheme": "inherit" | "light" | "dark" | undefined,
+            "content": { "type": "doc", "content": [...] }
+          }
         ]
       }
       // … one entry per section
     ]
   },
+  "imagePromptStyle": {       // only present when image generation is enabled
+    "model": string,          // the image model name as configured
+    "approach": string,       // the AI's declared prompt strategy for this model
+    "exampleFormat": string   // one concrete example of the prompt format to be used
+  } | undefined,
+  "imageBriefs": {            // only present when image generation is enabled
+    "<section-or-zone-id>": {
+      "prompt": string,       // the image generation prompt, styled per imagePromptStyle
+      "aspectRatio": string,  // e.g. "16:9", "1:1", "3:2"
+      "style": "photorealistic" | "illustration" | "abstract",
+      "imageSourceUrl": string | undefined
+        // Only present when mul.image_reference_mode === "reference".
+        // The URL of the source image from the target page (og:image, hero img src, etc.)
+        // passed to the image generation API as a composition/style reference.
+        // Never stored in AECMS. Only transmitted transiently to the image provider.
+        // Owner must enable reference mode explicitly; UI shows:
+        //   "Reference mode sends images from the source URL to your image provider.
+        //    Only enable if you own or have rights to the source images."
+    }
+  } | undefined,
   "metadata": {
     "confidence": "high" | "medium" | "low",
     "notes": string           // 1–2 sentences: what you inferred and any caveats
@@ -458,7 +651,106 @@ Return ONLY a valid JSON object matching this schema. No prose, no markdown, no 
 }
 ```
 
-The system prompt is assembled in `MulConverterService.buildSystemPrompt()` and kept as a constant — it is not user-editable in v1.
+The system prompt is assembled in `MulConverterService.buildSystemPrompt(config: MulConfig)` and is parameterized on the active configuration — it is not user-editable in v1. Key runtime parameters injected into the prompt:
+
+- `{image_provider}` / `{image_model}` — inserted into Section 5 when image generation is enabled; omitted entirely when disabled
+- `{image_reference_mode}` — determines whether `imageSourceUrl` should be populated in briefs
+
+This parameterization is the mechanism that keeps the system open to new and upgraded image models without code changes: the master AI's training knowledge of any named model informs its brief vocabulary automatically.
+
+### Aesthetic Vocabulary — Guidance for the AI
+
+The system prompt must explicitly teach the AI when and how to use each aesthetic tool. Raw schema documentation is insufficient; the AI needs design intent, not just field names. The following guidance belongs in Section 3 of the system prompt:
+
+```
+[SECTION 3B — Aesthetic tools and when to use them]
+
+BACKGROUNDS
+  Use "gradient" for sections whose source page has a gradient hero, a dark tech aesthetic,
+  or any depth-layered background. Prefer CSS linear-gradient with 2–3 stops.
+  Example: "linear-gradient(160deg, #0d1b2a 0%, #1b263b 60%, #415a77 100%)"
+
+  Use "image" with type "media://placeholder" for any section the source page builds around
+  a background photograph. Always pair with an overlay when the zone text must be light-on-dark:
+    overlay: { "color": "#000000", "opacity": 0.45 }
+  Adjust opacity: 0.3 for subtle texture, 0.6+ for full legibility.
+
+  Use overlay on gradient backgrounds when zone text needs extra contrast beyond the gradient alone.
+
+PADDING
+  Match the source page's visual breathing room:
+    spacious → viewport-height heroes, major brand statements
+    normal   → standard body sections (default; omit if unsure)
+    compact  → feature grids, testimonial rows, tight content bands
+    none     → flush image blocks, map embeds, full-bleed elements
+
+ZONE SCHEME
+  Set zone.scheme: "light" when the section background is dark (gradient or dark color) and
+  the zone content needs white text. Set "dark" for zones on light/pale backgrounds that need
+  to explicitly force dark text. "inherit" or omitting scheme is correct for neutral sections.
+
+FONT IMPORT
+  Read the source page's font-family declarations in the extracted CSS. If you identify a
+  Google Fonts typeface, emit the Google Fonts URL in fontImport and the CSS font-family
+  values in fontVariables. This is one of the strongest brand-identity signals available.
+  If the page uses system fonts (Georgia, Arial, system-ui, etc.), omit fontImport entirely.
+
+TEXT ALIGNMENT
+  Center-align headings in hero sections (h1, h2 in spacious sections with dark backgrounds).
+  Left-align all body text and headings in content sections by default.
+  Use "justify" on long-form body paragraphs only — it signals editorial authority,
+  appropriate for literary or journalistic pages. Always combine with dropCap on the first
+  paragraph of a long-form content section.
+
+DROP CAPS
+  Apply dropCap: true to the first paragraph of any zone that contains extended prose and
+  where the source page has an editorial, literary, or magazine character. Drop caps signal
+  craft and are one of the clearest typographic identity markers for author and publishing sites.
+  Do not apply to list items, short paragraph stubs, or placeholder-only zones.
+
+UPPERCASE LABELS
+  Use the textStyle mark with textTransform: "uppercase" and letterSpacing: "wide" for
+  section eyebrows (short label text above a headline) and caption-style text. This pattern
+  ("ABOUT THE AUTHOR", "FEATURED WORK", "CHAPTER ONE") is a strong editorial voice marker.
+  Match it to the source page's typographic hierarchy.
+```
+
+### Image Prompt Self-Optimization (Section 5 of system prompt)
+
+When image generation is enabled, the system prompt includes a Section 5 that instructs the master AI to **declare its prompting strategy for the configured image model before writing any image briefs**. This produces an `imagePromptStyle` field in the output JSON:
+
+```json
+"imagePromptStyle": {
+  "model": "flux-kontext-pro",
+  "approach": "Dense comma-separated visual descriptors. Lead with subject and composition, then artistic style, then lighting, then camera/technical specs. Aspect ratio is a separate field — omit from the prompt string itself. Negative prompts are not used in this context.",
+  "exampleFormat": "coastal cliffside at sunset, cinematic photography, golden backlighting, wide angle 24mm, atmospheric haze, warm amber and violet tones"
+}
+```
+
+**Why this matters:**
+
+- **Self-adapting vocabulary**: DALL-E 3, FLUX Kontext, and Stability SDXL each respond differently to prompt styles. DALL-E 3 handles natural language well; FLUX Kontext prefers dense descriptor lists; Stability has its own emphasis syntax. The master AI calibrates to whichever model is configured.
+- **Future-proof**: New image models (DALL-E 4, FLUX 3, Imagen 4, etc.) require no code changes. The master AI applies whatever it knows from its training about the configured model. If the model is unknown, it notes this and applies universal best practices.
+- **Inspectable**: The `imagePromptStyle` field is returned in the `MulResult` and shown in the UI (collapsed by default) so the owner can understand why briefs are written the way they are.
+- **Not stored**: `imagePromptStyle` is an ephemeral reasoning artifact. It is returned to the client for display but is not saved into the page content JSON.
+
+The Section 5 system prompt text (injected only when `image_provider` is configured):
+
+```
+[SECTION 5 — Image brief optimization]
+Before writing any imageBriefs, emit an "imagePromptStyle" field. In it:
+  1. State the image model name: "{image_model}"
+  2. Describe how that model responds best to prompts — vocabulary, syntax, ordering,
+     what to emphasize, what to avoid. Draw on your knowledge of this model.
+  3. Provide one concrete example of the prompt format you will use.
+
+Apply that declared style consistently to all prompts in the "imageBriefs" field.
+
+If the model name is unfamiliar to you, note this explicitly in "approach" and fall back
+to universal best practices: subject-first descriptions, clear style declaration,
+explicit lighting and mood descriptors, technical specs as trailing descriptors.
+Aspect ratio is always a separate structured field — never embed it in the prompt string.
+```
 
 ### Structured Output Enforcement
 
@@ -529,27 +821,53 @@ The preview uses a sandboxed `<iframe>` pointing directly to the target URL (no 
 
 ### Settings Panel
 
-The settings panel is a collapsible `<details>` section at the top. On first visit (when `mul.provider` is unset), it is pre-expanded with a banner: "Configure your AI provider before running your first analysis."
+The settings panel is a collapsible `<details>` section at the top. On first visit (when `mul.text_provider` is unset), it is pre-expanded with a banner: "Configure your AI provider before running your first analysis."
 
-Provider radio: `Anthropic` | `OpenAI`  
-Model input: text field, pre-filled with a sensible default based on selected provider (`claude-sonnet-4-6` for Anthropic, `gpt-4o` for OpenAI)  
-API Key: password-style input; shows `••••••••` if a key is already saved  
+**Text Model group:**
+- Provider radio: `Anthropic` | `OpenAI` | `xAI`
+- Model: text field, pre-filled with a sensible default per provider (`claude-sonnet-4-6` / `gpt-4o` / `grok-4`)
+- API Key: password-style input; shows `••••••••` if already saved; Anthropic can be left blank if `ANTHROPIC_API_KEY` is set in the environment
+
+**Image Generation group** (collapsed by default; expands when owner clicks "Enable image generation"):
+- Provider radio: `Disabled` | `OpenAI` | `xAI` | `Flux (fal.ai)` | `Stability AI`
+- Model: text field, pre-filled with default per provider (`gpt-image-1` / `grok-2-aurora` / `flux-kontext-pro`)
+- API Key: hidden when provider matches the text provider (key is shared automatically — applies to both OpenAI↔OpenAI and xAI↔xAI); otherwise separate password input
+- Mode toggle: `Brief-only` | `+ Reference images`
+  - Reference mode disclosure: *"Reference mode passes images from the source URL to your image provider for style reference. Only enable if you own or have rights to the source images."*
+- Info note: "Image generation adds ~10–30s. Generated images are saved to your Media Library."
+
 Save button: `PATCH /mul/settings`
 
 ---
 
 ## LLM Model Recommendations
 
-The user supplies their own model. The system prompt is text-only (no image attachments in v1), so any sufficiently capable text model works. Guidance shown in the settings panel:
+The user supplies their own model and API key. The system prompt is text-only (no image attachments in v1), so any sufficiently capable text model works. Guidance shown in the settings panel:
+
+### Text (Semantic) Layer
 
 | Provider | Recommended Model | Notes |
 |----------|------------------|-------|
-| Anthropic | `claude-sonnet-4-6` | Best balance of speed, cost, and layout reasoning. Strong structured output via tool use. |
-| Anthropic | `claude-opus-4-8` | Highest quality for complex pages; noticeably more expensive. |
-| OpenAI | `gpt-4o` | Equivalent quality to Sonnet 4.6; supports strict JSON schema. |
+| Anthropic | `claude-sonnet-4-6` | Best balance of speed, cost, and layout reasoning. Strong structured output via tool use. Default recommendation. |
+| Anthropic | `claude-opus-4-8` | Highest quality for complex pages and nuanced aesthetic inference; noticeably more expensive. |
+| OpenAI | `gpt-4o` | Equivalent quality to Sonnet 4.6; supports strict JSON schema output. |
 | OpenAI | `gpt-4o-mini` | Faster and cheaper; acceptable for simple pages with straightforward color schemes. |
+| xAI | `grok-4` | 1M-token context window; strong reasoning; lowest reported hallucination rate among frontier models as of mid-2026. OpenAI-compatible API — easy integration. |
+
+### Image Generation Layer
+
+| Provider | Recommended Model | Mode | Notes |
+|----------|------------------|------|-------|
+| OpenAI | `gpt-image-1` | Brief-only or Reference | Natural language prompts. Shares API key with OpenAI text layer. Best for owners already using OpenAI. OpenAI-native optimization applies automatically when both layers are OpenAI. |
+| xAI | `grok-2-aurora` | Brief-only or Reference | xAI's Aurora image generation model. Shares API key with xAI text layer (`mul.xai_api_key_enc`). xAI-native optimization applies automatically when both layers are xAI/Grok. Best for owners already using Grok as the text model. |
+| Flux (fal.ai) | `flux-kontext-pro` | Brief-only or Reference | Best quality for reference-conditioned generation. Descriptor-list prompts. Separate fal.ai key required. |
+| Flux (fal.ai) | `flux-schnell` | Brief-only | Fastest and cheapest; good for layout scaffolding where photorealism isn't critical. |
+| Stability AI | `stable-diffusion-xl-1024-v1-0` | Brief-only | Wide model ecosystem; separate Stability key required. |
+| Disabled | — | — | Default. Scaffold uses `media://placeholder` slots the owner fills manually. |
 
 **Why not require a vision model?** The text-based HTML extraction is sufficient for most palette and layout inferences. The dominant CSS colors are explicitly present in the source; the DOM structure gives enough layout signal. Vision adds marginal value at higher cost and API complexity. A vision enhancement path is reserved for v2 (see Future Work).
+
+**Image prompt self-optimization**: The text model calibrates its image brief vocabulary to the configured image model automatically (see *Image Prompt Self-Optimization* above). Owners do not need to learn provider-specific prompt syntax — the master AI handles this.
 
 ---
 
@@ -566,10 +884,18 @@ MulConverterService.analyze(url)
   │  1. SSRF-validate URL
   │  2. Fetch HTML (timeout 10s, max 2MB)
   │  3. Extract: colors, DOM structure, meta
-  │  4. Read provider/model/key from ISM
-  │  5. Build system prompt + user message
-  │  6. Call AI provider (Anthropic or OpenAI)
+  │  4. Read text_provider/text_model + image_provider/image_model from ISM
+  │  5. Build system prompt (parameterized on image_provider/model if enabled)
+  │  6. Call text AI provider (Anthropic, OpenAI, or xAI)
+  │     → Response includes: palette, page sections, imagePromptStyle?, imageBriefs?
   │  7. Parse + validate structured JSON response
+  │  [if image_provider configured]
+  │  8. For each imageBrief: call image provider → bitmap
+  │     → Upload to GCS → create Media record → replace media://placeholder with media://uuid
+  │  [if text_provider === image_provider === 'openai']
+  │  8′. Use OpenAI Responses API conversation mode (steps 6+8 merged into one API call)
+  │  [if text_provider === image_provider === 'xai']
+  │  8″. Use Grok multi-turn API conversation mode (steps 6+8 merged; xAI-native optimization)
   ▼
   Return MulResult to controller → HTTP 200
 
@@ -607,13 +933,328 @@ Browser (owner)
 
 ---
 
+---
+
+## Part 2B — Bitmap-Imitating Layer (Image Generation)
+
+After the core scaffold generation (Part 2) is stable, a progressive-enhancement layer can replace `"media://placeholder"` slots with AI-generated images that approximate the mood and composition of the originals. This is an optional feature gated by a separate image provider configuration.
+
+### Concept
+
+The semantic text model already sees enough to write an image brief — alt text, figure captions, DOM context (`.hero__bg`, `.banner`, `og:image`), and surrounding headline text. Each `"media://placeholder"` in the generated scaffold corresponds to one image brief the model can produce as part of its output. A separate image generation model then renders each brief into a real bitmap. The generated image is uploaded to the Media Library (GCS public bucket) and a `Media` record is created — the section background references a real `media://uuid` from day one.
+
+The generated images are new original works. They are **inspired by** (not reproductions of) the source: the brief describes mood, composition, and subject matter inferred from DOM context, not pixel-level copying. This is legally clean.
+
+### Data Flow
+
+```
+MulConverterService.analyze(url)
+  │ ... existing text analysis + scaffold generation ...
+  │
+  ├── for each section with background.type === "image":
+  │     AI output includes: imageBriefs[id] = { description, aspectRatio, style }
+  │
+  ├── [if image provider configured]
+  │     for each imageBrief:
+  │       → POST to image generation API (brief → bitmap)
+  │       → Upload bitmap to GCS public bucket
+  │       → Create Media record in DB
+  │       → Replace "media://placeholder" with "media://{newUuid}" in sections
+  │
+  └── Return MulResult (with real media refs if image generation ran)
+```
+
+### AI Output Extension
+
+The scaffold generation prompt gains two new output fields when image generation is enabled: `imagePromptStyle` (see *Image Prompt Self-Optimization* above) and `imageBriefs`.
+
+```json
+"imagePromptStyle": {
+  "model": "flux-kontext-pro",
+  "approach": "Dense comma-separated visual descriptors. Lead with subject and composition, then artistic style, then lighting, then technical/camera details. Avoid negative prompts. Aspect ratio is a separate field.",
+  "exampleFormat": "coastal cliffside at dusk, cinematic photography, warm amber backlighting, 24mm wide angle, atmospheric haze, violet and gold tones"
+},
+"imageBriefs": {
+  "<zone-or-section-id>": {
+    "prompt": "...",         // written in the style declared by imagePromptStyle
+    "aspectRatio": "16:9",  // e.g. "16:9", "1:1", "3:2", "4:3"
+    "style": "photorealistic | illustration | abstract",
+    "imageSourceUrl": "https://source-site.com/hero.jpg"
+      // Only populated when mul.image_reference_mode === "reference".
+      // Passed to the image provider as a composition/mood reference; never stored.
+  }
+}
+```
+
+The section that declares `background.type: "image"` and `background.value: "media://placeholder"` uses the matching `id` as its key in `imageBriefs`. The master AI extracts candidate `imageSourceUrl` values from the page during its analysis pass (from `og:image`, prominent `<img>` tags, hero element backgrounds) — no extra network fetch is required.
+
+### Image Provider Abstraction
+
+```typescript
+interface ImageBrief {
+  prompt: string;
+  aspectRatio: string;
+  style: 'photorealistic' | 'illustration' | 'abstract';
+  imageSourceUrl?: string;  // populated in reference mode
+}
+
+interface ImageProvider {
+  generate(brief: ImageBrief): Promise<Buffer>; // returns PNG/JPEG bytes
+}
+
+class GptImage1Provider  implements ImageProvider { ... }  // OpenAI gpt-image-1
+class XAIImageProvider   implements ImageProvider { ... }  // xAI Aurora (thin subclass of GptImage1Provider; different base URL + model)
+class FluxProvider       implements ImageProvider { ... }  // FLUX models via fal.ai
+class StabilityProvider  implements ImageProvider { ... }  // Stability AI SDXL
+```
+
+Provider selected by `mul.image_provider` ISM key. All providers use REST/fetch — no image SDK hard dependency. When `imageSourceUrl` is present and the provider supports reference conditioning (OpenAI Responses API, xAI Aurora, FLUX Kontext), it is passed as a reference input. Providers that don't support reference conditioning ignore the field and use `prompt` only.
+
+**Reference mode and OpenAI**: When both `mul.text_provider` and `mul.image_provider` are `openai`, the Responses API conversation mode handles both analysis and reference-conditioned image generation in one context — no separate image API call is needed. The text model's vision understanding of the source page feeds directly into the image generation step.
+
+**Reference mode and xAI**: When both `mul.text_provider` and `mul.image_provider` are `xai`, the same principle applies using Grok's multi-turn API. `XAIImageProvider` is a thin subclass of `GptImage1Provider` with `baseUrl = 'https://api.x.ai/v1'` — xAI's image generation endpoint follows the OpenAI images API shape. The `mul.xai_api_key_enc` key is shared by both layers automatically (per-platform key sharing).
+
+### ISM Keys (Part 2B additions)
+
+Part 2B uses the same per-platform key structure defined in the main ISM Keys table above. No new key slots are needed — `mul.image_provider`, `mul.image_model`, `mul.image_reference_mode`, and the per-platform API keys are all defined there.
+
+### Settings Panel
+
+Image generation settings are integrated into the main MulSettingsPanel as described in the *Settings Panel* section above. No separate panel extension is needed.
+
+### Latency and Cost Notes
+
+- GPT-Image-1 / OpenAI: ~8–15s per image, ~$0.04–0.08 per image (1024×1024)
+- xAI Aurora: comparable to GPT-Image-1; pricing subject to xAI's published rates
+- Stability AI SDXL: ~3–8s per image, ~$0.002–0.006 per image
+- Flux (fal.ai): ~2–5s, competitive pricing, highest quality
+
+For a typical 3-section scaffold with 2 background images, total generation adds ~15–30s. The UI should show per-image progress in the "Analyzing…" step.
+
+---
+
+---
+
+## Part 3: Scroll-Driven Background Transitions + Gradient Overlays
+
+Part 3 implements true simultaneous crossfade between section backgrounds, a full transition vocabulary, gradient overlay masks, and enriched HTML signal extraction for the Mul Converter. No production pages currently use the sections format, so there is no backward compatibility burden.
+
+### Renderer architecture: true crossfade via fixed-position background stack
+
+The renderer splits into two independent passes:
+
+**Pass 1 — Fixed background stack.** All section background composites are rendered as `position: fixed; inset: 0` layers, z-ordered so that earlier sections in the page sit above later ones (section 0 = highest z-index). Scroll-driven animation (`animation-timeline: view()`, anchored to each section's content spacer) drives opacity, clip-path, or transform on each layer as its corresponding section exits the viewport.
+
+**Pass 2 — Transparent content sections.** Content sections are normal document-flow divs with no background CSS. They provide scroll height, anchor animation timelines, and render zone grids above the background stack.
+
+This produces **true simultaneous crossfade**: as section A's composite fades from opacity 1→0, section B's composite (already at full opacity at a lower z-index) is revealed beneath it. At the midpoint of the transition both composites are visible simultaneously — a genuine dissolve, not a sequential fade-to-nothing.
+
+### Composite unit: background image + overlay
+
+The overlay div is a child of the background composite layer — not a sibling at the same level. When the composite transitions (fades, clips, slides), the overlay rides it as a single inseparable unit. No synchronization is needed because there is nothing to synchronize: the scrim belongs to its background.
+
+```
+<div class="fixed-bg-layer" style="z-index: N; ...scroll-driven animation...">
+  <div class="bg-image" />      ← image
+  <div class="bg-overlay" />    ← overlay rides the composite
+</div>
+```
+
+**Parallax exception.** For `transition: 'parallax'`, the image drifts at ~50% scroll speed while the overlay must remain planted (otherwise the gradient shifts relative to the zone text, breaking legibility). Image and overlay are siblings inside the fixed layer; `transform` is applied only to the image div. The image is oversized by 20% top/bottom to prevent black bars at drift extremes.
+
+### Background rendering model: two-tier architecture
+
+The background system has two fundamentally different rendering paths, reflected as a top-level `mode` field:
+
+**Traditional (`mode: 'traditional'`)** — background is set as an inline CSS property directly on the section `<div>`. The section scrolls as normal page content. No fixed-position stack is engaged. This is the default and has the broadest browser compatibility. The `imageSize` sub-option (Cover / Fit Width) applies here.
+
+**Animated (`mode: 'animated'`)** — background is rendered as a `position: fixed` layer in a stacked slide system (z-ordered so earlier sections sit above later ones). A scroll listener drives all animation. Only sections with `mode: 'animated'` participate in the fixed stack. The section itself renders as a transparent scroll spacer; the fixed layer provides the visual.
+
+The fixed-position stack is **opt-in** — only engaged when `mode === 'animated'`.
+
+#### Animated sub-axes: movement and exit
+
+Animated backgrounds have two fully independent axes:
+
+**Movement** — how the slide behaves while the section occupies the viewport:
+
+| Value | Behaviour | Best use |
+|---|---|---|
+| `'fixed'` (default) | Background stays planted; content scrolls over it (window-pane) | Subtle depth without motion |
+| `'parallax'` | Image drifts upward at ~50% scroll speed; overlay stays planted | Photography-forward, depth aesthetics |
+
+**Exit** — how the slide gives way when the section boundary crosses the viewport:
+
+| Value | Behaviour | Best use |
+|---|---|---|
+| `'none'` (default) | Snap cut — layer opacity snaps to 0 once section exits | Clean cut between slides |
+| `'fade'` | Composite dissolves out, revealing next slide beneath | Hero image sections; smooth dissolves |
+| `'wipe-v'` | Vertical clip-path wipe upward | Structured, editorial transitions |
+| `'wipe-left'` | Clip wipe from the right edge | Alternating image+text, magazine style |
+| `'wipe-right'` | Clip wipe from the left edge | Reverse magazine alternation |
+| `'slide-up'` | Composite translates upward off screen | Motion-heavy, scroll-storytelling |
+
+Any movement value can be combined with any exit value. Examples:
+- `Fixed + Fade` — planted background dissolves to next (most common animated combo)
+- `Parallax + Fade` — drifting image dissolves at boundary
+- `Fixed + Wipe ↓` — planted background clips away vertically
+- `Parallax + None` — drift while displayed, snap cut at boundary
+
+#### Backward-compat mapping from deprecated `transition` field
+
+Existing sections saved with the old single `transition` field are read-time migrated:
+
+| Old `transition` | New `mode` | New `movement` | New `exit` |
+|---|---|---|---|
+| `'none'` | `'traditional'` | — | — |
+| `'fixed'` | `'animated'` | `'fixed'` | `'none'` |
+| `'parallax'` | `'animated'` | `'parallax'` | `'none'` |
+| `'fade'` | `'animated'` | `'fixed'` | `'fade'` |
+| `'wipe-v'` | `'animated'` | `'fixed'` | `'wipe-v'` |
+| `'wipe-left'` | `'animated'` | `'fixed'` | `'wipe-left'` |
+| `'wipe-right'` | `'animated'` | `'fixed'` | `'wipe-right'` |
+| `'slide-up'` | `'animated'` | `'fixed'` | `'slide-up'` |
+
+Old `attachment: 'parallax'` → `mode: 'animated'`, `movement: 'parallax'`, `exit: 'none'`. All other `attachment` values are silently ignored (they had no remaining meaning once the fixed stack was introduced in Part 3).
+
+### SectionBackgroundPanel UI flow (Transition sub-section)
+
+The Transition sub-section of the panel has three visually separated groups:
+
+```
+── Traditional ──────────────────────
+  [Scroll ↕]  (+ Cover/Fit Width sub-option when type=image)
+
+── Animated ─────────────────────────
+  Movement:  [Fixed ⬛]  [Parallax 〰]
+  Exit:      [None]  [Fade ◐]  [Wipe ↓ ▽]  [Wipe ← ◁]  [Wipe → ▷]  [Slide ↑ ⬆]
+```
+
+**Selection flow:**
+
+1. **Default state**: Scroll (Traditional) is highlighted. Movement and Exit pickers show all options unselected (visible but no highlight — communicates "not active" without hiding information).
+
+2. **Switching to Animated**: clicking any Movement or Exit option atomically:
+   - Removes Scroll's highlight
+   - Highlights the clicked option
+   - Auto-selects the default in the *other* picker if nothing is chosen there: `movement` defaults to `'fixed'`, `exit` defaults to `'none'`
+   - One click always produces a complete, valid animated profile
+
+3. **Switching back to Traditional**: clicking Scroll:
+   - Removes all Movement/Exit highlights
+   - Sets `mode: 'traditional'`
+   - Does **not** discard the current `movement`/`exit` values from local panel state
+
+4. **Session restore**: if the user switches Traditional → Animated → Traditional → Animated again within a single panel open/close cycle, the previous `movement` and `exit` selections are restored from local React state (`useState` initialized from the saved background if an animated profile exists, otherwise cold defaults of `fixed + none`). This state is not persisted beyond the panel's React lifecycle — closing and reopening the panel re-initializes from whatever `mode` is saved in the page data.
+
+### Gradient overlay patterns
+
+When `overlay.gradient` is set, alpha is baked into the gradient stops; no separate `opacity` field is needed.
+
+| Pattern | CSS | Use |
+|---|---|---|
+| Bottom vignette | `linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.75) 100%)` | Hero with headline at the bottom — default |
+| Top vignette | `linear-gradient(to top, transparent 30%, rgba(0,0,0,0.75) 100%)` | Caption above a photo |
+| Dual vignette | `linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.5) 100%)` | Framed / cinematic section |
+| Radial vignette | `radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%)` | Centre-focus portrait or product shot |
+| Side fade | `linear-gradient(to right, rgba(0,0,0,0.7) 0%, transparent 60%)` | Text panel beside an image, left-aligned |
+
+### Enriched HTML extraction: `AnimationSignals`
+
+The HTML extractor adds `extractAnimationSignals(html)` producing an `AnimationSignals` struct passed to the AI alongside colors and DOM structure:
+
+```typescript
+interface AnimationSignals {
+  hasFixedBackground: boolean      // background-attachment: fixed in CSS
+  hasScrollTimeline: boolean       // animation-timeline or scroll() detected
+  hasKeyframes: boolean            // @keyframes present
+  hasOpacityTransition: boolean    // transition/animation involving opacity
+  hasTransformTransition: boolean  // transition/animation involving transform
+  hasStickyElements: boolean       // position: sticky
+  hasHighZIndexStack: boolean      // z-index > 10 on multiple elements
+  libraryFingerprints: string[]    // ['aos', 'gsap', 'locomotive', 'framer-motion']
+  overlayGradients: string[]       // extracted gradient strings from overlay elements
+  motionClassNames: string[]       // class names: parallax, fade, scroll-reveal, etc.
+}
+```
+
+Library detection is by data-attribute and class-name fingerprint — no script parsing required. This gives the model concrete observable evidence rather than requiring it to guess from palette alone.
+
+### System prompt Section 3C: signal-to-tool decision tree
+
+The system prompt teaches the model to map `AnimationSignals` to transition and overlay choices — **semantic equivalence, not literal CSS replication**:
+
+- `hasFixedBackground` or `motionClassNames` contains `"parallax"` → `mode: 'animated'`, `movement: 'parallax'`, `exit: 'none'`
+- `libraryFingerprints` contains `"aos"`, `"framer-motion"`, or `"locomotive"` → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'fade'` (these libraries predominantly use opacity reveals)
+- `libraryFingerprints` contains `"gsap"` → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'slide-up'` (GSAP commonly animates translateY)
+- DOM shows alternating image+text pairs → alternate `exit: 'wipe-left'` / `'wipe-right'`, `movement: 'fixed'`
+- Photography-forward page, no specific signal → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'fade'`
+- No motion signals, structural/editorial layout → `mode: 'animated'`, `movement: 'fixed'`, `exit: 'none'` (planted background, snap cut) or `mode: 'traditional'` (scrolls with content — use for simple/light sites)
+- Simple informational page, minimal visual design → `mode: 'traditional'`
+- `overlayGradients` non-empty → adopt detected gradient direction and alpha
+- Hero section with image background and zone heading → bottom vignette gradient overlay by default
+- Full-zone body text → solid overlay at 0.4–0.6 opacity
+- Decorative / no zone text → no overlay
+- Any image background with `mode: 'animated'` → `minHeight: "60vh"`
+
+---
+
+## System Prompt Architecture
+
+### Approach
+
+The Mul Converter system prompt is composed from a set of named TypeScript files in `backend/src/mul-converter/prompts/`. Each file exports a string constant covering one logical section of the prompt. `buildSystemPrompt()` in `system-prompt.ts` imports and concatenates these constants, then appends the dynamic image-generation sections inline (those sections are conditional on `hasImages` / `nativeMode` flags and cannot be static prose).
+
+**The PRD is the single source of truth** for sections 2–5. Each prompt file carries a header comment citing the specific PRD section it describes. When the page builder schema or aesthetic vocabulary changes:
+
+1. Update the PRD first (this file, the relevant section)
+2. Use a frontier LLM to diff the affected prompt file(s) against the updated PRD section and produce a revised prompt
+3. Review and commit the updated prompt file alongside the code change
+
+This is preferable to auto-generating prompt prose from TypeScript types because the prompt files contain *interpretive* content — semantic mappings, constraint explanations, combination guidance — that cannot be derived mechanically from the type system.
+
+**Why not the DB?** The structural sections (schema, constraints, signal mapping) are tightly coupled to the codebase. A mistaken DB edit would silently break every Mul Converter run until noticed. These are load-bearing infrastructure and belong under version control. The optional `mul.system_context` ISM key (owner-settable from Admin Settings) covers the subjective layer — brand voice, design preferences, site-specific aesthetic guidance — without touching the structural sections.
+
+**Why not individual code files as the source of truth?** The mapping from prompt sections to code files is unstable. A new aesthetic feature (e.g. `textShadow`) might touch `types/index.ts`, a renderer, a panel component, and a CSS utility — none of which is the single authoritative description of the capability. The PRD describes capabilities at the right abstraction level; code files describe implementation details.
+
+### Prompt file inventory
+
+| File | PRD source | Content |
+|---|---|---|
+| `prompts/01-role.prompt.ts` | § "What we need" | Role statement, task definition |
+| `prompts/02-palette-schema.prompt.ts` | § "Color palette schema" | 10-slot palette, color rules |
+| `prompts/03-page-schema.prompt.ts` | § "Page layout system", § "Background rendering model" | Section/zone/TipTap schema, `mode`/`movement`/`exit` vocabulary |
+| `prompts/04-aesthetic-tools.prompt.ts` | § "Aesthetic tools" in system prompt design | Padding, overlay, zone scheme, fonts, alignment, drop caps, labels |
+| `prompts/05-signal-mapping.prompt.ts` | § "SectionBackgroundPanel UI flow", § AnimationSignals decision tree | `AnimationSignals` → `mode`/`movement`/`exit` two-axis decision tree |
+
+Dynamic sections (image briefs, native image generation) are inline in `system-prompt.ts` because they are conditional on runtime flags and contain model-specific template values.
+
+### LLM sync workflow
+
+When a schema or behavior change is made:
+
+```
+1. Edit the PRD section that describes the changed capability
+2. Run:
+   "Here is the updated PRD section: <paste>
+    Here is the current prompt file: <paste>
+    Update the prompt file to match the PRD. Preserve tone and structure;
+    only change what the PRD says has changed."
+3. Review output, commit both the PRD change and the prompt file update together
+```
+
+The prompt file header comment makes step 2 self-documenting — it always points to the exact PRD section to paste.
+
+---
+
 ## Future Work (v2+)
 
 - **Vision mode**: Optionally take a screenshot via a configurable screenshot API (urlbox.io, htmlcsstoimage.com) and send the image to a vision-capable model alongside the HTML data. Significantly better for visually unusual pages that don't expose colors in CSS, or pages that rely on background images for layout identity.
-- **Font pairing extraction**: Read `font-family` declarations from extracted CSS; map to available font pairings or generate a Google Fonts URL for custom pairings.
-- **Section background image upload**: After scaffold creation, prompt the owner to upload images from the Media Library to fill `"media://placeholder"` background slots in the generated sections.
+- **Media Library image picker for placeholders**: After scaffold creation without image generation, a picker lets the owner drag Media Library assets into `"media://placeholder"` slots inline in the ResultsPanel.
 - **Conversion history**: Store past `MulResult` entries so the owner can revisit or re-apply a previous analysis without re-fetching.
 - **Palette editing UI**: A color-picker interface for adjusting individual slots before saving, rather than raw hex inputs.
 - **Export / share**: Export a palette as a JSON file that another AECMS instance can import.
 - **Section responsive overrides**: Per-section `collapseBelow` setting to control at which breakpoint columns collapse — for cases where a 2-column section should remain 2-column on tablet.
+- **Human editor controls for AI properties**: UI controls in the section editor for gradient backgrounds, overlay opacity, zone scheme, drop caps, letter spacing, and text transform. These properties are handled by the renderer and steward-preserved by the editor in v1 but have no explicit controls. Add incrementally.
 - **Freeform canvas positioning**: Absolute x/y placement of blocks. Requires a full breakpoint system to remain responsive; out of scope for AECMS's lightweight positioning as a CMS, not a visual builder.
+- **Multi-layer section backgrounds** (Phase 28): `background` becomes `backgrounds: SectionBackground[]` — an ordered array of layers, each with its own `mode`/`movement`/`exit` axes, image/color/gradient, overlay, and drift rate. The fixed-position stack already accommodates multiple layers per section architecturally; the data model and scroll handler iteration are the only structural changes. Enables: multi-depth parallax (base color + texture PNG at 0.3× drift + cut-out foreground at 0.7× drift), simultaneous opposing exits (two layers wipe in opposite directions at the boundary), and transparent PNG cut-outs compositing over subsequent sections' backgrounds through the z-ordered stack. Panel UI: collapsed accordion per layer, "Add Layer" button at the bottom, same Background/Overlay/Transition sub-sections per card. Full plan: `docs/phases/PHASE_28_PLAN.md`.

@@ -29,11 +29,27 @@ export class PublicSettingsController {
   constructor(private settingsService: SettingsService) {}
 
   @Get('theme')
-  @ApiOperation({ summary: 'Get current theme settings (palette, font pairing)' })
+  @ApiOperation({ summary: 'Get current theme settings (palette, font pairing, custom palettes)' })
   async getTheme() {
-    const raw = await this.settingsService.get('theme');
-    if (!raw) return { palette: 'midnight', fontPairing: 'default' };
-    try { return JSON.parse(raw); } catch { return { palette: 'midnight', fontPairing: 'default' }; }
+    const [themeRaw, customRaw] = await Promise.all([
+      this.settingsService.get('theme'),
+      this.settingsService.get('appearance.custom_palettes'),
+    ]);
+    const theme = themeRaw ? (() => { try { return JSON.parse(themeRaw); } catch { return {}; } })() : {};
+    const customPalettes = customRaw ? (() => { try { return JSON.parse(customRaw); } catch { return []; } })() : [];
+    return {
+      palette: theme.palette ?? 'midnight',
+      fontPairing: theme.fontPairing ?? 'default',
+      customPalettes,
+    };
+  }
+
+  @Get('fonts')
+  @ApiOperation({ summary: 'Get custom font library entries (curated fonts are client-side constants)' })
+  async getFonts() {
+    const raw = await this.settingsService.get('appearance.fonts');
+    if (!raw) return { customFonts: [] };
+    try { return { customFonts: JSON.parse(raw) }; } catch { return { customFonts: [] }; }
   }
 
   @Get('general')
@@ -207,11 +223,15 @@ export class SettingsController {
 
   @Patch('appearance')
   @RequiresCapability('system.appearance')
-  @ApiOperation({ summary: 'Update appearance settings (theme key only) — requires system.appearance' })
-  async updateAppearance(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+  @ApiOperation({ summary: 'Update appearance settings (theme, fonts, customPalettes) — requires system.appearance' })
+  async updateAppearance(@Body() dto: UpdateSettingsDto & { customPalettes?: unknown[] }, @Request() req: any) {
+    const ALLOWED_KEYS = new Set(['theme', 'appearance.fonts']);
     const allowed = Object.fromEntries(
-      Object.entries(dto.updates).filter(([k]) => k === 'theme'),
+      Object.entries(dto.updates ?? {}).filter(([k]) => ALLOWED_KEYS.has(k)),
     );
+    if (dto.customPalettes !== undefined) {
+      allowed['appearance.custom_palettes'] = JSON.stringify(dto.customPalettes);
+    }
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'Appearance saved' };
   }

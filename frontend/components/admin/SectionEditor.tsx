@@ -1,10 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { GripVertical, Plus, Trash2, CopyPlus, Settings } from 'lucide-react';
+import { GripVertical, Plus, Trash2, CopyPlus, Layers, Minus, Sun, Moon, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Maximize2, Eye, EyeOff, Lock } from 'lucide-react';
 import { TipTapEditor } from '@/components/editor/TipTapEditor';
 import { WidgetSizeProvider } from '@/contexts/WidgetSizeContext';
-import type { PageSection, PageZone, SectionBackground } from '@/types';
+import { SectionBackgroundPanel } from '@/components/admin/SectionBackgroundPanel';
+import type { PageSection, PageZone, SectionBackground, ZoneScheme, ZoneAlign, ZoneWidth, SectionBorder, SectionVisibility } from '@/types';
 
 // ── Template definitions ───────────────────────────────────────────────────────
 
@@ -211,112 +212,6 @@ function TemplatePicker({ section, onApply }: TemplatePickerProps) {
   );
 }
 
-// ── Background Flyout ──────────────────────────────────────────────────────────
-
-interface BackgroundFlyoutProps {
-  background?: SectionBackground;
-  onUpdate: (bg: SectionBackground) => void;
-}
-
-function BackgroundFlyout({ background, onUpdate }: BackgroundFlyoutProps) {
-  const [open, setOpen] = useState(false);
-  const bg = background ?? { type: 'none' as const };
-  const hasActive = bg.type !== 'none';
-
-  return (
-    <div className="relative flex-shrink-0">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        title="Section background"
-        className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors ${
-          hasActive ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-        }`}
-      >
-        <Settings className="w-3 h-3" />
-        <span>BG</span>
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 z-20 bg-surface border border-border rounded-lg shadow-lg p-3 w-56 space-y-3">
-            <div>
-              <p className="text-xs font-medium mb-1.5">Type</p>
-              <div className="flex gap-1">
-                {(['none', 'color', 'image'] as const).map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => onUpdate({ ...bg, type: t })}
-                    className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                      bg.type === t ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-                    }`}
-                  >
-                    {t === 'none' ? 'None' : t === 'color' ? 'Color' : 'Image'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {bg.type === 'color' && (
-              <div>
-                <p className="text-xs font-medium mb-1.5">Color</p>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="color"
-                    value={bg.value ?? '#ffffff'}
-                    onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                    className="w-8 h-7 rounded cursor-pointer border border-border bg-transparent p-0.5"
-                  />
-                  <input
-                    type="text"
-                    value={bg.value ?? ''}
-                    onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                    className="flex-1 text-xs px-2 py-1 border border-border rounded font-mono bg-background"
-                    placeholder="#ffffff or rgba(…)"
-                  />
-                </div>
-              </div>
-            )}
-
-            {bg.type === 'image' && (
-              <>
-                <div>
-                  <p className="text-xs font-medium mb-1.5">Image URL</p>
-                  <input
-                    type="url"
-                    value={bg.value ?? ''}
-                    onChange={(e) => onUpdate({ ...bg, value: e.target.value })}
-                    className="w-full text-xs px-2 py-1.5 border border-border rounded bg-background"
-                    placeholder="https://…"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs font-medium mb-1.5">Attachment</p>
-                  <div className="flex gap-1">
-                    {(['scroll', 'fixed', 'parallax'] as const).map(a => (
-                      <button
-                        key={a}
-                        type="button"
-                        onClick={() => onUpdate({ ...bg, attachment: a })}
-                        className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-                          (bg.attachment ?? 'scroll') === a ? 'border-accent bg-accent/10 text-accent' : 'border-border hover:bg-surface-raised'
-                        }`}
-                      >
-                        {a.charAt(0).toUpperCase() + a.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 // ── Main SectionEditor ─────────────────────────────────────────────────────────
 
 interface SectionEditorProps {
@@ -338,6 +233,8 @@ export function SectionEditor({
   onUpdate,
   onDelete,
 }: SectionEditorProps) {
+  const [bgPanelOpen, setBgPanelOpen] = useState(false);
+
   function applyTemplate(template: TemplateSpec) {
     if (sectionHasContent(section) && !window.confirm('Apply template? Existing zone content will be removed.')) return;
     onUpdate({
@@ -377,6 +274,22 @@ export function SectionEditor({
     }
   }
 
+  function handleZoneSchemeChange(idx: number, scheme: ZoneScheme) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, scheme } : z)) });
+  }
+
+  function handleZoneAlignChange(idx: number, align: ZoneAlign) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, align } : z)) });
+  }
+
+  function handleZoneWidthChange(idx: number, contentWidth: ZoneWidth) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, contentWidth } : z)) });
+  }
+
+  function handleZoneFullBleedToggle(idx: number) {
+    onUpdate({ ...section, zones: section.zones.map((z, i) => (i === idx ? { ...z, fullBleed: !z.fullBleed } : z)) });
+  }
+
   function handleZoneContentChange(idx: number, value: string) {
     try {
       const parsed = JSON.parse(value);
@@ -391,8 +304,14 @@ export function SectionEditor({
 
   const heightValue = section.minHeight ?? '';
 
+  const visibility = section.visibility ?? 'public';
+
   return (
-    <div className="border border-border rounded-lg overflow-hidden">
+    <div className={`border rounded-lg overflow-hidden ${
+      visibility === 'draft'     ? 'border-border opacity-50' :
+      visibility === 'logged_in' ? 'border-amber-500/40' :
+      'border-border'
+    }`}>
       {/* Section header bar */}
       <div className="flex items-center gap-2 px-3 py-2 bg-surface border-b border-border">
         {/* Drag handle */}
@@ -422,20 +341,70 @@ export function SectionEditor({
           <Plus className="w-3.5 h-3.5" />
         </button>
 
-        <BackgroundFlyout
-          background={section.background}
-          onUpdate={(bg) => onUpdate({ ...section, background: bg })}
-        />
+        <button
+          type="button"
+          onClick={() => setBgPanelOpen(true)}
+          title="Section background, overlay &amp; transition"
+          className={`flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors flex-shrink-0 ${
+            section.background && section.background.type !== 'none'
+              ? 'border-accent bg-accent/10 text-accent'
+              : 'border-border hover:bg-surface-raised'
+          }`}
+        >
+          <Layers className="w-3 h-3" />
+          <span>BG</span>
+        </button>
+
+        <select
+          value={section.padding ?? 'normal'}
+          onChange={(e) => onUpdate({ ...section, padding: e.target.value as import('@/types').SectionPadding })}
+          className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
+          title="Padding — vertical space between the section edge and its content&#10;No pad: flush/full-bleed&#10;Compact: tight feature rows&#10;Normal: standard body sections&#10;Spacious: heroes and major statements"
+        >
+          <option value="none">No pad</option>
+          <option value="compact">Compact</option>
+          <option value="normal">Normal</option>
+          <option value="spacious">Spacious</option>
+        </select>
 
         <select
           value={heightValue}
           onChange={(e) => onUpdate({ ...section, minHeight: e.target.value || undefined })}
           className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
-          title="Section height"
+          title="Min-height — section will be at least this tall even if content is shorter&#10;Auto: shrinks to content&#10;50vh: half the screen&#10;60vh: three-fifths screen&#10;75vh: three-quarters screen&#10;100vh: full screen (classic hero)"
         >
           <option value="">Auto</option>
           <option value="50vh">50vh</option>
+          <option value="60vh">60vh</option>
+          <option value="75vh">75vh</option>
           <option value="100vh">100vh</option>
+        </select>
+
+        <select
+          value={section.border ?? 'none'}
+          onChange={(e) => onUpdate({ ...section, border: e.target.value as SectionBorder })}
+          className="text-xs px-1.5 py-1 border border-border rounded bg-background cursor-pointer flex-shrink-0"
+          title="Section border — adds a ruled divider line above, below, or both"
+        >
+          <option value="none">No border</option>
+          <option value="top">Border top</option>
+          <option value="bottom">Border bottom</option>
+          <option value="both">Border both</option>
+        </select>
+
+        <select
+          value={section.visibility ?? 'public'}
+          onChange={(e) => onUpdate({ ...section, visibility: e.target.value as SectionVisibility })}
+          className={`text-xs px-1.5 py-1 border rounded bg-background cursor-pointer flex-shrink-0 ${
+            (section.visibility ?? 'public') === 'public'
+              ? 'border-border'
+              : 'border-amber-500/60 text-amber-600'
+          }`}
+          title="Section visibility&#10;Public: visible to everyone&#10;Members only: visible to logged-in users&#10;Draft: invisible to all visitors (editor only)"
+        >
+          <option value="public">👁 Public</option>
+          <option value="logged_in">🔒 Members only</option>
+          <option value="draft">✎ Draft</option>
         </select>
 
         {canDelete && (
@@ -466,16 +435,92 @@ export function SectionEditor({
             style={{ gridColumn: `span ${zone.span}` }}
             className="min-w-0 relative group"
           >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] text-foreground/25 select-none">Span {zone.span}</span>
-              <button
-                type="button"
-                onClick={() => handleSplitZone(idx)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground/40 hover:text-foreground/70 flex items-center gap-0.5"
-                title="Split zone"
-              >
-                <CopyPlus className="w-3 h-3" />
-              </button>
+            <div className="flex items-center justify-between mb-1 gap-1 flex-wrap">
+              <span className="text-[10px] text-foreground/25 select-none flex-shrink-0">Span {zone.span}</span>
+              <div className="flex items-center gap-1 flex-wrap">
+                {/* Text scheme */}
+                {([
+                  { value: 'inherit' as ZoneScheme, icon: <Minus className="w-3 h-3" />, title: 'Auto text colour — follows site scheme' },
+                  { value: 'light'   as ZoneScheme, icon: <Sun   className="w-3 h-3" />, title: 'Light text — use on dark backgrounds' },
+                  { value: 'dark'    as ZoneScheme, icon: <Moon  className="w-3 h-3" />, title: 'Dark text — use on light backgrounds' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleZoneSchemeChange(idx, opt.value)}
+                    title={opt.title}
+                    className={`p-0.5 rounded transition-colors ${
+                      (zone.scheme ?? 'inherit') === opt.value
+                        ? 'text-accent'
+                        : 'text-foreground/25 hover:text-foreground/60'
+                    }`}
+                  >
+                    {opt.icon}
+                  </button>
+                ))}
+
+                <span className="w-px h-3 bg-border flex-shrink-0" />
+
+                {/* Vertical alignment */}
+                {([
+                  { value: 'start'  as ZoneAlign, icon: <AlignStartVertical  className="w-3 h-3" />, title: 'Align content to top of row' },
+                  { value: 'center' as ZoneAlign, icon: <AlignCenterVertical className="w-3 h-3" />, title: 'Center content vertically in row' },
+                  { value: 'end'    as ZoneAlign, icon: <AlignEndVertical    className="w-3 h-3" />, title: 'Align content to bottom of row' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleZoneAlignChange(idx, opt.value)}
+                    title={opt.title}
+                    className={`p-0.5 rounded transition-colors ${
+                      (zone.align ?? 'start') === opt.value
+                        ? 'text-accent'
+                        : 'text-foreground/25 hover:text-foreground/60'
+                    }`}
+                  >
+                    {opt.icon}
+                  </button>
+                ))}
+
+                <span className="w-px h-3 bg-border flex-shrink-0" />
+
+                {/* Content max-width */}
+                <select
+                  value={zone.contentWidth ?? 'full'}
+                  onChange={(e) => handleZoneWidthChange(idx, e.target.value as ZoneWidth)}
+                  className="text-[10px] h-5 px-1 border border-border rounded bg-background cursor-pointer"
+                  title="Content width — constrains text inside the zone&#10;Full: fills the column&#10;Reading: ~672px centered (body text)&#10;Narrow: ~512px centered (captions, CTAs)"
+                >
+                  <option value="full">Full</option>
+                  <option value="reading">Reading</option>
+                  <option value="narrow">Narrow</option>
+                </select>
+
+                {/* Full-bleed toggle */}
+                <button
+                  type="button"
+                  onClick={() => handleZoneFullBleedToggle(idx)}
+                  title="Full bleed — removes side padding for edge-to-edge content"
+                  className={`p-0.5 rounded transition-colors ${
+                    zone.fullBleed
+                      ? 'text-accent'
+                      : 'text-foreground/25 hover:text-foreground/60'
+                  }`}
+                >
+                  <Maximize2 className="w-3 h-3" />
+                </button>
+
+                <span className="w-px h-3 bg-border flex-shrink-0" />
+
+                <button
+                  type="button"
+                  onClick={() => handleSplitZone(idx)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground/25 hover:text-foreground/60"
+                  title="Split zone"
+                >
+                  <CopyPlus className="w-3 h-3" />
+                </button>
+              </div>
             </div>
             <WidgetSizeProvider size="large">
               <TipTapEditor
@@ -487,6 +532,16 @@ export function SectionEditor({
           </div>
         ))}
       </div>
+
+      {/* Background / overlay / transition panel (slide-in drawer) */}
+      <SectionBackgroundPanel
+        open={bgPanelOpen}
+        background={section.background}
+        zones={section.zones}
+        onUpdate={(bg) => onUpdate({ ...section, background: bg })}
+        onZonesUpdate={(zones) => onUpdate({ ...section, zones })}
+        onClose={() => setBgPanelOpen(false)}
+      />
     </div>
   );
 }

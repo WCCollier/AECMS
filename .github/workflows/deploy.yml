@@ -137,7 +137,7 @@ jobs:
             --memory 512Mi \
             --cpu 1 \
             --port 4000 \
-            --timeout 60
+            --timeout 3600
 
       - name: Get backend Cloud Run URL
         id: backend
@@ -178,7 +178,7 @@ jobs:
             --memory 512Mi \
             --cpu 1 \
             --port 3000 \
-            --timeout 60
+            --timeout 3600
 
       - name: Print service URLs
         run: |

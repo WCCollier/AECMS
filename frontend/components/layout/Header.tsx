@@ -109,6 +109,20 @@ export function Header({ siteTitle }: { siteTitle: string }) {
   const [loginError, setLoginError] = useState('');
   const flyoutRef = useRef<HTMLDivElement>(null);
   const loginBtnRef = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Keep --header-height on :root in sync with the actual rendered header height.
+  // Used by the section background fixed-layer stack to avoid painting under the header.
+  useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const sync = () =>
+      document.documentElement.style.setProperty('--header-height', `${el.offsetHeight}px`);
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const { data: navPages } = useSWR<NavPage[]>('/pages/nav', navFetcher, {
     revalidateOnFocus: false,
@@ -149,7 +163,7 @@ export function Header({ siteTitle }: { siteTitle: string }) {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
+    <header ref={headerRef} className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}

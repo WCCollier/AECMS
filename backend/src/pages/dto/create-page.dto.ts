@@ -104,4 +104,13 @@ export class CreatePageDto {
   @IsBoolean()
   @IsOptional()
   admin_can_delete?: boolean;
+
+  @ApiPropertyOptional({ description: 'Show this page in the site navigation', default: true })
+  @IsBoolean()
+  @IsOptional()
+  show_in_nav?: boolean;
+
+  @ApiPropertyOptional({ description: 'Sort order within the navigation', default: 0 })
+  @IsOptional()
+  nav_order?: number;
 }
