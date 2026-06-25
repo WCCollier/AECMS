@@ -271,7 +271,7 @@ export class MulConverterService {
         Authorization: `Bearer ${config.textApiKey}`,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(600_000),
     });
 
     if (!res.ok) throw new Error(`Responses API returned HTTP ${res.status}`);

@@ -43,7 +43,7 @@ export class AnthropicMulProvider implements MulProvider {
           'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(600_000),
       });
     } catch (err) {
       throw new BadGatewayException('AI provider request failed: ' + err.message);

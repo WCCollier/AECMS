@@ -12,7 +12,7 @@ const TEXT_PROVIDERS: { value: string; label: string; models: ModelOption[] }[] 
     models: [
       { value: 'claude-sonnet-4-6',         label: 'Claude Sonnet 4.6 — Recommended' },
       { value: 'claude-opus-4-8',           label: 'Claude Opus 4.8 — Most capable' },
-      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — Fastest' },
+      { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — Fast (simple pages only)' },
     ],
   },
   {

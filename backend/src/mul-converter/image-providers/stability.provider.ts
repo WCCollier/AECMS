@@ -49,7 +49,7 @@ export class StabilityProvider implements ImageProvider {
             Authorization: `Bearer ${this.apiKey}`,
           },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(60_000),
+          signal: AbortSignal.timeout(300_000),
         },
       );
     } catch (err) {

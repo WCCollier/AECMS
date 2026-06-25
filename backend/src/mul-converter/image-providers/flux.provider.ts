@@ -56,7 +56,7 @@ export class FluxProvider implements ImageProvider {
           Authorization: `Key ${this.apiKey}`,
         },
         body: JSON.stringify({ input }),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(60_000),
       });
     } catch (err) {
       throw new BadGatewayException('Image provider request failed: ' + err.message);
@@ -67,14 +67,14 @@ export class FluxProvider implements ImageProvider {
 
     const { request_id } = await submitRes.json() as { request_id: string };
 
-    // Poll for result (up to 90s)
+    // Poll for result (up to 8 minutes)
     const start = Date.now();
-    while (Date.now() - start < 90_000) {
+    while (Date.now() - start < 480_000) {
       await new Promise((r) => setTimeout(r, 3000));
 
       const pollRes = await fetch(`https://queue.fal.run/${app}/requests/${request_id}`, {
         headers: { Authorization: `Key ${this.apiKey}` },
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(30_000),
       });
 
       if (!pollRes.ok) continue;
@@ -90,11 +90,11 @@ export class FluxProvider implements ImageProvider {
       }
     }
 
-    throw new BadGatewayException('FLUX image generation timed out after 90 seconds.');
+    throw new BadGatewayException('FLUX image generation timed out after 8 minutes.');
   }
 
   private async downloadImage(url: string): Promise<Buffer> {
-    const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(60_000) });
     if (!res.ok) throw new BadGatewayException('Failed to download FLUX image.');
     return Buffer.from(await res.arrayBuffer());
   }
