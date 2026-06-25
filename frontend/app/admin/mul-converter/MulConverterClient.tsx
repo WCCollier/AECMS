@@ -110,7 +110,7 @@ export function MulConverterClient() {
   };
 
   const handlePageCreated = (pageId: string) => {
-    router.push(`/admin/pages/${pageId}`);
+    router.push(`/admin/pages/${pageId}/edit`);
   };
 
   if (!settingsData) {
