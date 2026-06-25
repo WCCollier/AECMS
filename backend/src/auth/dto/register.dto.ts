@@ -7,6 +7,7 @@ import {
   Matches,
 } from 'class-validator';
 
+
 export class RegisterDto {
   @IsEmail()
   email: string;
@@ -39,4 +40,8 @@ export class RegisterDto {
   @MaxLength(50)
   @IsOptional()
   lastName?: string;
+
+  @IsString()
+  @IsOptional()
+  captchaToken?: string;
 }

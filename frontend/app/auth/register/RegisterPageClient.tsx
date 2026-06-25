@@ -1,10 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input, PasswordInput, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
 
 export function RegisterPageClient() {
   const router = useRouter();
@@ -12,6 +15,8 @@ export function RegisterPageClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirmTouched, setConfirmTouched] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef<TurnstileInstance>(null);
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -51,6 +56,12 @@ export function RegisterPageClient() {
       return;
     }
 
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setError('Please complete the CAPTCHA verification.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       await register({
         email: formData.email,
@@ -58,10 +69,14 @@ export function RegisterPageClient() {
         password: formData.password,
         firstName: formData.firstName || undefined,
         lastName: formData.lastName || undefined,
+        captchaToken: captchaToken || undefined,
       });
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
+      // Reset CAPTCHA so user can retry — tokens are single-use
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
     } finally {
       setIsLoading(false);
     }
@@ -167,6 +182,19 @@ export function RegisterPageClient() {
                 </Link>
               </span>
             </label>
+
+            {TURNSTILE_SITE_KEY && (
+              <div className="flex justify-center">
+                <Turnstile
+                  ref={turnstileRef}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onSuccess={(token) => setCaptchaToken(token)}
+                  onError={() => { setCaptchaToken(''); }}
+                  onExpire={() => { setCaptchaToken(''); }}
+                  options={{ theme: 'dark' }}
+                />
+              </div>
+            )}
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4">

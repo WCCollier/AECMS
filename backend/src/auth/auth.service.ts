@@ -39,6 +39,18 @@ export class AuthService {
    * Register a new user
    */
   async register(registerDto: RegisterDto): Promise<{ message: string; userId: string }> {
+    // Verify CAPTCHA token if a secret key is configured
+    const turnstileSecret = this.configService.get<string>('TURNSTILE_SECRET_KEY');
+    if (turnstileSecret) {
+      if (!registerDto.captchaToken) {
+        throw new BadRequestException('CAPTCHA verification required');
+      }
+      const captchaOk = await this.verifyTurnstileToken(registerDto.captchaToken, turnstileSecret);
+      if (!captchaOk) {
+        throw new BadRequestException('CAPTCHA verification failed. Please try again.');
+      }
+    }
+
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: registerDto.email },
@@ -602,6 +614,21 @@ export class AuthService {
    */
   private generateVerificationToken(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  private async verifyTurnstileToken(token: string, secretKey: string): Promise<boolean> {
+    try {
+      const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ secret: secretKey, response: token }).toString(),
+      });
+      const data = await res.json() as { success: boolean };
+      return data.success === true;
+    } catch (e) {
+      console.error('[auth] Turnstile verification request failed:', e);
+      return false;
+    }
   }
 
   /**
