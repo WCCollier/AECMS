@@ -159,7 +159,7 @@ describe('CommentsService', () => {
         ratings: [],
         article: mockArticle,
       });
-      const ownerUser = { ...mockUser, role: 'owner' };
+      const ownerUser = { ...mockUser, role_name: 'owner' };
       const result = await service.create(
         { article_id: 'article-123', content: 'Owner comment' },
         ownerUser as any,

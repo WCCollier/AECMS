@@ -65,6 +65,9 @@ export const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
   // Registration Controls
   { name: 'registration.configure', category: 'system', scope: 'backstage', description: 'Configure registration policy: default role and approval requirement' },
   { name: 'registration.approve',   category: 'users',  scope: 'backstage', description: 'Review and approve or reject pending user registrations' },
+  // Account Deletion
+  { name: 'account.delete.limited', category: 'users',  scope: 'backstage', description: 'Delete accounts that do not themselves hold any account.delete capability' },
+  { name: 'account.delete.any',     category: 'users',  scope: 'backstage', description: 'Delete any account except your own (including other owners)' },
   // Customer-facing capabilities
   { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
   { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a review on an article' },

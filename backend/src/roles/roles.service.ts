@@ -141,16 +141,8 @@ export class RolesService {
     await this.prisma.roleCapability.deleteMany({ where: { role_name: name } });
 
     if (capabilityIds.length > 0) {
-      // For canonical roles that still have the enum column, write role too
-      const canonicalRoles = ['admin', 'member', 'guest'] as const;
-      const isCanonical = (canonicalRoles as readonly string[]).includes(name);
-
       await this.prisma.roleCapability.createMany({
-        data: capabilityIds.map((cid) => ({
-          role_name: name,
-          ...(isCanonical ? { role: name as any } : {}),
-          capability_id: cid,
-        })),
+        data: capabilityIds.map((cid) => ({ role_name: name, capability_id: cid })),
       });
     }
 

@@ -67,6 +67,9 @@ const capabilities = [
   // Registration Controls
   { name: 'registration.configure', category: 'system', scope: 'backstage', description: 'Configure registration policy: default role and approval requirement' },
   { name: 'registration.approve',   category: 'users',  scope: 'backstage', description: 'Review and approve or reject pending user registrations' },
+  // Account Deletion
+  { name: 'account.delete.limited', category: 'users',  scope: 'backstage', description: 'Delete accounts that do not themselves hold any account.delete capability' },
+  { name: 'account.delete.any',     category: 'users',  scope: 'backstage', description: 'Delete any account except your own (including other owners)' },
   // Customer-facing capabilities
   { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
   { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
@@ -96,7 +99,7 @@ const adminBackstageCaps = [
   'media.upload', 'media.delete', 'product.create', 'product.edit.own', 'product.edit',
   'product.delete.own', 'product.delete', 'order.view.all', 'order.edit',
   'user.edit', 'comment.view.all', 'comment.moderate', 'comment.delete',
-  'review.moderate', 'digital.deliver', 'registration.approve',
+  'review.moderate', 'digital.deliver', 'registration.approve', 'account.delete.limited',
 ];
 
 const defaultSettings = [
@@ -111,8 +114,6 @@ const defaultSettings = [
 
 async function assignCapsToRole(role, capNames) {
   let count = 0;
-  const canonicalRoles = ['admin', 'member', 'guest'];
-  const isCanonical = canonicalRoles.includes(role);
   for (const capName of capNames) {
     const cap = await prisma.capability.findUnique({ where: { name: capName } });
     if (!cap) continue;
@@ -120,9 +121,7 @@ async function assignCapsToRole(role, capNames) {
       where: { role_name: role, capability_id: cap.id },
     });
     if (!existing) {
-      const data = { role_name: role, capability_id: cap.id };
-      if (isCanonical) data.role = role;
-      await prisma.roleCapability.create({ data });
+      await prisma.roleCapability.create({ data: { role_name: role, capability_id: cap.id } });
       count++;
     }
   }

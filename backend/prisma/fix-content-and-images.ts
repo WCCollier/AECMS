@@ -55,7 +55,7 @@ async function getOrCreateMedia(filename: string, ownerId: string): Promise<stri
 }
 
 async function main() {
-  const owner = await prisma.user.findFirst({ where: { role: 'owner' } });
+  const owner = await prisma.user.findFirst({ where: { role_name: 'owner' } });
   if (!owner) throw new Error('No owner user found');
 
   let contentUpdated = 0, imageSet = 0, missing = 0;

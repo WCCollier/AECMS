@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { config } from 'dotenv';
 import * as path from 'path';
@@ -136,7 +136,7 @@ async function main() {
         password_hash: passwordHash,
         first_name: 'System',
         last_name: 'Owner',
-        role: UserRole.owner,
+        role_name: 'owner', email_verified: true, approved_at: new Date(),
         email_verified: true,
       },
     });
@@ -151,7 +151,7 @@ async function main() {
         password_hash: adminHash,
         first_name: 'System',
         last_name: 'Admin',
-        role: UserRole.admin,
+        role_name: 'admin',
         email_verified: true,
       },
     });
@@ -166,7 +166,7 @@ async function main() {
         password_hash: memberHash,
         first_name: 'Test',
         last_name: 'Member',
-        role: UserRole.member,
+        role_name: 'member',
         email_verified: true,
       },
     });
@@ -230,28 +230,28 @@ async function main() {
     'digital.deliver',
   ];
 
-  async function assignCapsToRole(role: UserRole, capNames: string[]) {
+  async function assignCapsToRole(roleName: string, capNames: string[]) {
     let count = 0;
     for (const capName of capNames) {
       const capability = await prisma.capability.findUnique({ where: { name: capName } });
       if (!capability) continue;
       const existing = await prisma.roleCapability.findFirst({
-        where: { role, capability_id: capability.id },
+        where: { role_name: roleName, capability_id: capability.id },
       });
       if (!existing) {
-        await prisma.roleCapability.create({ data: { role, capability_id: capability.id } });
+        await prisma.roleCapability.create({ data: { role_name: roleName, capability_id: capability.id } });
         count++;
       }
     }
     return count;
   }
 
-  const adminCount = await assignCapsToRole(UserRole.admin, [
+  const adminCount = await assignCapsToRole('admin', [
     ...adminBackstageCapabilities,
     ...memberCustomerCapabilities,
   ]);
-  const memberCount = await assignCapsToRole(UserRole.member, memberCustomerCapabilities);
-  const guestCount = await assignCapsToRole(UserRole.guest, guestCapabilities);
+  const memberCount = await assignCapsToRole('member', memberCustomerCapabilities);
+  const guestCount = await assignCapsToRole('guest', guestCapabilities);
 
   console.log(`✓ Assigned ${adminCount} capabilities to Admin role`);
   console.log(`✓ Assigned ${memberCount} capabilities to Member role`);

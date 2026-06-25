@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole, Capability, RoleCapability, UserCapability } from '@prisma/client';
+import { Capability, RoleCapability, UserCapability } from '@prisma/client';
 
 @Injectable()
 export class CapabilitiesService {
@@ -168,8 +168,8 @@ export class CapabilitiesService {
   /**
    * Assign a capability to a role
    */
-  async assignCapabilityToRole(role: UserRole, capabilityId: string): Promise<RoleCapability> {
-    const roleStr = role as string;
+  async assignCapabilityToRole(role: string, capabilityId: string): Promise<RoleCapability> {
+    const roleStr = role;
     // Owner cannot have capabilities assigned (they always have all)
     if (roleStr === 'owner') {
       throw new BadRequestException('Owner role always has all capabilities');
@@ -198,7 +198,6 @@ export class CapabilitiesService {
 
     return this.prisma.roleCapability.create({
       data: {
-        role,
         role_name: roleStr,
         capability_id: capabilityId,
       },
@@ -209,8 +208,8 @@ export class CapabilitiesService {
   /**
    * Remove a capability from a role
    */
-  async removeCapabilityFromRole(role: UserRole, capabilityId: string): Promise<void> {
-    const roleStr = role as string;
+  async removeCapabilityFromRole(role: string, capabilityId: string): Promise<void> {
+    const roleStr = role;
     // Owner cannot have capabilities removed
     if (roleStr === 'owner') {
       throw new BadRequestException('Cannot remove capabilities from Owner role');

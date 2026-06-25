@@ -423,7 +423,7 @@ const posts = [
 type Post = typeof posts[0];
 
 async function main() {
-  const owner = await prisma.user.findFirst({ where: { role: 'owner' } });
+  const owner = await prisma.user.findFirst({ where: { role_name: 'owner' } });
   if (!owner) throw new Error('No owner user found — run prisma db seed first');
 
   const shortThoughtsTag = await prisma.tag.upsert({

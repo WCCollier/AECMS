@@ -21,9 +21,7 @@ import { CapabilitiesService } from './capabilities.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { UserRole } from '@prisma/client';
 import { AssignCapabilityToRoleDto, AssignCapabilityToUserDto } from './dto';
-// UserRole imported for backward-compat on existing POST/DELETE role endpoints
 import { CapabilityGuard } from './guards/capability.guard';
 import { RequiresCapability } from './decorators/requires-capability.decorator';
 
@@ -75,7 +73,7 @@ export class CapabilitiesController {
     @Param('role') role: string,
     @Body() dto: AssignCapabilityToRoleDto,
   ) {
-    return this.capabilitiesService.assignCapabilityToRole(role as UserRole, dto.capability_id);
+    return this.capabilitiesService.assignCapabilityToRole(role, dto.capability_id);
   }
 
   @Delete('roles/:role/:capabilityId')
@@ -91,7 +89,7 @@ export class CapabilitiesController {
     @Param('role') role: string,
     @Param('capabilityId') capabilityId: string,
   ) {
-    await this.capabilitiesService.removeCapabilityFromRole(role as UserRole, capabilityId);
+    await this.capabilitiesService.removeCapabilityFromRole(role, capabilityId);
   }
 
   @Post('users/:userId')

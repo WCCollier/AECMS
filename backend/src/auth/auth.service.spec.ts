@@ -10,7 +10,6 @@ import {
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit.service';
-import { UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 
@@ -26,7 +25,6 @@ describe('AuthService', () => {
     password_hash: '$2b$12$KIXhash...',
     first_name: 'Test',
     last_name: 'User',
-    role: UserRole.member,
     role_name: 'member',
     approved_at: null,
     email_verified: true,
