@@ -1,8 +1,8 @@
 # FR-003: Role Manager
 
-**Status:** `accepted`
+**Status:** `in-dev` (Deploy 1 on main; Deploy 2 pending)
 **Requested:** 2026-06-25
-**Deployed:** —
+**Deployed:** — (Deploy 1 awaiting QA + deploy merge; Deploy 2 is a future separate PR)
 **Size:** `large` (schema migration + new module + new UI)
 
 ---
@@ -18,6 +18,7 @@ Replace the hardcoded `UserRole` enum with a first-class `roles` table, and add 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-25 | accepted | Designed and planned; ready for implementation sprint |
+| 2026-06-25 | in-dev | Deploy 1 built and pushed to main (roles table, RolesModule, /admin/roles UI, role_name migration) |
 
 ---
 

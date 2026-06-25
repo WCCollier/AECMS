@@ -26,6 +26,11 @@
         <a href="ch06-going-live.html">Ch 6 — Going Live</a>
         <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
       </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Backstage Tools</div>
+        <a href="ch05-admin-settings.html#roles">Roles &amp; Permissions</a>
+        <a href="ch05-admin-settings.html#mul-converter">Mul Converter</a>
+      </div>
     </nav>
   </aside>
   <main class="main">
@@ -60,7 +65,65 @@
       </div>
 
       <h2>Appearance</h2>
-      <p>Choose a color palette and font pairing. Changes apply site-wide immediately after saving. Available palettes: Midnight, Ocean, Forest, Sunset, Rose, Storm, Ember, Arctic.</p>
+      <p>Choose a color palette and font pairing. Changes apply site-wide immediately after saving. Available palettes: Midnight, Ocean, Forest, Sunset, Rose, Storm, Ember, Arctic. You can also create and save custom palettes using the <strong>Mul Converter</strong> or the Design Library (Phase 27).</p>
+
+      <h2 id="roles">Roles &amp; Permissions</h2>
+      <p>Found at <strong>/admin/roles</strong> (gated on the <code>role.manage</code> capability, Owner-only by default). The Role Manager lets you define exactly what each role can do.</p>
+
+      <h3>Canonical roles</h3>
+      <table>
+        <thead><tr><th>Role</th><th>Protection</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Owner</strong></td><td>Full</td><td>All capabilities always. Cannot be edited or deleted.</td></tr>
+          <tr><td><strong>Admin</strong></td><td>None</td><td>Default set covers content + ecommerce management. Freely editable.</td></tr>
+          <tr><td><strong>Member</strong></td><td>None</td><td>Logged-in customers — comments, reviews, purchases. Freely editable.</td></tr>
+          <tr><td><strong>Guest</strong></td><td>Constrained</td><td>Applies to <em>logged-out visitors</em>. No user record ever holds this role — it is virtual. Only customer-scoped capabilities may be assigned. Cannot be deleted.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Custom roles</h3>
+      <p>Click <strong>New Role</strong> to create a role with a slug name (lowercase, hyphens) and a display label. Assign any combination of capabilities using the checkbox matrix. Custom roles appear in the role dropdown on the Users page.</p>
+
+      <h3>Capability matrix</h3>
+      <p>Capabilities are grouped into <strong>Backstage</strong> (requires a backstage session — admin dashboard access) and <strong>Customer</strong> (available in the customer-facing experience). Within each group they are further sorted by category: content, ecommerce, users, system.</p>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Deleting a role with assigned users</div>
+        <p>A role cannot be deleted while any user holds it. The system will report the number of affected users. Reassign those users to another role first, then retry the deletion.</p>
+      </div>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Assigning a role to a user</div>
+        <p>Role assignment is done on the <strong>Users</strong> page (<code>/admin/users</code>), not here. The Role Manager is for defining what roles can do; the Users page is for assigning those roles to people.</p>
+      </div>
+
+      <h2 id="mul-converter">Mul Converter</h2>
+      <p>Found at <strong>/admin/mul-converter</strong> (gated on the <code>mul.convert</code> capability, Owner-only by default). The Mul Converter is an AI-powered tool that ingests any public URL and outputs a custom color palette and a page scaffold you can save directly to your site.</p>
+
+      <h3>Setup</h3>
+      <p>Expand <strong>AI Provider Settings</strong> at the top of the page. You need at minimum a <strong>Text Provider</strong> (the AI that analyzes the page and writes the scaffold):</p>
+      <ul>
+        <li><strong>Anthropic (Claude)</strong> — recommended. Get a key at console.anthropic.com. Sonnet models give the best balance of quality and speed.</li>
+        <li><strong>OpenAI (GPT)</strong> — alternative. Get a key at platform.openai.com.</li>
+        <li><strong>xAI (Grok)</strong> — alternative.</li>
+      </ul>
+      <p>Optionally enable an <strong>Image Provider</strong> to have the AI generate placeholder background images for sections that call for them. Supported: GPT-Image-1 (OpenAI), xAI Aurora, FLUX (via fal.ai), Stability AI.</p>
+      <p>Paste your API key and click <strong>Save Settings</strong>. Keys are stored encrypted in the Internal Secrets Manager. Leave the key field blank on future saves to keep the stored key.</p>
+
+      <h3>Running an analysis</h3>
+      <ol>
+        <li>Enter the target URL and click <strong>Load Preview</strong> to confirm the page loads.</li>
+        <li>Toggle <strong>Images</strong> on or off (only available if an image provider is configured).</li>
+        <li>Click <strong>Looks right — Analyze</strong>. Analysis takes 30–90 seconds; do not close the tab.</li>
+        <li>Review the results: a color palette and a page layout diagram. The layout badges show background colors/gradients as live swatches — click any badge to see the full CSS value.</li>
+        <li>Edit any palette color by clicking its swatch in the Palette panel.</li>
+        <li>Choose a save action: <strong>Save Palette Only</strong>, <strong>Create Page Draft</strong>, or <strong>Save Both</strong>. The page draft opens in the page editor where you can swap placeholder images for real uploads and refine the content.</li>
+      </ol>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Site preview may be blank</div>
+        <p>Many sites block iframe embedding. If the preview frame is blank, that is expected — the analysis still works because the backend fetches the page directly, not through the iframe.</p>
+      </div>
 
     </div>
   </main>
