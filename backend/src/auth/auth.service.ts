@@ -819,6 +819,7 @@ export class AuthService {
           first_name: true,
           last_name: true,
           role: true,
+          role_name: true,
           email_verified: true,
           created_at: true,
         },
@@ -826,7 +827,11 @@ export class AuthService {
       this.prisma.user.count({ where }),
     ]);
 
-    return { data: users, total, page, limit, pages: Math.ceil(total / limit) };
+    const normalized = users.map(({ role_name, role, ...rest }) => ({
+      ...rest,
+      role: role_name ?? role,
+    }));
+    return { data: normalized, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async updateUserRole(actorId: string, targetId: string, newRole: string): Promise<{ message: string }> {
