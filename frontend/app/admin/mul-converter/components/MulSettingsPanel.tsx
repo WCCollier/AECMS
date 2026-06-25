@@ -199,7 +199,7 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
                   type="password"
                   value={textKey}
                   onChange={(e) => setTextKey(e.target.value)}
-                  placeholder={settings[`mul.${textProvider}_api_key_enc` as keyof MulSettings] ? '••••••••' : textProvider === 'anthropic' ? 'Leave blank to use server ANTHROPIC_API_KEY' : 'Paste API key'}
+                  placeholder={settings[`mul.${textProvider}_api_key_enc` as keyof MulSettings] ? 'Leave blank to keep stored key' : 'Paste API key (leave blank to use server environment key)'}
                   className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
                 />
               </div>
@@ -252,7 +252,7 @@ export function MulSettingsPanel({ settings, onSave }: Props) {
                       type="password"
                       value={imageKey}
                       onChange={(e) => setImageKey(e.target.value)}
-                      placeholder="Paste API key"
+                      placeholder={settings[`mul.${imageProvider === 'flux' ? 'fal' : imageProvider}_api_key_enc` as keyof MulSettings] ? 'Leave blank to keep stored key' : 'Paste API key'}
                       className="w-full px-3 py-2 bg-background border border-border rounded text-sm text-foreground placeholder:text-muted focus:outline-none focus:border-accent"
                     />
                   </div>
