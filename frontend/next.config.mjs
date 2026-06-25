@@ -29,6 +29,11 @@ const nextConfig = {
 
   // Turbopack is the default bundler in Next.js 16 — empty config satisfies the requirement
   turbopack: {},
+
+  experimental: {
+    // Next.js rewrite proxy default is 30s — raise to 10min for long-running AI calls
+    proxyTimeout: 600_000,
+  },
 };
 
 export default nextConfig;
