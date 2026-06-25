@@ -31,8 +31,11 @@ const nextConfig = {
   turbopack: {},
 
   experimental: {
-    // Next.js rewrite proxy default is 30s — raise to 10min for long-running AI calls
-    proxyTimeout: 600_000,
+    // Next.js rewrite proxy default is 30s. Mul Converter can run text analysis
+    // (~10min max) + image generation (~8min per image × N sections) in one request.
+    // Match the Cloud Run service timeout ceiling so the proxy never cuts the
+    // connection before the backend finishes.
+    proxyTimeout: 3_600_000,
   },
 };
 
