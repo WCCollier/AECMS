@@ -60,8 +60,12 @@ The migration replaces the `UserRole` enum with a `roles` table whose `name` col
 
 - **String PK on `roles`** — name is the identity. `user.role === 'owner'` continues to work unchanged after migration. Custom role names are slugs (lowercase, hyphens, no spaces).
 - **`role.manage` capability** — new cap, Owner-only in seed. Gates all role CRUD endpoints and the Role Manager UI page.
-- **Owner is the only protected role** — `is_protected: true` in the roles table. Cannot edit its capability set, cannot delete it, cannot rename it. All other canonical roles (Admin, Member, Guest) are modifiable and deletable.
-- **Guest role is virtual** — No user record ever has `role = 'guest'`; it exists in `roles` and `role_capabilities` only to drive `guestHasAnyCapability()` in the capability guard. The UI should show it with a "virtual — applies to logged-out visitors" note and 0 users, and make its capabilities editable.
+- **`protection` enum on the roles table** — three levels, not a boolean, because Guest and Owner need different constraints:
+  - `none` — fully editable and deletable (Admin, Member, all custom roles)
+  - `constrained` — editable but only `scope: 'customer'` capabilities may be assigned; not deletable (Guest)
+  - `full` — not editable, not deletable, not renameable (Owner)
+  All other canonical roles (Admin, Member) default to `none`.
+- **Guest role is virtual but owner-managed** — No user record ever has `role = 'guest'`; it exists in `roles` and `role_capabilities` only to drive `guestHasAnyCapability()` in the capability guard. Its capability set is a policy decision (e.g. allowing anonymous comments), so it is editable. Protection level: `constrained` — only `scope: 'customer'` capabilities may be assigned; attempting to assign a backstage-scoped cap returns 422. Cannot be deleted. UI shows a "virtual — applies to logged-out visitors" banner. Note: assigning a capability like `comment.article` to Guest is valid data but requires separate backend work (anonymous submission handling) to be actionable.
 - **Delete guard** — A role cannot be deleted while any user holds it. The delete endpoint returns 409 with a count of affected users and a suggestion to reassign them first.
 - **Default registration role** — Currently hardcoded as `'member'`. If `member` is deleted, new registrations break. Mitigation: block deletion of the role currently set as the default registration role, or expose a "default role" setting in Site Settings so the owner can change it before deleting `member`.
 - **No capability-scope restriction in role assignment** — Any capability (backstage or customer) can go into any role. The owner is responsible for sensible configuration.
@@ -78,8 +82,10 @@ The migration replaces the `UserRole` enum with a `roles` table whose `name` col
 | Case | Handling |
 |------|----------|
 | Delete role with active users | 409 — return user count, block deletion |
-| Delete Owner role | 403 — always blocked (`is_protected`) |
-| Edit Owner role capabilities | 403 — always blocked |
+| Delete Owner role | 403 — blocked (`protection: full`) |
+| Edit Owner role capabilities | 403 — blocked (`protection: full`) |
+| Assign backstage cap to Guest role | 422 — blocked (`protection: constrained`, customer-scope only) |
+| Delete Guest role | 403 — blocked (`protection: constrained`) |
 | Delete the default registration role | 409 — block until a new default is set |
 | Guest role user count | Always 0 (virtual); displayed with explanatory note |
 | Custom role name collision with existing role | 409 — duplicate name rejected |
@@ -165,11 +171,17 @@ frontend/app/admin/users/UsersClient.tsx
 ### Data model (Deploy 1)
 
 ```prisma
+enum RoleProtection {
+  none          // editable + deletable
+  constrained   // editable (customer-scoped caps only) + not deletable  — Guest
+  full          // not editable + not deletable                           — Owner
+}
+
 model Role {
-  name         String   @id            // 'owner', 'admin', 'member', 'guest', or custom slug
-  label        String                  // display name: 'Owner', 'Admin', …
-  is_protected Boolean  @default(false)
-  created_at   DateTime @default(now())
+  name       String         @id            // 'owner', 'admin', 'member', 'guest', or custom slug
+  label      String                        // display name: 'Owner', 'Admin', …
+  protection RoleProtection @default(none)
+  created_at DateTime       @default(now())
 
   users             User[]           @relation("UserRole")
   role_capabilities RoleCapability[]
@@ -201,8 +213,9 @@ model RoleCapability {
 **Role editor** (inline drawer or sub-page):
 - Two-column capability matrix grouped by category: Backstage | Customer
 - Checkboxes; Save button
-- Owner role: all checkboxes read-only, save disabled
-- Guest role: shows "virtual — applies to logged-out visitors" banner
+- `protection: full` (Owner): all checkboxes read-only, Save disabled
+- `protection: constrained` (Guest): backstage caps greyed out with "requires authentication" tooltip; customer caps freely editable; "virtual — applies to logged-out visitors" banner shown
+- `protection: none` (Admin, Member, custom): all caps freely editable
 
 **User assignment** (existing `/admin/users`):
 - Role dropdown populated from `GET /roles` instead of hardcoded enum values
