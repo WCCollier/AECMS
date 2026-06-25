@@ -21,7 +21,7 @@ import type { ImageProvider } from './image-providers/image-provider.interface';
 import type { MulConfig, MulResult, PageData } from './mul-converter.types';
 
 const MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB
-const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_TIMEOUT_MS = 30_000;
 const MAX_REDIRECTS = 3;
 
 const PRIVATE_IP_RE = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|127\.|::1|fd[0-9a-f]{2}:|fc|169\.254\.)/i;
