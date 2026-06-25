@@ -73,6 +73,7 @@ export class AuthService {
         first_name: registerDto.firstName,
         last_name: registerDto.lastName,
         role: UserRole.member,
+        role_name: 'member',
         email_verified: false,
         email_verification_token: verificationToken,
         email_verification_expires: verificationExpires,
@@ -128,8 +129,8 @@ export class AuthService {
       },
     });
 
-    // Generate tokens
-    const tokens = await this.generateTokens(user.id, user.email, user.role, undefined, 'customer');
+    // Generate tokens (prefer role_name for JWT; falls back to legacy role enum)
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, undefined, 'customer');
 
     // Store refresh token
     await this.storeRefreshToken(user.id, tokens.refreshToken, undefined, 'customer');
@@ -172,13 +173,14 @@ export class AuthService {
     }
 
     // Owner always has backstage access; others must hold at least one backstage-scoped capability
-    if (user.role !== 'owner') {
+    const effectiveRole = user.role_name ?? user.role;
+    if (effectiveRole !== 'owner') {
       const backstageCap = await this.prisma.capability.findFirst({
         where: {
           scope: 'backstage',
           OR: [
             { user_capabilities: { some: { user_id: user.id } } },
-            { role_capabilities: { some: { role: user.role, enabled: true } } },
+            { role_capabilities: { some: { role_name: effectiveRole, enabled: true } } },
           ],
         },
       });
@@ -198,7 +200,7 @@ export class AuthService {
     }
 
     // 2FA not yet set up — grant backstage access with 7-day tokens and flag setup required
-    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, '7d', 'backstage');
     await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
 
     if (user.role === UserRole.owner) {
@@ -252,7 +254,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid authenticator code');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role, '7d', 'backstage');
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, '7d', 'backstage');
     const storedToken = await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
     const revoked = await this.revokeOtherBackstageSessions(user.id, storedToken.id);
 
@@ -382,7 +384,7 @@ export class AuthService {
       const tokens = await this.generateTokens(
         storedToken.user.id,
         storedToken.user.email,
-        storedToken.user.role,
+        storedToken.user.role_name ?? storedToken.user.role,
         refreshExpiry,
         sessionType,
       );
@@ -483,15 +485,16 @@ export class AuthService {
   }
 
   async hasBackstageAccess(userId: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, role_name: true } });
     if (!user) return false;
-    if (user.role === 'owner') return true;
+    const effectiveRole = user.role_name ?? user.role;
+    if (effectiveRole === 'owner') return true;
     const cap = await this.prisma.capability.findFirst({
       where: {
         scope: 'backstage',
         OR: [
           { user_capabilities: { some: { user_id: userId } } },
-          { role_capabilities: { some: { role: user.role, enabled: true } } },
+          { role_capabilities: { some: { role_name: effectiveRole, enabled: true } } },
         ],
       },
     });
@@ -674,11 +677,12 @@ export class AuthService {
   /**
    * Generate access and refresh tokens. refreshExpiryOverride allows the admin
    * back-door to enforce a fixed 7-day expiry independent of global config.
+   * role accepts either a UserRole enum value or a string role_name.
    */
   private async generateTokens(
     userId: string,
     email: string,
-    role: UserRole,
+    role: UserRole | string,
     refreshExpiryOverride?: string,
     sessionType: 'customer' | 'backstage' = 'customer',
   ): Promise<{ accessToken: string; refreshToken: string }> {
@@ -825,9 +829,15 @@ export class AuthService {
     return { data: users, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async updateUserRole(actorId: string, targetId: string, newRole: UserRole): Promise<{ message: string }> {
+  async updateUserRole(actorId: string, targetId: string, newRole: string): Promise<{ message: string }> {
     if (actorId === targetId) {
       throw new ForbiddenException('Cannot change your own role');
+    }
+
+    // Validate the role exists in the roles table
+    const roleExists = await this.prisma.role.findUnique({ where: { name: newRole } });
+    if (!roleExists) {
+      throw new NotFoundException(`Role '${newRole}' not found`);
     }
 
     const target = await this.prisma.user.findFirst({
@@ -835,8 +845,16 @@ export class AuthService {
     });
     if (!target) throw new NotFoundException('User not found');
 
-    const oldRole = target.role;
-    await this.prisma.user.update({ where: { id: targetId }, data: { role: newRole } });
+    const oldRole = target.role_name ?? target.role;
+
+    // Write both role_name (new) and role enum (legacy compat — only for canonical roles)
+    const canonicalRoles: string[] = ['owner', 'admin', 'member', 'guest'];
+    const updateData: Record<string, unknown> = { role_name: newRole };
+    if (canonicalRoles.includes(newRole)) {
+      updateData.role = newRole as UserRole;
+    }
+
+    await this.prisma.user.update({ where: { id: targetId }, data: updateData });
 
     await this.auditLog.log({
       event_type: 'user.role_changed',

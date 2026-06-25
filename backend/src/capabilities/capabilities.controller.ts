@@ -23,6 +23,7 @@ import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UserRole } from '@prisma/client';
 import { AssignCapabilityToRoleDto, AssignCapabilityToUserDto } from './dto';
+// UserRole imported for backward-compat on existing POST/DELETE role endpoints
 import { CapabilityGuard } from './guards/capability.guard';
 import { RequiresCapability } from './decorators/requires-capability.decorator';
 
@@ -42,9 +43,9 @@ export class CapabilitiesController {
 
   @Get('roles/:role')
   @ApiOperation({ summary: 'Get capabilities for a specific role' })
-  @ApiParam({ name: 'role', enum: UserRole })
+  @ApiParam({ name: 'role', description: 'Role name (owner, admin, member, guest, or custom)' })
   @ApiResponse({ status: 200, description: 'Returns role capabilities' })
-  async getRoleCapabilities(@Param('role') role: UserRole) {
+  async getRoleCapabilities(@Param('role') role: string) {
     return this.capabilitiesService.getRoleCapabilities(role);
   }
 
@@ -67,14 +68,14 @@ export class CapabilitiesController {
   @UseGuards(BackstageGuard, CapabilityGuard)
   @RequiresCapability('system.configure')
   @ApiOperation({ summary: 'Assign capability to role (Owner only)' })
-  @ApiParam({ name: 'role', enum: UserRole })
+  @ApiParam({ name: 'role', description: 'Role name' })
   @ApiResponse({ status: 201, description: 'Capability assigned successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden - backstage session + system.configure required' })
   async assignCapabilityToRole(
-    @Param('role') role: UserRole,
+    @Param('role') role: string,
     @Body() dto: AssignCapabilityToRoleDto,
   ) {
-    return this.capabilitiesService.assignCapabilityToRole(role, dto.capability_id);
+    return this.capabilitiesService.assignCapabilityToRole(role as UserRole, dto.capability_id);
   }
 
   @Delete('roles/:role/:capabilityId')
@@ -82,15 +83,15 @@ export class CapabilitiesController {
   @RequiresCapability('system.configure')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Remove capability from role (Owner only)' })
-  @ApiParam({ name: 'role', enum: UserRole })
+  @ApiParam({ name: 'role', description: 'Role name' })
   @ApiParam({ name: 'capabilityId', description: 'Capability ID' })
   @ApiResponse({ status: 204, description: 'Capability removed successfully' })
   @ApiResponse({ status: 403, description: 'Forbidden - backstage session + system.configure required' })
   async removeCapabilityFromRole(
-    @Param('role') role: UserRole,
+    @Param('role') role: string,
     @Param('capabilityId') capabilityId: string,
   ) {
-    await this.capabilitiesService.removeCapabilityFromRole(role, capabilityId);
+    await this.capabilitiesService.removeCapabilityFromRole(role as UserRole, capabilityId);
   }
 
   @Post('users/:userId')

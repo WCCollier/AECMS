@@ -6,7 +6,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { DomainAlias, UserRole } from '@prisma/client';
+import { DomainAlias } from '@prisma/client';
 import { CreateDomainAliasDto, UpdateDomainAliasDto } from './dto';
 import * as crypto from 'crypto';
 import * as dns from 'dns';
@@ -127,12 +127,12 @@ export class DomainAliasesService {
     id: string,
     dto: UpdateDomainAliasDto,
     userId: string,
-    userRole: UserRole,
+    userRole: string,
   ): Promise<DomainAlias> {
     const alias = await this.findById(id);
 
     // Check ownership (only owner or site owner can modify)
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
+    if (alias.owner_id !== userId && userRole !== 'owner') {
       throw new ForbiddenException('You can only modify your own domain aliases');
     }
 
@@ -155,11 +155,11 @@ export class DomainAliasesService {
   /**
    * Verify domain ownership via DNS TXT record
    */
-  async verify(id: string, userId: string, userRole: UserRole): Promise<DomainAlias> {
+  async verify(id: string, userId: string, userRole: string): Promise<DomainAlias> {
     const alias = await this.findById(id);
 
     // Check ownership
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
+    if (alias.owner_id !== userId && userRole !== 'owner') {
       throw new ForbiddenException('You can only verify your own domain aliases');
     }
 
@@ -216,11 +216,11 @@ export class DomainAliasesService {
   /**
    * Remove a domain alias
    */
-  async remove(id: string, userId: string, userRole: UserRole): Promise<void> {
+  async remove(id: string, userId: string, userRole: string): Promise<void> {
     const alias = await this.findById(id);
 
     // Check ownership
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
+    if (alias.owner_id !== userId && userRole !== 'owner') {
       throw new ForbiddenException('You can only delete your own domain aliases');
     }
 
@@ -232,11 +232,11 @@ export class DomainAliasesService {
   /**
    * Regenerate verification token
    */
-  async regenerateToken(id: string, userId: string, userRole: UserRole): Promise<DomainAlias> {
+  async regenerateToken(id: string, userId: string, userRole: string): Promise<DomainAlias> {
     const alias = await this.findById(id);
 
     // Check ownership
-    if (alias.owner_id !== userId && userRole !== UserRole.owner) {
+    if (alias.owner_id !== userId && userRole !== 'owner') {
       throw new ForbiddenException('You can only modify your own domain aliases');
     }
 

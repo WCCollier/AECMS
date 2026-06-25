@@ -6,7 +6,11 @@ import { ArrowLeft, Search, ChevronLeft, ChevronRight, AlertTriangle } from 'luc
 import { Button, Input } from '@/components/ui';
 import adminApi from '@/lib/adminApi';
 
-type UserRole = 'member' | 'admin' | 'owner';
+interface RoleDef {
+  name: string;
+  label: string;
+  protection: 'none' | 'constrained' | 'full';
+}
 
 interface UserRow {
   id: string;
@@ -14,7 +18,7 @@ interface UserRow {
   username: string | null;
   first_name: string | null;
   last_name: string | null;
-  role: UserRole;
+  role: string;
   email_verified: boolean;
   created_at: string;
 }
@@ -27,30 +31,35 @@ interface Page {
   pages: number;
 }
 
-const ROLE_LABELS: Record<UserRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' };
-const ROLE_COLORS: Record<UserRole, string> = {
-  owner: 'bg-amber-500/15 text-amber-600 border border-amber-500/30',
-  admin: 'bg-blue-500/15 text-blue-600 border border-blue-500/30',
-  member: 'bg-foreground/5 text-foreground/60 border border-border',
-};
+// Fallback colors for known protection levels + generic custom roles
+function getRoleColor(role: string, roles: RoleDef[]): string {
+  const def = roles.find((r) => r.name === role);
+  if (!def || def.protection === 'full') return 'bg-amber-500/15 text-amber-600 border border-amber-500/30';
+  if (role === 'admin') return 'bg-blue-500/15 text-blue-600 border border-blue-500/30';
+  if (role === 'member') return 'bg-foreground/5 text-foreground/60 border border-border';
+  return 'bg-purple-500/15 text-purple-600 border border-purple-500/30';
+}
 
-function RoleBadge({ role }: { role: UserRole }) {
+function RoleBadge({ role, roles }: { role: string; roles: RoleDef[] }) {
+  const def = roles.find((r) => r.name === role);
+  const label = def?.label ?? role;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[role]}`}>
-      {ROLE_LABELS[role]}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getRoleColor(role, roles)}`}>
+      {label}
     </span>
   );
 }
 
 interface ConfirmModalProps {
   targetEmail: string;
-  fromRole: UserRole;
-  toRole: UserRole;
+  fromRole: string;
+  toRole: string;
+  roles: RoleDef[];
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-function ConfirmModal({ targetEmail, fromRole, toRole, onConfirm, onCancel }: ConfirmModalProps) {
+function ConfirmModal({ targetEmail, fromRole, toRole, roles, onConfirm, onCancel }: ConfirmModalProps) {
   const isOwnerTransfer = toRole === 'owner';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -63,7 +72,7 @@ function ConfirmModal({ targetEmail, fromRole, toRole, onConfirm, onCancel }: Co
             </h3>
             <p className="text-sm text-foreground/60 mt-1">
               Change <strong>{targetEmail}</strong> from{' '}
-              <RoleBadge role={fromRole} /> to <RoleBadge role={toRole} />?
+              <RoleBadge role={fromRole} roles={roles} /> to <RoleBadge role={toRole} roles={roles} />?
             </p>
             {isOwnerTransfer && (
               <p className="text-sm text-amber-600 mt-3 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
@@ -95,9 +104,16 @@ export function UsersClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [roles, setRoles] = useState<RoleDef[]>([
+    // Fallback defaults while loading
+    { name: 'owner', label: 'Owner', protection: 'full' },
+    { name: 'admin', label: 'Admin', protection: 'none' },
+    { name: 'member', label: 'Member', protection: 'none' },
+    { name: 'guest', label: 'Guest', protection: 'constrained' },
+  ]);
   const [pending, setPending] = useState<{
     user: UserRow;
-    newRole: UserRole;
+    newRole: string;
   } | null>(null);
 
   // Resolve current user id from sessionStorage
@@ -106,6 +122,15 @@ export function UsersClient() {
       const stored = sessionStorage.getItem('admin_user');
       if (stored) setCurrentUserId(JSON.parse(stored).id ?? null);
     } catch { /* ignore */ }
+  }, []);
+
+  // Load roles catalogue (for dropdown options)
+  useEffect(() => {
+    adminApi.get('/roles').then((res) => {
+      // Filter out 'guest' — it's a virtual role, not assignable to users
+      const assignable = (res.data as RoleDef[]).filter((r) => r.name !== 'guest');
+      if (assignable.length > 0) setRoles(assignable);
+    }).catch(() => { /* keep defaults */ });
   }, []);
 
   // Debounce search
@@ -134,7 +159,7 @@ export function UsersClient() {
   // Reset to page 1 when search changes
   useEffect(() => { setCurrentPage(1); }, [debouncedSearch]);
 
-  async function applyRoleChange(user: UserRow, newRole: UserRole) {
+  async function applyRoleChange(user: UserRow, newRole: string) {
     try {
       await adminApi.patch(`/users/${user.id}/role`, { role: newRole });
       await load();
@@ -144,7 +169,7 @@ export function UsersClient() {
     }
   }
 
-  function handleRoleSelect(user: UserRow, newRole: UserRole) {
+  function handleRoleSelect(user: UserRow, newRole: string) {
     if (newRole === user.role) return;
     setPending({ user, newRole });
   }
@@ -221,16 +246,16 @@ export function UsersClient() {
                   </td>
                   <td className="px-4 py-3">
                     {isSelf ? (
-                      <RoleBadge role={user.role} />
+                      <RoleBadge role={user.role} roles={roles} />
                     ) : (
                       <select
                         value={user.role}
-                        onChange={(e) => handleRoleSelect(user, e.target.value as UserRole)}
+                        onChange={(e) => handleRoleSelect(user, e.target.value)}
                         className="text-xs font-medium rounded border border-border bg-surface px-2 py-1 focus:outline-none focus:border-accent cursor-pointer"
                       >
-                        <option value="member">Member</option>
-                        <option value="admin">Admin</option>
-                        <option value="owner">Owner</option>
+                        {roles.map((r) => (
+                          <option key={r.name} value={r.name}>{r.label}</option>
+                        ))}
                       </select>
                     )}
                   </td>
@@ -281,6 +306,7 @@ export function UsersClient() {
           targetEmail={pending.user.email}
           fromRole={pending.user.role}
           toRole={pending.newRole}
+          roles={roles}
           onConfirm={async () => {
             const { user, newRole } = pending;
             setPending(null);

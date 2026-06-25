@@ -1,6 +1,8 @@
-import { IsIn } from 'class-validator';
+import { IsString, MinLength, Matches } from 'class-validator';
 
 export class UpdateUserRoleDto {
-  @IsIn(['member', 'admin', 'owner'])
-  role: 'member' | 'admin' | 'owner';
+  @IsString()
+  @MinLength(1)
+  @Matches(/^[a-z][a-z0-9-]*$/, { message: 'Role name must be lowercase letters, digits, or hyphens' })
+  role: string;
 }

@@ -21,6 +21,24 @@ datasource db {
 // USER MANAGEMENT & AUTHENTICATION
 // ============================================================================
 
+enum RoleProtection {
+  none
+  constrained
+  full
+}
+
+model Role {
+  name       String         @id
+  label      String
+  protection RoleProtection @default(none)
+  created_at DateTime       @default(now())
+
+  users             User[]           @relation("UserRoleName")
+  role_capabilities RoleCapability[] @relation("RoleCapabilityName")
+
+  @@map("roles")
+}
+
 model User {
   id                    String    @id @default(uuid())
   email                 String    @unique
@@ -30,6 +48,8 @@ model User {
   last_name             String?
   avatar_url            String?
   role                  UserRole  @default(member)
+  role_name             String    @default("member")
+  role_ref              Role      @relation("UserRoleName", fields: [role_name], references: [name])
   email_verified        Boolean   @default(false)
   email_verification_token String?
   email_verification_expires DateTime?
@@ -67,6 +87,7 @@ model User {
 
   @@index([email])
   @@index([role])
+  @@index([role_name])
   @@map("users")
 }
 
@@ -148,15 +169,17 @@ model UserCapability {
 }
 
 model RoleCapability {
-  id            String   @id @default(uuid())
-  role          UserRole
+  id            String    @id @default(uuid())
+  role          UserRole?
+  role_name     String    @default("admin")
+  role_ref      Role      @relation("RoleCapabilityName", fields: [role_name], references: [name])
   capability_id String
-  enabled       Boolean  @default(true)
-  updated_at    DateTime @updatedAt
+  enabled       Boolean   @default(true)
+  updated_at    DateTime  @updatedAt
 
   capability Capability @relation(fields: [capability_id], references: [id], onDelete: Cascade)
 
-  @@unique([role, capability_id])
+  @@unique([role_name, capability_id])
   @@map("role_capabilities")
 }
 

@@ -60,6 +60,8 @@ export const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
   { name: 'digital.deliver',     category: 'ecommerce', scope: 'backstage', description: 'Manage digital delivery — extend/regenerate download tokens' },
   // Mul Converter
   { name: 'mul.convert',         category: 'system',    scope: 'backstage', description: 'Run the Mul Converter AI tool to extract palettes and page layouts from external URLs' },
+  // Role Management
+  { name: 'role.manage',         category: 'system',    scope: 'backstage', description: 'Create, edit, and delete roles and their capability assignments' },
   // Customer-facing capabilities
   { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
   { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a review on an article' },

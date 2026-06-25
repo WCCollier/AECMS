@@ -21,16 +21,16 @@ export class CapabilitiesService {
   }
 
   /**
-   * Get capabilities for a specific role
+   * Get capabilities for a specific role (accepts string role name)
    */
-  async getRoleCapabilities(role: UserRole): Promise<Capability[]> {
+  async getRoleCapabilities(role: string): Promise<Capability[]> {
     // Owner always has all capabilities
-    if (role === UserRole.owner) {
+    if (role === 'owner') {
       return this.getAllCapabilities();
     }
 
     const roleCapabilities = await this.prisma.roleCapability.findMany({
-      where: { role },
+      where: { role_name: role },
       include: { capability: true },
     });
 
@@ -44,7 +44,7 @@ export class CapabilitiesService {
   async getUserCapabilities(userId: string): Promise<Capability[]> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { role_name: true },
     });
 
     if (!user) {
@@ -52,12 +52,12 @@ export class CapabilitiesService {
     }
 
     // Owner always has all capabilities
-    if (user.role === UserRole.owner) {
+    if (user.role_name === 'owner') {
       return this.getAllCapabilities();
     }
 
     // Get role capabilities
-    const roleCapabilities = await this.getRoleCapabilities(user.role);
+    const roleCapabilities = await this.getRoleCapabilities(user.role_name);
 
     // Get user-specific capabilities
     const userCapabilities = await this.prisma.userCapability.findMany({
@@ -85,7 +85,7 @@ export class CapabilitiesService {
   async userHasCapability(userId: string, capabilityName: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { role: true },
+      select: { role_name: true },
     });
 
     if (!user) {
@@ -93,7 +93,7 @@ export class CapabilitiesService {
     }
 
     // Owner always has all capabilities
-    if (user.role === UserRole.owner) {
+    if (user.role_name === 'owner') {
       return true;
     }
 
@@ -109,7 +109,7 @@ export class CapabilitiesService {
     // Check role capability
     const roleCapability = await this.prisma.roleCapability.findFirst({
       where: {
-        role: user.role,
+        role_name: user.role_name,
         capability_id: capability.id,
       },
     });
@@ -150,7 +150,7 @@ export class CapabilitiesService {
     });
     if (!capability) return false;
     const rc = await this.prisma.roleCapability.findFirst({
-      where: { role: UserRole.guest, capability_id: capability.id },
+      where: { role_name: 'guest', capability_id: capability.id },
     });
     return !!rc;
   }
@@ -169,8 +169,9 @@ export class CapabilitiesService {
    * Assign a capability to a role
    */
   async assignCapabilityToRole(role: UserRole, capabilityId: string): Promise<RoleCapability> {
+    const roleStr = role as string;
     // Owner cannot have capabilities assigned (they always have all)
-    if (role === UserRole.owner) {
+    if (roleStr === 'owner') {
       throw new BadRequestException('Owner role always has all capabilities');
     }
 
@@ -186,7 +187,7 @@ export class CapabilitiesService {
     // Check if already assigned
     const existing = await this.prisma.roleCapability.findFirst({
       where: {
-        role,
+        role_name: roleStr,
         capability_id: capabilityId,
       },
     });
@@ -198,6 +199,7 @@ export class CapabilitiesService {
     return this.prisma.roleCapability.create({
       data: {
         role,
+        role_name: roleStr,
         capability_id: capabilityId,
       },
       include: { capability: true },
@@ -208,14 +210,15 @@ export class CapabilitiesService {
    * Remove a capability from a role
    */
   async removeCapabilityFromRole(role: UserRole, capabilityId: string): Promise<void> {
+    const roleStr = role as string;
     // Owner cannot have capabilities removed
-    if (role === UserRole.owner) {
+    if (roleStr === 'owner') {
       throw new BadRequestException('Cannot remove capabilities from Owner role');
     }
 
     const roleCapability = await this.prisma.roleCapability.findFirst({
       where: {
-        role,
+        role_name: roleStr,
         capability_id: capabilityId,
       },
     });
@@ -240,6 +243,7 @@ export class CapabilitiesService {
     // Verify user exists
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: { role_name: true },
     });
 
     if (!user) {
@@ -247,7 +251,7 @@ export class CapabilitiesService {
     }
 
     // Owner doesn't need user-specific capabilities
-    if (user.role === UserRole.owner) {
+    if (user.role_name === 'owner') {
       throw new BadRequestException('Owner role always has all capabilities');
     }
 

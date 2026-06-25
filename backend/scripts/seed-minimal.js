@@ -62,6 +62,8 @@ const capabilities = [
   { name: 'digital.deliver',     category: 'ecommerce', scope: 'backstage', description: 'Manage digital delivery — extend/regenerate download tokens' },
   // Mul Converter
   { name: 'mul.convert',         category: 'system',    scope: 'backstage', description: 'Run the Mul Converter AI tool to extract palettes and page layouts from external URLs' },
+  // Role Management
+  { name: 'role.manage',         category: 'system',    scope: 'backstage', description: 'Create, edit, and delete roles and their capability assignments' },
   // Customer-facing capabilities
   { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
   { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
@@ -104,14 +106,18 @@ const defaultSettings = [
 
 async function assignCapsToRole(role, capNames) {
   let count = 0;
+  const canonicalRoles = ['admin', 'member', 'guest'];
+  const isCanonical = canonicalRoles.includes(role);
   for (const capName of capNames) {
     const cap = await prisma.capability.findUnique({ where: { name: capName } });
     if (!cap) continue;
     const existing = await prisma.roleCapability.findFirst({
-      where: { role, capability_id: cap.id },
+      where: { role_name: role, capability_id: cap.id },
     });
     if (!existing) {
-      await prisma.roleCapability.create({ data: { role, capability_id: cap.id } });
+      const data = { role_name: role, capability_id: cap.id };
+      if (isCanonical) data.role = role;
+      await prisma.roleCapability.create({ data });
       count++;
     }
   }
@@ -137,6 +143,22 @@ async function main() {
     await prisma.capability.delete({ where: { id: legacy.id } });
     console.log('[seed-minimal] ✓ Removed legacy system.configure capability');
   }
+
+  console.log('[seed-minimal] Seeding roles...');
+  const roleDefs = [
+    { name: 'owner',  label: 'Owner',  protection: 'full' },
+    { name: 'admin',  label: 'Admin',  protection: 'none' },
+    { name: 'member', label: 'Member', protection: 'none' },
+    { name: 'guest',  label: 'Guest',  protection: 'constrained' },
+  ];
+  for (const r of roleDefs) {
+    await prisma.role.upsert({
+      where: { name: r.name },
+      update: { label: r.label, protection: r.protection },
+      create: r,
+    });
+  }
+  console.log('[seed-minimal] ✓ roles upserted');
 
   console.log('[seed-minimal] Seeding role capabilities...');
   const adminCount  = await assignCapsToRole('admin',  [...adminBackstageCaps, ...memberCustomerCaps]);

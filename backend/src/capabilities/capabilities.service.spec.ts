@@ -25,12 +25,14 @@ describe('CapabilitiesService', () => {
     id: 'user-1',
     email: 'test@example.com',
     role: UserRole.admin,
+    role_name: 'admin',
   };
 
   const mockOwner = {
     id: 'owner-1',
     email: 'owner@example.com',
     role: UserRole.owner,
+    role_name: 'owner',
   };
 
   const mockPrismaService = {
@@ -105,11 +107,11 @@ describe('CapabilitiesService', () => {
         roleCapabilities,
       );
 
-      const result = await service.getRoleCapabilities(UserRole.admin);
+      const result = await service.getRoleCapabilities('admin');
 
       expect(result).toEqual([mockCapability]);
       expect(prisma.roleCapability.findMany).toHaveBeenCalledWith({
-        where: { role: UserRole.admin },
+        where: { role_name: 'admin' },
         include: { capability: true },
       });
     });
@@ -117,7 +119,7 @@ describe('CapabilitiesService', () => {
     it('should return role-specific capabilities for member role', async () => {
       mockPrismaService.roleCapability.findMany.mockResolvedValue([]);
 
-      const result = await service.getRoleCapabilities(UserRole.member);
+      const result = await service.getRoleCapabilities('member');
 
       expect(result).toEqual([]);
     });
@@ -126,7 +128,8 @@ describe('CapabilitiesService', () => {
   describe('getUserCapabilities', () => {
     it('should return all capabilities for owner user', async () => {
       const capabilities = [mockCapability];
-      mockPrismaService.user.findUnique.mockResolvedValue(mockOwner);
+      // Service selects role_name; mock returns it
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'owner' });
       mockPrismaService.capability.findMany.mockResolvedValue(capabilities);
 
       const result = await service.getUserCapabilities(mockOwner.id);
@@ -135,7 +138,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should return combined role and user capabilities', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.roleCapability.findMany.mockResolvedValue([
         { capability: mockCapability },
       ]);
@@ -156,7 +159,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should deduplicate capabilities from role and user', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.roleCapability.findMany.mockResolvedValue([
         { capability: mockCapability },
       ]);
@@ -172,7 +175,7 @@ describe('CapabilitiesService', () => {
 
   describe('userHasCapability', () => {
     it('should return true for owner user', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockOwner);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'owner' });
 
       const result = await service.userHasCapability(
         mockOwner.id,
@@ -191,7 +194,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should return false if capability not found', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.capability.findUnique.mockResolvedValue(null);
 
       const result = await service.userHasCapability(mockUser.id, 'invalid');
@@ -200,7 +203,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should return true if user has capability via role', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.capability.findUnique.mockResolvedValue(mockCapability);
       mockPrismaService.roleCapability.findFirst.mockResolvedValue({
         id: 'rc-1',
@@ -215,7 +218,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should return true if user has capability directly assigned', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.capability.findUnique.mockResolvedValue(mockCapability);
       mockPrismaService.roleCapability.findFirst.mockResolvedValue(null);
       mockPrismaService.userCapability.findFirst.mockResolvedValue({
@@ -231,7 +234,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should return false if user does not have capability', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.capability.findUnique.mockResolvedValue(mockCapability);
       mockPrismaService.roleCapability.findFirst.mockResolvedValue(null);
       mockPrismaService.userCapability.findFirst.mockResolvedValue(null);
@@ -366,7 +369,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should throw BadRequestException for owner user', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockOwner);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'owner' });
 
       await expect(
         service.assignCapabilityToUser(mockOwner.id, mockCapability.id, 'granter-1'),
@@ -374,7 +377,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should throw NotFoundException if capability not found', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.capability.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -383,7 +386,7 @@ describe('CapabilitiesService', () => {
     });
 
     it('should throw ConflictException if already assigned', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.capability.findUnique.mockResolvedValue(mockCapability);
       mockPrismaService.userCapability.findFirst.mockResolvedValue({
         id: 'uc-1',
@@ -402,7 +405,7 @@ describe('CapabilitiesService', () => {
         granted_by: 'granter-1',
         capability: mockCapability,
       };
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser);
+      mockPrismaService.user.findUnique.mockResolvedValue({ role_name: 'admin' });
       mockPrismaService.capability.findUnique.mockResolvedValue(mockCapability);
       mockPrismaService.userCapability.findFirst.mockResolvedValue(null);
       mockPrismaService.userCapability.create.mockResolvedValue(
