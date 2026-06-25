@@ -153,6 +153,13 @@ export function SettingsClient() {
   );
   const publishedPages = pagesData?.data ?? [];
 
+  // Roles list for default registration role picker
+  const { data: rolesData } = useSWR<{ id: string; name: string; label: string }[]>(
+    activeTab === 'general' ? '/roles' : null,
+    fetcher,
+  );
+  const availableRoles = (rolesData ?? []).filter((r) => r.name !== 'guest');
+
   // Favicon upload state
   const [faviconUploading, setFaviconUploading] = useState(false);
   const [faviconError, setFaviconError] = useState<string | null>(null);
@@ -467,6 +474,61 @@ export function SettingsClient() {
                 </div>
               )}
             </div>
+          </FieldRow>
+          <FieldRow
+            label="Default Registration Role"
+            help="Role assigned to new accounts when they register. Changing this does not affect existing users."
+          >
+            <select
+              value={f('general.default_role') || 'member'}
+              onChange={(e) => set('general.default_role', e.target.value)}
+              className="w-full bg-neutral-900 border border-neutral-700 rounded px-3 py-2 text-sm text-neutral-100 focus:outline-none focus:border-neutral-500"
+            >
+              {availableRoles.length > 0
+                ? availableRoles.map((r) => (
+                    <option key={r.name} value={r.name}>{r.label}</option>
+                  ))
+                : <option value="member">Member</option>}
+            </select>
+            <p className="text-xs text-neutral-500 mt-1">
+              Manage available roles in{' '}
+              <a href="/admin/roles" className="text-blue-400 hover:underline">Admin → Roles</a>.
+              The default role cannot be deleted until another role is set as default.
+            </p>
+          </FieldRow>
+          <FieldRow
+            label="Require Registration Approval"
+            help="When on, new accounts must be approved by an admin before they can log in."
+          >
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => set('general.require_registration_approval', f('general.require_registration_approval') === 'true' ? 'false' : 'true')}
+                className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
+                  f('general.require_registration_approval') === 'true'
+                    ? 'bg-blue-600'
+                    : 'bg-neutral-700'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                    f('general.require_registration_approval') === 'true' ? 'translate-x-5' : ''
+                  }`}
+                />
+              </div>
+              <span className="text-sm text-neutral-300">
+                {f('general.require_registration_approval') === 'true' ? 'Enabled' : 'Disabled'}
+              </span>
+            </label>
+            {f('general.require_registration_approval') === 'true' && (
+              <p className="text-xs text-amber-400 mt-2 flex items-start gap-1.5">
+                <span>⚠</span>
+                <span>
+                  Approval is active. Existing verified users will not be affected.
+                  Pending registrations are reviewed at{' '}
+                  <a href="/admin/registrations" className="underline">Admin → Registrations</a>.
+                </span>
+              </p>
+            )}
           </FieldRow>
           <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />
         </div>

@@ -60,6 +60,9 @@ model User {
   totp_backup_codes     String[]  // Encrypted recovery codes
   last_login_at         DateTime?
   last_login_ip         String?
+  approved_at           DateTime? // Set when registration is approved (null = pending or approval not required)
+  approved_by           String?   // User ID of the approver
+
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
   deleted_at            DateTime? // Soft delete

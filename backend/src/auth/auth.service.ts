@@ -64,6 +64,16 @@ export class AuthService {
     const verificationToken = this.generateVerificationToken();
     const verificationExpires = new Date(Date.now() + this.verificationTokenExpiry);
 
+    // Resolve default registration role from settings (fallback: 'member')
+    const defaultRoleSetting = await this.prisma.siteSettings.findUnique({
+      where: { key: 'general.default_role' },
+    });
+    const defaultRole = defaultRoleSetting?.value ?? 'member';
+    const canonicalRoles: string[] = ['owner', 'admin', 'member', 'guest'];
+    const roleEnumValue: UserRole = canonicalRoles.includes(defaultRole)
+      ? (defaultRole as UserRole)
+      : UserRole.member;
+
     // Create user with email_verified = false
     const user = await this.prisma.user.create({
       data: {
@@ -72,8 +82,8 @@ export class AuthService {
         password_hash: passwordHash,
         first_name: registerDto.firstName,
         last_name: registerDto.lastName,
-        role: UserRole.member,
-        role_name: 'member',
+        role: roleEnumValue,
+        role_name: defaultRole,
         email_verified: false,
         email_verification_token: verificationToken,
         email_verification_expires: verificationExpires,
@@ -120,6 +130,9 @@ export class AuthService {
         'Email not verified. Please check your email and verify your account before logging in.',
       );
     }
+
+    // Check registration approval gate
+    await this.assertApproved(user);
 
     // Update last login
     await this.prisma.user.update({
@@ -171,6 +184,9 @@ export class AuthService {
     if (!user.email_verified) {
       throw new UnauthorizedException('Email not verified');
     }
+
+    // Check registration approval gate
+    await this.assertApproved(user);
 
     // Owner always has backstage access; others must hold at least one backstage-scoped capability
     const effectiveRole = user.role_name ?? user.role;
@@ -534,6 +550,15 @@ export class AuthService {
       },
     });
 
+    // If approval gate is on, notify all approvers and return a distinct message
+    const requireApproval = await this.isApprovalRequired();
+    if (requireApproval) {
+      await this.notifyApprovers(user.email, user.first_name).catch((e) =>
+        console.error('[auth] notifyApprovers failed:', e?.message),
+      );
+      return { message: 'Email verified. Your account is awaiting admin approval. You will receive an email once it is reviewed.' };
+    }
+
     return { message: 'Email verified successfully. You can now log in.' };
   }
 
@@ -868,6 +893,176 @@ export class AuthService {
     });
 
     return { message: `Role changed from ${oldRole} to ${newRole}` };
+  }
+
+  // ── Registration Approval ─────────────────────────────────────────────────
+
+  private async isApprovalRequired(): Promise<boolean> {
+    const row = await this.prisma.siteSettings.findUnique({
+      where: { key: 'general.require_registration_approval' },
+    });
+    return row?.value === 'true';
+  }
+
+  private async assertApproved(user: { id: string; role: UserRole | string; role_name: string; approved_at: Date | null }): Promise<void> {
+    // Owner is always exempt from the approval gate
+    const effectiveRole = user.role_name ?? user.role;
+    if (effectiveRole === 'owner') return;
+
+    const requireApproval = await this.isApprovalRequired();
+    if (!requireApproval) return;
+
+    if (!user.approved_at) {
+      throw new UnauthorizedException(
+        'Your registration is pending approval. You will receive an email when it is reviewed.',
+      );
+    }
+  }
+
+  async listPendingRegistrations() {
+    const users = await this.prisma.user.findMany({
+      where: {
+        email_verified: true,
+        approved_at: null,
+        deleted_at: null,
+        role_name: { not: 'owner' },
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        first_name: true,
+        last_name: true,
+        role_name: true,
+        email_verified: true,
+        created_at: true,
+      },
+      orderBy: { created_at: 'asc' },
+    });
+    return { data: users, total: users.length };
+  }
+
+  async approveRegistration(actorId: string, targetId: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: targetId, deleted_at: null, email_verified: true, approved_at: null },
+    });
+    if (!user) throw new NotFoundException('Pending registration not found');
+
+    await this.prisma.user.update({
+      where: { id: targetId },
+      data: { approved_at: new Date(), approved_by: actorId },
+    });
+
+    await this.auditLog.log({
+      event_type: 'user.registration_approved',
+      user_id: actorId,
+      metadata: { target_id: targetId, target_email: user.email },
+    });
+
+    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    await this.emailProvider.send({
+      to: user.email,
+      subject: 'Your account has been approved',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #333;">Welcome!</h1>
+          <p>Hi ${user.first_name || 'there'},</p>
+          <p>Your account registration has been approved. You can now log in at:</p>
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${appUrl}/login"
+               style="background-color: #4F46E5; color: white; padding: 12px 24px;
+                      text-decoration: none; border-radius: 6px; display: inline-block;">
+              Log In Now
+            </a>
+          </p>
+        </div>
+      `,
+      text: `Hi ${user.first_name || 'there'},\n\nYour account has been approved. Log in at: ${appUrl}/login`,
+    }).catch((e) => console.error('[auth] approval email failed:', e?.message));
+
+    return { message: 'Registration approved' };
+  }
+
+  async rejectRegistration(actorId: string, targetId: string, reason: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: { id: targetId, deleted_at: null, email_verified: true, approved_at: null },
+    });
+    if (!user) throw new NotFoundException('Pending registration not found');
+
+    await this.auditLog.log({
+      event_type: 'user.registration_rejected',
+      user_id: actorId,
+      metadata: { target_id: targetId, target_email: user.email, reason },
+    });
+
+    await this.prisma.user.update({
+      where: { id: targetId },
+      data: { deleted_at: new Date() },
+    });
+
+    return { message: 'Registration rejected' };
+  }
+
+  private async notifyApprovers(applicantEmail: string, applicantName?: string | null): Promise<void> {
+    // Find all users who hold the registration.approve capability
+    const cap = await this.prisma.capability.findUnique({
+      where: { name: 'registration.approve' },
+    });
+    if (!cap) return;
+
+    const approverIds = new Set<string>();
+
+    // Via role assignment
+    const roleCaps = await this.prisma.roleCapability.findMany({
+      where: { capability_id: cap.id },
+      select: { role_name: true },
+    });
+    if (roleCaps.length > 0) {
+      const roleNames = [...new Set(roleCaps.map((rc) => rc.role_name).filter(Boolean))];
+      const roleUsers = await this.prisma.user.findMany({
+        where: { role_name: { in: roleNames }, deleted_at: null, email_verified: true },
+        select: { id: true },
+      });
+      roleUsers.forEach((u) => approverIds.add(u.id));
+    }
+
+    // Via direct user capability grants
+    const userCaps = await this.prisma.userCapability.findMany({
+      where: { capability_id: cap.id },
+      select: { user_id: true },
+    });
+    userCaps.forEach((uc) => approverIds.add(uc.user_id));
+
+    if (approverIds.size === 0) return;
+
+    const approvers = await this.prisma.user.findMany({
+      where: { id: { in: [...approverIds] }, deleted_at: null },
+      select: { email: true },
+    });
+
+    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    const displayName = applicantName ? `${applicantName} (${applicantEmail})` : applicantEmail;
+
+    for (const approver of approvers) {
+      await this.emailProvider.send({
+        to: approver.email,
+        subject: `New registration pending approval — ${applicantEmail}`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">New registration pending approval</h2>
+            <p><strong>${displayName}</strong> has verified their email and is waiting for account approval.</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${appUrl}/admin/registrations"
+                 style="background-color: #4F46E5; color: white; padding: 12px 24px;
+                        text-decoration: none; border-radius: 6px; display: inline-block;">
+                Review Pending Registrations
+              </a>
+            </p>
+          </div>
+        `,
+        text: `New registration pending approval: ${displayName}\n\nReview at: ${appUrl}/admin/registrations`,
+      }).catch((e) => console.error('[auth] approver notification email failed:', e?.message));
+    }
   }
 
   /**

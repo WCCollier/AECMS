@@ -1,8 +1,8 @@
 # FR-004: Registration Controls
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Requested:** 2026-06-25
-**Deployed:** —
+**Deployed:** 2026-06-25
 **Size:** `medium` (1–2 days — migration + settings + new endpoints + new UI page)
 
 ---
@@ -20,6 +20,7 @@ Also bundled: remove `'admin'` from `RESERVED_NAMES` in `roles.service.ts` — i
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-25 | accepted | Fully designed and planned; ready for implementation |
+| 2026-06-25 | deployed | Implemented to main; CI/CD deploying to production |
 
 ---
 
@@ -169,7 +170,25 @@ Two new email cases in `EmailService` / `SmtpEmailProvider`:
 
 ## Completion Report
 
-> _Fill in after implementation._
+### Files changed
+
+**Backend:**
+- `prisma/schema.prisma` — added `approved_at DateTime?` + `approved_by String?` to `User`
+- `prisma/migrations/20260625200000_add_registration_approval_fields/migration.sql` — additive columns
+- `src/capabilities/capability-definitions.ts` — added `registration.configure` + `registration.approve`
+- `scripts/seed-minimal.js` — new caps, `registration.approve` → adminBackstageCaps, 2 new defaultSettings
+- `src/roles/roles.service.ts` — removed `'admin'`+`'member'` from `RESERVED_NAMES`; dynamic delete guard reads `general.default_role` from DB
+- `src/auth/auth.service.ts` — `register()` reads `general.default_role`; `login()`+`adminLogin()` call `assertApproved()`; `verifyEmail()` notifies approvers when gate is on; new methods: `listPendingRegistrations()`, `approveRegistration()`, `rejectRegistration()`, `notifyApprovers()`, `assertApproved()`, `isApprovalRequired()`
+- `src/settings/settings.service.ts` — toggle-on backfill in `set()`: when `general.require_registration_approval` flips to `'true'`, auto-approves all existing email-verified users
+- `src/users/users.controller.ts` — 3 new endpoints: `GET /users/pending`, `POST /users/:id/approve`, `POST /users/:id/reject` (all gated `registration.approve`)
+- `src/auth/auth.service.spec.ts` — extended mock with `siteSettings`, `capability`, `roleCapability`, `userCapability`; added `role_name`+`approved_at` to `mockUser`
+
+**Frontend:**
+- `app/admin/settings/SettingsClient.tsx` — General tab: default role dropdown (from live `/roles`) + approval toggle with inline warning link
+- `app/admin/registrations/page.tsx` (new) — page shell with `force-dynamic`
+- `app/admin/registrations/RegistrationsClient.tsx` (new) — pending table, Approve button, Reject modal (reason required), success/error flash
+- `app/admin/layout.tsx` — "Registrations" nav item (UserCheck icon, gated `registration.approve`)
+- `app/admin/roles/page.tsx` — added `force-dynamic` (fixes static prerender error discovered during build)
 
 ---
 

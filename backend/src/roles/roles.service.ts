@@ -9,8 +9,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 
-const RESERVED_NAMES = ['owner', 'admin', 'member', 'guest'];
-const DEFAULT_REGISTRATION_ROLE = 'member';
+// Only structurally invariant roles — owner (immutable singleton) and guest (virtual/constrained).
+// 'admin' and 'member' are canonical seeds but are freely deletable; the default registration
+// role is now a setting (general.default_role) rather than a hardcoded constant.
+const RESERVED_NAMES = ['owner', 'guest'];
 
 @Injectable()
 export class RolesService {
@@ -74,9 +76,15 @@ export class RolesService {
     if (role.protection !== 'none') {
       throw new ForbiddenException(`Role '${name}' cannot be deleted`);
     }
-    if (name === DEFAULT_REGISTRATION_ROLE) {
+
+    // Dynamic delete guard: block deletion of whichever role is currently the default
+    const defaultRoleSetting = await this.prisma.siteSettings.findUnique({
+      where: { key: 'general.default_role' },
+    });
+    const defaultRole = defaultRoleSetting?.value ?? 'member';
+    if (name === defaultRole) {
       throw new ConflictException(
-        `'${name}' is the default registration role. Change the default before deleting it.`,
+        `'${name}' is the default registration role. Change the default in Settings → General before deleting it.`,
       );
     }
 
