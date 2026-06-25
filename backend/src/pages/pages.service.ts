@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePageDto, UpdatePageDto, QueryPagesDto, ReorderPagesDto } from './dto';
@@ -19,6 +20,8 @@ const RESERVED_SLUGS = [
 
 @Injectable()
 export class PagesService {
+  private readonly logger = new Logger(PagesService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditLog: AuditLogService,
@@ -722,8 +725,8 @@ export class PagesService {
         if (!Array.isArray(section.zones)) continue;
         const spanSum: number = section.zones.reduce((s: number, z: { span?: unknown }) => s + (Number(z.span) || 0), 0);
         if (spanSum !== section.columns) {
-          throw new BadRequestException(
-            `Section "${section.id}": zone spans sum to ${spanSum} but columns is ${section.columns}`,
+          this.logger.warn(
+            `Section "${section.id}": zone spans sum to ${spanSum} but columns is ${section.columns} — saving anyway`,
           );
         }
       }
