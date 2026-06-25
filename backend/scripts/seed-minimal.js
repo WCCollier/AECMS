@@ -60,6 +60,8 @@ const capabilities = [
   { name: 'system.appearance',   category: 'system',    scope: 'backstage', description: 'Change site visual theme' },
   // Digital Delivery
   { name: 'digital.deliver',     category: 'ecommerce', scope: 'backstage', description: 'Manage digital delivery — extend/regenerate download tokens' },
+  // Mul Converter
+  { name: 'mul.convert',         category: 'system',    scope: 'backstage', description: 'Run the Mul Converter AI tool to extract palettes and page layouts from external URLs' },
   // Customer-facing capabilities
   { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
   { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
