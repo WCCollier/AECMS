@@ -219,7 +219,7 @@ export function MulConverterClient() {
           <span className="text-sm">{analyzeStep ? STEP_LABELS[analyzeStep] : 'Working…'}</span>
           {analyzeStep === 'analyzing' && (
             <span className="text-xs text-center max-w-sm">
-              This can take a minute or more. If no error appears, your request is still processing — please don't close this tab.
+              {"This can take a minute or more. If no error appears, your request is still processing — please don't close this tab."}
             </span>
           )}
           {imageProgress && (
