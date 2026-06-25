@@ -92,7 +92,7 @@ export class DomainAliasesController {
   @ApiResponse({ status: 200, description: 'Domain verified successfully' })
   @ApiResponse({ status: 400, description: 'Verification failed - check DNS configuration' })
   async verify(@Param('id') id: string, @Req() req: Request & { user: any }) {
-    return this.domainAliasesService.verify(id, req.user.id, req.user.role);
+    return this.domainAliasesService.verify(id, req.user.id);
   }
 
   @Post(':id/regenerate-token')
@@ -100,7 +100,7 @@ export class DomainAliasesController {
   @ApiParam({ name: 'id', description: 'Domain alias ID' })
   @ApiResponse({ status: 200, description: 'Token regenerated successfully' })
   async regenerateToken(@Param('id') id: string, @Req() req: Request & { user: any }) {
-    const alias = await this.domainAliasesService.regenerateToken(id, req.user.id, req.user.role);
+    const alias = await this.domainAliasesService.regenerateToken(id, req.user.id);
     return this.domainAliasesService.getVerificationInstructions(alias);
   }
 
@@ -113,7 +113,7 @@ export class DomainAliasesController {
     @Body() dto: UpdateDomainAliasDto,
     @Req() req: Request & { user: any },
   ) {
-    return this.domainAliasesService.update(id, dto, req.user.id, req.user.role);
+    return this.domainAliasesService.update(id, dto, req.user.id);
   }
 
   @Delete(':id')
@@ -122,6 +122,6 @@ export class DomainAliasesController {
   @ApiParam({ name: 'id', description: 'Domain alias ID' })
   @ApiResponse({ status: 204, description: 'Domain alias deleted successfully' })
   async remove(@Param('id') id: string, @Req() req: Request & { user: any }) {
-    await this.domainAliasesService.remove(id, req.user.id, req.user.role);
+    await this.domainAliasesService.remove(id, req.user.id);
   }
 }
