@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input, PasswordInput, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
-
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
 
 export function RegisterPageClient() {
   const router = useRouter();
@@ -16,7 +14,17 @@ export function RegisterPageClient() {
   const [error, setError] = useState('');
   const [confirmTouched, setConfirmTouched] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileInstance>(null);
+
+  useEffect(() => {
+    fetch('/api-proxy/settings-public/captcha')
+      .then((r) => r.json())
+      .then((data: { turnstile_site_key: string | null }) => {
+        setTurnstileSiteKey(data.turnstile_site_key || null);
+      })
+      .catch(() => { /* CAPTCHA widget won't show if fetch fails */ });
+  }, []);
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -56,7 +64,7 @@ export function RegisterPageClient() {
       return;
     }
 
-    if (TURNSTILE_SITE_KEY && !captchaToken) {
+    if (turnstileSiteKey && !captchaToken) {
       setError('Please complete the CAPTCHA verification.');
       setIsLoading(false);
       return;
@@ -183,11 +191,11 @@ export function RegisterPageClient() {
               </span>
             </label>
 
-            {TURNSTILE_SITE_KEY && (
+            {turnstileSiteKey && (
               <div className="flex justify-center">
                 <Turnstile
                   ref={turnstileRef}
-                  siteKey={TURNSTILE_SITE_KEY}
+                  siteKey={turnstileSiteKey}
                   onSuccess={(token) => setCaptchaToken(token)}
                   onError={() => { setCaptchaToken(''); }}
                   onExpire={() => { setCaptchaToken(''); }}

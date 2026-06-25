@@ -32,6 +32,7 @@ interface MigratedUser {
   first_name: string | null;
   last_name: string | null;
   role: string;
+  role_name?: string;
   email_verified: boolean;
   password_reset_required: boolean;
   wp_id: number;

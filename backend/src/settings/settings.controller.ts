@@ -75,6 +75,13 @@ export class PublicSettingsController {
     return { favicon_url, logo_url, brand_color };
   }
 
+  @Get('captcha')
+  @ApiOperation({ summary: 'Get CAPTCHA config (site key only — secret never exposed)' })
+  async getCaptcha() {
+    const turnstile_site_key = await this.settingsService.getEffective('security.turnstile_site_key');
+    return { turnstile_site_key: turnstile_site_key || null };
+  }
+
   @Get('seo')
   @ApiOperation({ summary: 'Get public SEO settings (site name, author, canonical domain)' })
   async getSeoPublic() {
@@ -121,7 +128,7 @@ export class SettingsController {
   @ApiOperation({ summary: 'Update general and site identity settings' })
   async updateGeneral(@Body() dto: UpdateSettingsDto, @Request() req: any) {
     const allowed = Object.fromEntries(
-      Object.entries(dto.updates).filter(([k]) => k.startsWith('general.') || k.startsWith('identity.')),
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('general.') || k.startsWith('identity.') || k.startsWith('security.')),
     );
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'Settings saved' };

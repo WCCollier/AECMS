@@ -219,7 +219,7 @@ export function SettingsClient() {
   };
 
   const TAB_PREFIXES: Record<TabId, string[]> = {
-    general:  ['general.', 'identity.'],
+    general:  ['general.', 'identity.', 'security.'],
     identity: ['general.', 'identity.'],
     email:    ['email.'],
     payment:  ['payment.'],
@@ -529,6 +529,45 @@ export function SettingsClient() {
                 </span>
               </p>
             )}
+          </FieldRow>
+          <FieldRow
+            label="CAPTCHA Site Key"
+            help="Cloudflare Turnstile site key — safe to expose publicly. Shown on the registration form."
+          >
+            <TextInput
+              value={f('security.turnstile_site_key')}
+              onChange={(v) => set('security.turnstile_site_key', v)}
+              placeholder="0x4AAAAAAA…"
+            />
+            {f('security.turnstile_site_key') && f('security.turnstile_secret_key_enc') && (
+              <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                <span>✓</span> CAPTCHA active — widget will appear on the registration form.
+              </p>
+            )}
+            {!f('security.turnstile_site_key') && (
+              <p className="text-xs text-neutral-500 mt-1">
+                Leave blank to disable CAPTCHA.{' '}
+                <a
+                  href="https://dash.cloudflare.com/?to=/:account/turnstile"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:underline"
+                >
+                  Create a Turnstile site
+                </a>{' '}
+                (free, Managed widget type).
+              </p>
+            )}
+          </FieldRow>
+          <FieldRow
+            label="CAPTCHA Secret Key"
+            help="Turnstile secret key — stored encrypted, never sent to the browser."
+          >
+            <SecretInput
+              value={f('security.turnstile_secret_key_enc')}
+              onChange={(v) => set('security.turnstile_secret_key_enc', v)}
+              placeholder="0x4AAAAAAA…"
+            />
           </FieldRow>
           <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />
         </div>

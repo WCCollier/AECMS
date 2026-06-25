@@ -136,11 +136,12 @@ async function main() {
         password_hash: passwordHash,
         first_name: 'System',
         last_name: 'Owner',
-        role_name: 'owner', email_verified: true, approved_at: new Date(),
+        role_name: 'owner',
         email_verified: true,
+        approved_at: new Date(),
       },
     });
-    console.log('✓ Created Owner user:', { email: owner.email, role: owner.role, id: owner.id });
+    console.log('✓ Created Owner user:', { email: owner.email, role: owner.role_name, id: owner.id });
 
     const adminHash = await bcrypt.hash('Admin123!@#', 12);
     const admin = await prisma.user.upsert({
@@ -155,7 +156,7 @@ async function main() {
         email_verified: true,
       },
     });
-    console.log('✓ Created Admin user:', { email: admin.email, role: admin.role, id: admin.id });
+    console.log('✓ Created Admin user:', { email: admin.email, role: admin.role_name, id: admin.id });
 
     const memberHash = await bcrypt.hash('Member123!@#', 12);
     const member = await prisma.user.upsert({
@@ -170,7 +171,7 @@ async function main() {
         email_verified: true,
       },
     });
-    console.log('✓ Created Member user:', { email: member.email, role: member.role, id: member.id });
+    console.log('✓ Created Member user:', { email: member.email, role: member.role_name, id: member.id });
   } else {
     console.log('\n[2/3] Skipping dev users (minimal profile — setup wizard creates Owner)');
   }

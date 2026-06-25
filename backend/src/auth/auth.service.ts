@@ -20,6 +20,7 @@ import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
 import { AuditLogService } from '../audit/audit.service';
 import { CAPABILITY_DEFINITIONS } from '../capabilities/capability-definitions';
+import { LocalKeyProvider } from '../settings/local-key.provider';
 
 @Injectable()
 export class AuthService {
@@ -38,8 +39,8 @@ export class AuthService {
    * Register a new user
    */
   async register(registerDto: RegisterDto): Promise<{ message: string; userId: string }> {
-    // Verify CAPTCHA token if a secret key is configured
-    const turnstileSecret = this.configService.get<string>('TURNSTILE_SECRET_KEY');
+    // Verify CAPTCHA token if a secret key is configured (ISM DB-first, env fallback)
+    const turnstileSecret = await this.getTurnstileSecret();
     if (turnstileSecret) {
       if (!registerDto.captchaToken) {
         throw new BadRequestException('CAPTCHA verification required');
@@ -608,6 +609,22 @@ export class AuthService {
    */
   private generateVerificationToken(): string {
     return crypto.randomBytes(32).toString('hex');
+  }
+
+  private async getTurnstileSecret(): Promise<string | null> {
+    const row = await this.prisma.siteSettings.findUnique({
+      where: { key: 'security.turnstile_secret_key_enc' },
+    });
+    if (row?.value) {
+      const sek = this.configService.get<string>('SETTINGS_ENCRYPTION_KEY', '');
+      if (sek?.length === 64) {
+        try {
+          const kp = new LocalKeyProvider(sek);
+          return await kp.decrypt(row.value);
+        } catch { /* corrupted ciphertext — fall through */ }
+      }
+    }
+    return this.configService.get<string>('TURNSTILE_SECRET_KEY') ?? null;
   }
 
   private async verifyTurnstileToken(token: string, secretKey: string): Promise<boolean> {
