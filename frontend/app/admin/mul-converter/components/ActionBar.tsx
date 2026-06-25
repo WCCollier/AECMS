@@ -45,7 +45,7 @@ export function ActionBar({ result, customPalettes, onPaletteSaved, onPageCreate
       title: result.page.suggestedTitle || 'Mul Converter Draft',
       slug: `mul-draft-${Date.now()}`,
       status: 'draft',
-      content: pageContent,
+      content: JSON.stringify(pageContent),
     });
     return res.data.id;
   };
