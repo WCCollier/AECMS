@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CapabilitiesService } from './capabilities.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '@prisma/client';
 import {
   NotFoundException,
   ConflictException,
@@ -24,14 +23,12 @@ describe('CapabilitiesService', () => {
   const mockUser = {
     id: 'user-1',
     email: 'test@example.com',
-    role: UserRole.admin,
     role_name: 'admin',
   };
 
   const mockOwner = {
     id: 'owner-1',
     email: 'owner@example.com',
-    role: UserRole.owner,
     role_name: 'owner',
   };
 
@@ -94,7 +91,7 @@ describe('CapabilitiesService', () => {
       const capabilities = [mockCapability];
       mockPrismaService.capability.findMany.mockResolvedValue(capabilities);
 
-      const result = await service.getRoleCapabilities(UserRole.owner);
+      const result = await service.getRoleCapabilities('owner');
 
       expect(result).toEqual(capabilities);
     });
@@ -281,7 +278,7 @@ describe('CapabilitiesService', () => {
   describe('assignCapabilityToRole', () => {
     it('should throw BadRequestException for owner role', async () => {
       await expect(
-        service.assignCapabilityToRole(UserRole.owner, mockCapability.id),
+        service.assignCapabilityToRole('owner', mockCapability.id),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -289,7 +286,7 @@ describe('CapabilitiesService', () => {
       mockPrismaService.capability.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.assignCapabilityToRole(UserRole.admin, 'invalid'),
+        service.assignCapabilityToRole('admin', 'invalid'),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -300,14 +297,14 @@ describe('CapabilitiesService', () => {
       });
 
       await expect(
-        service.assignCapabilityToRole(UserRole.admin, mockCapability.id),
+        service.assignCapabilityToRole('admin', mockCapability.id),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should assign capability to role successfully', async () => {
       const roleCapability = {
         id: 'rc-1',
-        role: UserRole.admin,
+        role_name: 'admin',
         capability_id: mockCapability.id,
         capability: mockCapability,
       };
@@ -318,7 +315,7 @@ describe('CapabilitiesService', () => {
       );
 
       const result = await service.assignCapabilityToRole(
-        UserRole.admin,
+        'admin',
         mockCapability.id,
       );
 
@@ -330,7 +327,7 @@ describe('CapabilitiesService', () => {
   describe('removeCapabilityFromRole', () => {
     it('should throw BadRequestException for owner role', async () => {
       await expect(
-        service.removeCapabilityFromRole(UserRole.owner, mockCapability.id),
+        service.removeCapabilityFromRole('owner', mockCapability.id),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -338,7 +335,7 @@ describe('CapabilitiesService', () => {
       mockPrismaService.roleCapability.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.removeCapabilityFromRole(UserRole.admin, mockCapability.id),
+        service.removeCapabilityFromRole('admin', mockCapability.id),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -351,7 +348,7 @@ describe('CapabilitiesService', () => {
         roleCapability,
       );
 
-      await service.removeCapabilityFromRole(UserRole.admin, mockCapability.id);
+      await service.removeCapabilityFromRole('admin', mockCapability.id);
 
       expect(prisma.roleCapability.delete).toHaveBeenCalledWith({
         where: { id: roleCapability.id },

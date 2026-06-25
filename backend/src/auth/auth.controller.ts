@@ -117,7 +117,7 @@ export class AuthController {
       username: user.username,
       firstName: user.first_name,
       lastName: user.last_name,
-      role: user.role,
+      role: user.role_name,
       emailVerified: user.email_verified,
       totpEnabled: user.totp_enabled,
       hasBackstageAccess,

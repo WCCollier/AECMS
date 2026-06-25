@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Search, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Search, ChevronLeft, ChevronRight, AlertTriangle, Trash2, Loader2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
 import adminApi from '@/lib/adminApi';
 
@@ -104,6 +104,7 @@ export function UsersClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userCaps, setUserCaps] = useState<string[]>([]);
   const [roles, setRoles] = useState<RoleDef[]>([
     // Fallback defaults while loading
     { name: 'owner', label: 'Owner', protection: 'full' },
@@ -115,12 +116,23 @@ export function UsersClient() {
     user: UserRow;
     newRole: string;
   } | null>(null);
+  const [deletePending, setDeletePending] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  // Resolve current user id from sessionStorage
+  // Resolve current user id + capabilities from sessionStorage / API
   useEffect(() => {
     try {
       const stored = sessionStorage.getItem('admin_user');
-      if (stored) setCurrentUserId(JSON.parse(stored).id ?? null);
+      if (stored) {
+        const u = JSON.parse(stored);
+        const uid = u.id ?? null;
+        setCurrentUserId(uid);
+        if (uid) {
+          adminApi.get(`/capabilities/users/${uid}`)
+            .then((res) => setUserCaps((res.data as { name: string }[]).map((c) => c.name)))
+            .catch(() => {});
+        }
+      }
     } catch { /* ignore */ }
   }, []);
 
@@ -158,6 +170,22 @@ export function UsersClient() {
 
   // Reset to page 1 when search changes
   useEffect(() => { setCurrentPage(1); }, [debouncedSearch]);
+
+  const canDelete = userCaps.includes('account.delete.any') || userCaps.includes('account.delete.limited');
+
+  async function applyDelete(user: UserRow) {
+    setDeleting(true);
+    try {
+      await adminApi.delete(`/users/${user.id}`);
+      setDeletePending(null);
+      await load();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Delete failed.';
+      alert(Array.isArray(msg) ? msg.join(', ') : msg);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function applyRoleChange(user: UserRow, newRole: string) {
     try {
@@ -214,6 +242,7 @@ export function UsersClient() {
               <th className="text-left px-4 py-3 font-medium text-foreground/60">Role</th>
               <th className="text-left px-4 py-3 font-medium text-foreground/60">Joined</th>
               <th className="text-left px-4 py-3 font-medium text-foreground/60">Verified</th>
+              {canDelete && <th className="px-4 py-3" />}
             </tr>
           </thead>
           <tbody>
@@ -267,6 +296,19 @@ export function UsersClient() {
                       {user.email_verified ? '✓' : '—'}
                     </span>
                   </td>
+                  {canDelete && (
+                    <td className="px-4 py-3 text-right">
+                      {!isSelf && (
+                        <button
+                          onClick={() => setDeletePending(user)}
+                          title="Delete account"
+                          className="text-foreground/30 hover:text-red-500 transition-colors p-1 rounded"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -297,6 +339,33 @@ export function UsersClient() {
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
+          </div>
+        </div>
+      )}
+
+      {deletePending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface border border-border rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <div className="flex items-start gap-3 mb-4">
+              <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+              <div>
+                <h3 className="font-semibold text-lg">Delete Account</h3>
+                <p className="text-sm text-foreground/60 mt-1">
+                  Permanently delete <strong>{deletePending.email}</strong>? This soft-deletes the account — the email address can be re-registered.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setDeletePending(null)} disabled={deleting}>Cancel</Button>
+              <Button
+                onClick={() => applyDelete(deletePending)}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {deleting ? <Loader2 size={14} className="animate-spin mr-1.5" /> : <Trash2 size={14} className="mr-1.5" />}
+                Delete Account
+              </Button>
+            </div>
           </div>
         </div>
       )}

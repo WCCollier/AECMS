@@ -29,6 +29,8 @@
       <div class="nav-section">
         <div class="nav-section-title">Backstage Tools</div>
         <a href="ch05-admin-settings.html#roles">Roles &amp; Permissions</a>
+        <a href="ch05-admin-settings.html#registration">Registration Controls</a>
+        <a href="ch05-admin-settings.html#captcha">CAPTCHA</a>
         <a href="ch05-admin-settings.html#mul-converter">Mul Converter</a>
       </div>
     </nav>
@@ -43,11 +45,69 @@
       </div>
 
       <h2>General</h2>
-      <p>Site title, tagline, timezone, date format, and homepage mode. The <strong>Homepage</strong> setting controls what visitors see at your root URL (<code>/</code>):</p>
+      <p>Site title, tagline, timezone, date format, homepage mode, registration controls, and CAPTCHA. The <strong>Homepage</strong> setting controls what visitors see at your root URL (<code>/</code>):</p>
       <ul>
         <li><strong>Article Feed</strong> — redirects <code>/</code> to <code>/articles</code></li>
         <li><strong>Custom Page</strong> — shows a specific page at <code>/</code>. Select a published page from the dropdown. If the selected page is not published, the site falls back to the <code>_home_</code> page, then to the article feed.</li>
       </ul>
+
+      <h2 id="registration">Registration Controls</h2>
+      <p>The two registration-control settings live at the bottom of the General tab.</p>
+
+      <h3>Default Registration Role</h3>
+      <p>The role automatically assigned to new accounts when they register. Defaults to <strong>Member</strong>. If you create a custom role (e.g. "Patron" with premium content access), you can make it the default here — new sign-ups will receive that role automatically.</p>
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Elevating the default role</div>
+        <p>If you set a higher-privilege role as the default, consider enabling <strong>Require Registration Approval</strong> (below) or activating <strong>CAPTCHA</strong> so that elevated access is not handed to bots or throwaway email addresses.</p>
+      </div>
+      <p>The currently-set default role cannot be deleted until you change this setting to another role. This prevents accidentally breaking the registration flow.</p>
+
+      <h3>Require Registration Approval</h3>
+      <p>When toggled on, new accounts must be manually approved by an admin before they can log in. The approval workflow:</p>
+      <ol>
+        <li>User registers and verifies their email address.</li>
+        <li>All users who hold the <code>registration.approve</code> capability (Admins and Owners by default) receive an email notification.</li>
+        <li>Approvers visit <strong>/admin/registrations</strong> to approve or reject the account.</li>
+        <li>Rejection requires a written reason, which is included in the notification email and stored in the audit log. The account is soft-deleted, freeing the email address for re-registration.</li>
+      </ol>
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Existing users are not affected</div>
+        <p>Enabling approval does not lock out users who are already verified. The system auto-approves all currently verified accounts the moment you toggle the setting on.</p>
+      </div>
+      <p>The approval gate is best for tightly controlled communities. For public sites that just need bot protection, <strong>CAPTCHA</strong> (below) is a lighter-weight alternative — real users are not inconvenienced and no admin action is needed per registration.</p>
+
+      <h2 id="captcha">CAPTCHA</h2>
+      <p>AECMS integrates <strong>Cloudflare Turnstile</strong> for registration-form bot protection. Turnstile's Managed widget type works silently in the background — legitimate visitors see at most a brief "Verifying…" indicator, with no image puzzles or checkbox clicks required.</p>
+
+      <h3>Getting your Turnstile keys</h3>
+      <ol>
+        <li>Log into the <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare Dashboard</a>.</li>
+        <li>In the left nav, go to <strong>Turnstile</strong>.</li>
+        <li>Click <strong>Add Site</strong>.</li>
+        <li>Enter your domain (e.g. <code>yourdomain.com</code>). For local testing you can add <code>localhost</code> as a second hostname.</li>
+        <li>Select widget type: <strong>Managed</strong> (recommended — fully invisible for genuine users).</li>
+        <li>Copy the <strong>Site Key</strong> and <strong>Secret Key</strong>.</li>
+      </ol>
+
+      <h3>Activating CAPTCHA</h3>
+      <ol>
+        <li>Go to <strong>Settings → General</strong> and scroll to the <em>CAPTCHA</em> section near the bottom.</li>
+        <li>Paste your Site Key into the <strong>CAPTCHA Site Key</strong> field.</li>
+        <li>Paste your Secret Key into the <strong>CAPTCHA Secret Key</strong> field. The secret is stored encrypted in the Internal Secrets Manager (AES-256-GCM) and is never returned in any API response.</li>
+        <li>Click <strong>Save Changes</strong>. A green "CAPTCHA active" indicator appears when both fields are populated.</li>
+        <li>Open the registration form at <code>/auth/register</code> in a private window — the Turnstile widget should appear below the Terms checkbox.</li>
+      </ol>
+
+      <div class="callout tip">
+        <div class="callout-title">✅ No rebuild required</div>
+        <p>Unlike typical CAPTCHA integrations that bake the site key at Docker build time, AECMS fetches it at runtime from the settings database. You can activate, deactivate, or rotate CAPTCHA keys any time through the Settings panel — no code push or redeploy needed.</p>
+      </div>
+
+      <h3>Disabling CAPTCHA</h3>
+      <p>Clear either the Site Key or the Secret Key field in Settings → General and save. The widget will stop appearing on the registration form immediately.</p>
+
+      <h3>Rotating keys</h3>
+      <p>If you generate new Turnstile keys (e.g. to decommission an old site entry), simply paste the new keys into the settings fields and save. The change takes effect on the next page load.</p>
 
       <h2>Email / SMTP</h2>
       <p>Enter your SMTP credentials here. Required fields: Host, Port, Username, Password, From Address. Click <strong>Test</strong> to send a test email using the values currently in the form (you do not need to save first). Save after a successful test.</p>

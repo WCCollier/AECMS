@@ -5,7 +5,7 @@
  * Run with: npx ts-node prisma/import-wp-migration.ts
  */
 
-import { PrismaClient, UserRole, ContentStatus, ContentVisibility, ProductType, StockStatus } from '@prisma/client';
+import { PrismaClient, ContentStatus, ContentVisibility, ProductType, StockStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -32,6 +32,7 @@ interface MigratedUser {
   first_name: string | null;
   last_name: string | null;
   role: string;
+  role_name?: string;
   email_verified: boolean;
   password_reset_required: boolean;
   wp_id: number;
@@ -110,7 +111,7 @@ async function importUsers(): Promise<Map<number, string>> {
           password_hash: tempPasswordHash,
           first_name: user.first_name,
           last_name: user.last_name,
-          role: user.role as UserRole,
+          role_name: user.role_name ?? user.role ?? 'member',
           email_verified: user.email_verified,
         },
       });
@@ -244,7 +245,7 @@ async function main() {
 
     // Get owner user for authorship
     const owner = await prisma.user.findFirst({
-      where: { role: UserRole.owner },
+      where: { role_name: 'owner' },
     });
 
     if (!owner) {

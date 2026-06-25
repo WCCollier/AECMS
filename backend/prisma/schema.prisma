@@ -47,7 +47,6 @@ model User {
   first_name            String?
   last_name             String?
   avatar_url            String?
-  role                  UserRole  @default(member)
   role_name             String    @default("member")
   role_ref              Role      @relation("UserRoleName", fields: [role_name], references: [name])
   email_verified        Boolean   @default(false)
@@ -89,16 +88,8 @@ model User {
   domain_aliases        DomainAlias[]
 
   @@index([email])
-  @@index([role])
   @@index([role_name])
   @@map("users")
-}
-
-enum UserRole {
-  owner
-  admin
-  member
-  guest
 }
 
 model OAuthAccount {
@@ -173,7 +164,6 @@ model UserCapability {
 
 model RoleCapability {
   id            String    @id @default(uuid())
-  role          UserRole?
   role_name     String    @default("admin")
   role_ref      Role      @relation("RoleCapabilityName", fields: [role_name], references: [name])
   capability_id String

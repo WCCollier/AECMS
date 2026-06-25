@@ -15,12 +15,12 @@ import * as bcrypt from 'bcrypt';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponse, AdminLoginResponse, TokenPayload } from './interfaces/auth-response.interface';
-import { UserRole } from '@prisma/client';
 import * as crypto from 'crypto';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
 import { AuditLogService } from '../audit/audit.service';
 import { CAPABILITY_DEFINITIONS } from '../capabilities/capability-definitions';
+import { LocalKeyProvider } from '../settings/local-key.provider';
 
 @Injectable()
 export class AuthService {
@@ -39,8 +39,8 @@ export class AuthService {
    * Register a new user
    */
   async register(registerDto: RegisterDto): Promise<{ message: string; userId: string }> {
-    // Verify CAPTCHA token if a secret key is configured
-    const turnstileSecret = this.configService.get<string>('TURNSTILE_SECRET_KEY');
+    // Verify CAPTCHA token if a secret key is configured (ISM DB-first, env fallback)
+    const turnstileSecret = await this.getTurnstileSecret();
     if (turnstileSecret) {
       if (!registerDto.captchaToken) {
         throw new BadRequestException('CAPTCHA verification required');
@@ -81,10 +81,6 @@ export class AuthService {
       where: { key: 'general.default_role' },
     });
     const defaultRole = defaultRoleSetting?.value ?? 'member';
-    const canonicalRoles: string[] = ['owner', 'admin', 'member', 'guest'];
-    const roleEnumValue: UserRole = canonicalRoles.includes(defaultRole)
-      ? (defaultRole as UserRole)
-      : UserRole.member;
 
     // Create user with email_verified = false
     const user = await this.prisma.user.create({
@@ -94,7 +90,6 @@ export class AuthService {
         password_hash: passwordHash,
         first_name: registerDto.firstName,
         last_name: registerDto.lastName,
-        role: roleEnumValue,
         role_name: defaultRole,
         email_verified: false,
         email_verification_token: verificationToken,
@@ -155,7 +150,7 @@ export class AuthService {
     });
 
     // Generate tokens (prefer role_name for JWT; falls back to legacy role enum)
-    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, undefined, 'customer');
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name, undefined, 'customer');
 
     // Store refresh token
     await this.storeRefreshToken(user.id, tokens.refreshToken, undefined, 'customer');
@@ -169,7 +164,7 @@ export class AuthService {
         email: user.email,
         firstName: user.first_name || undefined,
         lastName: user.last_name || undefined,
-        role: user.role,
+        role: user.role_name,
         emailVerified: user.email_verified,
       },
     };
@@ -201,7 +196,7 @@ export class AuthService {
     await this.assertApproved(user);
 
     // Owner always has backstage access; others must hold at least one backstage-scoped capability
-    const effectiveRole = user.role_name ?? user.role;
+    const effectiveRole = user.role_name;
     if (effectiveRole !== 'owner') {
       const backstageCap = await this.prisma.capability.findFirst({
         where: {
@@ -228,10 +223,10 @@ export class AuthService {
     }
 
     // 2FA not yet set up — grant backstage access with 7-day tokens and flag setup required
-    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, '7d', 'backstage');
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name, '7d', 'backstage');
     await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
 
-    if (user.role === UserRole.owner) {
+    if (user.role_name === 'owner') {
       this.syncOwnerCapabilities(user.id).catch((e) =>
         console.error('[auth] syncOwnerCapabilities failed:', e?.message),
       );
@@ -248,7 +243,7 @@ export class AuthService {
         email: user.email,
         firstName: user.first_name || undefined,
         lastName: user.last_name || undefined,
-        role: user.role,
+        role: user.role_name,
         emailVerified: user.email_verified,
       },
     };
@@ -282,11 +277,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid authenticator code');
     }
 
-    const tokens = await this.generateTokens(user.id, user.email, user.role_name ?? user.role, '7d', 'backstage');
+    const tokens = await this.generateTokens(user.id, user.email, user.role_name, '7d', 'backstage');
     const storedToken = await this.storeRefreshToken(user.id, tokens.refreshToken, '7d', 'backstage');
     const revoked = await this.revokeOtherBackstageSessions(user.id, storedToken.id);
 
-    if (user.role === UserRole.owner) {
+    if (user.role_name === 'owner') {
       this.syncOwnerCapabilities(user.id).catch((e) =>
         console.error('[auth] syncOwnerCapabilities failed:', e?.message),
       );
@@ -304,7 +299,7 @@ export class AuthService {
         email: user.email,
         firstName: user.first_name || undefined,
         lastName: user.last_name || undefined,
-        role: user.role,
+        role: user.role_name,
         emailVerified: user.email_verified,
       },
     };
@@ -412,7 +407,7 @@ export class AuthService {
       const tokens = await this.generateTokens(
         storedToken.user.id,
         storedToken.user.email,
-        storedToken.user.role_name ?? storedToken.user.role,
+        storedToken.user.role_name,
         refreshExpiry,
         sessionType,
       );
@@ -427,7 +422,7 @@ export class AuthService {
           email: storedToken.user.email,
           firstName: storedToken.user.first_name || undefined,
           lastName: storedToken.user.last_name || undefined,
-          role: storedToken.user.role,
+          role: storedToken.user.role_name,
         },
       };
     } catch (error) {
@@ -513,9 +508,9 @@ export class AuthService {
   }
 
   async hasBackstageAccess(userId: string): Promise<boolean> {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true, role_name: true } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role_name: true } });
     if (!user) return false;
-    const effectiveRole = user.role_name ?? user.role;
+    const effectiveRole = user.role_name;
     if (effectiveRole === 'owner') return true;
     const cap = await this.prisma.capability.findFirst({
       where: {
@@ -616,6 +611,22 @@ export class AuthService {
     return crypto.randomBytes(32).toString('hex');
   }
 
+  private async getTurnstileSecret(): Promise<string | null> {
+    const row = await this.prisma.siteSettings.findUnique({
+      where: { key: 'security.turnstile_secret_key_enc' },
+    });
+    if (row?.value) {
+      const sek = this.configService.get<string>('SETTINGS_ENCRYPTION_KEY', '');
+      if (sek?.length === 64) {
+        try {
+          const kp = new LocalKeyProvider(sek);
+          return await kp.decrypt(row.value);
+        } catch { /* corrupted ciphertext — fall through */ }
+      }
+    }
+    return this.configService.get<string>('TURNSTILE_SECRET_KEY') ?? null;
+  }
+
   private async verifyTurnstileToken(token: string, secretKey: string): Promise<boolean> {
     try {
       const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
@@ -698,7 +709,7 @@ export class AuthService {
   async deleteAccount(userId: string, password: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
-    if (user.role === 'owner') throw new ForbiddenException('Owner account cannot be deleted');
+    if (user.role_name === 'owner') throw new ForbiddenException('Owner account cannot be deleted');
 
     if (!user.password_hash) throw new BadRequestException('Account uses OAuth login — deletion not supported via password');
     const valid = await bcrypt.compare(password, user.password_hash);
@@ -729,12 +740,11 @@ export class AuthService {
   /**
    * Generate access and refresh tokens. refreshExpiryOverride allows the admin
    * back-door to enforce a fixed 7-day expiry independent of global config.
-   * role accepts either a UserRole enum value or a string role_name.
    */
   private async generateTokens(
     userId: string,
     email: string,
-    role: UserRole | string,
+    role: string,
     refreshExpiryOverride?: string,
     sessionType: 'customer' | 'backstage' = 'customer',
   ): Promise<{ accessToken: string; refreshToken: string }> {
@@ -870,7 +880,6 @@ export class AuthService {
           username: true,
           first_name: true,
           last_name: true,
-          role: true,
           role_name: true,
           email_verified: true,
           created_at: true,
@@ -879,9 +888,9 @@ export class AuthService {
       this.prisma.user.count({ where }),
     ]);
 
-    const normalized = users.map(({ role_name, role, ...rest }) => ({
+    const normalized = users.map(({ role_name, ...rest }) => ({
       ...rest,
-      role: role_name ?? role,
+      role: role_name,
     }));
     return { data: normalized, total, page, limit, pages: Math.ceil(total / limit) };
   }
@@ -902,16 +911,9 @@ export class AuthService {
     });
     if (!target) throw new NotFoundException('User not found');
 
-    const oldRole = target.role_name ?? target.role;
+    const oldRole = target.role_name;
 
-    // Write both role_name (new) and role enum (legacy compat — only for canonical roles)
-    const canonicalRoles: string[] = ['owner', 'admin', 'member', 'guest'];
-    const updateData: Record<string, unknown> = { role_name: newRole };
-    if (canonicalRoles.includes(newRole)) {
-      updateData.role = newRole as UserRole;
-    }
-
-    await this.prisma.user.update({ where: { id: targetId }, data: updateData });
+    await this.prisma.user.update({ where: { id: targetId }, data: { role_name: newRole } });
 
     await this.auditLog.log({
       event_type: 'user.role_changed',
@@ -931,9 +933,8 @@ export class AuthService {
     return row?.value === 'true';
   }
 
-  private async assertApproved(user: { id: string; role: UserRole | string; role_name: string; approved_at: Date | null }): Promise<void> {
-    // Owner is always exempt from the approval gate
-    const effectiveRole = user.role_name ?? user.role;
+  private async assertApproved(user: { id: string; role_name: string; approved_at: Date | null }): Promise<void> {
+    const effectiveRole = user.role_name;
     if (effectiveRole === 'owner') return;
 
     const requireApproval = await this.isApprovalRequired();
@@ -1090,6 +1091,65 @@ export class AuthService {
         text: `New registration pending approval: ${displayName}\n\nReview at: ${appUrl}/admin/registrations`,
       }).catch((e) => console.error('[auth] approver notification email failed:', e?.message));
     }
+  }
+
+  // ── Account Deletion (admin panel) ───────────────────────────────────────
+
+  async deleteUser(
+    actorId: string,
+    targetId: string,
+    actorCaps: string[],
+  ): Promise<{ message: string }> {
+    if (actorId === targetId) {
+      throw new ForbiddenException('You cannot delete your own account from here');
+    }
+
+    const target = await this.prisma.user.findFirst({
+      where: { id: targetId, deleted_at: null },
+      select: { id: true, email: true, role_name: true },
+    });
+    if (!target) throw new NotFoundException('User not found');
+
+    const hasAny = actorCaps.includes('account.delete.any');
+    const hasLimited = actorCaps.includes('account.delete.limited');
+
+    if (hasAny) {
+      // Can delete anyone except themselves (already checked above)
+    } else if (hasLimited) {
+      // Cannot delete if the target holds any account.delete.* capability
+      const deleteCap = await this.prisma.capability.findMany({
+        where: { name: { startsWith: 'account.delete.' } },
+        select: { id: true },
+      });
+      if (deleteCap.length > 0) {
+        const capIds = deleteCap.map((c) => c.id);
+        const targetHasCap = await this.prisma.roleCapability.findFirst({
+          where: { role_name: target.role_name, capability_id: { in: capIds } },
+        }) ?? await this.prisma.userCapability.findFirst({
+          where: { user_id: targetId, capability_id: { in: capIds } },
+        });
+        if (targetHasCap) {
+          throw new ForbiddenException(
+            'account.delete.limited cannot delete users who hold an account.delete capability',
+          );
+        }
+      }
+    } else {
+      throw new ForbiddenException('Insufficient permission to delete accounts');
+    }
+
+    await this.prisma.user.update({
+      where: { id: targetId },
+      data: { deleted_at: new Date() },
+    });
+
+    await this.auditLog.log({
+      event_type: 'user.deleted',
+      user_id: actorId,
+      metadata: { target_id: targetId, target_email: target.email },
+    });
+
+    return { message: `Account ${target.email} deleted` };
   }
 
   /**

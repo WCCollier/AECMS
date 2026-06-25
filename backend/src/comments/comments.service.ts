@@ -61,7 +61,7 @@ export class CommentsService {
 
     // Capability check — Owner bypasses; all others must hold the matching capability.
     // The required capability depends on target type and whether ratings are included.
-    if (user.role !== 'owner') {
+    if (user.role_name !== 'owner') {
       const requiredCap = dto.product_id
         ? (isReview ? 'review.product' : 'comment.product')
         : (isReview ? 'review.article' : 'comment.article');

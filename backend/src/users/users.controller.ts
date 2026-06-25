@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
@@ -18,6 +19,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthService } from '../auth/auth.service';
+import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
@@ -37,7 +39,10 @@ class RejectRegistrationDto {
 @RequiresCapability('user.assign_role')
 @ApiBearerAuth()
 export class UsersController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly capabilitiesService: CapabilitiesService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List all users (Owner only)' })
@@ -85,5 +90,15 @@ export class UsersController {
   @ApiOperation({ summary: 'Reject a pending registration (requires reason; soft-deletes account)' })
   rejectRegistration(@Request() req: any, @Param('id') id: string, @Body() dto: RejectRegistrationDto) {
     return this.authService.rejectRegistration(req.user.id, id, dto.reason);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @RequiresCapability('account.delete.any', 'account.delete.limited')
+  @ApiOperation({ summary: 'Soft-delete a user account (account.delete.any or account.delete.limited)' })
+  async deleteUser(@Request() req: any, @Param('id') id: string) {
+    const actorCaps = (await this.capabilitiesService.getUserCapabilities(req.user.id))
+      .map((c: { name: string }) => c.name);
+    return this.authService.deleteUser(req.user.id, id, actorCaps);
   }
 }

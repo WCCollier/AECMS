@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { config } from 'dotenv';
 import * as path from 'path';
@@ -136,11 +136,12 @@ async function main() {
         password_hash: passwordHash,
         first_name: 'System',
         last_name: 'Owner',
-        role: UserRole.owner,
+        role_name: 'owner',
         email_verified: true,
+        approved_at: new Date(),
       },
     });
-    console.log('✓ Created Owner user:', { email: owner.email, role: owner.role, id: owner.id });
+    console.log('✓ Created Owner user:', { email: owner.email, role: owner.role_name, id: owner.id });
 
     const adminHash = await bcrypt.hash('Admin123!@#', 12);
     const admin = await prisma.user.upsert({
@@ -151,11 +152,11 @@ async function main() {
         password_hash: adminHash,
         first_name: 'System',
         last_name: 'Admin',
-        role: UserRole.admin,
+        role_name: 'admin',
         email_verified: true,
       },
     });
-    console.log('✓ Created Admin user:', { email: admin.email, role: admin.role, id: admin.id });
+    console.log('✓ Created Admin user:', { email: admin.email, role: admin.role_name, id: admin.id });
 
     const memberHash = await bcrypt.hash('Member123!@#', 12);
     const member = await prisma.user.upsert({
@@ -166,11 +167,11 @@ async function main() {
         password_hash: memberHash,
         first_name: 'Test',
         last_name: 'Member',
-        role: UserRole.member,
+        role_name: 'member',
         email_verified: true,
       },
     });
-    console.log('✓ Created Member user:', { email: member.email, role: member.role, id: member.id });
+    console.log('✓ Created Member user:', { email: member.email, role: member.role_name, id: member.id });
   } else {
     console.log('\n[2/3] Skipping dev users (minimal profile — setup wizard creates Owner)');
   }
@@ -230,28 +231,28 @@ async function main() {
     'digital.deliver',
   ];
 
-  async function assignCapsToRole(role: UserRole, capNames: string[]) {
+  async function assignCapsToRole(roleName: string, capNames: string[]) {
     let count = 0;
     for (const capName of capNames) {
       const capability = await prisma.capability.findUnique({ where: { name: capName } });
       if (!capability) continue;
       const existing = await prisma.roleCapability.findFirst({
-        where: { role, capability_id: capability.id },
+        where: { role_name: roleName, capability_id: capability.id },
       });
       if (!existing) {
-        await prisma.roleCapability.create({ data: { role, capability_id: capability.id } });
+        await prisma.roleCapability.create({ data: { role_name: roleName, capability_id: capability.id } });
         count++;
       }
     }
     return count;
   }
 
-  const adminCount = await assignCapsToRole(UserRole.admin, [
+  const adminCount = await assignCapsToRole('admin', [
     ...adminBackstageCapabilities,
     ...memberCustomerCapabilities,
   ]);
-  const memberCount = await assignCapsToRole(UserRole.member, memberCustomerCapabilities);
-  const guestCount = await assignCapsToRole(UserRole.guest, guestCapabilities);
+  const memberCount = await assignCapsToRole('member', memberCustomerCapabilities);
+  const guestCount = await assignCapsToRole('guest', guestCapabilities);
 
   console.log(`✓ Assigned ${adminCount} capabilities to Admin role`);
   console.log(`✓ Assigned ${memberCount} capabilities to Member role`);

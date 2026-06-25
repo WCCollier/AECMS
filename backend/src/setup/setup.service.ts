@@ -12,7 +12,7 @@ export class SetupService {
   ) {}
 
   async isSetupRequired(): Promise<boolean> {
-    const owner = await this.prisma.user.findFirst({ where: { role: 'owner' } });
+    const owner = await this.prisma.user.findFirst({ where: { role_name: 'owner' } });
     return owner === null;
   }
 
@@ -56,8 +56,9 @@ export class SetupService {
         password_hash: passwordHash,
         first_name: dto.first_name,
         last_name: dto.last_name,
-        role: 'owner',
+        role_name: 'owner',
         email_verified: true,
+        approved_at: new Date(),
       },
     });
 
