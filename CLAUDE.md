@@ -33,7 +33,7 @@ Specific rules:
 
 **Phases 0–22**: ✅ ALL COMPLETE — foundation, auth/RBAC, content management (articles, pages, media), ecommerce (products, cart, orders), payments (Stripe + PayPal), frontend (Next.js, Tailwind, Radix, TipTap), digital products + Kindle, domain aliasing + email verification, widget system (inline TipTap nodes: MediaCarousel, Callout, VideoEmbed, XEmbed, SearchResultsEmbed, RssEmbed), page builder (sections/zones, dual-size widgets), audit trail + version history, admin settings + ISM, nav menus, alternate domain capture, RSS widget, themes (8 palettes, 5 font pairings), Cloud Run deployment, Node 22 + Next.js 15 upgrades, media library + bulk upload, CSV export, role manager (UserRole enum removed).
 
-**Phase 23**: 🚧 ON MAIN (awaiting full QA + deploy) — Mul Converter + Section Background System. All 3 parts built: (1) section-based page schema, SectionEditor, SectionsLayout renderer; (2) MulConverterModule (3 endpoints), AI providers (Anthropic/OpenAI/xAI text + GPT-Image-1/FLUX/Stability image), /admin/mul-converter UI; (3) true crossfade renderer, full transition vocabulary (none/fixed/fade/wipe-*/slide-up/parallax), gradient overlays, SectionBackgroundPanel. PRD: `docs/prd/13-mul-converter.md` v1.7. Plan: `docs/phases/PHASE_23_PLAN.md`
+**Phase 23**: ✅ DEPLOYED — Mul Converter + Section Background System. All 3 parts built: (1) section-based page schema, SectionEditor, SectionsLayout renderer; (2) MulConverterModule (3 endpoints), AI providers (Anthropic/OpenAI/xAI text + GPT-Image-1/FLUX/Stability image), /admin/mul-converter UI; (3) true crossfade renderer, full transition vocabulary (none/fixed/fade/wipe-*/slide-up/parallax), gradient overlays, SectionBackgroundPanel. PRD: `docs/prd/13-mul-converter.md` v1.7. Plan: `docs/phases/PHASE_23_PLAN.md`
 
 **FR-001**: ✅ LIVE — Tag-filtered search, UnifiedSearchInput, category schema drop, SearchResultsEmbed. Docs: `docs/feature-requests/FR-001-tag-search-and-collection-embed.md`
 **FR-002**: ✅ LIVE — Owner capability sync on login. Docs: `docs/feature-requests/FR-002-owner-capability-sync.md`
@@ -42,11 +42,13 @@ Specific rules:
 **FR-005**: ✅ LIVE — Cloudflare Turnstile CAPTCHA via ISM (Settings → General). Docs: `docs/feature-requests/FR-005-turnstile-captcha.md`
 **FR-006**: ✅ DEPLOYED — Forgot Password / Password Reset (`/auth/forgot-password`, `/auth/reset-password`). Enumeration-safe. Docs: `docs/feature-requests/FR-006-forgot-password.md`
 **FR-007**: ✅ DEPLOYED — Order Confirmation Emails (`OrderEmailService`, fire-and-forget on Stripe webhook + PayPal capture, adapts by product type). Docs: `docs/feature-requests/FR-007-order-confirmation-emails.md`
+**FR-008**: ✅ DEPLOYED — Free Product Checkout: bypass payment for $0 orders, service products now require shipping address, free digital requires login. Docs: `docs/feature-requests/FR-008-free-products.md`
+**FR-009**: 📋 PLANNED — Member Subscriptions & Syndication: new-article/product email notifications, news broadcast, RSS feed, account Notifications tab. Docs: `docs/feature-requests/FR-009-syndication.md`
 
 **Phase 24A**: 📋 PLANNED — Sales tax. Trigger: revenue >$1k or TX Comptroller registration. Plan: `docs/phases/PHASE_24_PLAN.md`
 **Phase 24B**: 📋 PLANNED — Shipping. Trigger: first physical product sale. Plan: `docs/phases/PHASE_24_PLAN.md`
-**Phase 25**: ✅ COMPLETE — Cloud SQL → Neon migration. Database now on Neon free tier; Cloud SQL deleted. Plan: `docs/phases/PHASE_25_PLAN.md`
-**Phase 26**: 📋 PLANNED — SEO toolkit: meta fields, Open Graph, JSON-LD, sitemap, robots.txt, book fields. PRD: `docs/prd/15-seo-toolkit.md`. Plan: `docs/phases/PHASE_26_PLAN.md`
+**Phase 25**: ✅ DEPLOYED — Cloud SQL → Neon migration. Database now on Neon free tier; Cloud SQL deleted. Plan: `docs/phases/PHASE_25_PLAN.md`
+**Phase 26**: ✅ DEPLOYED — SEO toolkit: generateMetadata on all site routes, JSON-LD (Book/Article/Person/WebSite/BreadcrumbList), /sitemap.xml, /robots.txt, SEO settings tab, per-content SEO panels + snippet preview, book fields (ISBN/format/page count/publisher/Amazon+Goodreads URLs), Owner's Manual ch08. PRD: `docs/prd/15-seo-toolkit.md`. Plan: `docs/phases/PHASE_26_PLAN.md`
 **Phase 27**: 📋 PLANNED — Design Library: manual palettes, page templates, export/import. PRD: `docs/prd/16-design-library.md`. Plan: `docs/phases/PHASE_27_PLAN.md`
 **Phase 28**: 📋 PLANNED — Multi-layer section backgrounds. Plan: `docs/phases/PHASE_28_PLAN.md`
 **Phase 31**: 💡 CONCEPT — Native mobile app. PRD: `docs/prd/14-mobile-app.md`
@@ -266,9 +268,12 @@ Small, self-contained features that don't constitute major phase-level work live
 - `docs/phases/PHASE_21_COMPLETION_REPORT.md` - Phase 21 completion: wizard, CI/CD, Cloud Run, content migration, distribution prep
 - `docs/phases/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
 - `docs/phases/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
+- `docs/phases/PHASE_23_COMPLETION_REPORT.md` - Phase 23 completion: section schema, SectionEditor, Mul Converter pipeline, image gen, scroll transitions, SectionBackgroundPanel
 - `docs/phases/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, PayPal flat-rate, tax settings, reporting
 - `docs/phases/PHASE_25_PLAN.md` - Cloud SQL → Neon migration: ~$10/mo savings, one-line deploy change
+- `docs/phases/PHASE_25_COMPLETION_REPORT.md` - Phase 25 completion: Cloud SQL → Neon operational migration, cost to $0
 - `docs/phases/PHASE_26_PLAN.md` - SEO toolkit: 11 items, generateMetadata, JSON-LD, sitemap, robots, book fields
+- `docs/phases/PHASE_26_COMPLETION_REPORT.md` - Phase 26 completion: full SEO layer, JSON-LD schemas, sitemap, robots.txt, book fields, Owner's Manual ch08
 - `docs/phases/PHASE_27_PLAN.md` - Design Library: manual palette creation, page templates, export/import, Mul Converter integration
 - `docs/prd/13-mul-converter.md` - Mul Converter PRD: full design spec (access control, data flow, AI provider abstraction, system prompt, custom palette system)
 - `docs/prd/14-mobile-app.md` - Mobile App PRD (Phase 31): Expo/React Native app, discovery manifest, theme mapping, two distribution models, IAP compliance notes

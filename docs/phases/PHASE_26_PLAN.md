@@ -2,7 +2,7 @@
 
 **Project**: AECMS  
 **Phase**: 26  
-**Status**: 📋 PLANNED  
+**Status**: ✅ COMPLETE (deployed 2026-06-26)  
 **PRD**: `docs/prd/15-seo-toolkit.md`  
 **Dependencies**: Phase 16 (catch-all routes), Phase 20 (theme/ISM), Phase 22 (Next.js 15 / Node 22)  
 **Branch**: `feature/phase-26`

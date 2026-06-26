@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { PaymentsService } from './payments.service';
 import {
+  CompleteFreeOrderDto,
   CreatePaymentIntentDto,
   CapturePayPalPaymentDto,
   RefundPaymentDto,
@@ -55,6 +56,16 @@ export class PaymentsController {
     @CurrentUser() user: any,
   ) {
     return this.paymentsService.capturePayPalPayment(dto, user?.id);
+  }
+
+  @Post('complete-free')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Complete a zero-total order without payment' })
+  completeFreeOrder(
+    @Body() dto: CompleteFreeOrderDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.paymentsService.completeFreeOrder(dto.order_id, user?.id);
   }
 
   @Post('refund/:orderId')

@@ -2,7 +2,7 @@
 
 **Project**: AECMS  
 **Phase**: 25  
-**Status**: 📋 PLANNED  
+**Status**: ✅ COMPLETE (deployed 2026-06-26)  
 **Dependencies**: Phase 21 (live on Cloud Run)  
 **Estimated savings**: ~$10/month  
 **Estimated effort**: 30 minutes  
