@@ -4,6 +4,7 @@ import {
   ConflictException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,13 +12,17 @@ import { CreateArticleDto, UpdateArticleDto, QueryArticlesDto } from './dto';
 import { Prisma, ContentStatus, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
 import { MediaSyncService } from '../media/media-sync.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class ArticlesService {
+  private readonly logger = new Logger(ArticlesService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditLog: AuditLogService,
     private mediaSync: MediaSyncService,
+    private subscriptions: SubscriptionsService,
   ) {}
 
   private getMediaInclude() {
@@ -298,6 +303,12 @@ export class ArticlesService {
       resource_id: id,
       changes: Object.keys(diff.before).length ? diff : undefined,
     });
+
+    if (isPublishing) {
+      this.subscriptions.notifyNewArticle(id).catch((err) =>
+        this.logger.error('Failed to send new article notifications', err),
+      );
+    }
 
     const updated = await this.prisma.article.findUnique({
       where: { id },

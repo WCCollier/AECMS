@@ -79,6 +79,8 @@ export default async function RootLayout({
         <style dangerouslySetInnerHTML={{ __html: cssOverrides }} />
         {/* Favicon from settings */}
         {faviconUrl && <link rel="icon" href={faviconUrl} />}
+        {/* RSS feed auto-discovery */}
+        <link rel="alternate" type="application/rss+xml" title={`${siteTitle} — RSS Feed`} href="/feed.xml" />
         {/* Site title from settings */}
         <title>{siteTitle}</title>
       </head>

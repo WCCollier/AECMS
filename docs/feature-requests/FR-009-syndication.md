@@ -1,8 +1,8 @@
 # FR-009: Member Subscriptions & Syndication
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Requested:** 2026-06-26
-**Deployed:** —
+**Deployed:** 2026-06-26
 **Size:** `medium` (schema migration, new backend module, RSS endpoint, frontend account preferences UI, admin broadcast tool)
 
 ---
@@ -290,3 +290,86 @@ Revalidate hourly (`export const revalidate = 3600`). Add `<link rel="alternate"
 8. Unsubscribe landing page
 9. RSS feed route
 10. Admin broadcast page (`broadcast.send` gate) + sidebar nav entry
+
+---
+
+## Completion Report
+
+**Deployed:** 2026-06-26
+
+### What was built
+
+All 10 implementation steps completed:
+
+**Schema**: Migration `20260626160043_add_subscription_preferences` — added `subscribe_new_articles`, `subscribe_new_products`, `subscribe_news_alerts` (all `Boolean @default(false)`) and `unsubscribe_token String?` to the `users` table.
+
+**Capabilities**: `broadcast.send` and `broadcast.config` added to `CAPABILITY_DEFINITIONS` and `seed-minimal.js`. Owner-only by default; `broadcast.config` can be granted to Admin.
+
+**ISM defaults**: `subscription.default_new_articles`, `subscription.default_new_products`, `subscription.default_news_alerts` seeded to `false` in `defaultSettings`.
+
+**Backend — SubscriptionsModule** (`backend/src/subscriptions/`):
+- `subscriptions.service.ts` — getPreferences, updatePreferences (generates unsubscribe token on first subscription), unsubscribeByToken, notifyNewArticle, notifyNewProduct, sendBroadcast, getSubscriberCount
+- `subscriptions.controller.ts` — 5 endpoints: GET/PATCH `/subscriptions/preferences` (JwtAuthGuard), GET `/subscriptions/unsubscribe` (public), GET `/subscriptions/counts` + POST `/subscriptions/broadcast` (BackstageGuard + broadcast.send)
+
+**Backend — Hooks**: `ArticlesService.update()` and `ProductsService.update()` each fire-and-forget call `notifyNewArticle/notifyNewProduct` on status → published transition. Logger captures errors; failures never block the publish.
+
+**Backend — Registration**: `AuthService.register()` reads 3 ISM keys directly via `prisma.siteSettings.findMany()` (avoids circular module dependency AuthModule → SettingsModule → CapabilitiesModule → AuthModule) and applies defaults to new user at creation time.
+
+**Backend — Settings**: `PATCH /settings/notifications` endpoint added (gated on `broadcast.config`), accepting `subscription.*` keys. `GET /settings` now also allows `broadcast.config` capability in addition to the four configure atoms.
+
+**Frontend — Admin Settings Notifications tab** (`SettingsClient.tsx`): New `notifications` tab, visible only to users with `broadcast.config` cap. Three checkbox toggles for the ISM subscription defaults, saving to `PATCH /settings/notifications`.
+
+**Frontend — Admin Broadcasts page** (`/admin/broadcasts`): Simple form with subject + body + live subscriber count + confirmation modal before send. Gated on `broadcast.send` cap; sidebar nav entry added.
+
+**Frontend — Account Notifications tab** (`AccountPageClient.tsx`): Collapsible "Notifications" section with read-only system emails list + three toggle rows (New Articles, New Products, News & Alerts). Each toggle calls `PATCH /subscriptions/preferences` on change; shows "Saved" flash.
+
+**Frontend — Unsubscribe page** (`/auth/unsubscribe`): Reads `?token=&category=` from URL, calls `GET /subscriptions/unsubscribe` without auth, shows confirmation or error.
+
+**Frontend — RSS feed** (`/feed.xml/route.ts`): Next.js route handler serving RSS 2.0 XML, revalidates hourly. Fetches 50 most-recent published articles from backend. RSS auto-discovery `<link rel="alternate">` added to `app/layout.tsx`.
+
+### Notable implementation decisions
+
+- **No circular dep**: `AuthService` reads subscription ISM defaults via `prisma.siteSettings.findMany()` directly instead of injecting `SettingsService`, which would have created a `AuthModule → SettingsModule → AuditModule → CapabilitiesModule → AuthModule` cycle.
+- **One unsubscribe token per user**: Token is generated lazily on first subscription action and reused across all categories. The `category` query param scopes which preference is turned off.
+- **Notification email FROM address**: Uses `email.notification_from` if set, falls back to `email.system_from`.
+
+---
+
+## Testing Guide
+
+### API
+
+```bash
+# 1. Get preferences (customer session)
+curl http://localhost:4000/subscriptions/preferences \
+  -H "Authorization: Bearer <member_token>"
+
+# 2. Update preferences
+curl -X PATCH http://localhost:4000/subscriptions/preferences \
+  -H "Authorization: Bearer <member_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"subscribe_new_articles":true}'
+
+# 3. Test unsubscribe (token from user DB row)
+curl "http://localhost:4000/subscriptions/unsubscribe?token=<token>&category=articles"
+
+# 4. RSS feed
+curl http://localhost:3000/feed.xml
+```
+
+### UI flows
+
+1. **Account → Notifications**: Log in as member, go to `/account`, expand Notifications → toggle New Articles → confirm "Saved" flash; toggle off → re-check DB.
+2. **Admin Settings → Notifications tab**: Log in to backstage as owner, go to Settings → Notifications tab (new, last tab) → toggle defaults → save.
+3. **Admin Broadcasts**: Go to `/admin/broadcasts` → enter subject + body → "Send" → confirmation modal → confirm → success message with count.
+4. **Unsubscribe link**: Navigate to `/auth/unsubscribe?token=<token>&category=articles` → confirm "Unsubscribed" message.
+5. **RSS**: Visit `/feed.xml` → confirm valid RSS 2.0 XML with articles. Check `<head>` source for `<link rel="alternate" type="application/rss+xml">`.
+6. **Publish hook** (manual): In backstage, publish a draft article while member is subscribed → confirm email logged (console provider in dev).
+
+### Live deployment
+
+Run migration on Neon before deploying code:
+```bash
+DATABASE_URL=<neon-url> npx prisma migrate deploy
+```
+The migration adds nullable/boolean-with-default columns only — fully backward-compatible.

@@ -8,7 +8,7 @@ import adminApi from '@/lib/adminApi';
 const fetcher = (url: string) => adminApi.get(url).then((r) => r.data);
 const publicFetcher = (url: string) => fetch(url).then((r) => r.json());
 
-type TabId = 'general' | 'identity' | 'email' | 'payment' | 'storage' | 'seo';
+type TabId = 'general' | 'identity' | 'email' | 'payment' | 'storage' | 'seo' | 'notifications';
 
 interface DeployProfile {
   storageProvider: string;
@@ -18,13 +18,14 @@ interface DeployProfile {
   envKeys: string[];
 }
 
-const TABS: { id: TabId; label: string }[] = [
+const ALL_TABS: { id: TabId; label: string; requiredCap?: string }[] = [
   { id: 'general', label: 'General' },
   { id: 'identity', label: 'Site Identity' },
   { id: 'email', label: 'Email / SMTP' },
   { id: 'payment', label: 'Payment Providers' },
   { id: 'storage', label: 'File Storage' },
   { id: 'seo', label: 'SEO' },
+  { id: 'notifications', label: 'Notifications', requiredCap: 'broadcast.config' },
 ];
 
 const TIMEZONES = [
@@ -140,6 +141,20 @@ export function SettingsClient() {
   const { data: profile } = useSWR<DeployProfile>('/api-proxy/setup/profile', publicFetcher);
   const envKeys = new Set(profile?.envKeys ?? []);
 
+  // Resolve current user caps to filter capability-gated tabs
+  const [userCaps, setUserCaps] = useState<string[]>([]);
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? sessionStorage.getItem('admin_user') : null;
+    if (!stored) return;
+    try {
+      const u = JSON.parse(stored);
+      adminApi.get(`/capabilities/users/${u.id}`).then((res) => {
+        setUserCaps((res.data as { name: string }[]).map((c) => c.name));
+      }).catch(() => {});
+    } catch { /* ignore */ }
+  }, []);
+  const TABS = ALL_TABS.filter((t) => !t.requiredCap || userCaps.includes(t.requiredCap));
+
   const [fields, setFields] = useState<Record<string, string>>({});
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -210,21 +225,23 @@ export function SettingsClient() {
   const f = (key: string) => fields[key] ?? '';
 
   const TAB_ENDPOINT: Record<TabId, string> = {
-    general:  '/settings/general',
-    identity: '/settings/general',
-    email:    '/settings/email',
-    payment:  '/settings/payments',
-    storage:  '/settings/storage',
-    seo:      '/settings/seo',
+    general:       '/settings/general',
+    identity:      '/settings/general',
+    email:         '/settings/email',
+    payment:       '/settings/payments',
+    storage:       '/settings/storage',
+    seo:           '/settings/seo',
+    notifications: '/settings/notifications',
   };
 
   const TAB_PREFIXES: Record<TabId, string[]> = {
-    general:  ['general.', 'identity.', 'security.'],
-    identity: ['general.', 'identity.'],
-    email:    ['email.'],
-    payment:  ['payment.'],
-    storage:  ['storage.'],
-    seo:      ['seo.'],
+    general:       ['general.', 'identity.', 'security.'],
+    identity:      ['general.', 'identity.'],
+    email:         ['email.'],
+    payment:       ['payment.'],
+    storage:       ['storage.'],
+    seo:           ['seo.'],
+    notifications: ['subscription.'],
   };
 
   const handleSave = async () => {
@@ -981,6 +998,60 @@ export function SettingsClient() {
             <TextInput value={f('seo.google_verification')} onChange={(v) => set('seo.google_verification', v)} placeholder="aBcDeFgHiJkLmNoPqRsT..." />
           </FieldRow>
 
+          <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />
+        </div>
+      )}
+
+      {activeTab === 'notifications' && (
+        <div>
+          <div className="pb-4 mb-4 border-b border-neutral-800">
+            <p className="text-sm text-neutral-400">
+              Configure which subscription categories new members are automatically enrolled in when they register.
+              Members can always change their own preferences in their account settings.
+            </p>
+          </div>
+          <FieldRow
+            label="New Articles"
+            help="Auto-subscribe new members to new article email notifications"
+          >
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={f('subscription.default_new_articles') === 'true'}
+                onChange={(e) => set('subscription.default_new_articles', e.target.checked ? 'true' : 'false')}
+                className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-blue-500 focus:ring-0"
+              />
+              <span className="text-sm text-neutral-300">Subscribe new members to new article emails by default</span>
+            </label>
+          </FieldRow>
+          <FieldRow
+            label="New Products"
+            help="Auto-subscribe new members to new product email notifications"
+          >
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={f('subscription.default_new_products') === 'true'}
+                onChange={(e) => set('subscription.default_new_products', e.target.checked ? 'true' : 'false')}
+                className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-blue-500 focus:ring-0"
+              />
+              <span className="text-sm text-neutral-300">Subscribe new members to new product emails by default</span>
+            </label>
+          </FieldRow>
+          <FieldRow
+            label="News & Alerts"
+            help="Auto-subscribe new members to news and alert broadcast emails"
+          >
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={f('subscription.default_news_alerts') === 'true'}
+                onChange={(e) => set('subscription.default_news_alerts', e.target.checked ? 'true' : 'false')}
+                className="w-4 h-4 rounded border-neutral-700 bg-neutral-900 text-blue-500 focus:ring-0"
+              />
+              <span className="text-sm text-neutral-300">Subscribe new members to news and alert broadcasts by default</span>
+            </label>
+          </FieldRow>
           <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />
         </div>
       )}

@@ -43,7 +43,7 @@ Specific rules:
 **FR-006**: ✅ DEPLOYED — Forgot Password / Password Reset (`/auth/forgot-password`, `/auth/reset-password`). Enumeration-safe. Docs: `docs/feature-requests/FR-006-forgot-password.md`
 **FR-007**: ✅ DEPLOYED — Order Confirmation Emails (`OrderEmailService`, fire-and-forget on Stripe webhook + PayPal capture, adapts by product type). Docs: `docs/feature-requests/FR-007-order-confirmation-emails.md`
 **FR-008**: ✅ DEPLOYED — Free Product Checkout: bypass payment for $0 orders, service products now require shipping address, free digital requires login. Docs: `docs/feature-requests/FR-008-free-products.md`
-**FR-009**: 📋 PLANNED — Member Subscriptions & Syndication: new-article/product email notifications, news broadcast, RSS feed, account Notifications tab. Docs: `docs/feature-requests/FR-009-syndication.md`
+**FR-009**: ✅ DEPLOYED — Member Subscriptions & Syndication: opt-in email notifications for articles/products/news, admin broadcast tool, RSS feed at `/feed.xml`, account Notifications tab, unsubscribe page, default subscription ISM settings. Docs: `docs/feature-requests/FR-009-syndication.md`
 
 **Phase 24A**: 📋 PLANNED — Sales tax. Trigger: revenue >$1k or TX Comptroller registration. Plan: `docs/phases/PHASE_24_PLAN.md`
 **Phase 24B**: 📋 PLANNED — Shipping. Trigger: first physical product sale. Plan: `docs/phases/PHASE_24_PLAN.md`

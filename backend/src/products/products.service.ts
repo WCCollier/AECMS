@@ -5,19 +5,24 @@ import {
   ForbiddenException,
   BadRequestException,
   UnprocessableEntityException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateProductDto, UpdateProductDto, QueryProductsDto } from './dto';
 import { Prisma, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
 import { MediaSyncService } from '../media/media-sync.service';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = new Logger(ProductsService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditLog: AuditLogService,
     private mediaSync: MediaSyncService,
+    private subscriptions: SubscriptionsService,
   ) {}
 
   /**
@@ -458,6 +463,12 @@ export class ProductsService {
       resource_id: id,
       changes: Object.keys(diff.before).length ? diff : undefined,
     });
+
+    if (dto.status === 'published' && product.status !== 'published') {
+      this.subscriptions.notifyNewProduct(updated.id).catch((err) =>
+        this.logger.error('Failed to send new product notifications', err),
+      );
+    }
 
     const updatedResult = await this.transformProduct(updated);
     return updateWarnings.length ? { ...updatedResult, warnings: updateWarnings } : updatedResult;

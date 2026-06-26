@@ -106,15 +106,14 @@ export class SettingsController {
     private testEmailService: TestEmailService,
   ) {}
 
-  // Any one of the four configure.* caps grants read access to all settings.
-  // Note: when caps are delegated (Phase 21+), this endpoint should filter
-  // returned keys to the caller's granted namespaces.
+  // Any one of the configure.* or broadcast.config caps grants read access to all settings.
   @Get()
   @RequiresCapability(
     'system.configure.general',
     'system.configure.email',
     'system.configure.payments',
     'system.configure.storage',
+    'broadcast.config',
   )
   @ApiOperation({ summary: 'Get all site settings (encrypted fields redacted)' })
   async getAll() {
@@ -224,6 +223,20 @@ export class SettingsController {
     );
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'SEO settings saved' };
+  }
+
+  // ── Notifications (subscription defaults — broadcast.config) ──────────────
+
+  @Patch('notifications')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('broadcast.config')
+  @ApiOperation({ summary: 'Update default subscription preferences for new sign-ups' })
+  async updateNotifications(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('subscription.')),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'Notification settings saved' };
   }
 
   // ── Appearance (separate capability — delegatable to Admin) ────────────────
