@@ -12,6 +12,19 @@ export interface PolicyParams {
   effectiveDate: string; // e.g. "June 26, 2026"
 }
 
+// Wrap a TipTap doc inside the page editor's sections envelope
+function sectionsWrap(doc: object): object {
+  const uid = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+  return {
+    type: 'sections',
+    sections: [{
+      id: uid(),
+      columns: 1,
+      zones: [{ id: uid(), span: 1, content: doc }],
+    }],
+  };
+}
+
 // TipTap JSON node builders
 const p = (text: string) => ({
   type: 'paragraph',
@@ -106,7 +119,7 @@ export function buildTermsContent(p_: PolicyParams): string {
       p(`Questions about these Terms? Contact us at ${contactEmail}.`),
     ],
   };
-  return JSON.stringify(doc);
+  return JSON.stringify(sectionsWrap(doc));
 }
 
 export function buildPrivacyContent(p_: PolicyParams): string {
@@ -185,5 +198,5 @@ export function buildPrivacyContent(p_: PolicyParams): string {
       p(siteUrl),
     ],
   };
-  return JSON.stringify(doc);
+  return JSON.stringify(sectionsWrap(doc));
 }

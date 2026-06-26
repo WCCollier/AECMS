@@ -18,6 +18,13 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
+// ── Page content wrapper (sections format required by the page editor) ─────────
+const uid = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+const sectionsWrap = (doc) => ({
+  type: 'sections',
+  sections: [{ id: uid(), columns: 1, zones: [{ id: uid(), span: 1, content: doc }] }],
+});
+
 // ── TipTap node builders ───────────────────────────────────────────────────────
 const p = (text) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
 const h2 = (text) => ({ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text }] });
@@ -32,7 +39,7 @@ const EFFECTIVE_DATE = 'June 26, 2026';
 
 // ── Terms of Service ───────────────────────────────────────────────────────────
 function buildTerms() {
-  return JSON.stringify({
+  return JSON.stringify(sectionsWrap({
     type: 'doc',
     content: [
       h2('Terms of Service'),
@@ -94,12 +101,12 @@ function buildTerms() {
       h2('13. Contact'),
       p(`Questions about these Terms? Email us at ${CONTACT_EMAIL}.`),
     ],
-  });
+  }));
 }
 
 // ── Privacy Policy ─────────────────────────────────────────────────────────────
 function buildPrivacy() {
-  return JSON.stringify({
+  return JSON.stringify(sectionsWrap({
     type: 'doc',
     content: [
       h2('Privacy Policy'),
@@ -167,7 +174,7 @@ function buildPrivacy() {
       p(`${SITE_NAME}`),
       p(SITE_URL),
     ],
-  });
+  }));
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -180,7 +187,11 @@ async function main() {
   ]);
 
   if (existingTerms) {
-    console.log('✓ /terms page already exists — skipping.');
+    await prisma.page.update({
+      where: { id: existingTerms.id },
+      data: { content: buildTerms() },
+    });
+    console.log('✓ Updated /terms content (sections format)');
   } else {
     await prisma.page.create({
       data: {
@@ -198,7 +209,11 @@ async function main() {
   }
 
   if (existingPrivacy) {
-    console.log('✓ /privacy page already exists — skipping.');
+    await prisma.page.update({
+      where: { id: existingPrivacy.id },
+      data: { content: buildPrivacy() },
+    });
+    console.log('✓ Updated /privacy content (sections format)');
   } else {
     await prisma.page.create({
       data: {
