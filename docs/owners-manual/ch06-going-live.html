@@ -37,8 +37,6 @@
       </div>
 
       <h2>Domain Mapping by Platform</h2>
-      <p>Each platform handles custom domains slightly differently. The table below shows when and how to map your domain.</p>
-
       <table>
         <thead>
           <tr><th>Platform</th><th>When to map</th><th>How</th><th>SSL</th></tr>
@@ -47,12 +45,12 @@
           <tr>
             <td><strong>Railway</strong></td>
             <td>After first deploy</td>
-            <td>Service Settings → Networking → Custom Domain → add CNAME in your DNS</td>
+            <td>Service Settings → Networking → Custom Domain → add CNAME in DNS</td>
             <td>Automatic (Let's Encrypt)</td>
           </tr>
           <tr>
             <td><strong>Coolify</strong></td>
-            <td>During setup (Step 2)</td>
+            <td>During setup</td>
             <td>Set A record to VPS IP → Coolify handles domain via Traefik</td>
             <td>Automatic (Let's Encrypt)</td>
           </tr>
@@ -65,7 +63,7 @@
           <tr>
             <td><strong>Render</strong></td>
             <td>After first deploy</td>
-            <td>Service Settings → Custom Domains → add CNAME in your DNS</td>
+            <td>Service Settings → Custom Domains → add CNAME in DNS</td>
             <td>Automatic (Let's Encrypt)</td>
           </tr>
           <tr>
@@ -79,25 +77,69 @@
 
       <div class="callout tip">
         <div class="callout-title">✅ Run the wizard before DNS is ready</div>
-        <p>You do not need to wait for DNS to run the setup wizard. Use the platform's default URL (e.g. <code>*.railway.app</code>) to complete the wizard, then update <code>APP_URL</code> and redeploy once DNS is live.</p>
+        <p>You do not need to wait for DNS propagation to run the setup wizard. Use the platform's default URL to complete the wizard, then update <code>APP_URL</code> and redeploy once your domain is active.</p>
       </div>
 
       <div class="callout warning">
-        <div class="callout-title">⚠️ Set APP_URL to your final domain first</div>
-        <p><code>APP_URL</code> is baked into authentication cookies and email links at deploy time. Set it to your final custom domain (e.g. <code>https://myblog.com</code>) in your platform's environment variables before deploying — even if DNS isn't active yet. If you change it after setup, you will need to redeploy.</p>
+        <div class="callout-title">⚠️ Set APP_URL to your final domain before the wizard</div>
+        <p><code>APP_URL</code> is used in authentication cookies and all outbound email links. Set it to your final custom domain (e.g. <code>https://myblog.com</code>) in your platform's environment variables before running the wizard — even if DNS isn't active yet. Changing it later requires a redeploy and may break existing email links.</p>
       </div>
 
       <h2>Pre-Launch Checklist</h2>
+      <p>Complete all items before announcing your site publicly.</p>
+
+      <h3>Core Setup</h3>
       <ul>
         <li>☐ Setup wizard completed — owner account created</li>
-        <li>☐ Two-factor authentication configured</li>
-        <li>☐ Email test passed — SMTP credentials saved</li>
-        <li>☐ Storage test passed — bucket names confirmed</li>
-        <li>☐ Stripe Verify passed (if taking payments)</li>
-        <li>☐ Homepage published and set in General Settings</li>
-        <li>☐ CAPTCHA configured — Turnstile site + secret key saved in Settings → General (recommended for any public registration form)</li>
+        <li>☐ Two-factor authentication configured on the owner account</li>
         <li>☐ Custom domain mapped and SSL active</li>
-        <li>☐ <code>APP_URL</code> updated to final custom domain</li>
+        <li>☐ <code>APP_URL</code> set to your final custom domain and redeployed</li>
+        <li>☐ Homepage published and set in Settings → General</li>
+      </ul>
+
+      <h3>Email</h3>
+      <ul>
+        <li>☐ SMTP credentials saved in Settings → Email</li>
+        <li>☐ Test email sent and received successfully</li>
+        <li>☐ Test the forgot-password flow: go to <code>/auth/login</code> → "Forgot password?" — confirm reset email arrives and the link works</li>
+      </ul>
+
+      <h3>Payments (if taking payments)</h3>
+      <ul>
+        <li>☐ Stripe credentials saved and Verify passed</li>
+        <li>☐ Stripe webhook secret configured (<code>whsec_...</code> from dashboard or <code>stripe listen</code>)</li>
+        <li>☐ PayPal credentials saved and Verify passed (if offering PayPal)</li>
+        <li>☐ End-to-end test purchase completed — confirm order confirmation email arrives</li>
+      </ul>
+
+      <h3>File Storage</h3>
+      <ul>
+        <li>☐ Storage provider configured and Test Connection passed</li>
+        <li>☐ At least one media file uploaded successfully</li>
+      </ul>
+
+      <h3>Security</h3>
+      <ul>
+        <li>☐ CAPTCHA configured — Turnstile keys saved in Settings → General (recommended for any public registration form)</li>
+        <li>☐ Registration controls reviewed — set Default Role and decide whether to enable Approval Gate</li>
+      </ul>
+
+      <h3>Legal</h3>
+      <ul>
+        <li>☐ Terms of Service page reviewed, edited, and published (auto-generated at wizard completion — requires your review before publishing)</li>
+        <li>☐ Privacy Policy page reviewed, edited, and published</li>
+        <li>☐ Both pages linked in your site footer or navigation</li>
+      </ul>
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Auto-generated policies are a starting point only</div>
+        <p>The Terms of Service and Privacy Policy pages generated during setup are a generic template. They are created in <strong>draft</strong> status and must be reviewed by you — ideally with input from a qualified legal professional — before you publish them. Laws vary by jurisdiction and business type.</p>
+      </div>
+
+      <h3>Content</h3>
+      <ul>
+        <li>☐ At least one published article or page (the site should not be empty when announced)</li>
+        <li>☐ About page or author bio published</li>
+        <li>☐ Any sample/placeholder content removed or moved to draft</li>
       </ul>
 
       <p style="margin-top: 2rem;">

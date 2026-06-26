@@ -27,11 +27,26 @@
         <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
       </div>
       <div class="nav-section">
+        <div class="nav-section-title">Settings Tabs</div>
+        <a href="#general">General</a>
+        <a href="#registration">Registration Controls</a>
+        <a href="#captcha">CAPTCHA</a>
+        <a href="#email">Email / SMTP</a>
+        <a href="#payments">Payment Providers</a>
+        <a href="#storage">File Storage</a>
+        <a href="#appearance">Appearance</a>
+      </div>
+      <div class="nav-section">
         <div class="nav-section-title">Backstage Tools</div>
-        <a href="ch05-admin-settings.html#roles">Roles &amp; Permissions</a>
-        <a href="ch05-admin-settings.html#registration">Registration Controls</a>
-        <a href="ch05-admin-settings.html#captcha">CAPTCHA</a>
-        <a href="ch05-admin-settings.html#mul-converter">Mul Converter</a>
+        <a href="#users">Users</a>
+        <a href="#roles">Roles &amp; Permissions</a>
+        <a href="#media">Media Library</a>
+        <a href="#navigation">Navigation Menus</a>
+        <a href="#comments">Comments &amp; Moderation</a>
+        <a href="#orders">Orders</a>
+        <a href="#registrations">Registration Queue</a>
+        <a href="#audit">Audit Log</a>
+        <a href="#mul-converter">Mul Converter</a>
       </div>
     </nav>
   </aside>
@@ -39,150 +54,301 @@
     <div class="content">
       <div class="breadcrumb"><a href="index.html">Owner's Manual</a> <span>›</span> Chapter 5</div>
       <div class="page-header">
-        <h1>Chapter 5 — Admin Settings</h1>
-        <p class="subtitle">A reference for every settings tab in the backstage.</p>
-        <p class="meta">Full guide coming soon — key sections documented below.</p>
+        <h1>Chapter 5 — Admin Settings &amp; Backstage</h1>
+        <p class="subtitle">A reference for every settings tab and backstage tool.</p>
       </div>
 
-      <h2>General</h2>
-      <p>Site title, tagline, timezone, date format, homepage mode, registration controls, and CAPTCHA. The <strong>Homepage</strong> setting controls what visitors see at your root URL (<code>/</code>):</p>
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <h2>Settings Tabs</h2>
+      <p>All settings live at <strong>/admin/settings</strong>. Each tab saves independently — click <strong>Save Changes</strong> within each section. The Owner can access all tabs; Admins can access Appearance only (by default).</p>
+
+      <!-- General -->
+      <h2 id="general">General</h2>
+      <p>Site title, tagline, timezone, date format, homepage mode, registration controls, and CAPTCHA.</p>
+
+      <h3>Homepage Mode</h3>
+      <p>Controls what visitors see at your root URL (<code>/</code>):</p>
       <ul>
-        <li><strong>Article Feed</strong> — redirects <code>/</code> to <code>/articles</code></li>
-        <li><strong>Custom Page</strong> — shows a specific page at <code>/</code>. Select a published page from the dropdown. If the selected page is not published, the site falls back to the <code>_home_</code> page, then to the article feed.</li>
+        <li><strong>Article Feed</strong> — redirects <code>/</code> to <code>/articles</code>.</li>
+        <li><strong>Custom Page</strong> — shows a specific published page at <code>/</code>. Select the page from the dropdown. If the page is unpublished, the site falls back to <code>_home_</code> then to the article feed.</li>
       </ul>
 
+      <!-- Registration Controls -->
       <h2 id="registration">Registration Controls</h2>
       <p>The two registration-control settings live at the bottom of the General tab.</p>
 
       <h3>Default Registration Role</h3>
-      <p>The role automatically assigned to new accounts when they register. Defaults to <strong>Member</strong>. If you create a custom role (e.g. "Patron" with premium content access), you can make it the default here — new sign-ups will receive that role automatically.</p>
+      <p>The role automatically assigned to new accounts when they register. Defaults to <strong>Member</strong>. If you create a custom role (e.g. "Patron" with premium content access), you can make it the default here — new sign-ups receive that role automatically.</p>
       <div class="callout warning">
         <div class="callout-title">⚠️ Elevating the default role</div>
-        <p>If you set a higher-privilege role as the default, consider enabling <strong>Require Registration Approval</strong> (below) or activating <strong>CAPTCHA</strong> so that elevated access is not handed to bots or throwaway email addresses.</p>
+        <p>If you set a higher-privilege role as the default, consider enabling <strong>Require Registration Approval</strong> or activating <strong>CAPTCHA</strong> so that elevated access is not handed to bots or throwaway accounts.</p>
       </div>
-      <p>The currently-set default role cannot be deleted until you change this setting to another role. This prevents accidentally breaking the registration flow.</p>
+      <p>The currently-set default role cannot be deleted until you change this setting. This prevents accidentally breaking the registration flow.</p>
 
       <h3>Require Registration Approval</h3>
-      <p>When toggled on, new accounts must be manually approved by an admin before they can log in. The approval workflow:</p>
+      <p>When toggled on, new accounts must be manually approved by an admin before they can log in:</p>
       <ol>
         <li>User registers and verifies their email address.</li>
         <li>All users who hold the <code>registration.approve</code> capability (Admins and Owners by default) receive an email notification.</li>
-        <li>Approvers visit <strong>/admin/registrations</strong> to approve or reject the account.</li>
-        <li>Rejection requires a written reason, which is included in the notification email and stored in the audit log. The account is soft-deleted, freeing the email address for re-registration.</li>
+        <li>Approvers visit <strong>/admin/registrations</strong> to approve or reject.</li>
+        <li>Rejection requires a written reason. The account is soft-deleted, freeing the email address for re-registration.</li>
       </ol>
       <div class="callout note">
         <div class="callout-title">ℹ️ Existing users are not affected</div>
-        <p>Enabling approval does not lock out users who are already verified. The system auto-approves all currently verified accounts the moment you toggle the setting on.</p>
+        <p>Enabling approval does not lock out already-verified users. The system auto-approves all currently verified accounts the moment you toggle the setting on.</p>
       </div>
-      <p>The approval gate is best for tightly controlled communities. For public sites that just need bot protection, <strong>CAPTCHA</strong> (below) is a lighter-weight alternative — real users are not inconvenienced and no admin action is needed per registration.</p>
 
+      <!-- CAPTCHA -->
       <h2 id="captcha">CAPTCHA</h2>
-      <p>AECMS integrates <strong>Cloudflare Turnstile</strong> for registration-form bot protection. Turnstile's Managed widget type works silently in the background — legitimate visitors see at most a brief "Verifying…" indicator, with no image puzzles or checkbox clicks required.</p>
+      <p>AECMS integrates <strong>Cloudflare Turnstile</strong> for registration-form bot protection. The Managed widget type works silently — real users see at most a brief "Verifying…" indicator, no image puzzles required.</p>
 
-      <h3>Getting your Turnstile keys</h3>
+      <h3>Getting your keys</h3>
       <ol>
-        <li>Log into the <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener noreferrer">Cloudflare Dashboard</a>.</li>
-        <li>In the left nav, go to <strong>Turnstile</strong>.</li>
-        <li>Click <strong>Add Site</strong>.</li>
-        <li>Enter your domain (e.g. <code>yourdomain.com</code>). For local testing you can add <code>localhost</code> as a second hostname.</li>
-        <li>Select widget type: <strong>Managed</strong> (recommended — fully invisible for genuine users).</li>
+        <li>Log into the <a href="https://dash.cloudflare.com/" target="_blank" rel="noopener">Cloudflare Dashboard</a> → <strong>Turnstile</strong> → <strong>Add Site</strong>.</li>
+        <li>Enter your domain. Add <code>localhost</code> for local testing.</li>
+        <li>Select widget type: <strong>Managed</strong>.</li>
         <li>Copy the <strong>Site Key</strong> and <strong>Secret Key</strong>.</li>
       </ol>
 
       <h3>Activating CAPTCHA</h3>
       <ol>
-        <li>Go to <strong>Settings → General</strong> and scroll to the <em>CAPTCHA</em> section near the bottom.</li>
-        <li>Paste your Site Key into the <strong>CAPTCHA Site Key</strong> field.</li>
-        <li>Paste your Secret Key into the <strong>CAPTCHA Secret Key</strong> field. The secret is stored encrypted in the Internal Secrets Manager (AES-256-GCM) and is never returned in any API response.</li>
-        <li>Click <strong>Save Changes</strong>. A green "CAPTCHA active" indicator appears when both fields are populated.</li>
-        <li>Open the registration form at <code>/auth/register</code> in a private window — the Turnstile widget should appear below the Terms checkbox.</li>
+        <li>Go to <strong>Settings → General</strong> and scroll to the <em>CAPTCHA</em> section.</li>
+        <li>Paste your Site Key and Secret Key into the fields. The secret is stored encrypted (AES-256-GCM) and never returned by any API.</li>
+        <li>Click <strong>Save Changes</strong>. A green "CAPTCHA active" indicator appears when both keys are set.</li>
+        <li>Test in a private browser window at <code>/auth/register</code>.</li>
       </ol>
-
       <div class="callout tip">
         <div class="callout-title">✅ No rebuild required</div>
-        <p>Unlike typical CAPTCHA integrations that bake the site key at Docker build time, AECMS fetches it at runtime from the settings database. You can activate, deactivate, or rotate CAPTCHA keys any time through the Settings panel — no code push or redeploy needed.</p>
+        <p>CAPTCHA keys are fetched at runtime from the settings database. You can activate, deactivate, or rotate keys any time — no code push or redeploy needed.</p>
       </div>
 
-      <h3>Disabling CAPTCHA</h3>
-      <p>Clear either the Site Key or the Secret Key field in Settings → General and save. The widget will stop appearing on the registration form immediately.</p>
+      <h3>Disabling or rotating keys</h3>
+      <p>Clear either key field and save to disable. To rotate, paste new keys and save — the change takes effect immediately.</p>
 
-      <h3>Rotating keys</h3>
-      <p>If you generate new Turnstile keys (e.g. to decommission an old site entry), simply paste the new keys into the settings fields and save. The change takes effect on the next page load.</p>
+      <!-- Email -->
+      <h2 id="email">Email / SMTP</h2>
+      <p>Enter your SMTP credentials here. Required: Host, Port, Username, Password, From Address.</p>
+      <p>Click <strong>Test</strong> to send a test email using the current form values — you do not need to save first. After a successful test, click Save.</p>
 
-      <h2>Email / SMTP</h2>
-      <p>Enter your SMTP credentials here. Required fields: Host, Port, Username, Password, From Address. Click <strong>Test</strong> to send a test email using the values currently in the form (you do not need to save first). Save after a successful test.</p>
+      <h3>What AECMS emails</h3>
+      <table>
+        <thead><tr><th>Trigger</th><th>Recipient</th></tr></thead>
+        <tbody>
+          <tr><td>New registration</td><td>User — email verification link</td></tr>
+          <tr><td>Email verified (approval mode)</td><td>All approvers — pending registration notification</td></tr>
+          <tr><td>Registration approved</td><td>User — approval confirmation with login link</td></tr>
+          <tr><td>Forgot password</td><td>User — 1-hour reset link</td></tr>
+          <tr><td>Order paid (Stripe or PayPal)</td><td>Customer — order confirmation with item list and total</td></tr>
+          <tr><td>Digital product purchased</td><td>Customer — per-file download link email</td></tr>
+          <tr><td>Send to Kindle</td><td>User's Kindle email address</td></tr>
+        </tbody>
+      </table>
 
-      <h2>Payment Providers</h2>
-      <p>Stripe and PayPal credentials. Click <strong>Verify</strong> after entering credentials to confirm the API connection is working. Stripe handles cards, Apple Pay, Google Pay, and Amazon Pay. PayPal is an alternative checkout option.</p>
-
-      <h2>File Storage</h2>
-      <p>Shows the active storage provider and bucket configuration. Fields set via environment variables appear with an <strong>env var</strong> badge and are read-only — to change them, update the environment variable and redeploy. You can override env var values by entering a value here; the in-database value takes precedence.</p>
-      <p>Click <strong>Test Storage Connection</strong> to verify a write/read/delete round-trip against your storage provider using the values currently in the form.</p>
-
+      <!-- Payments -->
+      <h2 id="payments">Payment Providers</h2>
+      <p>Enter Stripe and PayPal credentials. Click <strong>Verify</strong> after entering credentials to confirm the API connection before going live.</p>
+      <ul>
+        <li><strong>Stripe</strong> — handles cards, Apple Pay, Google Pay, and Amazon Pay via Stripe Checkout. Requires a Secret Key and a Webhook Secret (from <code>stripe listen</code> or your dashboard).</li>
+        <li><strong>PayPal</strong> — alternative checkout. Requires Client ID and Client Secret. Set mode to <code>sandbox</code> for testing, <code>live</code> for production.</li>
+      </ul>
       <div class="callout warning">
-        <div class="callout-title">⚠️ Changing bucket names after files are uploaded</div>
-        <p>If you change the media or digital bucket name after files have already been uploaded, existing media URLs and download links will break. You must migrate files to the new bucket before changing the name here.</p>
+        <div class="callout-title">⚠️ Stripe webhook secret</div>
+        <p>The webhook secret is different from your API key. It begins with <code>whsec_</code> and is generated either by the Stripe CLI (<code>stripe listen</code>) during development, or from your Stripe Dashboard → Developers → Webhooks in production. Without it, AECMS cannot confirm payment completion from Stripe.</p>
       </div>
 
-      <h2>Appearance</h2>
-      <p>Choose a color palette and font pairing. Changes apply site-wide immediately after saving. Available palettes: Midnight, Ocean, Forest, Sunset, Rose, Storm, Ember, Arctic. You can also create and save custom palettes using the <strong>Mul Converter</strong> or the Design Library (Phase 27).</p>
+      <!-- File Storage -->
+      <h2 id="storage">File Storage</h2>
+      <p>Shows the active storage provider and bucket configuration. Fields set via environment variables appear with an <strong>env var</strong> badge and are read-only in the UI — change them by updating the environment variable and redeploying. You can override env-var values here; the database value takes precedence.</p>
+      <p>Click <strong>Test Storage Connection</strong> to verify a write/read/delete round-trip using the current form values.</p>
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Changing bucket names after upload</div>
+        <p>If you change a bucket name after files have been uploaded, existing media URLs and download links break. Migrate files to the new bucket before changing the name here.</p>
+      </div>
 
-      <h2 id="roles">Roles &amp; Permissions</h2>
-      <p>Found at <strong>/admin/roles</strong> (gated on the <code>role.manage</code> capability, Owner-only by default). The Role Manager lets you define exactly what each role can do.</p>
+      <!-- Appearance -->
+      <h2 id="appearance">Appearance</h2>
+      <p>Choose a color palette and font pairing. Changes apply site-wide immediately after saving.</p>
+      <p><strong>Available palettes:</strong> Midnight, Ocean, Forest, Sunset, Rose, Storm, Ember, Arctic.</p>
+      <p><strong>Font pairings:</strong> Classic, Modern, Serif, Mono, Display — each is a heading/body combination.</p>
+      <p>Custom palettes generated by the <strong>Mul Converter</strong> also appear here once saved.</p>
+
+      <!-- ═══════════════════════════════════════════════════════════════════ -->
+      <h2>Backstage Tools</h2>
+
+      <!-- Users -->
+      <h2 id="users">Users — <code>/admin/users</code></h2>
+      <p>Lists all registered accounts (excluding soft-deleted users). Requires the <code>user.list</code> capability (Admin and Owner by default).</p>
+
+      <h3>Searching</h3>
+      <p>The search box filters by email, username, first name, or last name in real time.</p>
+
+      <h3>Assigning a role</h3>
+      <p>Click the role badge next to a user's name to open a dropdown of all available roles. Select the new role and confirm. Requires the <code>user.assign_role</code> capability (Owner only by default).</p>
+      <div class="callout note">
+        <div class="callout-title">ℹ️ You cannot change your own role</div>
+        <p>The Owner's role is fixed and cannot be changed via the Users page. To promote another user to Owner-level access, assign them the Owner role — but be aware that the Owner role carries all capabilities and cannot be restricted.</p>
+      </div>
+
+      <h3>Deleting a user</h3>
+      <p>Click the trash icon. Deletion is a soft-delete — the account is hidden from the site and cannot log in, but the record is retained for data integrity (order history, comments, audit log). Requires the <code>account.delete.limited</code> or <code>account.delete.any</code> capability.</p>
+      <ul>
+        <li><strong>account.delete.limited</strong> — can delete users who do not themselves hold a delete capability. Admins have this by default.</li>
+        <li><strong>account.delete.any</strong> — can delete any non-Owner user. Owner-only by default.</li>
+      </ul>
+
+      <!-- Roles -->
+      <h2 id="roles">Roles &amp; Permissions — <code>/admin/roles</code></h2>
+      <p>Gated on the <code>role.manage</code> capability (Owner only by default). Defines what each role can do.</p>
 
       <h3>Canonical roles</h3>
       <table>
         <thead><tr><th>Role</th><th>Protection</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td><strong>Owner</strong></td><td>Full</td><td>All capabilities always. Cannot be edited or deleted.</td></tr>
+          <tr><td><strong>Owner</strong></td><td>Full — immutable</td><td>All capabilities always. Cannot be edited or deleted.</td></tr>
           <tr><td><strong>Admin</strong></td><td>None</td><td>Default set covers content + ecommerce management. Freely editable.</td></tr>
           <tr><td><strong>Member</strong></td><td>None</td><td>Logged-in customers — comments, reviews, purchases. Freely editable.</td></tr>
-          <tr><td><strong>Guest</strong></td><td>Constrained</td><td>Applies to <em>logged-out visitors</em>. No user record ever holds this role — it is virtual. Only customer-scoped capabilities may be assigned. Cannot be deleted.</td></tr>
+          <tr><td><strong>Guest</strong></td><td>Constrained</td><td>Applies to logged-out visitors. Virtual — no user ever holds this role. Only customer-scoped capabilities may be assigned. Cannot be deleted.</td></tr>
         </tbody>
       </table>
 
       <h3>Custom roles</h3>
-      <p>Click <strong>New Role</strong> to create a role with a slug name (lowercase, hyphens) and a display label. Assign any combination of capabilities using the checkbox matrix. Custom roles appear in the role dropdown on the Users page.</p>
+      <p>Click <strong>New Role</strong>. Enter a slug (lowercase, hyphens allowed) and a display label. Assign capabilities using the checkbox matrix. Custom roles appear in the role dropdown on the Users page.</p>
 
-      <h3>Capability matrix</h3>
-      <p>Capabilities are grouped into <strong>Backstage</strong> (requires a backstage session — admin dashboard access) and <strong>Customer</strong> (available in the customer-facing experience). Within each group they are further sorted by category: content, ecommerce, users, system.</p>
-
+      <h3>Capability scopes</h3>
+      <ul>
+        <li><strong>Backstage</strong> — requires a backstage session (admin dashboard login). Examples: content.publish, order.manage, user.list.</li>
+        <li><strong>Customer</strong> — available in the customer-facing experience (standard login). Examples: comment.article, purchase.digital.</li>
+      </ul>
       <div class="callout warning">
-        <div class="callout-title">⚠️ Deleting a role with assigned users</div>
-        <p>A role cannot be deleted while any user holds it. The system will report the number of affected users. Reassign those users to another role first, then retry the deletion.</p>
+        <div class="callout-title">⚠️ Deleting a role with active users</div>
+        <p>A role cannot be deleted while any user holds it. The system reports how many users are affected. Reassign those users first, then retry the deletion.</p>
       </div>
 
+      <!-- Media Library -->
+      <h2 id="media">Media Library — <code>/admin/media</code></h2>
+      <p>The Media Library manages all uploaded files. It has two tabs:</p>
+      <ul>
+        <li><strong>Media Library</strong> — images and other public-facing assets (product photos, article hero images, etc.).</li>
+        <li><strong>Digital Files</strong> — source files for digital products (PDFs, EPUBs, ZIPs, MP3s, etc.). These are never directly publicly accessible — they are served only via time-limited download tokens after purchase.</li>
+      </ul>
+
+      <h3>Uploading</h3>
+      <p>Drag files onto the upload zone, or click <strong>Choose Files</strong>. Multiple files can be uploaded at once. Supported image types: JPEG, PNG, GIF, WebP, AVIF, SVG.</p>
+      <p>Use <strong>Bulk Upload</strong> for large batches — it shows a progress bar and a per-file success/error report.</p>
+
+      <h3>Media usage</h3>
+      <p>Each file shows a <strong>uses</strong> count — the number of content items (articles, products, pages) that reference it. Files with uses are protected from accidental deletion; you must confirm explicitly before deleting them.</p>
+
+      <h3>Replacing a file</h3>
+      <p>Click <strong>Replace</strong> on any file to upload a new version. The file record (and all references to it in content) stays intact; only the stored binary changes. Useful for correcting an image without having to re-link it everywhere.</p>
+
+      <h3>Bulk delete</h3>
+      <p>Select files using the checkboxes and click <strong>Delete Selected</strong>. If any selected files are in use, the confirmation dialog tells you how many are referenced — you can proceed or cancel.</p>
+
+      <!-- Navigation -->
+      <h2 id="navigation">Navigation Menus</h2>
+      <p>The header navigation is managed from <strong>Admin → Pages</strong>. Each page has two navigation fields:</p>
+      <ul>
+        <li><strong>Show in Nav</strong> — toggle to include the page in the header menu.</li>
+        <li><strong>Nav Label</strong> — overrides the page title for the nav item (useful for shorter menu labels).</li>
+        <li><strong>Parent Page</strong> — nest this page under another to create a submenu.</li>
+        <li><strong>Nav Order</strong> — drag-and-drop reorder via the sibling list in the page editor sidebar.</li>
+      </ul>
+      <p>Top-level nav items with children show a dropdown on hover with a configurable delay.</p>
       <div class="callout note">
-        <div class="callout-title">ℹ️ Assigning a role to a user</div>
-        <p>Role assignment is done on the <strong>Users</strong> page (<code>/admin/users</code>), not here. The Role Manager is for defining what roles can do; the Users page is for assigning those roles to people.</p>
+        <div class="callout-title">ℹ️ Articles and Shop links</div>
+        <p>The <code>/articles</code> and <code>/shop</code> links in the header are generated from built-in routes, not from the page system. They are always present and cannot currently be hidden via the nav settings.</p>
       </div>
 
-      <h2 id="mul-converter">Mul Converter</h2>
-      <p>Found at <strong>/admin/mul-converter</strong> (gated on the <code>mul.convert</code> capability, Owner-only by default). The Mul Converter is an AI-powered tool that ingests any public URL and outputs a custom color palette and a page scaffold you can save directly to your site.</p>
+      <!-- Comments -->
+      <h2 id="comments">Comments &amp; Moderation — <code>/admin/comments</code></h2>
+      <p>All comments and reviews across articles and products flow through a single moderation queue.</p>
+
+      <h3>Comment statuses</h3>
+      <table>
+        <thead><tr><th>Status</th><th>Visible on site?</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Pending</strong></td><td>No — awaiting moderation</td></tr>
+          <tr><td><strong>Approved</strong></td><td>Yes</td></tr>
+          <tr><td><strong>Rejected</strong></td><td>No — hidden but retained</td></tr>
+          <tr><td><strong>Deleted</strong></td><td>No</td></tr>
+        </tbody>
+      </table>
+
+      <h3>AI moderation</h3>
+      <p>When an OpenAI API key is configured, new comments are automatically analyzed for toxicity, spam, and guideline violations before they enter the queue. Comments that pass are auto-approved; borderline ones are flagged for manual review with an AI confidence score. You can override any AI decision.</p>
+
+      <h3>Reviews vs. comments</h3>
+      <p>A <strong>Review</strong> is a comment that includes a star rating. Only users with a verified purchase of the product can leave a product review. Article reviews have no purchase requirement. The review score is the average of all approved reviews.</p>
+
+      <!-- Orders -->
+      <h2 id="orders">Orders — <code>/admin/orders</code></h2>
+      <p>Lists all orders across all payment methods. Each order shows: order number, date, customer email, items, total, payment method, and status.</p>
+
+      <h3>Order statuses</h3>
+      <table>
+        <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Pending</strong></td><td>Order created; payment not yet confirmed</td></tr>
+          <tr><td><strong>Processing</strong></td><td>Payment confirmed; fulfilment in progress</td></tr>
+          <tr><td><strong>Scheduled</strong></td><td>Service order — appointment confirmed</td></tr>
+          <tr><td><strong>Shipped</strong></td><td>Physical order — in transit</td></tr>
+          <tr><td><strong>Completed</strong></td><td>Fulfilled</td></tr>
+          <tr><td><strong>Cancelled</strong></td><td>Cancelled before fulfilment</td></tr>
+          <tr><td><strong>Refunded</strong></td><td>Payment returned to customer</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Order confirmation emails</h3>
+      <p>AECMS automatically sends a confirmation email to the customer when their payment is confirmed (Stripe webhook or PayPal capture). The email includes the order number, item list, total, and type-specific information:</p>
+      <ul>
+        <li><strong>Digital orders</strong> — note that download links are arriving separately.</li>
+        <li><strong>Physical orders</strong> — the shipping address on file.</li>
+        <li><strong>Service orders</strong> — a note that you will be in contact.</li>
+      </ul>
+
+      <h3>Refunding an order</h3>
+      <p>Open an order and click <strong>Refund</strong>. You can issue a full or partial refund. The refund is processed directly through the payment gateway (Stripe or PayPal) and the order status updates to <strong>Refunded</strong>.</p>
+
+      <h3>Exporting transactions</h3>
+      <p>Click <strong>Export CSV</strong> on the Orders list to download a transaction history. Select a date range (defaults to the current calendar month). The CSV is suitable for accounting software or AI-assisted bookkeeping.</p>
+
+      <!-- Registration Queue -->
+      <h2 id="registrations">Registration Queue — <code>/admin/registrations</code></h2>
+      <p>Visible only when <strong>Require Registration Approval</strong> is enabled. Shows all accounts that have verified their email and are awaiting manual review.</p>
+      <p>Click <strong>Approve</strong> to grant access — the user receives a confirmation email. Click <strong>Reject</strong> and enter a reason — the account is soft-deleted and the reason is stored in the audit log.</p>
+
+      <!-- Audit Log -->
+      <h2 id="audit">Audit Log — <code>/admin/audit</code></h2>
+      <p>A chronological record of significant events: logins, content publishes, setting changes, role assignments, order status changes, and more. Each entry records the actor (user ID), the event type, the affected resource, and a metadata blob with before/after values where relevant.</p>
+      <p>The audit log is append-only and cannot be edited or deleted from the UI. Use it to investigate unexpected changes or security events.</p>
+
+      <!-- Mul Converter -->
+      <h2 id="mul-converter">Mul Converter — <code>/admin/mul-converter</code></h2>
+      <p>Gated on the <code>mul.convert</code> capability (Owner only by default). An AI-powered tool that ingests any public URL and outputs a custom color palette and a page scaffold you can save directly to your site.</p>
 
       <h3>Setup</h3>
-      <p>Expand <strong>AI Provider Settings</strong> at the top of the page. You need at minimum a <strong>Text Provider</strong> (the AI that analyzes the page and writes the scaffold):</p>
+      <p>Expand <strong>AI Provider Settings</strong> at the top of the page. You need at minimum a <strong>Text Provider</strong>:</p>
       <ul>
-        <li><strong>Anthropic (Claude)</strong> — recommended. Get a key at console.anthropic.com. Sonnet models give the best balance of quality and speed.</li>
-        <li><strong>OpenAI (GPT)</strong> — alternative. Get a key at platform.openai.com.</li>
+        <li><strong>Anthropic (Claude)</strong> — recommended. Sonnet models give the best quality/speed balance.</li>
+        <li><strong>OpenAI (GPT)</strong> — alternative.</li>
         <li><strong>xAI (Grok)</strong> — alternative.</li>
       </ul>
-      <p>Optionally enable an <strong>Image Provider</strong> to have the AI generate placeholder background images for sections that call for them. Supported: GPT-Image-1 (OpenAI), xAI Aurora, FLUX (via fal.ai), Stability AI.</p>
-      <p>Paste your API key and click <strong>Save Settings</strong>. Keys are stored encrypted in the Internal Secrets Manager. Leave the key field blank on future saves to keep the stored key.</p>
+      <p>Optionally enable an <strong>Image Provider</strong> to generate placeholder section backgrounds. Supported: GPT-Image-1, xAI Aurora, FLUX (fal.ai), Stability AI.</p>
+      <p>API keys are stored encrypted in the Internal Secrets Manager. Leave a key field blank on future saves to keep the stored value.</p>
 
       <h3>Running an analysis</h3>
       <ol>
-        <li>Enter the target URL and click <strong>Load Preview</strong> to confirm the page loads.</li>
-        <li>Toggle <strong>Images</strong> on or off (only available if an image provider is configured).</li>
-        <li>Click <strong>Looks right — Analyze</strong>. Analysis takes 30–90 seconds; do not close the tab.</li>
-        <li>Review the results: a color palette and a page layout diagram. The layout badges show background colors/gradients as live swatches — click any badge to see the full CSS value.</li>
-        <li>Edit any palette color by clicking its swatch in the Palette panel.</li>
-        <li>Choose a save action: <strong>Save Palette Only</strong>, <strong>Create Page Draft</strong>, or <strong>Save Both</strong>. The page draft opens in the page editor where you can swap placeholder images for real uploads and refine the content.</li>
+        <li>Enter a URL and click <strong>Load Preview</strong>.</li>
+        <li>Toggle <strong>Images</strong> on or off (requires an image provider).</li>
+        <li>Click <strong>Looks right — Analyze</strong>. Allow 30–90 seconds.</li>
+        <li>Review the palette and page layout. Click any color swatch badge to inspect the CSS value.</li>
+        <li>Edit palette colors by clicking swatches in the Palette panel.</li>
+        <li>Choose: <strong>Save Palette Only</strong>, <strong>Create Page Draft</strong>, or <strong>Save Both</strong>.</li>
       </ol>
-
       <div class="callout note">
-        <div class="callout-title">ℹ️ Site preview may be blank</div>
-        <p>Many sites block iframe embedding. If the preview frame is blank, that is expected — the analysis still works because the backend fetches the page directly, not through the iframe.</p>
+        <div class="callout-title">ℹ️ Preview frame may be blank</div>
+        <p>Many sites block iframe embedding. A blank preview is expected — the backend fetches the page directly, not through the iframe, so the analysis still works.</p>
       </div>
 
     </div>
