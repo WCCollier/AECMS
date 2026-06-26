@@ -368,8 +368,78 @@ curl http://localhost:3000/feed.xml
 
 ### Live deployment
 
-Run migration on Neon before deploying code:
+FR-009 requires two steps that the CI/CD pipeline does **not** run automatically: a Prisma migration on Neon and a seed-minimal run to register the new capabilities. Both must be done **before or immediately after** merging to `deploy` — the migration is backward-compatible so it is safe to run it first while the old code is still live.
+
+#### Step 1 — Get the Neon connection string
+
+The live `DATABASE_URL` is stored in GCP Secret Manager as `aecms-database-url`. Retrieve it:
+
 ```bash
-DATABASE_URL=<neon-url> npx prisma migrate deploy
+gcloud secrets versions access latest --secret="aecms-database-url" --project=<GCP_PROJECT_ID>
 ```
-The migration adds nullable/boolean-with-default columns only — fully backward-compatible.
+
+Copy the full connection string (starts with `postgresql://...`). It is the **pooler** URL (port 5432, `pgbouncer=true`). For `prisma migrate deploy` you need the **direct** (non-pooler) URL — replace `-pooler` in the hostname with nothing, and change the port if needed, or use the direct URL from the Neon dashboard (`Project → Connection Details → Connection string → Direct connection`).
+
+> **Tip**: Neon Dashboard → your project → Connection Details → toggle "Connection pooling" off → copy the string.
+
+#### Step 2 — Run the migration on Neon
+
+From the `backend/` directory (Prisma client already generated in your Codespace):
+
+```bash
+cd /workspaces/AECMS/backend
+
+DATABASE_URL="postgresql://neondb_owner:<password>@<direct-host>.neon.tech/neondb?sslmode=require" \
+  npx prisma migrate deploy
+```
+
+Expected output — two migrations should apply:
+```
+Applying migration `20260626120000_rename_email_from_address`
+Applying migration `20260626160043_add_subscription_preferences`
+```
+
+If you see `No pending migrations` for the first one, that's fine — it was already applied. The subscription preferences migration must show as applied.
+
+**What it does**: Adds four columns to `users` with safe defaults (`subscribe_new_articles BOOLEAN DEFAULT false`, `subscribe_new_products BOOLEAN DEFAULT false`, `subscribe_news_alerts BOOLEAN DEFAULT false`, `unsubscribe_token TEXT NULL`). Fully backward-compatible — the running old code ignores these columns.
+
+#### Step 3 — Merge main → deploy
+
+```bash
+git checkout deploy
+git merge main
+git push origin deploy
+```
+
+This triggers the GitHub Actions workflow, which runs tests then builds and deploys the new Docker image to Cloud Run. Monitor at: GitHub → Actions → Deploy to Cloud Run.
+
+#### Step 4 — Run seed-minimal on Neon to register new capabilities and ISM defaults
+
+Once the new image is live, run `seed-minimal.js` against the live database to upsert the two new capabilities (`broadcast.send`, `broadcast.config`) and the three new ISM default keys (`subscription.default_*`). This is idempotent — safe to run multiple times.
+
+```bash
+cd /workspaces/AECMS/backend
+
+DATABASE_URL="postgresql://neondb_owner:<password>@<pooler-host>-pooler.neon.tech/neondb?sslmode=require&pgbouncer=true" \
+  node scripts/seed-minimal.js
+```
+
+You can use the pooler URL here (seed-minimal is pure upserts, no migrations).
+
+Expected output includes:
+```
+[seed-minimal] ✓ 56 capabilities upserted   ← was 54 before; now includes broadcast.send + broadcast.config
+[seed-minimal] ✓ 8 default settings upserted ← was 5; now includes 3 subscription.default_* keys
+```
+
+#### Step 5 — Verify on the live site
+
+1. Log into backstage → Settings → confirm a **Notifications** tab appears (last tab).
+2. Confirm the three subscription default toggles are present and save correctly.
+3. Visit `https://fantasyvreality.com/feed.xml` → confirm valid RSS 2.0 XML with your articles.
+4. Log into your member account → My Account → expand **Notifications** → confirm the three opt-in toggles appear.
+5. Log into backstage → confirm **Broadcasts** appears in the sidebar nav.
+
+#### Rollback (if needed)
+
+The migration only adds nullable/defaulted columns — there is nothing to roll back at the DB level. If the new code has an issue, rolling back to the previous Cloud Run revision (GCP Console → Cloud Run → `aecms-backend` → Revisions → route 100% traffic to previous revision) will work without any DB change.
