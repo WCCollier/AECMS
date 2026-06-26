@@ -71,6 +71,8 @@ Expected: no errors. Warnings about existing extensions (plpgsql) are harmless.
 
 ```bash
 psql "$NEON_DIRECT" -c "SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM articles; SELECT COUNT(*) FROM orders;"
+
+psql "$NEON_DIRECT" -c "SELECT COUNT(*) FROM pages;"
 ```
 
 Expected: row counts matching what's in production.
