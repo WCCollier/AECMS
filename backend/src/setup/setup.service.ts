@@ -3,6 +3,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { CompleteSetupDto } from './dto/complete-setup.dto';
+import { buildTermsContent, buildPrivacyContent } from './policy-templates';
 
 @Injectable()
 export class SetupService {
@@ -73,6 +74,16 @@ export class SetupService {
 
     // Seed sample content now that an owner exists (idempotent — skips if slugs already exist)
     await this.seedSampleContent(owner.id);
+
+    // Seed draft policy pages (Terms of Service + Privacy Policy)
+    const appUrl = process.env.APP_URL ?? 'https://example.com';
+    await this.seedPolicyPages(owner.id, {
+      siteName: dto.site_name,
+      siteUrl: appUrl,
+      contactEmail: dto.email,
+      ownerName: `${dto.first_name} ${dto.last_name}`.trim(),
+      effectiveDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    });
   }
 
   private async seedSampleContent(ownerId: string): Promise<void> {
@@ -161,6 +172,40 @@ export class SetupService {
         description: aboutProductsContent,
         short_description: 'An introduction to the product system — physical, digital, and service types; pricing; digital file delivery; and payment providers.',
         author_id: ownerId,
+      }}),
+    ]);
+  }
+
+  private async seedPolicyPages(ownerId: string, params: {
+    siteName: string;
+    siteUrl: string;
+    contactEmail: string;
+    ownerName: string;
+    effectiveDate: string;
+  }): Promise<void> {
+    const [existingTerms, existingPrivacy] = await Promise.all([
+      this.prisma.page.findFirst({ where: { slug: 'terms' } }),
+      this.prisma.page.findFirst({ where: { slug: 'privacy' } }),
+    ]);
+
+    await Promise.all([
+      !existingTerms && this.prisma.page.create({ data: {
+        slug: 'terms',
+        title: 'Terms of Service',
+        content: buildTermsContent(params),
+        status: 'draft',
+        visibility: 'public',
+        show_in_nav: false,
+        meta_title: `Terms of Service — ${params.siteName}`,
+      }}),
+      !existingPrivacy && this.prisma.page.create({ data: {
+        slug: 'privacy',
+        title: 'Privacy Policy',
+        content: buildPrivacyContent(params),
+        status: 'draft',
+        visibility: 'public',
+        show_in_nav: false,
+        meta_title: `Privacy Policy — ${params.siteName}`,
       }}),
     ]);
   }
