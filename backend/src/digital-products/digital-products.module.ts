@@ -9,9 +9,10 @@ import { StorageModule } from '../storage/storage.module';
 import { EmailModule } from '../email/email.module';
 import { AuthModule } from '../auth/auth.module';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
-  imports: [PrismaModule, StorageModule, EmailModule, AuthModule, CapabilitiesModule],
+  imports: [PrismaModule, StorageModule, EmailModule, AuthModule, CapabilitiesModule, SettingsModule],
   controllers: [DigitalProductsController, KindleController],
   providers: [
     DigitalProductsService,

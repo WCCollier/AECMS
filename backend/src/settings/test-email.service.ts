@@ -16,7 +16,7 @@ export class TestEmailService {
   async send(recipientEmail: string): Promise<{ success: boolean; message: string }> {
     try {
       const siteTitle = await this.settingsService.getEffective('general.site_title') || 'AECMS';
-      const fromAddress = await this.settingsService.getEffective('email.from_address');
+      const fromAddress = await this.settingsService.getEffective('email.system_from');
       const fromName = await this.settingsService.getEffective('email.from_name') || siteTitle;
 
       const result = await this.emailProvider.send({
@@ -53,7 +53,7 @@ export class TestEmailService {
     const secure  = (config['email.smtp_security'] || config['smtp_security']) === 'ssl';
     const user    = config['email.smtp_user'] || config['smtp_user'];
     const pass    = config['email.smtp_pass_enc'] || config['smtp_pass'];
-    const from    = config['email.from_address'] || config['from_address'] || 'noreply@aecms.local';
+    const from    = config['email.system_from'] || config['from_address'] || 'noreply@aecms.local';
     const fromName = config['email.from_name'] || config['from_name'] || 'AECMS';
 
     try {

@@ -24,9 +24,10 @@ const ENV_KEY_MAP: Record<string, string> = {
   'email.smtp_security':                 'SMTP_SECURITY',
   'email.smtp_user':                     'SMTP_USER',
   'email.smtp_pass_enc':                 'SMTP_PASS',
-  'email.from_address':                  'SMTP_FROM',
+  'email.system_from':                   'SMTP_FROM',
   'email.from_name':                     'EMAIL_FROM_NAME',
   'email.kindle_from':                   'KINDLE_FROM_ADDRESS',
+  // email.notification_from — no env fallback; falls back to email.system_from in code
   'payment.stripe_publishable_key':      'STRIPE_PUBLISHABLE_KEY',
   'payment.stripe_secret_key_enc':       'STRIPE_SECRET_KEY',
   'payment.stripe_webhook_secret_enc':   'STRIPE_WEBHOOK_SECRET',

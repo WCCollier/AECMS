@@ -30,7 +30,7 @@ export class SetupService {
       this.isSetupRequired(),
       this.settings.getEnvSourcedKeys(),
       this.settings.getEffective('email.kindle_from'),
-      this.settings.getEffective('email.from_address'),
+      this.settings.getEffective('email.system_from'),
     ]);
     return {
       storageProvider: process.env.STORAGE_PROVIDER_TYPE ?? 'local',

@@ -33,7 +33,7 @@ export class OrderEmailService {
 
     const [siteName, contactEmail, appUrl] = await Promise.all([
       this.settingsService.getEffective('general.site_title').then((v) => v || 'AECMS'),
-      this.settingsService.getEffective('email.from_address').then((v) => v || ''),
+      this.settingsService.getEffective('email.system_from').then((v) => v || ''),
       Promise.resolve(this.configService.get<string>('APP_URL', 'http://localhost:3000')),
     ]);
 
