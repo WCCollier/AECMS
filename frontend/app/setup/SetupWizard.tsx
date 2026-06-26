@@ -426,6 +426,20 @@ export default function SetupPage() {
                     <p className="text-xs text-foreground/50 mt-0.5">You&apos;ll be prompted on first backstage login.</p>
                   </div>
                 </div>
+
+                {/* Policy pages */}
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <span className="text-amber-500 mt-0.5">⚠</span>
+                  <div>
+                    <p className="font-medium text-foreground/80">Review your legal pages</p>
+                    <p className="text-xs text-foreground/50 mt-0.5">
+                      Draft <strong>Terms of Service</strong> and <strong>Privacy Policy</strong> pages have been generated from your
+                      site information and saved as drafts. Go to <strong>Admin → Pages</strong>, review both documents carefully,
+                      and publish them before accepting registrations or payments.{' '}
+                      <em>These drafts are auto-generated — consult a legal professional to confirm they suit your situation.</em>
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <a

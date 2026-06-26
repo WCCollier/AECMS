@@ -1,11 +1,20 @@
-# Phase 24: Sales Tax Collection & Accounting Infrastructure
+# Phase 24: Commerce Infrastructure — Tax & Shipping
 
 **Project**: AECMS  
 **Phase**: 24  
 **Status**: 📋 PLANNED  
 **Dependencies**: Phase 21 (live deployment), Phase 22 (dependency cleanup)
 
+This phase covers two distinct sub-phases that can be implemented independently:
+
+| Sub-phase | Scope | Trigger |
+|-----------|-------|---------|
+| **24A — Sales Tax** | Stripe Tax integration, PayPal flat-rate, tax settings UI, receipts, reporting | Revenue >$1k or Texas Comptroller registration |
+| **24B — Shipping** | Flat-rate tiers, per-product shipping cost, cart/checkout display, order shipping line | First physical product sale to a real customer |
+
 ---
+
+# Phase 24A — Sales Tax Collection & Accounting Infrastructure
 
 ## Goal
 
@@ -15,7 +24,7 @@ Add sales tax collection to the checkout flow and provide the owner with the rep
 
 ## Activation Trigger
 
-Do not implement Phase 24 until one of these conditions is met:
+Do not implement Phase 24A until one of these conditions is met:
 
 - Annual revenue crosses **$1,000** (enough to justify the administrative overhead), OR
 - The owner registers with the Texas Comptroller and becomes legally obligated to collect, OR
@@ -180,3 +189,168 @@ This can be built from the existing `orders` table by aggregating on shipping st
 5. Part D (PayPal) — decision point, then implementation
 6. Part F (reporting) — receipts first, then dashboard report
 7. Part G (nexus monitoring) — deferred until meaningful multi-state volume
+
+---
+
+---
+
+# Phase 24B — Shipping Infrastructure
+
+## Goal
+
+Add shipping cost collection to the checkout flow for physical products. The owner defines one or more flat-rate shipping tiers in Admin Settings; individual products can override with a per-product shipping cost. The shipping amount is shown in the cart, confirmed at checkout, and stored on the order. No carrier API integration — rates are owner-defined.
+
+---
+
+## Activation Trigger
+
+Implement Phase 24B when the first physical product is sold to a real customer, or when the owner decides to set up shipping before launch. It can be built independently of Phase 24A.
+
+---
+
+## Design Principles
+
+- **No carrier APIs**: UPS/FedEx/USPS real-time rate quotes are complex and overkill for a low-volume store. Flat rates configured by the owner are sufficient.
+- **Opt-in per product**: digital and service products have no shipping cost. Only physical products trigger the shipping calculation.
+- **Additive only**: shipping is an extra line in the order — the product price is unchanged. The Stripe Checkout session receives a shipping line item.
+- **Single shipping address model**: the existing `shipping_*` columns on the `Order` model already capture address. No schema changes needed there.
+
+---
+
+## Part A — Shipping Settings in Admin Settings
+
+Add a **Shipping** tab (or section within General Settings) to the Admin Settings UI.
+
+### Flat-rate tiers (ISM keys)
+
+| Setting | ISM key | Description |
+|---------|---------|-------------|
+| Shipping enabled | `shipping.enabled` | Master toggle — off means no shipping added |
+| Domestic standard label | `shipping.tier1_label` | e.g. "Standard Shipping" |
+| Domestic standard rate | `shipping.tier1_rate` | Cents (e.g. `799` = $7.99) |
+| Domestic priority label | `shipping.tier2_label` | e.g. "Priority Shipping" (optional) |
+| Domestic priority rate | `shipping.tier2_rate` | Cents (leave blank to disable second tier) |
+| Free shipping threshold | `shipping.free_threshold` | Order subtotal in cents above which shipping is free (0 = disabled) |
+
+At MVP a single flat rate is sufficient. The two-tier design allows a standard/priority option without a schema change.
+
+### Future: per-country rates
+
+Out of scope for 24B. If international shipping is needed, add a `shipping.international_rate` key. For now, all orders share the same flat rate regardless of destination.
+
+---
+
+## Part B — Per-Product Shipping Override
+
+Add `shipping_override` (nullable integer, cents) to the `Product` model. When set, this overrides the global flat-rate tiers for that product.
+
+```prisma
+model Product {
+  // ... existing fields ...
+  shipping_override  Int?  // shipping cost in cents; null = use global tier
+}
+```
+
+Migration: `add_product_shipping_override`
+
+**Admin UI**: add a "Shipping Cost Override" field to the Product edit form (Physical product section only, shown when `product_type === 'physical'`). Hint text: "Leave blank to use the global shipping rate from Settings."
+
+---
+
+## Part C — Shipping Calculation at Checkout
+
+### Cart API (`GET /cart`)
+
+Add a computed `shipping_total` field to the cart response:
+
+```ts
+shipping_total: number // 0 for non-physical carts; calculated rate for physical
+```
+
+Calculation:
+1. If `shipping.enabled` is not `'true'`, return 0.
+2. If all items are non-physical, return 0.
+3. If any physical item has `shipping_override`, use the highest override (one shipping charge per order, covers the most expensive item to ship).
+4. Else use `shipping.tier1_rate` (the standard tier; the customer selects standard vs. priority at a later step if tier2 is configured).
+5. If cart subtotal ≥ `shipping.free_threshold` (and threshold > 0), return 0.
+
+The tier selection (standard vs. priority) is a future refinement. For 24B, standard rate is always applied.
+
+### Stripe Checkout session
+
+In `stripe.provider.ts`, when building the Checkout session for an order containing physical items:
+1. Calculate `shippingCost` using the same logic as the cart.
+2. Add a `shipping_options` entry to the session with `shipping_rate_data`:
+   ```ts
+   shipping_options: [{
+     shipping_rate_data: {
+       type: 'fixed_amount',
+       fixed_amount: { amount: shippingCost, currency: 'usd' },
+       display_name: tier1Label,
+     }
+   }]
+   ```
+3. Store `shipping_amount` on the order (retrieved from `checkout.session.completed` webhook via `session.shipping_cost?.amount_total`).
+
+### PayPal Orders API
+
+In `paypal.provider.ts`, when building the PayPal order for a physical cart:
+1. Calculate `shippingCost`.
+2. Set `purchase_units[].amount.breakdown.shipping.value` to the formatted amount.
+3. Ensure `purchase_units[].amount.value` includes the shipping cost.
+4. Store `shipping_amount` on the order after capture.
+
+### Order schema addition
+
+```prisma
+model Order {
+  // ... existing fields ...
+  shipping_amount  Int  @default(0)  // shipping cost in cents
+}
+```
+
+Migration: `add_order_shipping_amount`
+
+---
+
+## Part D — Cart and Checkout UI
+
+### Cart page (`/cart`)
+
+Below the subtotal line, add:
+```
+Subtotal:   $24.99
+Shipping:   $7.99   (or "Free" if threshold met, or "Calculated at checkout" if mixed cart)
+──────────────────
+Total:      $32.98
+```
+
+If no physical items: shipping line not shown.
+
+### Order confirmation page and email
+
+Add shipping line to the order summary breakdown:
+```
+Items:      $24.99
+Shipping:   $7.99
+Total:      $32.98
+```
+
+---
+
+## Part E — Admin Orders
+
+The Orders list and order detail view already show `total`. Add `shipping_amount` to the detail view so the owner can see how much was collected for shipping on each order.
+
+The existing CSV export (`/orders/export`) should include `shipping_amount` as a column.
+
+---
+
+## Implementation Order (24B)
+
+1. Part A — Shipping settings (ISM keys + Settings UI tab)
+2. Part B — `shipping_override` on Product (schema + admin UI field)
+3. `add_order_shipping_amount` migration
+4. Part C — Cart API + Stripe + PayPal shipping calculation
+5. Part D — Cart UI + order confirmation updates
+6. Part E — Admin orders detail + CSV export column
