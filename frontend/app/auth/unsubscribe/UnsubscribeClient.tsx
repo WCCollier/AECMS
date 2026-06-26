@@ -13,8 +13,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export function UnsubscribeClient() {
   const params = useSearchParams();
-  const token = params.get('token') ?? '';
-  const category = params.get('category') ?? '';
+  const token = params?.get('token') ?? '';
+  const category = params?.get('category') ?? '';
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMsg, setErrorMsg] = useState('');
