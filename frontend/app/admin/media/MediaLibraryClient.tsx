@@ -471,7 +471,7 @@ function MediaLibraryTab() {
   const [bulkConfirm, setBulkConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
-  const [usagesForBulk, setUsagesForBulk] = useState<number>(0);
+  const [filesInUseForBulk, setFilesInUseForBulk] = useState<number>(0);
 
   const params = new URLSearchParams({
     page: String(page),
@@ -500,16 +500,15 @@ function MediaLibraryTab() {
   };
 
   const handleBulkDeleteClick = async () => {
-    // Check usage of selected items
     const ids = Array.from(selected);
-    let totalUses = 0;
+    let inUseCount = 0;
     for (const id of ids) {
       try {
         const res = await adminApi.get<UsageData>(`/media/${id}/usage`);
-        totalUses += res.data.total_uses;
+        if (res.data.total_uses > 0) inUseCount++;
       } catch { /* ignore */ }
     }
-    setUsagesForBulk(totalUses);
+    setFilesInUseForBulk(inUseCount);
     setBulkConfirm(true);
   };
 
@@ -641,17 +640,17 @@ function MediaLibraryTab() {
       {/* Bulk delete modal */}
       {bulkConfirm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-lg p-6 max-w-sm w-full space-y-4 border border-border">
-            <h3 className="font-semibold">Delete {selected.size} file{selected.size !== 1 ? 's' : ''}?</h3>
-            {usagesForBulk > 0 && (
-              <div className="flex items-start gap-2 text-sm text-yellow-700 bg-yellow-500/10 rounded p-3">
+          <div className="bg-surface border border-border rounded-xl p-6 max-w-sm w-full space-y-4 shadow-xl">
+            <h3 className="font-semibold text-foreground">Delete {selected.size} file{selected.size !== 1 ? 's' : ''}?</h3>
+            {filesInUseForBulk > 0 && (
+              <div className="flex items-start gap-2 text-sm text-yellow-600 bg-yellow-500/10 rounded-lg p-3 border border-yellow-500/20">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-                <p>Warning: {usagesForBulk} of these files are currently referenced in content. Deleting them will break those references.</p>
+                <p>{filesInUseForBulk} of the {selected.size} selected file{selected.size !== 1 ? 's are' : ' is'} referenced in content. Deleting will break those references.</p>
               </div>
             )}
             <div className="flex gap-2">
-              <button onClick={() => setBulkConfirm(false)} className="flex-1 px-4 py-2 border border-border rounded text-sm">Cancel</button>
-              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="flex-1 px-4 py-2 bg-destructive text-white rounded text-sm disabled:opacity-50">
+              <button onClick={() => setBulkConfirm(false)} className="flex-1 px-4 py-2 border border-border rounded-lg text-sm text-foreground hover:bg-surface-raised transition-colors">Cancel</button>
+              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm disabled:opacity-50 transition-colors">
                 {bulkDeleting ? 'Deleting…' : `Delete ${selected.size} file${selected.size !== 1 ? 's' : ''}`}
               </button>
             </div>
