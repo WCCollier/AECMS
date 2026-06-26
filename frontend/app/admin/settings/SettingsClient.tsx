@@ -248,7 +248,7 @@ export function SettingsClient() {
   };
 
   const emailFieldsFilled = Boolean(
-    f('email.smtp_host') && f('email.smtp_port') && f('email.smtp_user') && f('email.from_address'),
+    f('email.smtp_host') && f('email.smtp_port') && f('email.smtp_user') && f('email.system_from'),
   );
 
   const handleTestEmail = async () => {
@@ -258,7 +258,7 @@ export function SettingsClient() {
       const config: Record<string, string> = {};
       for (const key of ['email.smtp_host', 'email.smtp_port', 'email.smtp_security',
                           'email.smtp_user', 'email.smtp_pass_enc',
-                          'email.from_address', 'email.from_name']) {
+                          'email.system_from', 'email.from_name']) {
         if (f(key)) config[key] = f(key);
       }
       const res = await adminApi.post('/settings/test-email-preview', config);
@@ -655,14 +655,17 @@ export function SettingsClient() {
           <FieldRow label="Password" help="Leave blank to keep existing password">
             <SecretInput value={f('email.smtp_pass_enc')} onChange={(v) => set('email.smtp_pass_enc', v)} />
           </FieldRow>
-          <FieldRow label="From Address">
-            <TextInput value={f('email.from_address')} onChange={(v) => set('email.from_address', v)} placeholder="noreply@yoursite.com" type="email" />
+          <FieldRow label="System From Address" help="Used for all transactional emails: verification, password reset, order confirmation, digital delivery">
+            <TextInput value={f('email.system_from')} onChange={(v) => set('email.system_from', v)} placeholder="noreply@yoursite.com" type="email" />
           </FieldRow>
           <FieldRow label="From Name">
             <TextInput value={f('email.from_name')} onChange={(v) => set('email.from_name', v)} placeholder="My Site" />
           </FieldRow>
-          <FieldRow label="Kindle From Address" help="Must be on Amazon's Approved Personal Document Email List">
-            <TextInput value={f('email.kindle_from')} onChange={(v) => set('email.kindle_from', v)} placeholder="you@gmail.com" type="email" />
+          <FieldRow label="Notification From Address" help="Used for subscription emails and broadcasts. Falls back to System From Address if not set.">
+            <TextInput value={f('email.notification_from')} onChange={(v) => set('email.notification_from', v)} placeholder="news@yoursite.com" type="email" />
+          </FieldRow>
+          <FieldRow label="Kindle From Address" help="Must be on Amazon's Approved Personal Document Email List. Used only for Send-to-Kindle delivery.">
+            <TextInput value={f('email.kindle_from')} onChange={(v) => set('email.kindle_from', v)} placeholder="kindle@yoursite.com" type="email" />
           </FieldRow>
 
           <div className="pt-4 space-y-2">

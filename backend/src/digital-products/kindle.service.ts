@@ -11,6 +11,7 @@ import type { StorageProvider } from '../storage';
 import { STORAGE_PROVIDER } from '../storage';
 import type { EmailProvider } from '../email';
 import { EMAIL_PROVIDER, isKindleEmail } from '../email';
+import { SettingsService } from '../settings/settings.service';
 import { PersonalizationService } from './personalization.service';
 import {
   CreateKindleDeviceDto,
@@ -45,6 +46,7 @@ export class KindleService {
     @Inject(EMAIL_PROVIDER)
     private emailProvider: EmailProvider,
     private personalizationService: PersonalizationService,
+    private settingsService: SettingsService,
   ) {}
 
   // ============================================================================
@@ -324,10 +326,13 @@ export class KindleService {
       format === FileFormat.EPUB ? 'application/epub+zip' : 'application/pdf';
 
     // Send email with attachment
+    // from must be the address the customer has whitelisted in their Amazon account
+    const kindleFrom = await this.settingsService.getEffective('email.kindle_from');
     const filename = `${download.digital_file.product.title}.${format}`;
 
     const emailResult = await this.emailProvider.sendWithAttachment({
       to: kindleEmail,
+      from: kindleFrom || undefined,
       subject: download.digital_file.product.title,
       text: `Your purchased book: ${download.digital_file.product.title}`,
       attachments: [

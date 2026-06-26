@@ -18,6 +18,7 @@ Allows site members to opt into email notifications for new articles, new produc
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-26 | accepted | Planned — implementation deferred |
+| 2026-06-26 | accepted | Amended — default subscription preferences, broadcast.config capability, Notifications settings tab added |
 
 ---
 
@@ -33,9 +34,31 @@ Allows site members to opt into email notifications for new articles, new produc
 
 System emails (authentication, password reset, digital product delivery, order confirmation) are displayed in the account Notifications tab as informational items with no opt-out toggle — members can see what automated emails they'll receive, but these cannot be disabled.
 
+### Default subscription preferences (configurable by owner)
+
+The owner can configure which categories new sign-ups are automatically subscribed to via Admin Settings → Notifications, gated on the `broadcast.config` capability. All three categories default to **off** out of the box — no surprise enrollment without deliberate owner action.
+
+New ISM keys:
+
+| Key | Description | Default |
+|-----|-------------|---------|
+| `subscription.default_new_articles` | Auto-subscribe new members to New Articles | `false` |
+| `subscription.default_new_products` | Auto-subscribe new members to New Products | `false` |
+| `subscription.default_news_alerts` | Auto-subscribe new members to News & Alerts | `false` |
+
+During registration (`AuthService.register()`), the three ISM defaults are read via `SettingsService.getEffective()` and applied to the newly-created user's `subscribe_*` fields. Members can change their own preferences at any time from the account Notifications tab.
+
+**New capability:**
+
+| Capability | Scope | Default roles |
+|-----------|-------|--------------|
+| `broadcast.config` | `backstage` | Owner only (grantable to Admin) |
+
+**Admin Settings — Notifications tab** (new, alongside General / Email / Payments / Storage / Appearance / SEO): Three toggle rows configuring the defaults. Gated on `broadcast.config`.
+
 ### Opt-in default
 
-All subscriptions are **opt-in** (default: off). No existing member is enrolled without action. New registrations also default to all-off. The account Notifications tab is where members turn categories on.
+The system-level default for all three categories is **off**. Owners who want all new sign-ups subscribed immediately can flip the ISM toggles. Existing members are never retroactively enrolled — only new registrations read the defaults at sign-up time.
 
 ### Unsubscribe links
 
@@ -136,11 +159,12 @@ if (dto.status === 'published' && existingArticle.status !== 'published') {
 | `GET` | `/subscriptions/unsubscribe` | None | One-click unsubscribe: `?token={token}&category={articles\|products\|news}` |
 | `POST` | `/subscriptions/broadcast` | `JwtAuthGuard + CapabilityGuard(broadcast.send)` | Admin sends a news/alert broadcast |
 
-#### New capability
+#### New capabilities
 
-| Capability | Scope | Default roles |
-|-----------|-------|--------------|
-| `broadcast.send` | `backstage` | Owner only |
+| Capability | Scope | Default roles | Purpose |
+|-----------|-------|--------------|---------|
+| `broadcast.send` | `backstage` | Owner only | Send a news/alert broadcast |
+| `broadcast.config` | `backstage` | Owner only (grantable to Admin) | Configure default subscription preferences in Settings |
 
 ---
 
@@ -173,10 +197,10 @@ Each toggle calls `PATCH /subscriptions/preferences` on change. Show a brief "Sa
 
 ### Admin — Broadcast form
 
-New page at `/admin/broadcasts` (or a panel within a future Messaging section). Simple form:
+New page at `/admin/broadcasts`. Simple form:
 - Subject line (text input)
-- Body (TipTap or textarea for now — full editor is overkill for a simple alert)
-- "Send to N subscribers" button (shows live count fetched from `GET /subscriptions/preferences` aggregate)
+- Body (TipTap or textarea — full editor is overkill for a simple alert)
+- "Send to N subscribers" button (shows live count fetched from subscriber aggregate)
 - Confirmation modal before send
 
 Sidebar nav entry: "Broadcasts" under a new "Communication" section, gated on `broadcast.send`.
@@ -185,6 +209,19 @@ Sidebar nav entry: "Broadcasts" under a new "Communication" section, gated on `b
 - `frontend/app/admin/broadcasts/page.tsx` (new)
 - `frontend/app/admin/broadcasts/BroadcastClient.tsx` (new)
 - `frontend/app/admin/layout.tsx` — add "Broadcasts" nav item
+
+### Admin Settings — Notifications tab
+
+New tab in Admin Settings, gated on `broadcast.config`. Three toggle rows:
+- **New Articles** — "Auto-subscribe new members to new article emails"
+- **New Products** — "Auto-subscribe new members to new product emails"
+- **News & Alerts** — "Auto-subscribe new members to news and alert broadcasts"
+
+Helper text beneath each: "Members can always change this in their own account settings."
+
+**Files:**
+- `frontend/app/admin/settings/NotificationsTab.tsx` (new)
+- `frontend/app/admin/settings/SettingsClient.tsx` — add Notifications tab to tab list
 
 ---
 
@@ -224,6 +261,9 @@ Revalidate hourly (`export const revalidate = 3600`). Add `<link rel="alternate"
 
 ## Acceptance Criteria
 
+- [ ] Admin Settings → Notifications tab allows owner to configure default subscription preferences for new sign-ups
+- [ ] New registrations automatically inherit the configured defaults at sign-up time
+- [ ] Existing members are unaffected when defaults change
 - [ ] Account page has a Notifications tab with system emails listed (no toggle) and three opt-in toggles
 - [ ] Toggling a preference calls the API and persists across sessions
 - [ ] Publishing a new article sends an email to all `subscribe_new_articles = true` users
@@ -240,11 +280,13 @@ Revalidate hourly (`export const revalidate = 3600`). Add `<link rel="alternate"
 
 ## Implementation Order
 
-1. Schema migration
-2. `SubscriptionsModule` (service + controller + endpoints)
-3. Hook `notifyNewArticle` / `notifyNewProduct` into Articles/Products services
-4. Account page Notifications tab
-5. Unsubscribe landing page
-6. RSS feed route
-7. Admin broadcast page
-8. `broadcast.send` capability + sidebar nav entry
+1. Schema migration (`subscribe_*` fields + `unsubscribe_token` on User)
+2. ISM keys + `broadcast.config` / `broadcast.send` capabilities seeded
+3. `SubscriptionsModule` (service + controller + endpoints)
+4. Admin Settings Notifications tab (`broadcast.config` gate, ISM defaults UI)
+5. Registration hook — read ISM defaults and apply to new user on sign-up
+6. Hook `notifyNewArticle` / `notifyNewProduct` into Articles/Products services
+7. Account page Notifications tab (member preferences + system email list)
+8. Unsubscribe landing page
+9. RSS feed route
+10. Admin broadcast page (`broadcast.send` gate) + sidebar nav entry

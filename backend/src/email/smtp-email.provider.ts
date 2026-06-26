@@ -28,7 +28,7 @@ export class SmtpEmailProvider implements EmailProvider {
     const secure = security === 'ssl' || process.env.SMTP_SECURE === 'true';
     const user = await this.getEffective('email.smtp_user', 'SMTP_USER');
     const pass = await this.getEffective('email.smtp_pass_enc', 'SMTP_PASS');
-    const from = await this.getEffective('email.from_address', 'SMTP_FROM') || 'noreply@aecms.local';
+    const from = await this.getEffective('email.system_from', 'SMTP_FROM') || 'noreply@aecms.local';
 
     const transporter = nodemailer.createTransport({
       host,
