@@ -12,7 +12,9 @@
 
 const { PrismaClient } = require('@prisma/client');
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasourceUrl: process.env.DATABASE_URL,
+});
 
 // ── TipTap node builders ───────────────────────────────────────────────────────
 const p = (text) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
