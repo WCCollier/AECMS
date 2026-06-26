@@ -1,6 +1,6 @@
 # FR-006: Forgot Password / Password Reset
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Requested:** 2026-06-26
 **Deployed:** —
 **Size:** `small` (a few hours — two endpoints, two pages, one email template, one migration)
@@ -18,6 +18,7 @@ Adds a self-service password reset flow triggered from the login page. The user 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-26 | accepted | Identified as a launch blocker during pre-marketing gap audit |
+| 2026-06-26 | deployed | Implemented in one session — schema fields already existed in initial migration |
 
 ---
 
@@ -129,10 +130,20 @@ Sent via the existing `EmailProvider` abstraction (SMTP or console fallback in d
 
 ## Completion Report
 
-> _Fill in after implementation._
+**Implemented:** 2026-06-26
+**Commit(s):** feat: FR-006 Forgot Password / Password Reset
 
-**Implemented:** —
-**Commit(s):** —
+**Files changed:**
+- `backend/src/auth/dto/forgot-password.dto.ts` — new DTO `{ email: string }`
+- `backend/src/auth/dto/reset-password.dto.ts` — new DTO `{ token, newPassword }`
+- `backend/src/auth/auth.service.ts` — `forgotPassword()`, `resetPassword()`, `sendPasswordResetEmail()`; site name read from ISM via Prisma (no circular dep)
+- `backend/src/auth/auth.controller.ts` — `POST /auth/forgot-password`, `POST /auth/reset-password`
+- `frontend/app/auth/forgot-password/page.tsx` + `ForgotPasswordClient.tsx` — email input, always-success UI
+- `frontend/app/auth/reset-password/page.tsx` + `ResetPasswordClient.tsx` — token from URL, two password fields, success/error states
+
+**No new migration required** — `password_reset_token` and `password_reset_expires` were already present in the initial schema migration (`20260129122758_initial_schema`).
+
+**Enumeration prevention:** `forgotPassword()` always returns the same generic success message regardless of whether the email exists. The email send is wrapped in `.catch()` so SMTP failures don't alter the response either.
 
 ---
 
@@ -169,10 +180,10 @@ Sent via the existing `EmailProvider` abstraction (SMTP or console fallback in d
 
 ### Acceptance criteria
 
-- [ ] `/auth/forgot-password` page exists and accepts email input.
-- [ ] Submitting sends a reset email to the registered address.
-- [ ] Submitting an unknown email returns the same success UI (no enumeration).
-- [ ] Reset link sets new password and invalidates the token.
-- [ ] Expired token shows a clear error with path to request a new link.
-- [ ] Used token cannot be reused.
-- [ ] New request invalidates any prior outstanding token.
+- [x] `/auth/forgot-password` page exists and accepts email input.
+- [x] Submitting sends a reset email to the registered address.
+- [x] Submitting an unknown email returns the same success UI (no enumeration).
+- [x] Reset link sets new password and invalidates the token.
+- [x] Expired token shows a clear error with path to request a new link.
+- [x] Used token cannot be reused.
+- [x] New request invalidates any prior outstanding token.

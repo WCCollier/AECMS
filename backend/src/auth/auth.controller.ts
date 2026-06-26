@@ -27,6 +27,8 @@ import { VerifyTwoFactorDto } from './dto/verify-two-factor.dto';
 import { EnableTwoFactorDto } from './dto/enable-two-factor.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateShippingAddressDto } from './dto/shipping-address.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -163,6 +165,23 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'Owner account cannot be deleted' })
   async deleteAccount(@Request() req: any, @Body() dto: DeleteAccountDto) {
     return this.authService.deleteAccount(req.user.id, dto.password);
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset email' })
+  @ApiResponse({ status: 200, description: 'Reset email sent if account exists (always returns success)' })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(dto.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Set a new password using a reset token' })
+  @ApiResponse({ status: 200, description: 'Password updated' })
+  @ApiResponse({ status: 400, description: 'Token invalid or expired' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
   }
 
   // ── Back-door / Admin login ────────────────────────────────────────────────
