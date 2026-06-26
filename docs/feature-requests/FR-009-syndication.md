@@ -372,15 +372,24 @@ FR-009 requires two steps that the CI/CD pipeline does **not** run automatically
 
 #### Step 1 — Get the Neon connection string
 
-The live `DATABASE_URL` is stored in GCP Secret Manager as `aecms-database-url`. Retrieve it:
+**All commands below run fine from the Codespaces terminal** — no Cloud Console shell needed.
 
+Get the direct (non-pooler) connection string from the Neon dashboard — this is the easiest path and works from anywhere:
+
+> Neon Dashboard → your project → **Connection Details** → toggle **"Connection pooling" OFF** → copy the string.
+
+It will look like:
+```
+postgresql://neondb_owner:<password>@<host>.neon.tech/neondb?sslmode=require
+```
+
+You need the **direct** (non-pooler) URL for `prisma migrate deploy` — the pooler URL (which has `-pooler` in the hostname and `pgbouncer=true`) will not work for migrations. For Step 4 (seed-minimal), either URL works.
+
+The URL is also stored in GCP Secret Manager as `aecms-database-url` if you prefer to retrieve it that way (requires `gcloud auth login` first):
 ```bash
 gcloud secrets versions access latest --secret="aecms-database-url" --project=<GCP_PROJECT_ID>
 ```
-
-Copy the full connection string (starts with `postgresql://...`). It is the **pooler** URL (port 5432, `pgbouncer=true`). For `prisma migrate deploy` you need the **direct** (non-pooler) URL — replace `-pooler` in the hostname with nothing, and change the port if needed, or use the direct URL from the Neon dashboard (`Project → Connection Details → Connection string → Direct connection`).
-
-> **Tip**: Neon Dashboard → your project → Connection Details → toggle "Connection pooling" off → copy the string.
+That secret holds the pooler URL — strip `-pooler` from the hostname and remove `&pgbouncer=true` to get the direct URL for migrations.
 
 #### Step 2 — Run the migration on Neon
 
