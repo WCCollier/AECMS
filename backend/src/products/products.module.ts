@@ -5,9 +5,10 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import { AuthModule } from '../auth/auth.module';
 import { MediaModule } from '../media/media.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
-  imports: [PrismaModule, CapabilitiesModule, AuthModule, MediaModule],
+  imports: [PrismaModule, CapabilitiesModule, AuthModule, MediaModule, SubscriptionsModule],
   controllers: [ProductsController],
   providers: [ProductsService],
   exports: [ProductsService],

@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { Button, Input, PasswordInput } from '@/components/ui';
 import api, { getErrorMessage } from '@/lib/api';
-import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin } from 'lucide-react';
+import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin, Bell } from 'lucide-react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import type { Comment, PaginatedResponse, SavedShippingAddress } from '@/types';
@@ -30,7 +30,7 @@ export function AccountPageClient() {
     fetcher,
   );
 
-  const [activeSection, setActiveSection] = useState<'orders' | 'comments' | 'shipping' | 'password' | 'delete' | null>(null);
+  const [activeSection, setActiveSection] = useState<'orders' | 'comments' | 'shipping' | 'notifications' | 'password' | 'delete' | null>(null);
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   // Shipping address state
@@ -66,6 +66,15 @@ export function AccountPageClient() {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
   const [pwConfirmTouched, setPwConfirmTouched] = useState(false);
+
+  // Subscription preferences state
+  const { data: subPrefs, mutate: mutateSubPrefs } = useSWR<{
+    subscribe_new_articles: boolean;
+    subscribe_new_products: boolean;
+    subscribe_news_alerts: boolean;
+  }>(user ? '/subscriptions/preferences' : null, fetcher);
+  const [subSaving, setSubSaving] = useState<string | null>(null);
+  const [subSaved, setSubSaved] = useState<string | null>(null);
 
   // Delete account state
   const [deletePassword, setDeletePassword] = useState('');
@@ -409,6 +418,69 @@ export function AccountPageClient() {
               {shippingSuccess && <p className="text-sm text-green-600">{shippingSuccess}</p>}
               <Button type="submit" size="sm" isLoading={shippingLoading}>Save Address</Button>
             </form>
+          </div>
+        )}
+      </section>
+
+      {/* Notifications */}
+      <section className="bg-surface border border-border rounded-xl mb-6 overflow-hidden">
+        <button
+          onClick={() => setActiveSection(activeSection === 'notifications' ? null : 'notifications')}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-raised transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Bell className="w-5 h-5 text-accent" />
+            <span className="font-semibold">Notifications</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-foreground/40 transition-transform ${activeSection === 'notifications' ? 'rotate-90' : ''}`} />
+        </button>
+        {activeSection === 'notifications' && (
+          <div className="border-t border-border px-6 py-4 space-y-5">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground/80 mb-2">System Emails</h3>
+              <p className="text-xs text-foreground/50 mb-3">These emails are sent automatically and cannot be disabled:</p>
+              <ul className="text-sm text-foreground/60 space-y-1 list-disc list-inside">
+                <li>Account verification — sent when you register</li>
+                <li>Password reset — sent when you request a reset</li>
+                <li>Order confirmation — sent after every purchase</li>
+                <li>Digital product delivery — sent with your download links</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground/80 mb-2">Subscription Preferences</h3>
+              {[
+                { key: 'subscribe_new_articles' as const, label: 'New Articles', desc: 'Get an email when a new article is published' },
+                { key: 'subscribe_new_products' as const, label: 'New Products', desc: 'Get an email when a new product is added to the shop' },
+                { key: 'subscribe_news_alerts' as const, label: 'News & Alerts', desc: 'Receive occasional news and announcements' },
+              ].map(({ key, label, desc }) => (
+                <div key={key} className="flex items-start gap-3 py-2.5 border-b border-border last:border-0">
+                  <input
+                    type="checkbox"
+                    id={key}
+                    checked={subPrefs?.[key] ?? false}
+                    disabled={subSaving === key}
+                    onChange={async (e) => {
+                      setSubSaving(key);
+                      setSubSaved(null);
+                      try {
+                        await api.patch('/subscriptions/preferences', { [key]: e.target.checked });
+                        mutateSubPrefs();
+                        setSubSaved(key);
+                        setTimeout(() => setSubSaved(null), 2000);
+                      } catch { /* ignore */ } finally {
+                        setSubSaving(null);
+                      }
+                    }}
+                    className="mt-0.5 w-4 h-4 rounded border-border cursor-pointer"
+                  />
+                  <label htmlFor={key} className="flex-1 cursor-pointer">
+                    <span className="text-sm font-medium text-foreground/90">{label}</span>
+                    {subSaved === key && <span className="ml-2 text-xs text-green-500">Saved</span>}
+                    <p className="text-xs text-foreground/50">{desc}</p>
+                  </label>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>

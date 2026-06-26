@@ -62,6 +62,12 @@ model User {
   approved_at           DateTime? // Set when registration is approved (null = pending or approval not required)
   approved_by           String?   // User ID of the approver
 
+  // Subscription preferences
+  subscribe_new_articles  Boolean   @default(false)
+  subscribe_new_products  Boolean   @default(false)
+  subscribe_news_alerts   Boolean   @default(false)
+  unsubscribe_token       String?   // Persistent token for one-click unsubscribe links
+
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
   deleted_at            DateTime? // Soft delete

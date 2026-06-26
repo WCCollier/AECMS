@@ -82,6 +82,15 @@ export class AuthService {
     });
     const defaultRole = defaultRoleSetting?.value ?? 'member';
 
+    // Read subscription defaults directly from site_settings (avoids circular module dep)
+    const subKeys = ['subscription.default_new_articles', 'subscription.default_new_products', 'subscription.default_news_alerts'];
+    const subSettings = await this.prisma.siteSettings.findMany({ where: { key: { in: subKeys } } });
+    const subMap = Object.fromEntries(subSettings.map((s) => [s.key, s.value]));
+
+    const subscribeArticles = subMap['subscription.default_new_articles'] === 'true';
+    const subscribeProducts = subMap['subscription.default_new_products'] === 'true';
+    const subscribeAlerts = subMap['subscription.default_news_alerts'] === 'true';
+
     // Create user with email_verified = false
     const user = await this.prisma.user.create({
       data: {
@@ -94,6 +103,9 @@ export class AuthService {
         email_verified: false,
         email_verification_token: verificationToken,
         email_verification_expires: verificationExpires,
+        subscribe_new_articles: subscribeArticles,
+        subscribe_new_products: subscribeProducts,
+        subscribe_news_alerts: subscribeAlerts,
       },
     });
 

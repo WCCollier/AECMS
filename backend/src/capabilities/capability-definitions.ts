@@ -68,6 +68,9 @@ export const CAPABILITY_DEFINITIONS: CapabilityDefinition[] = [
   // Account Deletion
   { name: 'account.delete.limited', category: 'users',  scope: 'backstage', description: 'Delete accounts that do not themselves hold any account.delete capability' },
   { name: 'account.delete.any',     category: 'users',  scope: 'backstage', description: 'Delete any account except your own (including other owners)' },
+  // Subscriptions & Broadcasts
+  { name: 'broadcast.send',   category: 'communication', scope: 'backstage', description: 'Send a news/alert broadcast email to all subscribed members' },
+  { name: 'broadcast.config', category: 'communication', scope: 'backstage', description: 'Configure default subscription preferences for new sign-ups' },
   // Customer-facing capabilities
   { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
   { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a review on an article' },

@@ -29,6 +29,7 @@ import { SetupModule } from './setup/setup.module';
 import { UsersModule } from './users/users.module';
 import { MulConverterModule } from './mul-converter/mul-converter.module';
 import { RolesModule } from './roles/roles.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { RolesModule } from './roles/roles.module';
     UsersModule,
     MulConverterModule,
     RolesModule,
+    SubscriptionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -49,6 +49,7 @@ describe('AuthService', () => {
     },
     siteSettings: {
       findUnique: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     capability: {
       findUnique: jest.fn().mockResolvedValue(null),
