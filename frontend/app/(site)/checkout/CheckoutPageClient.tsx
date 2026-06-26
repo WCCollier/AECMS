@@ -36,8 +36,14 @@ export function CheckoutPageClient() {
     country: 'US',
   });
 
-  // Determine if all items in the cart are non-physical (skip shipping step)
-  const needsShipping = items.some((item) => item.product.product_type === 'physical');
+  // Physical and service products require a shipping address (service may mail materials)
+  const needsShipping = items.some(
+    (item) => item.product.product_type === 'physical' || item.product.product_type === 'service',
+  );
+  // Cart is free when all items total zero
+  const isFreeCart = subtotal === 0 && items.length > 0;
+  // Free digital products require a logged-in user (no payment gateway to validate guest identity)
+  const hasDigital = items.some((item) => item.product.product_type === 'digital');
   // Show name fields when guest, or when logged-in user hasn't provided a name yet
   const needsName = !isAuthenticated || !user?.firstName;
 
@@ -198,6 +204,47 @@ export function CheckoutPageClient() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFreeCheckout = async () => {
+    let currentOrderId = orderId;
+
+    if (!currentOrderId && !needsShipping) {
+      setIsLoading(true);
+      setError('');
+      try {
+        const validation = await api.post<{ adjusted: boolean; changes: any[] }>('/cart/validate');
+        if (validation.data.adjusted) {
+          await mutateCart();
+          router.push('/cart');
+          return;
+        }
+        const order = await createOrder({
+          guest_email: !isAuthenticated ? formData.email : undefined,
+          customer_first_name: formData.firstName || undefined,
+          customer_last_name: formData.lastName || undefined,
+        });
+        currentOrderId = order.id;
+        setOrderId(order.id);
+      } catch (err) {
+        setError(getErrorMessage(err));
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    if (!currentOrderId) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      await api.post('/payments/complete-free', { order_id: currentOrderId });
+      await clearCart();
+      router.push(`/order-confirmation?order=${currentOrderId}`);
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
@@ -390,102 +437,176 @@ export function CheckoutPageClient() {
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle>Payment Method</CardTitle>
-                {!needsShipping && (
+                <CardTitle>{isFreeCart ? 'Complete Your Order' : 'Payment Method'}</CardTitle>
+                {!needsShipping && !isFreeCart && (
                   <p className="text-sm text-foreground/60 mt-1">
                     No shipping required for your items.
                   </p>
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                {!isAuthenticated && !needsShipping && (
-                  <Input
-                    label="Email"
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    placeholder="your@email.com"
-                  />
-                )}
-
-                {needsName && !needsShipping && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-foreground/60">
-                      {isAuthenticated
-                        ? 'Please add your name — it\'ll be used for personalised digital files and receipts.'
-                        : 'Your name is used for personalised digital files and receipts.'}
+                {/* Guest login gate for free digital products */}
+                {isFreeCart && hasDigital && !isAuthenticated ? (
+                  <div className="text-center py-4 space-y-4">
+                    <p className="text-foreground/70">
+                      Please sign in to claim free digital products. This ensures you can access your downloads at any time from your account.
                     </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input
-                        label="First Name"
-                        type="text"
-                        name="firstName"
-                        value={formData.firstName}
-                        onChange={handleChange}
-                        required
-                        placeholder="Jane"
-                        autoComplete="given-name"
-                      />
-                      <Input
-                        label="Last Name"
-                        type="text"
-                        name="lastName"
-                        value={formData.lastName}
-                        onChange={handleChange}
-                        required
-                        placeholder="Smith"
-                        autoComplete="family-name"
-                      />
+                    <div className="flex gap-3 justify-center">
+                      <Button variant="outline" onClick={() => router.push('/auth/login?redirect=/checkout')}>
+                        Sign In
+                      </Button>
+                      <Button onClick={() => router.push('/auth/register?redirect=/checkout')}>
+                        Create Account
+                      </Button>
                     </div>
                   </div>
-                )}
-
-                <Button
-                  className="w-full justify-start h-auto py-4"
-                  variant="outline"
-                  onClick={() => handlePayment('stripe')}
-                  disabled={isLoading}
-                >
-                  <img src="/stripe-logo.svg" alt="Stripe" className="h-5 mr-4 flex-shrink-0" />
-                  <div className="text-left">
-                    <p className="font-semibold">Credit or Debit Card</p>
-                    <p className="text-sm text-foreground/60 flex items-center gap-1.5 flex-wrap">
-                      Visa, Mastercard, AMEX
-                      <span className="text-foreground/30">·</span>
-                      <span className="inline-flex items-center gap-1">
-                        includes
-                        <img src="/amazon-pay-logo.svg" alt="Amazon Pay" className="h-5 inline-block" />
-                      </span>
+                ) : isFreeCart ? (
+                  <>
+                    {!isAuthenticated && !needsShipping && (
+                      <Input
+                        label="Email"
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="your@email.com"
+                      />
+                    )}
+                    {needsName && !needsShipping && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="First Name"
+                          type="text"
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleChange}
+                          required
+                          placeholder="Jane"
+                          autoComplete="given-name"
+                        />
+                        <Input
+                          label="Last Name"
+                          type="text"
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleChange}
+                          required
+                          placeholder="Smith"
+                          autoComplete="family-name"
+                        />
+                      </div>
+                    )}
+                    <p className="text-sm text-center text-foreground/60">
+                      Your order total is $0.00 — no payment required.
                     </p>
-                  </div>
-                </Button>
+                    <Button
+                      className="w-full"
+                      onClick={handleFreeCheckout}
+                      disabled={isLoading}
+                      isLoading={isLoading}
+                    >
+                      Complete Free Order
+                    </Button>
+                    {needsShipping && (
+                      <Button variant="ghost" className="w-full" onClick={() => setStep('shipping')}>
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Shipping
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {!isAuthenticated && !needsShipping && (
+                      <Input
+                        label="Email"
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                        placeholder="your@email.com"
+                      />
+                    )}
 
-                <Button
-                  className="w-full justify-start h-auto py-4"
-                  variant="outline"
-                  onClick={() => handlePayment('paypal')}
-                  disabled={isLoading}
-                >
-                  <div className="w-6 h-6 mr-4 flex items-center justify-center font-bold text-blue-600">
-                    P
-                  </div>
-                  <div className="text-left">
-                    <p className="font-semibold">PayPal</p>
-                    <p className="text-sm text-foreground/60">Pay with your PayPal account</p>
-                  </div>
-                </Button>
+                    {needsName && !needsShipping && (
+                      <div className="space-y-3">
+                        <p className="text-sm text-foreground/60">
+                          {isAuthenticated
+                            ? 'Please add your name — it\'ll be used for personalised digital files and receipts.'
+                            : 'Your name is used for personalised digital files and receipts.'}
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Input
+                            label="First Name"
+                            type="text"
+                            name="firstName"
+                            value={formData.firstName}
+                            onChange={handleChange}
+                            required
+                            placeholder="Jane"
+                            autoComplete="given-name"
+                          />
+                          <Input
+                            label="Last Name"
+                            type="text"
+                            name="lastName"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                            required
+                            placeholder="Smith"
+                            autoComplete="family-name"
+                          />
+                        </div>
+                      </div>
+                    )}
 
-                {needsShipping && (
-                  <Button
-                    variant="ghost"
-                    className="w-full"
-                    onClick={() => setStep('shipping')}
-                  >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back to Shipping
-                  </Button>
+                    <Button
+                      className="w-full justify-start h-auto py-4"
+                      variant="outline"
+                      onClick={() => handlePayment('stripe')}
+                      disabled={isLoading}
+                    >
+                      <img src="/stripe-logo.svg" alt="Stripe" className="h-5 mr-4 flex-shrink-0" />
+                      <div className="text-left">
+                        <p className="font-semibold">Credit or Debit Card</p>
+                        <p className="text-sm text-foreground/60 flex items-center gap-1.5 flex-wrap">
+                          Visa, Mastercard, AMEX
+                          <span className="text-foreground/30">·</span>
+                          <span className="inline-flex items-center gap-1">
+                            includes
+                            <img src="/amazon-pay-logo.svg" alt="Amazon Pay" className="h-5 inline-block" />
+                          </span>
+                        </p>
+                      </div>
+                    </Button>
+
+                    <Button
+                      className="w-full justify-start h-auto py-4"
+                      variant="outline"
+                      onClick={() => handlePayment('paypal')}
+                      disabled={isLoading}
+                    >
+                      <div className="w-6 h-6 mr-4 flex items-center justify-center font-bold text-blue-600">
+                        P
+                      </div>
+                      <div className="text-left">
+                        <p className="font-semibold">PayPal</p>
+                        <p className="text-sm text-foreground/60">Pay with your PayPal account</p>
+                      </div>
+                    </Button>
+
+                    {needsShipping && (
+                      <Button
+                        variant="ghost"
+                        className="w-full"
+                        onClick={() => setStep('shipping')}
+                      >
+                        <ArrowLeft className="w-4 h-4 mr-2" />
+                        Back to Shipping
+                      </Button>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

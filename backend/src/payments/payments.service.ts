@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
+  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -193,6 +195,68 @@ export class PaymentsService {
       payment_id: capture.id,
       status: capture.status,
     };
+  }
+
+  /**
+   * Complete a zero-total order without payment
+   */
+  async completeFreeOrder(orderId: string, userId?: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { product: true } } },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    // Ownership check — guest orders (no user_id) can be completed by anyone with the order ID
+    if (order.user_id && order.user_id !== userId) {
+      throw new BadRequestException('Access denied');
+    }
+
+    // Verify total is actually zero
+    const total = parseFloat(order.total.toString());
+    if (total > 0) {
+      throw new BadRequestException('Order total is not zero — use a payment provider');
+    }
+
+    // Idempotency: already completed
+    if (order.status === 'processing' || order.status === 'completed') {
+      return { order_id: order.id, order_number: order.order_number };
+    }
+
+    if (order.status !== 'pending') {
+      throw new ConflictException(`Order cannot be completed in status: ${order.status}`);
+    }
+
+    // Free digital products require an authenticated user
+    const hasDigital = order.items.some((item) => item.product.product_type === 'digital');
+    if (hasDigital && !userId) {
+      throw new UnauthorizedException('Log in to claim free digital products');
+    }
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: 'processing',
+        payment_method: 'free',
+        paid_at: new Date(),
+      },
+    });
+
+    this.logger.log(`Free order ${order.order_number} completed`);
+
+    try {
+      await this.digitalProductsService.createDownloadTokensForOrder(orderId);
+    } catch (dlErr) {
+      this.logger.error(`Failed to create download tokens for free order ${orderId}`, dlErr);
+    }
+    this.orderEmailService.sendOrderConfirmation(orderId).catch((e) =>
+      this.logger.error(`Failed to send confirmation email for free order ${orderId}`, e),
+    );
+
+    return { order_id: order.id, order_number: order.order_number };
   }
 
   /**

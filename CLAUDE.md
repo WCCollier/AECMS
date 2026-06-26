@@ -31,87 +31,30 @@ Specific rules:
 
 ## Current Project Status
 
-**Phase 0**: ✅ COMPLETE - Project foundation, Docker, NestJS/Next.js initialized
-**Phase 1**: ✅ COMPLETE - Database schema (30+ models), JWT auth, tests passing
-**Phase 2**: ✅ COMPLETE - Capability-based RBAC (44 capabilities, guards, decorators)
-**Phase 3**: ✅ COMPLETE - Content Management (Media, Categories, Tags, Articles, Pages)
-**Phase 4**: ✅ COMPLETE - Ecommerce Core (Products, Cart, Orders)
-**Phase 5**: ✅ COMPLETE - Payments Module (Stripe, PayPal) - Configured
-**Phase 6**: ✅ COMPLETE - Frontend (Next.js 16, React 19, Tailwind v4)
-**Phase 6B**: ✅ COMPLETE - Comments & AI Moderation (OpenAI + profanity filter)
-**Phase 7**: ✅ COMPLETE - Digital Products (Storage, Email, Downloads, Send to Kindle)
-**Phase 8**: ✅ COMPLETE - Polish & Production (Domain Aliasing, Email Verification)
-**Phase 9**: ✅ COMPLETE - User Testing (Steps 1–8 verified; Steps 9–11 superseded by Phase 13)
-**Phase 13**: ✅ COMPLETE - Full-system QA: Admin CRUD (articles, products, pages), widget system, Stripe sandbox, audit log verified; PayPal E2E, version history restore, order management UI deferred
-**Phase 10A**: ✅ COMPLETE - Widget System: MediaGallery hero carousel, media schema normalization
-**Phase 10B**: ✅ COMPLETE - TipTap JSON migration + inline widget nodes (MediaCarousel, Callout, VideoEmbed, XEmbed)
-**Phase 11**: ✅ COMPLETE - Pages: widget-composed page builder, dual-size widget system, ArticleEmbed/ProductEmbed/RichTextBox
-**Phase 12**: ✅ COMPLETE - Audit trail, transaction logging, content version history
-**Phase 14**: ✅ COMPLETE - Digital item delivery: personalization, downloads, Kindle wizard (2026-06-16)
-**Phase 14 QA fixes** (2026-06-17): order status badge normalization, digital product UX polish, cart 403 fix, SKU/slug uniqueness hardening
-**Phase 14 QA fixes, session 2** (2026-06-17): name field implementation — username at registration, first+last required at checkout
-**Phase 15**: ✅ COMPLETE - Admin Settings: SiteSettings DB table, Internal Secrets Manager (ISM) with pluggable KeyProvider (AES-256-GCM), settings UI (General/Identity/Email/Payment tabs), audit logging (2026-06-17)
-**Phase 16**: ✅ COMPLETE - Navigation menus: /latest→/articles rename, dynamic header nav from DB, catch-all [...slug] route, page hierarchy, admin nav fields (2026-06-17)
-**Phase 17**: ✅ COMPLETE - Alternate domain capture: Next.js middleware 301 redirects from secondary domains; alias_type field for future proxy support (2026-06-17)
-**Phase 18**: ✅ COMPLETE - RSS Feed widget: ExternalFeedsModule backend (Redis cache, SSRF validation), RssFeedWidget component, RssEmbed TipTap node (2026-06-17)
-**Phase 19**: ♻️ MERGED INTO PHASE 21 - See PHASE_19_PLAN.md
-**Phase 20**: ✅ COMPLETE - Themes and templates: 8 curated palettes, 5 font pairings, CSS variable injection in root layout, /admin/settings/appearance backstage UI (2026-06-17)
-**Phase 20 post-fixes** (2026-06-18): pure CSS variable system (globals.css rewrite), instant client-side theme apply, AppearanceClient adminApi fix, Redis URL fix in start-dev.sh
-**Phase 21**: ✅ COMPLETE - Deployability + first live deployment (merged with Phase 19): SEED_PROFILE system, setup wizard, GcpKeyProvider, Dockerfiles, GitHub Actions CI/CD, Cloud Run, content migration, generic distribution prep (2026-06-21)
-**Phase 22**: ✅ COMPLETE - All items A–N (2026-06-21). Key additions: TipTap alignment, Node 22, Next.js 15.3.9 security upgrade, new-owner wizard/Owner's Manual, CSV export, MediaSyncService (TipTap→join table), PageMedia join table, bulk upload/replace/delete, /admin/media (Media Library + Digital Files tabs), /admin/users (role management, user.assign_role-gated)
-**Phase 23**: 🚧 IN PROGRESS (awaiting full QA + deploy) - Mul Converter + Section Background System. Part 1 ✅: section-based page schema, SectionEditor, SectionsLayout renderer (2026-06-21). Part 2 ✅: MulConverterModule (3 endpoints), HTML extraction pipeline, Anthropic/OpenAI/xAI text providers, GPT-Image-1/xAI-Aurora/FLUX/Stability image providers, /admin/mul-converter UI (2026-06-23). Part 3 ✅: true crossfade renderer, full transition vocabulary, gradient overlays, SectionBackgroundPanel (2026-06-23). QA session (2026-06-25): fixed proxy timeout (Next.js proxyTimeout → 3600s), page fetch timeout (10s→30s), Save Both 400 (JSON.stringify + span validation downgraded to warning), capability sync (FR-002), patience hint, API key placeholders, layout preview background badges with color swatches + popovers, page-creation redirect to /edit. System prompt rewrite: sections = single rows, columns = derived sum. PRD: docs/prd/13-mul-converter.md v1.7. Plan: docs/phases/PHASE_23_PLAN.md
+**Phases 0–22**: ✅ ALL COMPLETE — foundation, auth/RBAC, content management (articles, pages, media), ecommerce (products, cart, orders), payments (Stripe + PayPal), frontend (Next.js, Tailwind, Radix, TipTap), digital products + Kindle, domain aliasing + email verification, widget system (inline TipTap nodes: MediaCarousel, Callout, VideoEmbed, XEmbed, SearchResultsEmbed, RssEmbed), page builder (sections/zones, dual-size widgets), audit trail + version history, admin settings + ISM, nav menus, alternate domain capture, RSS widget, themes (8 palettes, 5 font pairings), Cloud Run deployment, Node 22 + Next.js 15 upgrades, media library + bulk upload, CSV export, role manager (UserRole enum removed).
 
-**FR-002**: ✅ DEPLOYED (2026-06-25) - Owner capability sync on login: every Owner backstage login upserts all capabilities from `capability-definitions.ts` and assigns them all to the owner — ensures the owner always holds the full set after upgrades without manual seeding. `seed-minimal.js` also always runs on container start (idempotent). Docs: docs/feature-requests/FR-002-owner-capability-sync.md
-**FR-003**: ✅ COMPLETE (Deploy 2 on main, 2026-06-25) - Role Manager fully migrated. Deploy 1: `roles` table + `role_name` columns. Deploy 2: dropped legacy `role` enum columns from `users` + `role_capabilities`, dropped `UserRole` PostgreSQL enum type; all TypeScript references replaced with `role_name: string`. `UserRole` import removed from all backend files. Docs: docs/feature-requests/FR-003-role-manager.md
-**FR-004**: ✅ DEPLOYED (2026-06-25) - Registration Controls: `general.default_role` setting replaces hardcoded `'member'` at registration; `'admin'`+`'member'` removed from `RESERVED_NAMES`; delete guard reads setting dynamically. `general.require_registration_approval` toggle (Owner-only via `registration.configure`); email-verified users held pending; approvers (`registration.approve`, Owner+Admin default) notified by email on verification; approval panel at `/admin/registrations`; rejection requires reason + soft-deletes; toggle-on backfills `approved_at` for existing verified users. Docs: docs/feature-requests/FR-004-registration-controls.md
-**FR-005**: ✅ DEPLOYED (2026-06-25) - Cloudflare Turnstile CAPTCHA on registration form. Keys (`security.turnstile_site_key` + `security.turnstile_secret_key_enc`) stored in ISM and managed via Settings → General. Site key fetched at runtime via `GET /settings-public/captcha` — no Docker rebuild needed to activate/deactivate. `AuthService.getTurnstileSecret()` reads + decrypts inline via `LocalKeyProvider` to avoid circular module dep. `PATCH /settings/general` now also accepts `security.*` keys. Docs: docs/feature-requests/FR-005-turnstile-captcha.md
-**FR-006**: ✅ COMPLETE (2026-06-26) - Forgot Password / Password Reset: `POST /auth/forgot-password` (enumeration-safe silent no-op on unknown email) + `POST /auth/reset-password` (token + newPassword). Frontend pages at `/auth/forgot-password` and `/auth/reset-password`. Schema fields existed in initial migration. Site name read from ISM via Prisma (avoids circular dep). Docs: docs/feature-requests/FR-006-forgot-password.md
-**FR-007**: ✅ COMPLETE (2026-06-26) - Order Confirmation Emails: new `OrderEmailService` in PaymentsModule; hooked into `handlePaymentSucceeded()` (Stripe webhook) and `capturePayPalPayment()` (PayPal return); fire-and-forget so SMTP failure never blocks order completion; content adapts by product type (digital/physical/service). Docs: docs/feature-requests/FR-007-order-confirmation-emails.md
-**FR-001 Deploy 1**: ✅ LIVE (2026-06-22) - Tag-filtered search: multi-tag AND/OR query params on /articles and /products backends, TagChipStrip with typeahead + ALL/ANY toggle on catalogue pages, bookmarkable URLs (?tags=,?tag_logic=), SearchResultsEmbed TipTap node. Category taxonomy removed: data migration promoted all categories to tags; category display code stripped from all customer-facing pages; tile tag chips clickable; tags above body text on detail pages. Docs: docs/feature-requests/FR-001-tag-search-and-collection-embed.md
-**FR-001 Deploy 2**: ✅ LIVE (2026-06-22) - UnifiedSearchInput component (contenteditable div, inline tag chips, ALL/ANY slide toggle, magnifying-glass/× button), ViewModeToggle relocated above grid with result count, SearchResultsEmbed infinite scroll via zone-trailing detection + displayMode override, category DB tables dropped (categories/article_categories/product_categories), CategoriesModule removed. Docs: docs/feature-requests/FR-001-tag-search-and-collection-embed.md
-**Phase 24A**: 📋 PLANNED - Sales tax: Stripe Tax integration, product tax codes, PayPal flat-rate fallback, tax settings UI, order receipts with tax breakdown, reporting dashboard. Trigger: revenue >$1k or TX Comptroller registration. Plan: docs/phases/PHASE_24_PLAN.md
-**Phase 24B**: 📋 PLANNED - Shipping: flat-rate tiers in Settings, per-product shipping override, cart/checkout shipping line, Stripe `shipping_options`, PayPal breakdown, `order.shipping_amount`. Trigger: first physical product sale. Plan: docs/phases/PHASE_24_PLAN.md
-**Phase 25**: 📋 PLANNED - Cloud SQL → Neon migration: replace Cloud SQL (~$10/mo) with Neon Postgres free tier; one-line deploy.yml change + GCP Secret update; saves ~$10/month at near-zero effort. Plan: docs/phases/PHASE_25_PLAN.md
-**Phase 26**: 📋 PLANNED - SEO toolkit: per-content meta fields, Open Graph, JSON-LD structured data (Book/Article/Person/Service/BreadcrumbList), dynamic sitemap, robots.txt, SEO admin panel, book-specific fields (ISBN, Amazon/Goodreads sameAs). PRD: docs/prd/15-seo-toolkit.md. Plan: docs/phases/PHASE_26_PLAN.md
-**Phase 27**: 📋 PLANNED - Design Library: manual palette creation (10-slot color picker, contrast warnings), page template library (save/browse/create-from-template), export/import (AecmsPalette + AecmsTemplate JSON formats), Mul Converter → save-as-template integration. Community-shareable design artifacts with no platform infrastructure. PRD: docs/prd/16-design-library.md. Plan: docs/phases/PHASE_27_PLAN.md
-**Phase 28**: 📋 PLANNED - Multi-layer section backgrounds: `backgrounds: SectionBackground[]` array per section, independent mode/movement/exit/parallaxRate per layer, PNG transparency compositing over lower layers and subsequent sections, panel accordion UI, Mul Converter multi-layer output. Plan: docs/phases/PHASE_28_PLAN.md
-**Phase 31**: 💡 CONCEPT - Native mobile app: Expo/React Native app that targets any AECMS instance, reads the site manifest, applies the active theme natively, and renders articles/shop/account. Two models: single-site white-label (owner publishes their own app) and multi-site reader. PRD: docs/prd/14-mobile-app.md
+**Phase 23**: ✅ DEPLOYED — Mul Converter + Section Background System. All 3 parts built: (1) section-based page schema, SectionEditor, SectionsLayout renderer; (2) MulConverterModule (3 endpoints), AI providers (Anthropic/OpenAI/xAI text + GPT-Image-1/FLUX/Stability image), /admin/mul-converter UI; (3) true crossfade renderer, full transition vocabulary (none/fixed/fade/wipe-*/slide-up/parallax), gradient overlays, SectionBackgroundPanel. PRD: `docs/prd/13-mul-converter.md` v1.7. Plan: `docs/phases/PHASE_23_PLAN.md`
 
-**Session 2026-06-18 improvements** (not phase-tracked):
-- TipTap link insertion modal (Pages/Articles/Products/URL tabs, new-tab toggle, inline search)
-- Nav header: hover-delay submenu fix, chevron pin/unpin, mobile handled separately
-- RSS widget: Cloudflare proxy fallback via rss2json.com, styled card with header + fade CTA
-- Page editor: drag-and-drop sibling nav reorder (PATCH /pages/reorder, @dnd-kit/sortable)
-- Digital Library: Kindle button now shown for PDF downloads (with warning label)
-- Backstage inactivity timeout: 30 min → 3 hours
-- ISM: consumer wiring (SMTP/Stripe/PayPal lazy reads), favicon upload, homepage mode toggle
-- ESM: GcsStorageProvider, S3StorageProvider, media.service migration, File Storage settings tab
-- Payment test mode removed entirely (was a dev stub; Stripe/PayPal sandbox replaces it)
-- Secrets migrated from .env to ISM via migration script
+**FR-001**: ✅ LIVE — Tag-filtered search, UnifiedSearchInput, category schema drop, SearchResultsEmbed. Docs: `docs/feature-requests/FR-001-tag-search-and-collection-embed.md`
+**FR-002**: ✅ LIVE — Owner capability sync on login. Docs: `docs/feature-requests/FR-002-owner-capability-sync.md`
+**FR-003**: ✅ LIVE — Role Manager: `roles` table, `role_name: string`, `UserRole` enum fully removed. Docs: `docs/feature-requests/FR-003-role-manager.md`
+**FR-004**: ✅ LIVE — Registration Controls: default role, approval gate, /admin/registrations. Docs: `docs/feature-requests/FR-004-registration-controls.md`
+**FR-005**: ✅ LIVE — Cloudflare Turnstile CAPTCHA via ISM (Settings → General). Docs: `docs/feature-requests/FR-005-turnstile-captcha.md`
+**FR-006**: ✅ DEPLOYED — Forgot Password / Password Reset (`/auth/forgot-password`, `/auth/reset-password`). Enumeration-safe. Docs: `docs/feature-requests/FR-006-forgot-password.md`
+**FR-007**: ✅ DEPLOYED — Order Confirmation Emails (`OrderEmailService`, fire-and-forget on Stripe webhook + PayPal capture, adapts by product type). Docs: `docs/feature-requests/FR-007-order-confirmation-emails.md`
+**FR-008**: ✅ DEPLOYED — Free Product Checkout: bypass payment for $0 orders, service products now require shipping address, free digital requires login. Docs: `docs/feature-requests/FR-008-free-products.md`
+**FR-009**: 📋 PLANNED — Member Subscriptions & Syndication: new-article/product email notifications, news broadcast, RSS feed, account Notifications tab. Docs: `docs/feature-requests/FR-009-syndication.md`
+
+**Phase 24A**: 📋 PLANNED — Sales tax. Trigger: revenue >$1k or TX Comptroller registration. Plan: `docs/phases/PHASE_24_PLAN.md`
+**Phase 24B**: 📋 PLANNED — Shipping. Trigger: first physical product sale. Plan: `docs/phases/PHASE_24_PLAN.md`
+**Phase 25**: ✅ DEPLOYED — Cloud SQL → Neon migration. Database now on Neon free tier; Cloud SQL deleted. Plan: `docs/phases/PHASE_25_PLAN.md`
+**Phase 26**: ✅ DEPLOYED — SEO toolkit: generateMetadata on all site routes, JSON-LD (Book/Article/Person/WebSite/BreadcrumbList), /sitemap.xml, /robots.txt, SEO settings tab, per-content SEO panels + snippet preview, book fields (ISBN/format/page count/publisher/Amazon+Goodreads URLs), Owner's Manual ch08. PRD: `docs/prd/15-seo-toolkit.md`. Plan: `docs/phases/PHASE_26_PLAN.md`
+**Phase 27**: 📋 PLANNED — Design Library: manual palettes, page templates, export/import. PRD: `docs/prd/16-design-library.md`. Plan: `docs/phases/PHASE_27_PLAN.md`
+**Phase 28**: 📋 PLANNED — Multi-layer section backgrounds. Plan: `docs/phases/PHASE_28_PLAN.md`
+**Phase 31**: 💡 CONCEPT — Native mobile app. PRD: `docs/prd/14-mobile-app.md`
 
 **Test Status**: 125 frontend + 190 backend unit tests (all passing); 16 backend E2E tests (require Docker)
-**API Endpoints**: 145 total (+7 RolesModule: GET/POST /roles, PATCH/DELETE /roles/:name, GET/PUT /roles/:name/capabilities, GET /roles/:name/members)
-
-## API Endpoint Summary
-
-| Module | Endpoints |
-|--------|-----------|
-| Auth | 7 |
-| Capabilities | 7 |
-| Media | 6 |
-| Categories | 5 |
-| Tags | 5 |
-| Articles | 6 |
-| Pages | 7 |
-| Products | 7 |
-| Cart | 6 |
-| Orders | 7 |
-| Payments | 10 |
-| Comments | 12 |
-| Digital Products | 11 |
-| Kindle | 7 |
-| Domain Aliases | 10 |
-| Roles | 7 |
+**API Modules**: Auth, Capabilities, Media, Tags, Articles, Pages, Products, Cart, Orders, Payments, Comments, Digital Products, Kindle, Domain Aliases, Roles (Categories module removed in FR-001)
 
 ## Key Architecture Decisions
 
@@ -325,9 +268,12 @@ Small, self-contained features that don't constitute major phase-level work live
 - `docs/phases/PHASE_21_COMPLETION_REPORT.md` - Phase 21 completion: wizard, CI/CD, Cloud Run, content migration, distribution prep
 - `docs/phases/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
 - `docs/phases/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
+- `docs/phases/PHASE_23_COMPLETION_REPORT.md` - Phase 23 completion: section schema, SectionEditor, Mul Converter pipeline, image gen, scroll transitions, SectionBackgroundPanel
 - `docs/phases/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, PayPal flat-rate, tax settings, reporting
 - `docs/phases/PHASE_25_PLAN.md` - Cloud SQL → Neon migration: ~$10/mo savings, one-line deploy change
+- `docs/phases/PHASE_25_COMPLETION_REPORT.md` - Phase 25 completion: Cloud SQL → Neon operational migration, cost to $0
 - `docs/phases/PHASE_26_PLAN.md` - SEO toolkit: 11 items, generateMetadata, JSON-LD, sitemap, robots, book fields
+- `docs/phases/PHASE_26_COMPLETION_REPORT.md` - Phase 26 completion: full SEO layer, JSON-LD schemas, sitemap, robots.txt, book fields, Owner's Manual ch08
 - `docs/phases/PHASE_27_PLAN.md` - Design Library: manual palette creation, page templates, export/import, Mul Converter integration
 - `docs/prd/13-mul-converter.md` - Mul Converter PRD: full design spec (access control, data flow, AI provider abstraction, system prompt, custom palette system)
 - `docs/prd/14-mobile-app.md` - Mobile App PRD (Phase 31): Expo/React Native app, discovery manifest, theme mapping, two distribution models, IAP compliance notes
@@ -396,193 +342,8 @@ The ESM is the subsystem that stores, retrieves, and deletes binary files (uploa
 
 **ISM keys** (all under `storage.*` namespace; S3 secret and GCS credentials JSON are `_enc`-suffixed and encrypted at rest). Full key list: `docs/prd/05-security.md` → "External Storage Manager (ESM)" section.
 
-## Phase 5: Payments Integration (✅ CONFIGURED)
+## Payments Architecture Note
 
-**Architecture** (simplified):
-- **Stripe (Primary)**: Cards, Apple Pay, Google Pay, **and Amazon Pay** — all via Stripe Checkout. Amazon Pay is a native Stripe payment method; no separate backend provider is needed.
-- **PayPal (Secondary)**: Alternative payment method for customers who prefer PayPal
+**Amazon Pay**: Do NOT add a separate Amazon Pay provider. Amazon Pay is exposed automatically by Stripe Checkout for eligible customers. A standalone `AmazonPayProvider` was built and then removed after this was discovered.
 
-**Implemented**:
-- ✅ PaymentsModule with provider abstraction pattern
-- ✅ StripeProvider — Stripe Checkout Sessions, webhooks (`checkout.session.completed`)
-- ✅ PayPalProvider — Orders API v2, OAuth2 tokens, capture on return
-- ✅ Test mode (`PAYMENT_TEST_MODE=true`) for development without live API calls
-- ✅ OptionalJwtAuthGuard for guest checkout
-- ✅ `/checkout/success` — PayPal capture-on-return page
-- ✅ `/checkout/cancel` — cancellation page (Stripe + PayPal)
-
-**Configuration Status**:
-- ✅ Stripe sandbox keys configured (via Codespaces Secrets)
-- ✅ PayPal sandbox keys configured (via Codespaces Secrets)
-- ⚠️ `PAYMENT_TEST_MODE=true` in backend `.env` — must be set to `false` for live sandbox testing
-- ⚠️ `STRIPE_WEBHOOK_SECRET=PLACEHOLDER` — must be replaced with real value from `stripe listen`
-
-**To enable live sandbox testing** (one-time setup per Codespace restart):
-```bash
-# 1. Set PAYMENT_TEST_MODE=false in backend/.env
-# 2. Run the Stripe CLI listener in a separate terminal:
-stripe listen --forward-to localhost:4000/payments/webhooks/stripe
-# 3. Copy the whsec_... value it prints to STRIPE_WEBHOOK_SECRET in backend/.env
-# 4. Restart the backend: kill the process and npm run start:dev again
-```
-
-**Do NOT add a separate Amazon Pay provider.** Amazon Pay is exposed automatically by Stripe Checkout for eligible customers. A standalone `AmazonPayProvider` was built and then removed after this was discovered.
-
-**Secrets Management**:
-- Development/Sandbox keys → Codespaces Secrets (current)
-- Production keys → Production environment only (NOT in Codespaces)
-
-## Phase 6: Frontend (✅ COMPLETE)
-
-**Tech Stack**:
-- Next.js 16 with App Router
-- React 19
-- Tailwind CSS v4
-- SWR for data fetching
-- Radix UI primitives
-
-**Implemented**:
-- ✅ API client with token refresh interceptors
-- ✅ Auth context and SWR hooks
-- ✅ UI components (Button, Input, Card)
-- ✅ Layout components (Header, Footer)
-- ✅ Auth pages (login, register)
-- ✅ Shop pages (listing, detail, cart, checkout)
-- ✅ Blog pages (listing, detail)
-- ✅ Admin dashboard (products, articles, orders)
-- ✅ 90 unit tests (Jest + React Testing Library)
-
-## Phase 7: Digital Products (✅ COMPLETE)
-
-**Implemented**:
-- ✅ Storage Provider Abstraction (local filesystem, cloud-ready)
-- ✅ Email Provider Abstraction (console dev, SMTP production)
-- ✅ Digital Products Module (upload, download tokens, personalization)
-- ✅ Send to Kindle Service (device management, file delivery)
-- ✅ 46 new unit tests (121 total backend)
-
-**Configuration**:
-```env
-# Storage
-STORAGE_PROVIDER_TYPE=local
-STORAGE_PATH=/app/uploads
-
-# Email (for Send to Kindle)
-# Development: EMAIL_PROVIDER_TYPE=smtp via Gmail (set SMTP_FROM to your Gmail address + app password in backend/.env)
-# Production: EMAIL_PROVIDER_TYPE=smtp with a dedicated transactional address
-EMAIL_PROVIDER_TYPE=smtp
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_FROM=your-email@gmail.com
-```
-
-**Frontend env** (`frontend/.env.local`):
-```env
-NEXT_PUBLIC_KINDLE_SENDER_EMAIL=your-email@gmail.com  # shown to user in wizard Step 2
-```
-
-## Phase 8: Polish & Production (✅ COMPLETE)
-
-**Implemented**:
-- ✅ Domain Aliasing Module (Owner configurable route-domain mapping)
-- ✅ Email Verification (required for new registrations)
-- ✅ 23 new unit tests (144 total backend)
-
-**Domain Aliasing Features**:
-- DNS TXT record verification for domain ownership
-- Admin UI endpoint for managing aliases
-- Auto-activation on verification
-- Owner-only access
-
-**Email Verification Features**:
-- Verification email sent on registration
-- 24-hour token expiry
-- Resend verification endpoint
-- Login blocked until verified
-
-## Phase 14 QA Fixes (2026-06-17)
-
-**Bugs fixed during operational testing:**
-
-- **Cart 403 on remove/decrement**: `cart.service.ts` `updateItem` and `removeItem` — `userId` now takes priority over `sessionId` in ownership check; sessionId check is skipped when user is authenticated. Old code threw 403 when the cart's stored `session_id` didn't match the header for a logged-in user's cart.
-- **`personalizationEnabled` validation**: FormData sends strings; added `@Transform(({ value }) => value === 'true' || value === true)` before `@IsBoolean()` in `CreateDigitalFileDto` and `UpdateDigitalFileDto`.
-- **Digital file format sync**: After uploading EPUB, the `uploadFormat` state stayed `'epub'` while the dropdown switched to PDF, so the file picker's `accept` filter was wrong. Fixed with `useEffect` that syncs state to first available format.
-- **Digital file slot upsert**: Uploading a second file of the same format now replaces the existing record (resets `personalization_tested`) instead of throwing a conflict. Each existing file row has a Replace button.
-- **New product redirect**: `ProductForm` now pushes to `/admin/products/${res.data.id}` on create so the admin lands on the edit page where Digital Files panel is visible.
-- **DigitalFilesPanel layout**: Moved into `ProductForm`'s `lg:col-span-2` left column via a `mainExtra` prop. Orange border (`border-orange-500/50`) to distinguish it.
-- **Digital product publish gate**: Backend blocks setting `status: published` on a digital product with zero source files (422 Unprocessable Entity).
-- **Order status badge normalization**: `frontend/lib/orderStatus.ts` — single source of truth for all 7 status colors. Used in AdminOrdersClient, admin order detail, AdminDashboardClient, OrderConfirmationClient, AccountPageClient. Removed stale `'paid'` check in dashboard.
-
-**Slug/SKU uniqueness hardening:**
-
-- **Products — soft-delete mangles both fields**: On `remove()`, slug becomes `__DELETED__{ts}__{slug}` and SKU becomes `__DELETED__{ts}__{sku}`, freeing both unique DB slots immediately.
-- **Products — reuse warning**: When `create()` or `update()` uses a slug or SKU that matches a deleted product's mangled value (`endsWith: '__${value}'` among `deleted_at: { not: null }`), the product is saved and a `warnings: string[]` field is included in the response. `ProductForm` shows an `alert()` before redirecting.
-- **Products — uniqueness checks exclude deleted**: All slug/SKU checks in `create()`, `update()`, and `generateUniqueSku()` now use `findFirst({ deleted_at: null })` instead of `findUnique()`.
-- **Articles & pages — slugs permanently reserved**: Slug is NOT mangled on soft-delete. If a new article/page uses a deleted record's slug, a `ConflictException` is thrown with message: *"The slug 'X' belongs to a deleted article/page. Choose a different title, or ask an administrator to restore the original."*
-
-## Name Field Design (implemented 2026-06-17)
-
-**Two distinct identity fields — different lifecycle:**
-
-- **`username`** — public-facing social handle for comments, reviews, and future social features. Required at registration. Stored as `users.username` (unique, nullable for accounts created before this change). Shown with `@` prefix on Account page.
-- **`first_name` + `last_name`** — legal/commercial identity for receipts, personalized files, and shipping. Optional at registration; **required at point of purchase** (prompted at checkout if missing). Back-filled to user record on first purchase so subsequent checkouts are pre-filled.
-
-**Checkout name collection:**
-- **Physical product checkout, guest**: Name fields shown on the Shipping Information step (goes on the package as `shipping_name`).
-- **Digital/service checkout, guest**: Name + email shown on the Payment Method step.
-- **Logged-in user, no name on file**: Name fields shown on the Payment Method step with a note that name is used for personalised files and receipts.
-- **Logged-in user, name already on file**: No name prompt — pre-populated silently.
-
-**Personalization priority chain** (in `digital-products.service.ts` `downloadFile()`):
-1. Explicit `?customerName=` query param (admin/test use)
-2. `order.customer_name` (set at checkout from first+last fields)
-3. User record `first_name + last_name` (fallback for orders before this change)
-4. `order.email` (last resort)
-
-**DB migration**: `20260617200000_add_username_and_order_customer_name`
-- `users.username VARCHAR UNIQUE` (nullable — existing accounts unaffected)
-- `orders.customer_name VARCHAR` (resolved full name stored at checkout time)
-
-**Seeded accounts** (owner, admin, member) have `username = NULL` — they will be prompted for a name on their first purchase.
-
-## Phase 9: User Testing (🔄 IN PROGRESS)
-
-**Goal**: Structured manual QA of the full user journey, fixing bugs as they surface.
-
-**Testing sequence** (see `docs/TESTING_GUIDE.md → Phase 9`):
-1. ✅ Anonymous article browsing (category/tag filtering fixed)
-2. ✅ Anonymous shop browsing (products recovered, service type added, images working)
-3. ✅ Anonymous cart mechanics (NaN price fixed, stock validation added, session ID working)
-4. ✅ Member login + browsing
-5. ✅ Member cart mechanics (anonymous cart merges on login; logout clears display)
-6. ✅ Checkout as member (shipping DTO fixed, order confirmation page built, flow verified)
-7. ✅ Guest checkout
-8. ✅ Admin back door — session bifurcation + 2FA (fully verified)
-9. Admin CRUD — articles
-10. Admin CRUD — products
-11. Admin orders
-
-**Features added during Phase 9**:
-- Service product type (`ProductType.service`, `StockStatus.available/unavailable`, nullable stock)
-- 15 lesson products recovered from WordPress SQL dump + images
-- Sample test product seeded for quantifiable item testing
-- Product feature parity with Articles: `author_id`, `compare_at_price`, comments support
-- Product description renders TipTap HTML; Compare-at Price field in admin form
-- Anonymous cart session ID (`x-session-id`) generated in `localStorage` and auto-injected
-- Infinite scroll / paginated toggle (`ViewModeContext`, `ViewModeToggle`, `useSWRInfinite`)
-- Virtual stock reservation system (`POST /cart/validate`, inline stock errors at 3 touch points)
-- Order confirmation page (`/order-confirmation?order=:id`)
-- Amazon Pay: standalone provider built, then removed — it is natively available through Stripe Checkout
-- API Shape Audit (`docs/Shape_Audit.md`) — 9 items identified and resolved
-- Unified Comment/Review system: `CommentRating` table, `ProductReview` dropped, verified purchase enforcement
-- CartProduct partial type, Cart audit fields (user_id, session_id, created_at, updated_at) retained
-- **Customer/backstage session bifurcation** — see Session Architecture section above
-- 12 customer-scoped capabilities (comment/review/edit/delete + checkout + purchase types) — see capability table in Session Architecture section
-
-**Deferred polish** (will fix as bugs surface during Phase 9):
-- Loading skeletons and toast notifications
-- Stripe Elements card UI (currently stubs via alert)
-- Admin CRUD forms, image upload
-- Responsive design improvements
-- SEO and performance optimization
-- WordPress migration scripts
+**Payment test mode** (`PAYMENT_TEST_MODE`) was removed entirely — use Stripe/PayPal sandbox keys for development testing. For local sandbox testing, run `stripe listen --forward-to localhost:4000/payments/webhooks/stripe` and set the printed `whsec_...` value as `STRIPE_WEBHOOK_SECRET` in `backend/.env`.

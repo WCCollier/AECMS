@@ -2,7 +2,7 @@
 
 **Status:** `deployed`
 **Requested:** 2026-06-26
-**Deployed:** —
+**Deployed:** 2026-06-26
 **Size:** `small` (a few hours — email template, hooks into two payment paths, one test endpoint)
 
 ---

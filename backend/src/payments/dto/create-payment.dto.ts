@@ -2,6 +2,12 @@ import { IsEnum, IsUUID, IsOptional, IsNumber, Min, IsString } from 'class-valid
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
+export class CompleteFreeOrderDto {
+  @ApiProperty({ description: 'Order ID to complete as free' })
+  @IsUUID()
+  order_id: string;
+}
+
 export class CreatePaymentIntentDto {
   @ApiProperty({ description: 'Order ID to create payment for' })
   @IsUUID()

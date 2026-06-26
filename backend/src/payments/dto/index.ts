@@ -1,4 +1,5 @@
 export {
+  CompleteFreeOrderDto,
   CreatePaymentIntentDto,
   CapturePayPalPaymentDto,
   RefundPaymentDto,
