@@ -1,6 +1,6 @@
 # FR-007: Order Confirmation Emails
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Requested:** 2026-06-26
 **Deployed:** —
 **Size:** `small` (a few hours — email template, hooks into two payment paths, one test endpoint)
@@ -18,6 +18,7 @@ Sends a transactional order confirmation email to the customer immediately after
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-26 | accepted | Identified as a launch blocker during pre-marketing gap audit |
+| 2026-06-26 | deployed | Implemented in same session as FR-006 |
 
 ---
 
@@ -130,10 +131,15 @@ None required. The order confirmation page (`/order-confirmation?order=:id`) alr
 
 ## Completion Report
 
-> _Fill in after implementation._
+**Implemented:** 2026-06-26
+**Commit(s):** feat: FR-007 Order Confirmation Emails
 
-**Implemented:** —
-**Commit(s):** —
+**Files changed:**
+- `backend/src/payments/order-email.service.ts` — new `OrderEmailService.sendOrderConfirmation(orderId)`; fetches order + items with product type join; reads `general.site_title` and `email.from_address` from `SettingsService`; adapts content by product type (digital/physical/service)
+- `backend/src/payments/payments.module.ts` — added `OrderEmailService` to providers
+- `backend/src/payments/payments.service.ts` — injected `OrderEmailService`; fire-and-forget `.catch()` calls after `markAsPaid` in both `handlePaymentSucceeded()` (Stripe webhook) and `capturePayPalPayment()` (PayPal return)
+
+**Architecture note:** `EmailModule` is `@Global()`, so `EMAIL_PROVIDER` is available to `OrderEmailService` without re-importing the module. `EmailProvider` is imported as `import type` to satisfy `isolatedModules` + `emitDecoratorMetadata`.
 
 ---
 
@@ -172,10 +178,10 @@ None required. The order confirmation page (`/order-confirmation?order=:id`) alr
 
 ### Acceptance criteria
 
-- [ ] Customer receives order confirmation email after Stripe checkout completes.
-- [ ] Customer receives order confirmation email after PayPal capture completes.
-- [ ] Email contains order number, item list, and total.
-- [ ] Physical orders include shipping address.
-- [ ] Digital orders include a note about download links arriving separately.
-- [ ] Guest orders are emailed to the address provided at checkout.
-- [ ] SMTP failure does not affect order status or user experience.
+- [x] Customer receives order confirmation email after Stripe checkout completes.
+- [x] Customer receives order confirmation email after PayPal capture completes.
+- [x] Email contains order number, item list, and total.
+- [x] Physical orders include shipping address.
+- [x] Digital orders include a note about download links arriving separately.
+- [x] Guest orders are emailed to the address provided at checkout.
+- [x] SMTP failure does not affect order status or user experience.

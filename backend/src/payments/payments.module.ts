@@ -9,6 +9,7 @@ import { DigitalProductsModule } from '../digital-products/digital-products.modu
 import { SettingsModule } from '../settings/settings.module';
 import { StripeProvider } from './providers/stripe.provider';
 import { PayPalProvider } from './providers/paypal.provider';
+import { OrderEmailService } from './order-email.service';
 
 // NOTE: Amazon Pay is NOT a separate provider here. Amazon Pay is natively
 // available as a payment method inside Stripe Checkout — no additional backend
@@ -18,7 +19,7 @@ import { PayPalProvider } from './providers/paypal.provider';
 @Module({
   imports: [PrismaModule, OrdersModule, CapabilitiesModule, DigitalProductsModule, SettingsModule, ScheduleModule.forRoot()],
   controllers: [PaymentsController],
-  providers: [PaymentsService, StripeProvider, PayPalProvider],
+  providers: [PaymentsService, StripeProvider, PayPalProvider, OrderEmailService],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

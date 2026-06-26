@@ -78,3 +78,5 @@ docs/screenshots/
 # Clipboard helper (local copy-paste tool, not for repo)
 docs/CLIPBOARD.md
 FvR_Deployment/
+clipboard.md
+docs/private/

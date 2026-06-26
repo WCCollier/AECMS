@@ -691,6 +691,88 @@ export class AuthService {
     });
   }
 
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: { email, deleted_at: null, email_verified: true },
+    });
+
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { password_reset_token: token, password_reset_expires: expires },
+      });
+
+      await this.sendPasswordResetEmail(user.email, token).catch((e) =>
+        console.error('[auth] forgot-password email failed:', e?.message),
+      );
+    }
+
+    return { message: 'If an account with that email exists, a reset link has been sent.' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        password_reset_token: token,
+        password_reset_expires: { gt: new Date() },
+        deleted_at: null,
+      },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Reset link is invalid or has expired.');
+    }
+
+    const newHash = await this.hashPassword(newPassword);
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        password_hash: newHash,
+        password_reset_token: null,
+        password_reset_expires: null,
+      },
+    });
+
+    return { message: 'Password updated. You can now log in.' };
+  }
+
+  private async sendPasswordResetEmail(email: string, token: string): Promise<void> {
+    const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    const resetUrl = `${appUrl}/auth/reset-password?token=${token}`;
+
+    const siteRow = await this.prisma.siteSettings.findUnique({ where: { key: 'general.site_title' } });
+    const siteName = siteRow?.value ?? 'AECMS';
+
+    await this.emailProvider.send({
+      to: email,
+      subject: `Reset your password — ${siteName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #333;">Reset your password</h1>
+          <p>Someone (hopefully you) requested a password reset for your ${siteName} account.</p>
+          <p>Click the button below to set a new password. This link expires in 1 hour.</p>
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${resetUrl}"
+               style="background-color: #4F46E5; color: white; padding: 12px 24px;
+                      text-decoration: none; border-radius: 6px; display: inline-block;">
+              Reset Password
+            </a>
+          </p>
+          <p>Or copy and paste this link into your browser:</p>
+          <p style="word-break: break-all; color: #666;">${resetUrl}</p>
+          <p style="color: #999; font-size: 12px; margin-top: 30px;">
+            If you didn't request this, you can safely ignore this email — your password won't change.
+          </p>
+        </div>
+      `,
+      text: `Reset your password — ${siteName}\n\nClick the link below to set a new password. This link expires in 1 hour.\n\n${resetUrl}\n\nIf you didn't request this, you can safely ignore this email.`,
+    });
+  }
+
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');

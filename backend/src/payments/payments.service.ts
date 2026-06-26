@@ -18,6 +18,7 @@ import {
 } from './dto';
 import { PaymentProvider, WebhookEvent } from './providers/payment-provider.interface';
 import { AuditLogService } from '../audit/audit.service';
+import { OrderEmailService } from './order-email.service';
 
 @Injectable()
 export class PaymentsService {
@@ -32,6 +33,7 @@ export class PaymentsService {
     private stripeProvider: StripeProvider,
     private paypalProvider: PayPalProvider,
     private auditLog: AuditLogService,
+    private orderEmailService: OrderEmailService,
   ) {
     this.providers = new Map();
     this.providers.set('stripe', stripeProvider);
@@ -180,6 +182,9 @@ export class PaymentsService {
       } catch (dlErr) {
         this.logger.error(`Failed to create download tokens for order ${order.id}`, dlErr);
       }
+      this.orderEmailService.sendOrderConfirmation(order.id).catch((e) =>
+        this.logger.error(`Failed to send order confirmation email for ${order.id}`, e),
+      );
     }
 
     return {
@@ -369,6 +374,10 @@ export class PaymentsService {
       } catch (dlErr) {
         this.logger.error(`Failed to create download tokens for order ${orderId}`, dlErr);
       }
+      // Send order confirmation email (failure must never block the webhook response)
+      this.orderEmailService.sendOrderConfirmation(orderId).catch((e) =>
+        this.logger.error(`Failed to send order confirmation email for ${orderId}`, e),
+      );
     } catch (error) {
       this.logger.error(`Failed to mark order ${orderId} as paid`, error);
     }

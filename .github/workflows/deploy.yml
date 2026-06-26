@@ -127,7 +127,6 @@ jobs:
             --region ${{ env.REGION }} \
             --project ${{ env.GCP_PROJECT }} \
             --service-account "aecms-backend@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
-            --add-cloudsql-instances "${{ env.GCP_PROJECT_ID }}:${{ env.REGION }}:aecms-db" \
             --set-secrets "DATABASE_URL=aecms-database-url:latest,JWT_SECRET=aecms-jwt-secret:latest,REDIS_URL=aecms-redis-url:latest" \
             --set-env-vars "NODE_ENV=production,SETTINGS_KMS_PROVIDER=gcp,GCP_PROJECT_ID=${{ env.GCP_PROJECT_ID }},SETTINGS_KMS_SECRET_ID=${{ vars.SETTINGS_KMS_SECRET_ID || 'aecms-sek' }},STORAGE_PROVIDER_TYPE=gcs,GCS_BUCKET_MEDIA=${{ vars.GCS_MEDIA_BUCKET }},GCS_BUCKET_DIGITAL=${{ vars.GCS_DIGITAL_BUCKET }},APP_URL=https://${{ vars.APP_DOMAIN }},FRONTEND_URL=https://${{ vars.APP_DOMAIN }},API_URL=https://${{ vars.APP_DOMAIN }},FRONTEND_ADMIN_URL=https://${{ vars.APP_DOMAIN }}/admin,EMAIL_PROVIDER_TYPE=smtp,JWT_EXPIRATION=15m,REFRESH_TOKEN_EXPIRATION=7d" \
             --platform managed \
