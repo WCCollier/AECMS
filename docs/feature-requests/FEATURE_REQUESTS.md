@@ -12,7 +12,6 @@ Small, self-contained features that don't constitute major phase-level work. One
 
 | ID | Size | Status | Description |
 |----|------|--------|-------------|
-| [FR-012](FR-012-media-picker-for-logo-and-favicon.md) | small | deployed | Media Picker for Logo & Favicon — replace text input + bespoke upload with `ImageField` picker; fixes favicon cloud-storage bug |
 | [FR-010](FR-010-pii-encryption.md) | medium | accepted | PII Encryption at Rest — `EncryptionService`, encrypted `UserAddress`, backfill for existing plaintext PII; paired with Phase 24 |
 | [FR-011](FR-011-resend-broadcast-integration.md) | medium | accepted | Resend Broadcast Integration — article/product/admin broadcasts via Resend Broadcast API + Topics; SMTP loop fallback when unset |
 
@@ -20,6 +19,7 @@ Small, self-contained features that don't constitute major phase-level work. One
 
 | ID | Size | Description |
 |----|------|-------------|
+| [FR-012](FR-012-media-picker-for-logo-and-favicon.md) | small | Media Picker for Logo & Favicon — replace text input + bespoke upload with `ImageField` picker; fixes favicon cloud-storage bug |
 | [FR-009](FR-009-syndication.md) | large | Member Subscriptions & Syndication — opt-in email notifications, admin broadcast, RSS feed, unsubscribe page |
 | [FR-008](FR-008-free-products.md) | small | Free Product Checkout — bypass payment for $0 orders; service products require shipping address |
 | [FR-007](FR-007-order-confirmation-emails.md) | small | Order Confirmation Emails — fire-and-forget on Stripe webhook + PayPal capture |

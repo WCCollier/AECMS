@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { GripVertical, Plus, Trash2, CopyPlus, Layers, Minus, Sun, Moon, AlignStartVertical, AlignCenterVertical, AlignEndVertical, Maximize2, Eye, EyeOff, Lock } from 'lucide-react';
+import { GripVertical, Plus, Trash2, CopyPlus, Layers, Minus, Sun, Moon, AlignStartHorizontal, AlignCenterHorizontal, AlignEndHorizontal, Maximize2, Eye, EyeOff, Lock } from 'lucide-react';
 import { TipTapEditor } from '@/components/editor/TipTapEditor';
 import { WidgetSizeProvider } from '@/contexts/WidgetSizeContext';
 import { SectionBackgroundPanel } from '@/components/admin/SectionBackgroundPanel';
@@ -463,9 +463,9 @@ export function SectionEditor({
 
                 {/* Vertical alignment */}
                 {([
-                  { value: 'start'  as ZoneAlign, icon: <AlignStartVertical  className="w-3 h-3" />, title: 'Align content to top of row' },
-                  { value: 'center' as ZoneAlign, icon: <AlignCenterVertical className="w-3 h-3" />, title: 'Center content vertically in row' },
-                  { value: 'end'    as ZoneAlign, icon: <AlignEndVertical    className="w-3 h-3" />, title: 'Align content to bottom of row' },
+                  { value: 'start'  as ZoneAlign, icon: <AlignStartHorizontal  className="w-3 h-3" />, title: 'Align content to top of row' },
+                  { value: 'center' as ZoneAlign, icon: <AlignCenterHorizontal className="w-3 h-3" />, title: 'Center content vertically in row' },
+                  { value: 'end'    as ZoneAlign, icon: <AlignEndHorizontal    className="w-3 h-3" />, title: 'Align content to bottom of row' },
                 ] as const).map(opt => (
                   <button
                     key={opt.value}
