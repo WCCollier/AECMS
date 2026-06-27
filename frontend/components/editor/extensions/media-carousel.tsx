@@ -5,7 +5,6 @@ import type { NodeViewProps } from '@tiptap/react';
 import { MediaGallery } from '@/components/widgets/MediaGallery/MediaGallery';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { Pencil, Trash2, Plus, Star, StarOff, Trash, ChevronUp, ChevronDown } from 'lucide-react';
-import Image from 'next/image';
 import type { MediaItem } from '@/types';
 import { conditionalDisplayAttribute, showWhenBadge, SHOW_WHEN_OPTIONS, SHOW_WHEN_LABELS } from './conditionalDisplay';
 import type { ShowWhen } from './conditionalDisplay';
@@ -99,8 +98,8 @@ function CarouselPanel({
                 e.isPrimary ? 'border-foreground/40 bg-foreground/5' : 'border-foreground/15'
               }`}
             >
-              <div className="relative w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-foreground/10">
-                <Image src={e.url} alt={e.alt_text || ''} fill className="object-cover" sizes="40px" />
+              <div className="w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-foreground/10">
+                <img src={e.url} alt={e.alt_text || ''} className="w-full h-full object-cover" />
               </div>
               <span className="flex-1 min-w-0 text-xs text-foreground/60 truncate">{e.url.split('/').pop()}</span>
               <div className="flex items-center gap-0.5 flex-shrink-0">

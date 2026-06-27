@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { Button } from '@/components/ui';
 import { MediaPicker } from '@/components/admin/MediaPicker';
 import { Star, StarOff, Trash2, Plus, ChevronUp, ChevronDown } from 'lucide-react';
@@ -72,8 +71,8 @@ export function MediaGalleryField({ value, onChange }: MediaGalleryFieldProps) {
                 entry.isPrimary ? 'border-foreground/40 bg-foreground/5' : 'border-foreground/15'
               }`}
             >
-              <div className="relative w-14 h-14 flex-shrink-0 rounded overflow-hidden bg-foreground/10">
-                <Image src={entry.url} alt="" fill className="object-cover" sizes="56px" />
+              <div className="w-14 h-14 flex-shrink-0 rounded overflow-hidden bg-foreground/10">
+                <img src={entry.url} alt="" className="w-full h-full object-cover" />
               </div>
 
               <div className="flex-1 min-w-0">
