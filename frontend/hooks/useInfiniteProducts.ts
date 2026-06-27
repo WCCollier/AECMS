@@ -7,11 +7,13 @@ interface Options {
   search?: string;
   tags?: string[];
   tagLogic?: 'and' | 'or';
+  excludeTags?: string[];
+  excludeTagLogic?: 'any' | 'all';
 }
 
 const LIMIT = 12;
 
-export function useInfiniteProducts({ limit = LIMIT, search, tags, tagLogic }: Options = {}) {
+export function useInfiniteProducts({ limit = LIMIT, search, tags, tagLogic, excludeTags, excludeTagLogic }: Options = {}) {
   const getKey = (pageIndex: number, previousData: PaginatedResponse<Product> | null) => {
     if (previousData) {
       const meta = previousData.meta ?? previousData;
@@ -27,6 +29,10 @@ export function useInfiniteProducts({ limit = LIMIT, search, tags, tagLogic }: O
     if (tags && tags.length > 0) {
       params.set('tags', tags.join(','));
       if (tagLogic === 'or') params.set('tag_logic', 'or');
+    }
+    if (excludeTags && excludeTags.length > 0) {
+      params.set('exclude_tags', excludeTags.join(','));
+      if (excludeTagLogic === 'all') params.set('exclude_tag_logic', 'all');
     }
     return `/products?${params.toString()}`;
   };

@@ -86,6 +86,8 @@ async function main() {
     // Digital Delivery (Admin by default; separate from product editing)
     { name: 'digital.deliver',     category: 'ecommerce', scope: 'backstage', description: 'Manage digital delivery — extend/regenerate download tokens, create admin grants' },
 
+    // Tag Management
+    { name: 'tag.edit',            category: 'content',   scope: 'backstage', description: 'Create, rename, delete, and bulk-assign tags' },
     // Customer-facing: comment & review actions (scope:'customer' — no backstage required)
     { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
     { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
@@ -229,6 +231,7 @@ async function main() {
     'comment.delete',
     'review.moderate',
     'digital.deliver',
+    'tag.edit',
   ];
 
   async function assignCapsToRole(roleName: string, capNames: string[]) {

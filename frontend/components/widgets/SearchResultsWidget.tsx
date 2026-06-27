@@ -8,6 +8,10 @@ import { useInfiniteArticles } from '@/hooks/useInfiniteArticles';
 import { useInfiniteProducts } from '@/hooks/useInfiniteProducts';
 import { ArticleCard } from '@/components/blog/ArticleCard';
 import { ProductCard } from '@/components/shop/ProductCard';
+import { ArticlePreviewPane } from '@/components/widgets/SearchResultsEmbed/ArticlePreviewPane';
+import { ArticleFullEmbed } from '@/components/widgets/SearchResultsEmbed/ArticleFullEmbed';
+import { ProductPreviewPane } from '@/components/widgets/SearchResultsEmbed/ProductPreviewPane';
+import { ProductFullEmbed } from '@/components/widgets/SearchResultsEmbed/ProductFullEmbed';
 import { Button } from '@/components/ui';
 import { ChevronRight } from 'lucide-react';
 
@@ -15,12 +19,16 @@ export interface SearchResultsWidgetProps {
   contentType: 'articles' | 'products';
   tags: string[];
   tagLogic: 'and' | 'or';
+  excludeTags?: string[];
+  excludeTagLogic?: 'any' | 'all';
   search: string;
-  display: 'grid' | 'list';
+  display: 'grid' | 'list' | 'preview' | 'full';
   pageSize: number;
   title: string;
   /** When true the widget can expand infinitely; false = always paginated */
   allowInfiniteScroll?: boolean;
+  /** Recursion depth — passed down so embedded RichTextContent can skip nested embeds */
+  depth?: number;
 }
 
 function buildSeeAllUrl(contentType: 'articles' | 'products', tags: string[], tagLogic: 'and' | 'or', search: string) {
@@ -39,17 +47,22 @@ export function SearchResultsWidget({
   contentType,
   tags,
   tagLogic,
+  excludeTags = [],
+  excludeTagLogic = 'any',
   search,
   display,
   pageSize,
   title,
   allowInfiniteScroll = false,
+  depth = 0,
 }: SearchResultsWidgetProps) {
   // Viewer-togglable: start in infinite mode when allowed, paginated otherwise
   const [viewerMode, setViewerMode] = useState<'infinite' | 'paginated'>(
     allowInfiniteScroll ? 'infinite' : 'paginated',
   );
   const [page, setPage] = useState(1);
+
+  const isInlineDisplay = display === 'preview' || display === 'full';
 
   // Sync viewer mode when prop changes (e.g. embed config update)
   useEffect(() => {
@@ -60,24 +73,24 @@ export function SearchResultsWidget({
   // ── Paginated queries ─────────────────────────────────────────────────────
   const articlePagedQuery = useArticles(
     contentType === 'articles' && viewerMode === 'paginated'
-      ? { page, limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
+      ? { page, limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, excludeTags: excludeTags.length > 0 ? excludeTags : undefined, excludeTagLogic, search: search || undefined }
       : { limit: 0 },
   );
   const productPagedQuery = useProducts(
     contentType === 'products' && viewerMode === 'paginated'
-      ? { page, limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
+      ? { page, limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, excludeTags: excludeTags.length > 0 ? excludeTags : undefined, excludeTagLogic, search: search || undefined }
       : { limit: 0 },
   );
 
   // ── Infinite queries ──────────────────────────────────────────────────────
   const articleInfiniteQuery = useInfiniteArticles(
     contentType === 'articles' && viewerMode === 'infinite'
-      ? { limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
+      ? { limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, excludeTags: excludeTags.length > 0 ? excludeTags : undefined, excludeTagLogic, search: search || undefined }
       : { limit: 0 },
   );
   const productInfiniteQuery = useInfiniteProducts(
     contentType === 'products' && viewerMode === 'infinite'
-      ? { limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, search: search || undefined }
+      ? { limit: pageSize, tags: tags.length > 0 ? tags : undefined, tagLogic, excludeTags: excludeTags.length > 0 ? excludeTags : undefined, excludeTagLogic, search: search || undefined }
       : { limit: 0 },
   );
 
@@ -126,6 +139,60 @@ export function SearchResultsWidget({
       ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'
       : 'flex flex-col gap-3';
 
+  // ── Inline (preview / full) renderers ─────────────────────────────────────
+  if (!isLoading && isInlineDisplay) {
+    if (!hasResults) {
+      return <p className="text-sm text-foreground/50 py-6 text-center">No results found.</p>;
+    }
+
+    return (
+      <div className="my-4">
+        {title && <h3 className="text-lg font-semibold mb-4">{title}</h3>}
+        {contentType === 'articles'
+          ? articles.map((a) =>
+              display === 'preview'
+                ? <ArticlePreviewPane key={a.id} article={a} depth={depth} />
+                : <ArticleFullEmbed key={a.id} article={a} depth={depth} />
+            )
+          : products.map((p) =>
+              display === 'preview'
+                ? <ProductPreviewPane key={p.id} product={p} depth={depth} />
+                : <ProductFullEmbed key={p.id} product={p} depth={depth} />
+            )}
+
+        {/* Paginated controls for inline display */}
+        {viewerMode === 'paginated' && totalPages > 1 && (
+          <div className="flex justify-center gap-2 mt-4">
+            <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
+              Previous
+            </Button>
+            <span className="flex items-center px-3 text-sm text-foreground/60">
+              {page} / {totalPages}
+            </span>
+            <Button variant="outline" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+              Next
+            </Button>
+          </div>
+        )}
+
+        {viewerMode === 'infinite' && (
+          <div className="mt-4 flex flex-col items-center gap-3">
+            {infiniteQuery.isFetchingMore && (
+              <div className="flex gap-1.5">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="w-2 h-2 rounded-full bg-foreground/40 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
+            )}
+            {!infiniteQuery.hasMore && <p className="text-sm text-foreground/40">You&apos;ve seen everything</p>}
+            <div ref={sentinelRef} className="h-1" />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Card (grid / list) renderer ───────────────────────────────────────────
   return (
     <div className="my-4">
       {/* Header row: title + viewer mode toggle */}

@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Tag } from '@prisma/client';
@@ -48,7 +47,7 @@ export class TagsService {
           select: { article_id: true },
         },
         _count: {
-          select: { articles: true },
+          select: { articles: true, products: true },
         },
       },
     });
@@ -123,26 +122,40 @@ export class TagsService {
    * Remove a tag
    */
   async remove(id: string): Promise<void> {
-    const tag = await this.prisma.tag.findUnique({
-      where: { id },
-      include: {
-        articles: true,
-      },
-    });
+    const tag = await this.prisma.tag.findUnique({ where: { id } });
 
     if (!tag) {
       throw new NotFoundException('Tag not found');
     }
 
-    // Check if tag has articles
-    if (tag.articles.length > 0) {
-      throw new BadRequestException(
-        'Cannot delete tag with associated articles. Remove articles from this tag first.',
-      );
-    }
+    // DB cascade (onDelete: Cascade on ArticleTag + ProductTag) removes all associations.
+    await this.prisma.tag.delete({ where: { id } });
+  }
 
-    await this.prisma.tag.delete({
-      where: { id },
+  async bulkAssign(tagId: string, articleIds: string[], productIds: string[]): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      if (articleIds.length) {
+        await Promise.all(
+          articleIds.map((aid) =>
+            tx.articleTag.upsert({
+              where: { article_id_tag_id: { article_id: aid, tag_id: tagId } },
+              create: { article_id: aid, tag_id: tagId },
+              update: {},
+            }),
+          ),
+        );
+      }
+      if (productIds.length) {
+        await Promise.all(
+          productIds.map((pid) =>
+            tx.productTag.upsert({
+              where: { product_id_tag_id: { product_id: pid, tag_id: tagId } },
+              create: { product_id: pid, tag_id: tagId },
+              update: {},
+            }),
+          ),
+        );
+      }
     });
   }
 

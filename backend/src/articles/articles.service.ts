@@ -126,6 +126,7 @@ export class ArticlesService {
   ) {
     const {
       status, visibility, tag_id, tag, tags, tag_logic,
+      exclude_tags, exclude_tag_logic,
       author_id, search, page = 1, limit = 20,
       sort_by = 'created_at', sort_order = 'desc',
       include_deleted,
@@ -176,6 +177,19 @@ export class ArticlesService {
       where.tags = { some: { tag_id } };
     } else if (tag) {
       where.tags = { some: { tag: { slug: tag } } };
+    }
+
+    if (exclude_tags) {
+      const excludeSlugs = exclude_tags.split(',').map((s) => s.trim()).filter(Boolean);
+      if (excludeSlugs.length > 0) {
+        if (exclude_tag_logic === 'all') {
+          where.NOT = {
+            AND: excludeSlugs.map((slug) => ({ tags: { some: { tag: { slug } } } })),
+          };
+        } else {
+          where.NOT = { tags: { some: { tag: { slug: { in: excludeSlugs } } } } };
+        }
+      }
     }
 
     if (author_id) where.author_id = author_id;

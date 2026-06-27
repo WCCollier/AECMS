@@ -68,8 +68,11 @@ export function getEditorExtensions() {
   return baseExtensions;
 }
 
-/** Extensions for the read-only display (links open on click) */
-export function getDisplayExtensions() {
+/** Extensions for the read-only display (links open on click).
+ *  Pass depth > 0 when rendering inside an embedded full/preview pane
+ *  so nested SearchResultsEmbed nodes render a placeholder instead of recursing. */
+export function getDisplayExtensions(opts?: { depth?: number }) {
+  const depth = opts?.depth ?? 0;
   return [
     StarterKit.configure({ heading: { levels: [1, 2, 3] }, link: false }),
     TextAlign.configure({ types: TEXT_ALIGN_TYPES, alignments: ['left', 'center', 'right', 'justify'] }),
@@ -93,6 +96,6 @@ export function getDisplayExtensions() {
     ArticleEmbedNode,
     ProductEmbedNode,
     RssEmbedNode,
-    SearchResultsEmbedNode,
+    SearchResultsEmbedNode.configure({ depth }),
   ];
 }

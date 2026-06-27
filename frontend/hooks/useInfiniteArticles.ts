@@ -8,11 +8,13 @@ interface Options {
   tag?: string;
   tags?: string[];
   tagLogic?: 'and' | 'or';
+  excludeTags?: string[];
+  excludeTagLogic?: 'any' | 'all';
 }
 
 const LIMIT = 9;
 
-export function useInfiniteArticles({ limit = LIMIT, search, tag, tags, tagLogic }: Options = {}) {
+export function useInfiniteArticles({ limit = LIMIT, search, tag, tags, tagLogic, excludeTags, excludeTagLogic }: Options = {}) {
   const getKey = (pageIndex: number, previousData: PaginatedResponse<Article> | null) => {
     if (previousData) {
       const meta = previousData.meta ?? previousData;
@@ -30,6 +32,10 @@ export function useInfiniteArticles({ limit = LIMIT, search, tag, tags, tagLogic
       if (tagLogic === 'or') params.set('tag_logic', 'or');
     } else if (tag) {
       params.set('tag', tag);
+    }
+    if (excludeTags && excludeTags.length > 0) {
+      params.set('exclude_tags', excludeTags.join(','));
+      if (excludeTagLogic === 'all') params.set('exclude_tag_logic', 'all');
     }
     return `/articles?${params.toString()}`;
   };

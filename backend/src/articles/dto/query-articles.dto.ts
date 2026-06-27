@@ -83,4 +83,14 @@ export class QueryArticlesDto {
   @IsBoolean()
   @IsOptional()
   include_deleted?: boolean;
+
+  @ApiPropertyOptional({ description: 'Exclude articles with these tag slugs (comma-separated)' })
+  @IsString()
+  @IsOptional()
+  exclude_tags?: string;
+
+  @ApiPropertyOptional({ description: 'Exclusion logic: any (default) or all', enum: ['any', 'all'] })
+  @IsEnum(['any', 'all'])
+  @IsOptional()
+  exclude_tag_logic?: 'any' | 'all';
 }
