@@ -12,9 +12,16 @@ const TipTapEditor = dynamic(
 );
 import { MediaGalleryField } from '@/components/widgets';
 import type { GalleryEntry } from '@/components/widgets';
+import { TagField } from '@/components/admin/TagField';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 import type { MediaItem } from '@/types';
+
+interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 interface ArticleFormData {
   title: string;
@@ -30,7 +37,7 @@ interface ArticleFormData {
 
 interface ArticleFormProps {
   articleId?: string;
-  initialData?: Partial<ArticleFormData & { media?: MediaItem[] }>;
+  initialData?: Partial<ArticleFormData & { media?: MediaItem[]; tags?: Tag[] }>;
   onSaved?: () => void;
 }
 
@@ -47,6 +54,7 @@ export function ArticleForm({ articleId, initialData, onSaved }: ArticleFormProp
   const [error, setError] = useState<string | null>(null);
   const [content, setContent] = useState(initialData?.content || '');
   const [gallery, setGallery] = useState<GalleryEntry[]>(() => toGalleryEntries(initialData?.media));
+  const [tags, setTags] = useState<Tag[]>(() => initialData?.tags ?? []);
   const [isDirtyExtra, setIsDirtyExtra] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -96,6 +104,7 @@ export function ArticleForm({ articleId, initialData, onSaved }: ArticleFormProp
         ...data,
         content,
         media_ids: gallery.map((e) => e.mediaId),
+        tag_ids: tags.map((t) => t.id),
       };
 
       if (articleId) {
@@ -239,6 +248,21 @@ export function ArticleForm({ articleId, initialData, onSaved }: ArticleFormProp
                   {isLoading ? 'Saving...' : saved ? 'Saved ✓' : articleId ? 'Save Changes' : 'Create'}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tags</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-foreground/50 mb-3">
+                Tags are used for filtering and categorisation. Select existing tags or type to create a new one.
+              </p>
+              <TagField
+                value={tags}
+                onChange={(t) => { setTags(t); setIsDirtyExtra(true); }}
+              />
             </CardContent>
           </Card>
 

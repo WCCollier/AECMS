@@ -12,6 +12,7 @@ Small, self-contained features that don't constitute major phase-level work. One
 
 | ID | Size | Status | Description |
 |----|------|--------|-------------|
+| [FR-013](FR-013-x-timeline-tiptap-widget.md) | medium | accepted | X Account Timeline Widget — TipTap block node fetching latest N posts via X API v2; ISM bearer token; Redis cache; first-use inline setup |
 | [FR-010](FR-010-pii-encryption.md) | medium | accepted | PII Encryption at Rest — `EncryptionService`, encrypted `UserAddress`, backfill for existing plaintext PII; paired with Phase 24 |
 | [FR-011](FR-011-resend-broadcast-integration.md) | medium | accepted | Resend Broadcast Integration — article/product/admin broadcasts via Resend Broadcast API + Topics; SMTP loop fallback when unset |
 
