@@ -12,6 +12,7 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
+| [BUG-007](BUG-007-tag-assign-modal-always-empty.md) | high | backstage, tags | Tag Assign modal shows "All already tagged" for every tag — `limit=1000` exceeds `@Max(100)` DTO constraint, silent `.catch` hides the 400, `articles=[]` and `products=[]` for every call |
 | [BUG-006](BUG-006-gallery-field-broken-thumbnails-and-tiptap-image-no-library.md) | critical/medium | media, frontend, editor | (A) No `images.remotePatterns` in next.config.mjs — Next.js `<Image>` silently blocks all cloud storage URLs; breaks article/product cards, detail carousels, embed widgets, and admin gallery thumbnails site-wide. (B) TipTap image insert has no media library browser. |
 | [BUG-001](BUG-001-2fa-session-expired-no-redirect.md) | medium | auth | Session-expired error on 2FA page doesn't redirect back to login |
 | [BUG-002](BUG-002-mul-converter-palette-saved-multiple-times.md) | medium | mul-converter | Save buttons re-enable after `done`, allowing duplicate palette entries |
