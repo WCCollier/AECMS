@@ -1,6 +1,6 @@
 # FR-014: Tag Editor
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Size:** `medium`
 **Area:** backstage, tags, articles, products
 
@@ -260,13 +260,11 @@ frontend/app/admin/layout.tsx                   — add Tags nav entry
 
 ## Completion Report
 
-> _Fill in after deployed._
-
-**Deployed:** YYYY-MM-DD
-**Commit(s):** `abc1234`
+**Deployed:** 2026-06-27
+**Commit(s):** `3916511`
 
 ### What changed
-_Summary of the actual implementation, noting any deviations from the plan above._
+Implemented exactly as planned with one minor deviation: `TagChipStrip` does not accept custom `anyLabel`/`allLabel` props, so the exclusion strip uses the existing AND/OR toggle with a helper text note below it explaining the semantics. All four operations (create, rename/re-slug, delete with cascade, bulk-assign) work. The delete confirmation row renders inline below the tag row showing exact article + product counts. The assign modal fetches published articles and products at ≤1000 limit, derives already-tagged items client-side, and uses idempotent upserts on the backend.
 
 ---
 
@@ -291,3 +289,4 @@ _Summary of the actual implementation, noting any deviations from the plan above
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-27 | accepted | Initial write-up |
+| 2026-06-27 | deployed | Built and shipped in commit 3916511 |

@@ -1,6 +1,6 @@
 # FR-015: Collection Embed — preview/full display modes and tag exclusion filter
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Size:** `medium`
 **Area:** page-editor, widgets, articles, products, backend
 
@@ -228,13 +228,11 @@ frontend/components/widgets/SearchResultsEmbed/ProductFullEmbed.tsx      — new
 
 ## Completion Report
 
-> _Fill in after deployed._
-
-**Deployed:** YYYY-MM-DD
-**Commit(s):** `abc1234`
+**Deployed:** 2026-06-27
+**Commit(s):** `3916511`
 
 ### What changed
-_Summary of the actual implementation, noting any deviations from the plan above._
+Implemented as planned. Key implementation notes: (1) `getDisplayExtensions()` now accepts `{ depth?: number }` and passes it to `SearchResultsEmbedNode.configure({ depth })`; the node view reads `extension.options.depth` to decide placeholder vs live widget. (2) The exclusion TagChipStrip maps `excludeTagLogic: 'any'` → `tagLogic: 'or'` and `'all'` → `'and'` since TagChipStrip uses the inclusion-side terminology. (3) Preview/full display modes use `100dvh` via inline style (Tailwind doesn't ship dvh utilities without config). (4) Loading skeleton is not shown for inline display modes to avoid height flicker — they render after data is available. All tags on Article/Product objects are flattened `Tag[]` (not junction objects) per the existing backend transform.
 
 ---
 
@@ -258,3 +256,4 @@ _Summary of the actual implementation, noting any deviations from the plan above
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-27 | accepted | Initial write-up |
+| 2026-06-27 | deployed | Built and shipped in commit 3916511 |
