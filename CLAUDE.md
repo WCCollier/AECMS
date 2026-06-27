@@ -44,6 +44,8 @@ Specific rules:
 **FR-007**: ✅ DEPLOYED — Order Confirmation Emails (`OrderEmailService`, fire-and-forget on Stripe webhook + PayPal capture, adapts by product type). Docs: `docs/feature-requests/FR-007-order-confirmation-emails.md`
 **FR-008**: ✅ DEPLOYED — Free Product Checkout: bypass payment for $0 orders, service products now require shipping address, free digital requires login. Docs: `docs/feature-requests/FR-008-free-products.md`
 **FR-009**: ✅ DEPLOYED — Member Subscriptions & Syndication: opt-in email notifications for articles/products/news, admin broadcast tool, RSS feed at `/feed.xml`, account Notifications tab, unsubscribe page, default subscription ISM settings. Docs: `docs/feature-requests/FR-009-syndication.md`
+**FR-010**: 📋 ACCEPTED — PII Encryption at Rest: `EncryptionService` (shared AES-256-GCM wrapper), `UserAddress` encrypted from day one, backfill for existing plaintext PII (`totp_secret`, OAuth tokens, order shipping fields, user names, IP hashing). Paired with Phase 24. Docs: `docs/feature-requests/FR-010-pii-encryption.md`
+**FR-011**: 📋 ACCEPTED — Resend Broadcast Integration: article/product/admin notifications routed to Resend Broadcast API + Topics when `email.broadcast_provider = 'resend'`; SMTP loop fallback when unset; bidirectional contact/topic sync; webhook for inbound unsubscribes. Docs: `docs/feature-requests/FR-011-resend-broadcast-integration.md`
 
 **Phase 24A**: 📋 PLANNED — Sales tax. Trigger: revenue >$1k or TX Comptroller registration. Plan: `docs/phases/PHASE_24_PLAN.md`
 **Phase 24B**: 📋 PLANNED — Shipping. Trigger: first physical product sale. Plan: `docs/phases/PHASE_24_PLAN.md`
@@ -221,8 +223,17 @@ rm -rf backend/dist frontend/.next
 
 Small, self-contained features that don't constitute major phase-level work live here. Each feature gets a single document that combines synopsis, status, discussion, design guide, completion report, and testing guide.
 
+- `docs/feature-requests/FEATURE_REQUESTS.md` - Index of all FRs with status
 - `docs/feature-requests/_TEMPLATE.md` - Document template for all feature requests
 - `docs/feature-requests/` - One file per feature (FR-NNN-kebab-name.md)
+
+## Bug Queue
+
+Known bugs, planned fixes, and fix history. One file per bug.
+
+- `docs/bugs/BUGS.md` - Index of all bugs with status and severity
+- `docs/bugs/_TEMPLATE.md` - Document template for bug reports
+- `docs/bugs/` - One file per bug (BUG-NNN-kebab-description.md)
 
 **Status values:** `draft` → `accepted` → `in-planning` → `in-dev` → `in-testing` → `deployed` (or `deferred` / `rejected`)
 
@@ -263,13 +274,16 @@ Small, self-contained features that don't constitute major phase-level work live
 - `docs/phases/PHASE_17_PLAN.md` - Alternate domain capture: redirect and transparent proxy options
 - `docs/phases/PHASE_18_PLAN.md` - Substack integration widget: RSS feed preview with height fade and CTA
 - `docs/phases/PHASE_19_PLAN.md` - ♻️ Merged into Phase 21 (redirect doc)
+- `docs/phases/PHASE_19_COMPLETION_REPORT.md` - ♻️ Merged into Phase 21; redirect stub with goal-to-outcome table
 - `docs/phases/PHASE_20_PLAN.md` - Themes and templates: color palettes, typography, backgrounds
 - `docs/phases/PHASE_21_PLAN.md` - Deployability + live deployment plan (merged 19+21)
 - `docs/phases/PHASE_21_COMPLETION_REPORT.md` - Phase 21 completion: wizard, CI/CD, Cloud Run, content migration, distribution prep
 - `docs/phases/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
 - `docs/phases/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
 - `docs/phases/PHASE_23_COMPLETION_REPORT.md` - Phase 23 completion: section schema, SectionEditor, Mul Converter pipeline, image gen, scroll transitions, SectionBackgroundPanel
-- `docs/phases/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, PayPal flat-rate, tax settings, reporting
+- `docs/feature-requests/FR-010-pii-encryption.md` - PII Encryption at Rest: EncryptionService, UserAddress encrypted columns, backfill strategy for totp/OAuth/orders/users, IP hashing
+- `docs/phases/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, address book (encrypted), PayPal flat-rate, tax settings, reporting; paired with FR-010
+- `docs/phases/PHASE_24_FR010_BUILD_ORDER.md` - Authoritative combined build order for Phase 24 + FR-010: 16 deploys, 5 two-pass backfill sequences, owner actions, Neon URL usage, external prerequisites
 - `docs/phases/PHASE_25_PLAN.md` - Cloud SQL → Neon migration: ~$10/mo savings, one-line deploy change
 - `docs/phases/PHASE_25_COMPLETION_REPORT.md` - Phase 25 completion: Cloud SQL → Neon operational migration, cost to $0
 - `docs/phases/PHASE_26_PLAN.md` - SEO toolkit: 11 items, generateMetadata, JSON-LD, sitemap, robots, book fields

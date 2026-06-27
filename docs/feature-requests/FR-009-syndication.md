@@ -415,9 +415,7 @@ If you see `No pending migrations` for the first one, that's fine — it was alr
 #### Step 3 — Merge main → deploy
 
 ```bash
-git checkout deploy
-git merge main
-git push origin deploy
+git checkout deploy && git merge main && git push origin deploy
 ```
 
 This triggers the GitHub Actions workflow, which runs tests then builds and deploys the new Docker image to Cloud Run. Monitor at: GitHub → Actions → Deploy to Cloud Run.

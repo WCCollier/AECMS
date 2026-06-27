@@ -100,7 +100,7 @@ export class MediaService {
         metadata: { filename: originalName, mime_type: mimeType, size },
       });
 
-      return this.transformMedia(media);
+      return await this.transformMedia(media);
     } catch (error) {
       throw new InternalServerErrorException(`Failed to upload file: ${error.message}`);
     }
@@ -251,7 +251,7 @@ export class MediaService {
       },
     });
 
-    return this.transformMedia(updated);
+    return await this.transformMedia(updated);
   }
 
   async bulkRemove(
@@ -379,10 +379,10 @@ export class MediaService {
     ]);
 
     return {
-      data: media.map((m) => ({
-        ...this.transformMedia(m),
+      data: await Promise.all(media.map(async (m) => ({
+        ...await this.transformMedia(m),
         total_uses: m._count.article_media + m._count.product_media + m._count.page_media,
-      })),
+      }))),
       meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
     };
   }
@@ -395,7 +395,7 @@ export class MediaService {
       },
     });
     if (!media) throw new NotFoundException('Media not found');
-    return this.transformMedia(media);
+    return await this.transformMedia(media);
   }
 
   async update(id: string, dto: UpdateMediaDto): Promise<Media> {
@@ -447,19 +447,17 @@ export class MediaService {
     return filePath;
   }
 
-  private mediaUrl(filePath: string): string {
-    const storagePath = this.storagePath(filePath);
-    const providerType = this.storageProvider.getProviderType();
-    if (providerType === 'local') {
-      return `/uploads/${storagePath}`;
-    }
-    return storagePath;
+  private async mediaUrl(filePath: string): Promise<string> {
+    return this.storageProvider.getUrl(this.storagePath(filePath));
   }
 
-  transformMedia(media: any) {
+  async transformMedia(media: any) {
     return {
       ...media,
-      url: this.mediaUrl(media.file_path),
+      url: await this.mediaUrl(media.file_path),
+      thumbnail_url: media.thumbnail_path
+        ? await this.storageProvider.getUrl(this.storagePath(media.thumbnail_path))
+        : null,
     };
   }
 
