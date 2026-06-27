@@ -12,10 +12,17 @@ const TipTapEditor = dynamic(
 );
 import { MediaGalleryField } from '@/components/widgets';
 import type { GalleryEntry } from '@/components/widgets';
+import { TagField } from '@/components/admin/TagField';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 import { slugToSku } from '@/lib/sku';
 import type { MediaItem } from '@/types';
+
+interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 interface ProductFormData {
   title: string;
@@ -44,7 +51,7 @@ interface ProductFormData {
 
 interface ProductFormProps {
   productId?: string;
-  initialData?: Partial<ProductFormData & { media?: MediaItem[] }>;
+  initialData?: Partial<ProductFormData & { media?: MediaItem[]; tags?: Tag[] }>;
   mainExtra?: React.ReactNode;
   digitalFileCount?: number;
   onSaved?: () => void;
@@ -63,6 +70,7 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
   const [error, setError] = useState<string | null>(null);
   const [description, setDescription] = useState(initialData?.description || '');
   const [gallery, setGallery] = useState<GalleryEntry[]>(() => toGalleryEntries(initialData?.media));
+  const [tags, setTags] = useState<Tag[]>(() => initialData?.tags ?? []);
   const [isDirtyExtra, setIsDirtyExtra] = useState(false);
   const [saved, setSaved] = useState(false);
   // Tracks whether the SKU is still auto-managed (false once user manually edits)
@@ -169,6 +177,7 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
         amazon_url: data.amazon_url || undefined,
         goodreads_url: data.goodreads_url || undefined,
         media_ids: gallery.map((e) => e.mediaId),
+        tag_ids: tags.map((t) => t.id),
       };
 
       if (data.product_type === 'physical') {
@@ -356,6 +365,21 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
                   {isLoading ? 'Saving...' : saved ? 'Saved ✓' : productId ? 'Save Changes' : 'Create'}
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tags</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-foreground/50 mb-3">
+                Tags are used for filtering and categorisation. Select existing tags or type to create a new one.
+              </p>
+              <TagField
+                value={tags}
+                onChange={(t) => { setTags(t); setIsDirtyExtra(true); }}
+              />
             </CardContent>
           </Card>
 
