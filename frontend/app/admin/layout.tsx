@@ -22,6 +22,7 @@ import {
   Shield,
   UserCheck,
   Mail,
+  Tag,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import adminApi from '@/lib/adminApi';
@@ -47,6 +48,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; required
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/articles', label: 'Articles', icon: FileText },
+  { href: '/admin/tags', label: 'Tags', icon: Tag, requiredCap: 'tag.edit' },
   { href: '/admin/pages', label: 'Pages', icon: LayoutTemplate },
   { href: '/admin/mul-converter', label: 'Mul Converter', icon: Wand2, requiredCap: 'mul.convert' },
   { href: '/admin/media', label: 'Media', icon: Images, requiredCap: 'media.upload' },

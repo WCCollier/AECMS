@@ -70,6 +70,8 @@ const capabilities = [
   // Account Deletion
   { name: 'account.delete.limited', category: 'users',  scope: 'backstage', description: 'Delete accounts that do not themselves hold any account.delete capability' },
   { name: 'account.delete.any',     category: 'users',  scope: 'backstage', description: 'Delete any account except your own (including other owners)' },
+  // Tag Management
+  { name: 'tag.edit',         category: 'content',       scope: 'backstage', description: 'Create, rename, delete, and bulk-assign tags' },
   // Subscriptions & Broadcasts
   { name: 'broadcast.send',   category: 'communication', scope: 'backstage', description: 'Send a news/alert broadcast email to all subscribed members' },
   { name: 'broadcast.config', category: 'communication', scope: 'backstage', description: 'Configure default subscription preferences for new sign-ups' },
@@ -103,6 +105,7 @@ const adminBackstageCaps = [
   'product.delete.own', 'product.delete', 'order.view.all', 'order.edit',
   'user.edit', 'comment.view.all', 'comment.moderate', 'comment.delete',
   'review.moderate', 'digital.deliver', 'registration.approve', 'account.delete.limited',
+  'tag.edit',
 ];
 
 const defaultSettings = [

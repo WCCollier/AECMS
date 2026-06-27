@@ -19,9 +19,10 @@ import {
 } from '@nestjs/swagger';
 import { TagsService } from './tags.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
 import { RequiresCapability } from '../capabilities/decorators/requires-capability.decorator';
-import { CreateTagDto, UpdateTagDto } from './dto';
+import { CreateTagDto, UpdateTagDto, BulkAssignTagDto } from './dto';
 
 @ApiTags('tags')
 @Controller('tags')
@@ -29,8 +30,8 @@ export class TagsController {
   constructor(private readonly tagsService: TagsService) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
-  @RequiresCapability('article.create')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('tag.edit')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new tag' })
   @ApiResponse({ status: 201, description: 'Tag created successfully' })
@@ -56,8 +57,8 @@ export class TagsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
-  @RequiresCapability('article.edit.any')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('tag.edit')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a tag' })
   @ApiParam({ name: 'id', description: 'Tag ID' })
@@ -69,16 +70,27 @@ export class TagsController {
   }
 
   @Delete(':id')
-  @UseGuards(JwtAuthGuard, CapabilityGuard)
-  @RequiresCapability('article.delete.any')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('tag.edit')
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a tag' })
   @ApiParam({ name: 'id', description: 'Tag ID' })
   @ApiResponse({ status: 204, description: 'Tag deleted successfully' })
   @ApiResponse({ status: 404, description: 'Tag not found' })
-  @ApiResponse({ status: 400, description: 'Tag has associated articles' })
   async remove(@Param('id') id: string) {
     await this.tagsService.remove(id);
+  }
+
+  @Post(':id/assign')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('tag.edit')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Bulk-assign a tag to articles and/or products' })
+  @ApiParam({ name: 'id', description: 'Tag ID' })
+  @ApiResponse({ status: 204, description: 'Tag assigned successfully' })
+  async bulkAssign(@Param('id') id: string, @Body() dto: BulkAssignTagDto): Promise<void> {
+    await this.tagsService.bulkAssign(id, dto.article_ids ?? [], dto.product_ids ?? []);
   }
 }

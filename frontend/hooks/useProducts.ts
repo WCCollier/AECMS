@@ -7,11 +7,13 @@ interface UseProductsOptions {
   limit?: number;
   tags?: string[];
   tagLogic?: 'and' | 'or';
+  excludeTags?: string[];
+  excludeTagLogic?: 'any' | 'all';
   search?: string;
 }
 
 export function useProducts(options: UseProductsOptions = {}) {
-  const { page = 1, limit = 12, tags, tagLogic, search } = options;
+  const { page = 1, limit = 12, tags, tagLogic, excludeTags, excludeTagLogic, search } = options;
 
   const params = new URLSearchParams();
   params.set('page', page.toString());
@@ -19,6 +21,10 @@ export function useProducts(options: UseProductsOptions = {}) {
   if (tags && tags.length > 0) {
     params.set('tags', tags.join(','));
     if (tagLogic === 'or') params.set('tag_logic', 'or');
+  }
+  if (excludeTags && excludeTags.length > 0) {
+    params.set('exclude_tags', excludeTags.join(','));
+    if (excludeTagLogic === 'all') params.set('exclude_tag_logic', 'all');
   }
   if (search) params.set('search', search);
 

@@ -8,11 +8,13 @@ interface UseArticlesOptions {
   tag?: string;
   tags?: string[];
   tagLogic?: 'and' | 'or';
+  excludeTags?: string[];
+  excludeTagLogic?: 'any' | 'all';
   search?: string;
 }
 
 export function useArticles(options: UseArticlesOptions = {}) {
-  const { page = 1, limit = 10, tag, tags, tagLogic, search } = options;
+  const { page = 1, limit = 10, tag, tags, tagLogic, excludeTags, excludeTagLogic, search } = options;
 
   const params = new URLSearchParams();
   params.set('page', page.toString());
@@ -22,6 +24,10 @@ export function useArticles(options: UseArticlesOptions = {}) {
     if (tagLogic === 'or') params.set('tag_logic', 'or');
   } else if (tag) {
     params.set('tag', tag);
+  }
+  if (excludeTags && excludeTags.length > 0) {
+    params.set('exclude_tags', excludeTags.join(','));
+    if (excludeTagLogic === 'all') params.set('exclude_tag_logic', 'all');
   }
   if (search) params.set('search', search);
 

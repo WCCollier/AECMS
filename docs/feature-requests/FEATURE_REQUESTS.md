@@ -20,6 +20,8 @@ Small, self-contained features that don't constitute major phase-level work. One
 
 | ID | Size | Description |
 |----|------|-------------|
+| [FR-015](FR-015-collection-embed-display-modes-and-tag-exclusion.md) | medium | Collection Embed — `preview` (100dvh pane + fade) and `full` (inline body) display modes; tag exclusion filter with ANY/ALL toggle |
+| [FR-014](FR-014-tag-editor.md) | medium | Tag Editor — `/admin/tags` panel: rename/delete tags, add without assigning, mass-assign to articles/products; new `tag.edit` capability |
 | [FR-012](FR-012-media-picker-for-logo-and-favicon.md) | small | Media Picker for Logo & Favicon — replace text input + bespoke upload with `ImageField` picker; fixes favicon cloud-storage bug |
 | [FR-009](FR-009-syndication.md) | large | Member Subscriptions & Syndication — opt-in email notifications, admin broadcast, RSS feed, unsubscribe page |
 | [FR-008](FR-008-free-products.md) | small | Free Product Checkout — bypass payment for $0 orders; service products require shipping address |

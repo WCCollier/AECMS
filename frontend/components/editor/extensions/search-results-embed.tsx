@@ -4,17 +4,19 @@ import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import type { NodeViewProps } from '@tiptap/react';
 import { SearchResultsWidget } from '@/components/widgets/SearchResultsWidget';
 import { TagChipStrip } from '@/components/ui';
-import { LayoutGrid, Trash2, Settings } from 'lucide-react';
+import { LayoutGrid, Trash2, Settings, AlertTriangle } from 'lucide-react';
 
 type ContentType = 'articles' | 'products';
 type TagLogic = 'and' | 'or';
-type Display = 'grid' | 'list';
+type Display = 'grid' | 'list' | 'preview' | 'full';
 type DisplayMode = 'auto' | 'paginated';
 
 interface SearchResultsAttrs {
   contentType: ContentType;
-  tags: string;       // stored as JSON string: string[]
+  tags: string;           // stored as JSON string: string[]
   tagLogic: TagLogic;
+  excludeTags: string;    // stored as JSON string: string[]
+  excludeTagLogic: 'any' | 'all';
   search: string;
   display: Display;
   pageSize: number;
@@ -52,6 +54,13 @@ function hasTrailingContent(
   return false;
 }
 
+const DISPLAY_OPTIONS: { value: Display; label: string }[] = [
+  { value: 'grid',    label: 'Grid' },
+  { value: 'list',    label: 'List' },
+  { value: 'preview', label: 'Preview (100vh pane)' },
+  { value: 'full',    label: 'Full article/product' },
+];
+
 function ConfigPanel({
   attrs,
   onUpdate,
@@ -64,17 +73,23 @@ function ConfigPanel({
   const [contentType, setContentType] = useState<ContentType>(attrs.contentType ?? 'articles');
   const [tags, setTags] = useState<string[]>(parseTagsAttr(attrs.tags));
   const [tagLogic, setTagLogic] = useState<TagLogic>(attrs.tagLogic ?? 'and');
+  const [excludeTags, setExcludeTags] = useState<string[]>(parseTagsAttr(attrs.excludeTags));
+  const [excludeTagLogic, setExcludeTagLogic] = useState<'any' | 'all'>(attrs.excludeTagLogic ?? 'any');
   const [search, setSearch] = useState(attrs.search ?? '');
   const [display, setDisplay] = useState<Display>(attrs.display ?? 'grid');
   const [pageSize, setPageSize] = useState(attrs.pageSize ?? 6);
   const [title, setTitle] = useState(attrs.title ?? '');
   const [displayMode, setDisplayMode] = useState<DisplayMode>(attrs.displayMode ?? 'auto');
 
+  const isInlineDisplay = display === 'preview' || display === 'full';
+
   const save = () => {
     onUpdate({
       contentType,
       tags: JSON.stringify(tags),
       tagLogic,
+      excludeTags: JSON.stringify(excludeTags),
+      excludeTagLogic,
       search,
       display,
       pageSize,
@@ -116,9 +131,9 @@ function ConfigPanel({
         </div>
       </div>
 
-      {/* Tags + logic */}
+      {/* Include tags + logic */}
       <div>
-        <p className="text-xs font-medium text-foreground/60 mb-1.5">Tags</p>
+        <p className="text-xs font-medium text-foreground/60 mb-1.5">Include tags</p>
         <TagChipStrip
           selected={tags}
           tagLogic={tagLogic}
@@ -127,6 +142,20 @@ function ConfigPanel({
           placeholder="Add tag filter…"
           alwaysShowLogic
         />
+      </div>
+
+      {/* Exclude tags + logic */}
+      <div>
+        <p className="text-xs font-medium text-foreground/60 mb-1.5">Exclude these tags</p>
+        <TagChipStrip
+          selected={excludeTags}
+          tagLogic={excludeTagLogic === 'any' ? 'or' : 'and'}
+          onChange={setExcludeTags}
+          onLogicChange={(v) => setExcludeTagLogic(v === 'or' ? 'any' : 'all')}
+          placeholder="Add exclusion tag…"
+          alwaysShowLogic
+        />
+        <p className="text-[10px] text-foreground/40 mt-1">OR = exclude if has any listed tag · AND = exclude only if has all listed tags</p>
       </div>
 
       {/* Text search */}
@@ -153,27 +182,37 @@ function ConfigPanel({
         />
       </div>
 
-      {/* Display + page size */}
-      <div className="flex gap-4">
-        <div>
-          <p className="text-xs font-medium text-foreground/60 mb-1.5">Display</p>
-          <div className="flex gap-2">
-            {(['grid', 'list'] as Display[]).map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setDisplay(d)}
-                className={`px-3 py-1 rounded-full text-xs border transition-colors capitalize ${
-                  display === d
-                    ? 'bg-accent text-white border-accent'
-                    : 'border-foreground/20 hover:border-accent/50'
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
+      {/* Display mode */}
+      <div>
+        <p className="text-xs font-medium text-foreground/60 mb-1.5">Display</p>
+        <div className="flex flex-wrap gap-2">
+          {DISPLAY_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setDisplay(value)}
+              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                display === value
+                  ? 'bg-accent text-white border-accent'
+                  : 'border-foreground/20 hover:border-accent/50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+      </div>
+
+      {/* Inline display warning */}
+      {isInlineDisplay && (
+        <div className="flex items-start gap-2 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 p-3 text-xs text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>Full/Preview display renders the complete article or product body inline. Use a small page size or paginated mode to avoid very long pages.</span>
+        </div>
+      )}
+
+      {/* Page size + scroll mode (hide layout toggle for preview/full) */}
+      <div className="flex gap-4">
         <div>
           <p className="text-xs font-medium text-foreground/60 mb-1.5">Items shown</p>
           <select
@@ -186,27 +225,27 @@ function ConfigPanel({
             ))}
           </select>
         </div>
-      </div>
-
-      {/* Display mode */}
-      <div>
-        <p className="text-xs font-medium text-foreground/60 mb-1.5">Scroll mode</p>
-        <div className="flex gap-2">
-          {([['auto', 'Auto (infinite when at zone tail)'], ['paginated', 'Always paginated']] as [DisplayMode, string][]).map(([val, label]) => (
-            <button
-              key={val}
-              type="button"
-              onClick={() => setDisplayMode(val)}
-              className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                displayMode === val
-                  ? 'bg-accent text-white border-accent'
-                  : 'border-foreground/20 hover:border-accent/50'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {!isInlineDisplay && (
+          <div>
+            <p className="text-xs font-medium text-foreground/60 mb-1.5">Scroll mode</p>
+            <div className="flex gap-2">
+              {([['auto', 'Auto (infinite at tail)'], ['paginated', 'Always paginated']] as [DisplayMode, string][]).map(([val, label]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setDisplayMode(val)}
+                  className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                    displayMode === val
+                      ? 'bg-accent text-white border-accent'
+                      : 'border-foreground/20 hover:border-accent/50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
@@ -221,10 +260,12 @@ function ConfigPanel({
   );
 }
 
-function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode, getPos }: NodeViewProps) {
+function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode, getPos, extension }: NodeViewProps) {
   const [configuring, setConfiguring] = useState(() => !node.attrs.contentType);
   const attrs = node.attrs as SearchResultsAttrs;
   const tags = parseTagsAttr(attrs.tags);
+  const excludeTags = parseTagsAttr(attrs.excludeTags);
+  const depth: number = (extension as any).options?.depth ?? 0;
 
   const summaryLabel = () => {
     const type = attrs.contentType ?? 'articles';
@@ -247,8 +288,18 @@ function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode
   }
 
   if (!editor.isEditable) {
-    // Zone-trailing detection: allow infinite scroll when displayMode is 'auto'
-    // and there is no substantive content after this node in the same zone.
+    // When depth > 0 we're inside an embedded article/product — show a placeholder
+    // instead of recursing into another live widget.
+    if (depth > 0) {
+      return (
+        <NodeViewWrapper contentEditable={false}>
+          <div className="border border-foreground/10 rounded px-3 py-2 text-sm text-foreground/40 my-4">
+            [Collection embed]
+          </div>
+        </NodeViewWrapper>
+      );
+    }
+
     const allowInfiniteScroll =
       (attrs.displayMode ?? 'auto') !== 'paginated' &&
       !hasTrailingContent(editor, getPos);
@@ -259,11 +310,14 @@ function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode
           contentType={attrs.contentType ?? 'articles'}
           tags={tags}
           tagLogic={attrs.tagLogic ?? 'and'}
+          excludeTags={excludeTags}
+          excludeTagLogic={attrs.excludeTagLogic ?? 'any'}
           search={attrs.search ?? ''}
           display={attrs.display ?? 'grid'}
           pageSize={Math.min(attrs.pageSize ?? 6, 12)}
           title={attrs.title ?? ''}
           allowInfiniteScroll={allowInfiniteScroll}
+          depth={0}
         />
       </NodeViewWrapper>
     );
@@ -278,6 +332,9 @@ function SearchResultsEmbedNodeView({ node, editor, updateAttributes, deleteNode
           {attrs.title && <span className="text-foreground/40">&middot; &ldquo;{attrs.title}&rdquo;</span>}
           {(attrs.displayMode ?? 'auto') === 'paginated' && (
             <span className="text-foreground/30 text-[10px] ml-auto">paginated</span>
+          )}
+          {(attrs.display === 'preview' || attrs.display === 'full') && (
+            <span className="text-foreground/30 text-[10px] ml-auto capitalize">{attrs.display}</span>
           )}
         </div>
         <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -306,16 +363,22 @@ export const SearchResultsEmbedNode = Node.create({
   group: 'block',
   atom: true,
 
+  addOptions() {
+    return { depth: 0 };
+  },
+
   addAttributes() {
     return {
-      contentType:  { default: 'articles',   parseHTML: (el) => el.getAttribute('data-content-type') || 'articles',    renderHTML: (a) => ({ 'data-content-type': a.contentType }) },
-      tags:         { default: '[]',          parseHTML: (el) => el.getAttribute('data-tags') || '[]',                  renderHTML: (a) => ({ 'data-tags': a.tags }) },
-      tagLogic:     { default: 'and',         parseHTML: (el) => el.getAttribute('data-tag-logic') || 'and',            renderHTML: (a) => ({ 'data-tag-logic': a.tagLogic }) },
-      search:       { default: '',            parseHTML: (el) => el.getAttribute('data-search') || '',                   renderHTML: (a) => ({ 'data-search': a.search }) },
-      display:      { default: 'grid',        parseHTML: (el) => el.getAttribute('data-display') || 'grid',              renderHTML: (a) => ({ 'data-display': a.display }) },
-      pageSize:     { default: 6,             parseHTML: (el) => Number(el.getAttribute('data-page-size')) || 6,         renderHTML: (a) => ({ 'data-page-size': String(a.pageSize) }) },
-      title:        { default: '',            parseHTML: (el) => el.getAttribute('data-title') || '',                    renderHTML: (a) => ({ 'data-title': a.title }) },
-      displayMode:  { default: 'auto',        parseHTML: (el) => el.getAttribute('data-display-mode') || 'auto',         renderHTML: (a) => ({ 'data-display-mode': a.displayMode }) },
+      contentType:      { default: 'articles',   parseHTML: (el) => el.getAttribute('data-content-type') || 'articles',       renderHTML: (a) => ({ 'data-content-type': a.contentType }) },
+      tags:             { default: '[]',          parseHTML: (el) => el.getAttribute('data-tags') || '[]',                     renderHTML: (a) => ({ 'data-tags': a.tags }) },
+      tagLogic:         { default: 'and',         parseHTML: (el) => el.getAttribute('data-tag-logic') || 'and',               renderHTML: (a) => ({ 'data-tag-logic': a.tagLogic }) },
+      excludeTags:      { default: '[]',          parseHTML: (el) => el.getAttribute('data-exclude-tags') || '[]',             renderHTML: (a) => ({ 'data-exclude-tags': a.excludeTags }) },
+      excludeTagLogic:  { default: 'any',         parseHTML: (el) => el.getAttribute('data-exclude-tag-logic') || 'any',       renderHTML: (a) => ({ 'data-exclude-tag-logic': a.excludeTagLogic }) },
+      search:           { default: '',            parseHTML: (el) => el.getAttribute('data-search') || '',                      renderHTML: (a) => ({ 'data-search': a.search }) },
+      display:          { default: 'grid',        parseHTML: (el) => el.getAttribute('data-display') || 'grid',                 renderHTML: (a) => ({ 'data-display': a.display }) },
+      pageSize:         { default: 6,             parseHTML: (el) => Number(el.getAttribute('data-page-size')) || 6,            renderHTML: (a) => ({ 'data-page-size': String(a.pageSize) }) },
+      title:            { default: '',            parseHTML: (el) => el.getAttribute('data-title') || '',                       renderHTML: (a) => ({ 'data-title': a.title }) },
+      displayMode:      { default: 'auto',        parseHTML: (el) => el.getAttribute('data-display-mode') || 'auto',            renderHTML: (a) => ({ 'data-display-mode': a.displayMode }) },
     };
   },
 
