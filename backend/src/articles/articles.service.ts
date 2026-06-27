@@ -1,18 +1,20 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   ConflictException,
   ForbiddenException,
   BadRequestException,
   Logger,
 } from '@nestjs/common';
-import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateArticleDto, UpdateArticleDto, QueryArticlesDto } from './dto';
 import { Prisma, ContentStatus, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
 import { MediaSyncService } from '../media/media-sync.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { STORAGE_PROVIDER } from '../storage';
+import type { StorageProvider } from '../storage';
 
 @Injectable()
 export class ArticlesService {
@@ -23,6 +25,7 @@ export class ArticlesService {
     private auditLog: AuditLogService,
     private mediaSync: MediaSyncService,
     private subscriptions: SubscriptionsService,
+    @Inject(STORAGE_PROVIDER) private storageProvider: StorageProvider,
   ) {}
 
   private getMediaInclude() {
@@ -108,7 +111,7 @@ export class ArticlesService {
       where: { id: article.id },
       include: this.getArticleInclude(true),
     });
-    return this.transformArticle(fresh!);
+    return await this.transformArticle(fresh!);
   }
 
   /**
@@ -198,7 +201,7 @@ export class ArticlesService {
     ]);
 
     return {
-      data: articles.map((a) => this.transformArticle(a)),
+      data: await Promise.all(articles.map((a) => this.transformArticle(a))),
       meta: { total, page, limit, total_pages: Math.ceil(total / limit) },
     };
   }
@@ -213,7 +216,7 @@ export class ArticlesService {
     });
     if (!article) throw new NotFoundException('Article not found');
     this.checkVisibilityAccess(article, userId, isAdmin);
-    return this.transformArticle(article);
+    return await this.transformArticle(article);
   }
 
   /**
@@ -226,7 +229,7 @@ export class ArticlesService {
     });
     if (!article) throw new NotFoundException('Article not found');
     this.checkVisibilityAccess(article, userId, isAdmin);
-    return this.transformArticle(article);
+    return await this.transformArticle(article);
   }
 
   /**
@@ -314,7 +317,7 @@ export class ArticlesService {
       where: { id },
       include: this.getArticleInclude(true),
     });
-    return this.transformArticle(updated!);
+    return await this.transformArticle(updated!);
   }
 
   /**
@@ -404,7 +407,7 @@ export class ArticlesService {
     });
 
     const updated = await this.prisma.article.findUnique({ where: { id: articleId }, include: this.getArticleInclude(true) });
-    return this.transformArticle(updated!);
+    return await this.transformArticle(updated!);
   }
 
   private generateSlug(title: string): string {
@@ -446,21 +449,19 @@ export class ArticlesService {
     throw new ForbiddenException('You do not have permission to delete this article');
   }
 
-  private mediaUrl(filePath: string | null | undefined): string | null {
+  private async mediaUrl(filePath: string | null | undefined): Promise<string | null> {
     if (!filePath) return null;
-    const uploadsBase = path.join(process.cwd(), 'uploads');
-    const rel = path.relative(uploadsBase, filePath);
-    return `/uploads/${rel}`;
+    return this.storageProvider.getUrl(filePath);
   }
 
-  private transformArticle(article: any) {
-    const mediaItems = (article.media || []).map((am: any) => ({
+  private async transformArticle(article: any) {
+    const mediaItems = await Promise.all((article.media || []).map(async (am: any) => ({
       id: am.media.id,
-      url: this.mediaUrl(am.media.file_path),
+      url: await this.mediaUrl(am.media.file_path),
       order: am.order,
       is_primary: am.is_primary,
       alt_text: am.media.alt_text ?? null,
-    }));
+    })));
 
     const primaryMedia = mediaItems.find((m: any) => m.is_primary) ?? mediaItems[0] ?? null;
 

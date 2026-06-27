@@ -21,6 +21,7 @@ interface MediaItem {
   height?: number;
   url: string;
   thumbnail_path?: string;
+  thumbnail_url?: string | null;
   alt_text?: string;
   caption?: string;
   uploaded_at: string;
@@ -74,9 +75,7 @@ function MediaThumb({ item, selected, onSelect, onClick }: {
   onClick: () => void;
 }) {
   const isImage = item.mime_type.startsWith('image/');
-  const thumbUrl = item.thumbnail_path
-    ? `/uploads/thumb-${item.filename.replace(/\.[^.]+$/, '.jpg')}?v=${new Date(item.uploaded_at).getTime()}`
-    : item.url;
+  const thumbUrl = item.thumbnail_url ?? item.url;
 
   return (
     <div
@@ -267,9 +266,7 @@ function DetailPanel({ item, onClose, onDeleted, onReplaced }: {
   const { data: usage } = useSWR<UsageData>(`/media/${item.id}/usage`, fetcher);
 
   const isImage = item.mime_type.startsWith('image/');
-  const thumbUrl = item.thumbnail_path
-    ? `/uploads/thumb-${item.filename.replace(/\.[^.]+$/, '.jpg')}?v=${new Date(item.uploaded_at).getTime()}`
-    : item.url;
+  const thumbUrl = item.thumbnail_url ?? item.url;
 
   const saveMetadata = async (field: 'alt_text' | 'caption', value: string) => {
     setSaving(true);

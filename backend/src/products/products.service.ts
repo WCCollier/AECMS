@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   ConflictException,
   ForbiddenException,
@@ -13,6 +14,8 @@ import { Prisma, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
 import { MediaSyncService } from '../media/media-sync.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
+import { STORAGE_PROVIDER } from '../storage';
+import type { StorageProvider } from '../storage';
 
 @Injectable()
 export class ProductsService {
@@ -23,6 +26,7 @@ export class ProductsService {
     private auditLog: AuditLogService,
     private mediaSync: MediaSyncService,
     private subscriptions: SubscriptionsService,
+    @Inject(STORAGE_PROVIDER) private storageProvider: StorageProvider,
   ) {}
 
   /**
@@ -724,22 +728,19 @@ export class ProductsService {
   /**
    * Transform product response
    */
-  private mediaUrl(filePath: string | null | undefined): string | null {
+  private async mediaUrl(filePath: string | null | undefined): Promise<string | null> {
     if (!filePath) return null;
-    const fp = filePath;
-    return fp.startsWith('/uploads/') ? fp
-      : fp.includes('/uploads/') ? fp.replace(/.*\/uploads\//, '/uploads/')
-      : `/uploads/${fp}`;
+    return this.storageProvider.getUrl(filePath);
   }
 
-  private buildProductBase(product: any) {
-    const mediaItems = (product.media || []).map((pm: any) => ({
+  private async buildProductBase(product: any) {
+    const mediaItems = await Promise.all((product.media || []).map(async (pm: any) => ({
       id: pm.media.id,
-      url: this.mediaUrl(pm.media.file_path),
+      url: await this.mediaUrl(pm.media.file_path),
       order: pm.order,
       is_primary: pm.is_primary,
       alt_text: pm.media.alt_text ?? null,
-    }));
+    })));
 
     const primaryMedia = mediaItems.find((m: any) => m.is_primary) ?? mediaItems[0] ?? null;
 
@@ -787,7 +788,7 @@ export class ProductsService {
   }
 
   private async transformProduct(product: any) {
-    const base = this.buildProductBase(product);
+    const base = await this.buildProductBase(product);
     const stats = await this.getRatingStats(product.id);
     return { ...base, ...stats };
   }
