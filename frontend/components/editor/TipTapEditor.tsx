@@ -1,16 +1,15 @@
 'use client';
 
 import { useEditor, EditorContent } from '@tiptap/react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Bold, Italic, Strikethrough, Code, List, ListOrdered, Quote,
   Undo, Redo, Link as LinkIcon, Unlink, Heading1, Heading2, Heading3,
-  Minus, ImagePlus, X, Upload, Info, Video, Twitter, GalleryHorizontal,
+  Minus, ImagePlus, X, Info, Video, Twitter, GalleryHorizontal,
   FileText, ShoppingBag, Square, Rss, LibraryBig,
   AlignLeft, AlignCenter, AlignRight, AlignJustify, Type,
 } from 'lucide-react';
-import adminApi from '@/lib/adminApi';
-import { getErrorMessage } from '@/lib/api';
+import { MediaPicker } from '@/components/admin/MediaPicker';
 import { getEditorExtensions } from './extensions';
 import { LinkModal } from './LinkModal';
 import { MediaGalleryField } from '@/components/widgets/MediaGallery/MediaGalleryField';
@@ -67,9 +66,6 @@ export function TipTapEditor({
   // Image insert state
   const [imageUrl, setImageUrl] = useState('');
   const [imageAlt, setImageAlt] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Carousel insert state
   const [carouselEntries, setCarouselEntries] = useState<GalleryEntry[]>([]);
@@ -103,7 +99,6 @@ export function TipTapEditor({
 
   const togglePanel = (panel: ActivePanel) => {
     setActivePanel((prev) => (prev === panel ? null : panel));
-    setUploadError(null);
   };
 
   const setLink = useCallback(() => {
@@ -131,38 +126,12 @@ export function TipTapEditor({
     setActivePanel(null);
   }, [editor, imageUrl, imageAlt]);
 
-  const handleFileUpload = useCallback(async (file: File) => {
-    if (!editor) return;
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (imageAlt.trim()) formData.append('altText', imageAlt.trim());
-
-      const response = await adminApi.post<{ id: string; url: string; filename: string }>(
-        '/media/upload',
-        formData,
-        { headers: { 'Content-Type': 'multipart/form-data' } },
-      );
-
-      const url = response.data.url;
-      editor.chain().focus().setImage({ src: url, alt: imageAlt.trim() || file.name }).run();
-      setImageUrl('');
-      setImageAlt('');
-      setActivePanel(null);
-    } catch (err) {
-      setUploadError(getErrorMessage(err));
-    } finally {
-      setUploading(false);
-    }
+  const handlePickerSelect = useCallback((url: string | null) => {
+    if (!editor || !url) return;
+    editor.chain().focus().setImage({ src: url, alt: imageAlt.trim() }).run();
+    setImageAlt('');
+    setActivePanel(null);
   }, [editor, imageAlt]);
-
-  const onFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFileUpload(file);
-    e.target.value = '';
-  }, [handleFileUpload]);
 
   const insertCarousel = useCallback(() => {
     if (!editor || carouselEntries.length === 0) return;
@@ -488,10 +457,18 @@ export function TipTapEditor({
             className="w-full px-3 py-1.5 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-1 focus:ring-accent/40"
           />
 
+          <MediaPicker compact onChange={handlePickerSelect} />
+
+          <div className="flex items-center gap-2 text-xs text-foreground/40">
+            <div className="flex-1 h-px bg-border" />
+            <span>or paste URL</span>
+            <div className="flex-1 h-px bg-border" />
+          </div>
+
           <div className="flex gap-2">
             <input
               type="text"
-              placeholder="Paste image URL…"
+              placeholder="https://…"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && insertImageFromUrl()}
@@ -506,25 +483,6 @@ export function TipTapEditor({
               Insert
             </button>
           </div>
-
-          <div className="flex items-center gap-2 text-xs text-foreground/40">
-            <div className="flex-1 h-px bg-border" />
-            <span>or</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onFileChange} />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm border border-border rounded-lg hover:bg-surface-raised hover:border-accent/30 transition-colors disabled:opacity-50"
-          >
-            <Upload className="w-4 h-4" />
-            {uploading ? 'Uploading…' : 'Upload from device'}
-          </button>
-
-          {uploadError && <p className="text-xs text-red-400">{uploadError}</p>}
         </div>
       )}
 

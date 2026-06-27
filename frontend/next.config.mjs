@@ -2,6 +2,14 @@
 const nextConfig = {
   output: 'standalone',
 
+  images: {
+    remotePatterns: [
+      // Allow any HTTPS hostname — covers GCS, S3, CDN, and any future storage provider.
+      // Wildcard is appropriate for a single-owner CMS where the admin controls all content.
+      { protocol: 'https', hostname: '**' },
+    ],
+  },
+
   async redirects() {
     return [
       { source: '/latest', destination: '/articles', permanent: true },
