@@ -1,19 +1,13 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
   Patch,
   Post,
   Request,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BackstageGuard } from '../auth/guards/backstage.guard';
 import { CapabilityGuard } from '../capabilities/guards/capability.guard';
@@ -131,32 +125,6 @@ export class SettingsController {
     );
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'Settings saved' };
-  }
-
-  @Post('favicon')
-  @RequiresCapability('system.configure.general')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiOperation({ summary: 'Upload site favicon (ICO, PNG, JPG, or SVG)' })
-  async uploadFavicon(
-    @UploadedFile() file: Express.Multer.File,
-    @Request() req: any,
-  ) {
-    if (!file) throw new BadRequestException('No file provided');
-    const allowed = [
-      'image/x-icon', 'image/vnd.microsoft.icon',
-      'image/png', 'image/jpeg', 'image/svg+xml', 'image/gif',
-    ];
-    if (!allowed.includes(file.mimetype)) {
-      throw new BadRequestException('Favicon must be an image file (ICO, PNG, JPG, or SVG)');
-    }
-    const ext = path.extname(file.originalname).toLowerCase() || '.png';
-    const filename = `system-favicon-${Date.now()}${ext}`;
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    await fs.mkdir(uploadsDir, { recursive: true });
-    await fs.writeFile(path.join(uploadsDir, filename), file.buffer);
-    const url = `/uploads/${filename}`;
-    await this.settingsService.set({ 'identity.favicon_url': url }, req.user.id);
-    return { url };
   }
 
   // ── Email / SMTP ───────────────────────────────────────────────────────────

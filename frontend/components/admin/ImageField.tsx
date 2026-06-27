@@ -6,12 +6,13 @@ import { MediaPicker } from './MediaPicker';
 import { Image as ImageIcon, X, Edit } from 'lucide-react';
 
 interface ImageFieldProps {
-  label: string;
+  label?: string;
+  emptyLabel?: string;
   value?: string | null;
   onChange: (url: string | null) => void;
 }
 
-export function ImageField({ label, value, onChange }: ImageFieldProps) {
+export function ImageField({ label, emptyLabel = 'Add image', value, onChange }: ImageFieldProps) {
   const [showPicker, setShowPicker] = useState(false);
 
   const handleChange = (url: string | null) => {
@@ -23,13 +24,13 @@ export function ImageField({ label, value, onChange }: ImageFieldProps) {
 
   return (
     <div>
-      <label className="block text-sm font-medium mb-2">{label}</label>
+      {label && <label className="block text-sm font-medium mb-2">{label}</label>}
 
       {value ? (
         <div className="relative group">
           <img
             src={value}
-            alt="Featured"
+            alt={label ?? 'Selected image'}
             className="w-full h-48 object-cover rounded-lg border border-foreground/20"
           />
           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2">
@@ -62,7 +63,7 @@ export function ImageField({ label, value, onChange }: ImageFieldProps) {
           className="w-full h-32 border-2 border-dashed border-foreground/20 rounded-lg flex flex-col items-center justify-center gap-2 text-foreground/50 hover:border-foreground/40 hover:text-foreground/70 transition-colors"
         >
           <ImageIcon className="w-8 h-8" />
-          <span className="text-sm">Add featured image</span>
+          <span className="text-sm">{emptyLabel}</span>
         </button>
       )}
 
