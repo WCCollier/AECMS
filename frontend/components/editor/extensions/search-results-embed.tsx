@@ -211,7 +211,7 @@ function ConfigPanel({
         </div>
       )}
 
-      {/* Page size + scroll mode (hide layout toggle for preview/full) */}
+      {/* Page size + scroll mode — both apply to all display types */}
       <div className="flex gap-4">
         <div>
           <p className="text-xs font-medium text-foreground/60 mb-1.5">Items shown</p>
@@ -225,27 +225,25 @@ function ConfigPanel({
             ))}
           </select>
         </div>
-        {!isInlineDisplay && (
-          <div>
-            <p className="text-xs font-medium text-foreground/60 mb-1.5">Scroll mode</p>
-            <div className="flex gap-2">
-              {([['auto', 'Auto (infinite at tail)'], ['paginated', 'Always paginated']] as [DisplayMode, string][]).map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => setDisplayMode(val)}
-                  className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                    displayMode === val
-                      ? 'bg-accent text-white border-accent'
-                      : 'border-foreground/20 hover:border-accent/50'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+        <div>
+          <p className="text-xs font-medium text-foreground/60 mb-1.5">Scroll mode</p>
+          <div className="flex gap-2">
+            {([['auto', 'Auto (infinite at tail)'], ['paginated', 'Always paginated']] as [DisplayMode, string][]).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setDisplayMode(val)}
+                className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                  displayMode === val
+                    ? 'bg-accent text-white border-accent'
+                    : 'border-foreground/20 hover:border-accent/50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
