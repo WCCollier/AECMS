@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import useSWR from 'swr';
 import { Save, Send, CheckCircle, XCircle, Loader2, Eye, EyeOff } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
+import { ImageField } from '@/components/admin/ImageField';
 
 const fetcher = (url: string) => adminApi.get(url).then((r) => r.data);
 const publicFetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -175,29 +176,6 @@ export function SettingsClient() {
   );
   const availableRoles = (rolesData ?? []).filter((r) => r.name !== 'guest');
 
-  // Favicon upload state
-  const [faviconUploading, setFaviconUploading] = useState(false);
-  const [faviconError, setFaviconError] = useState<string | null>(null);
-
-  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFaviconUploading(true);
-    setFaviconError(null);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await adminApi.post<{ url: string }>('/settings/favicon', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      setFields((prev) => ({ ...prev, 'identity.favicon_url': res.data.url }));
-    } catch (err: any) {
-      setFaviconError(err?.response?.data?.message ?? 'Upload failed');
-    } finally {
-      setFaviconUploading(false);
-      e.target.value = '';
-    }
-  };
 
   // Email test state
   const [emailTesting, setEmailTesting] = useState(false);
@@ -594,35 +572,21 @@ export function SettingsClient() {
       {activeTab === 'identity' && (
         <div>
           <FieldRow
-            label={<span className="flex items-center gap-2">Logo URL <span className="text-xs font-normal px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">Not yet active</span></span>}
+            label={<span className="flex items-center gap-2">Logo <span className="text-xs font-normal px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">Not yet active</span></span>}
             help="Saved but not yet displayed — header logo rendering is a planned feature"
           >
-            <TextInput value={f('identity.logo_url')} onChange={(v) => set('identity.logo_url', v)} />
-            {f('identity.logo_url') && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={f('identity.logo_url')} alt="Logo preview" className="mt-2 h-12 object-contain rounded border border-neutral-700" />
-            )}
+            <ImageField
+              value={f('identity.logo_url') || null}
+              onChange={(url) => set('identity.logo_url', url ?? '')}
+              emptyLabel="Select logo image"
+            />
           </FieldRow>
-          <FieldRow label="Favicon" help="Icon shown in browser tabs (ICO, PNG, JPG, or SVG)">
-            <div className="flex items-center gap-4">
-              {f('identity.favicon_url') && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={f('identity.favicon_url')} alt="Current favicon" className="h-8 w-8 object-contain rounded border border-neutral-700 bg-neutral-800" />
-              )}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-neutral-200 text-sm px-3 py-1.5 rounded transition-colors">
-                  {faviconUploading ? 'Uploading…' : f('identity.favicon_url') ? 'Replace' : 'Upload file'}
-                </span>
-                <input
-                  type="file"
-                  accept="image/x-icon,image/png,image/jpeg,image/svg+xml,.ico"
-                  onChange={handleFaviconUpload}
-                  disabled={faviconUploading}
-                  className="sr-only"
-                />
-              </label>
-            </div>
-            {faviconError && <p className="mt-1 text-xs text-red-400">{faviconError}</p>}
+          <FieldRow label="Favicon" help="Icon shown in browser tabs. Any image format works — modern browsers scale it automatically.">
+            <ImageField
+              value={f('identity.favicon_url') || null}
+              onChange={(url) => set('identity.favicon_url', url ?? '')}
+              emptyLabel="Select favicon image"
+            />
           </FieldRow>
           <FieldRow
             label={<span className="flex items-center gap-2">Brand Color <span className="text-xs font-normal px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">Not yet active</span></span>}
