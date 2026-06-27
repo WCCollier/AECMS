@@ -19,9 +19,9 @@ const ZONE_SCHEME_CLASSES: Record<ZoneScheme, string> = {
 };
 
 const ZONE_ALIGN_STYLES: Record<ZoneAlign, React.CSSProperties> = {
-  start:  { alignSelf: 'start' },
-  center: { alignSelf: 'center' },
-  end:    { alignSelf: 'end' },
+  start:  { justifyContent: 'flex-start' },
+  center: { justifyContent: 'center' },
+  end:    { justifyContent: 'flex-end' },
 };
 
 const ZONE_WIDTH_CLASSES: Record<ZoneWidth, string> = {
@@ -121,8 +121,8 @@ function OverlayDiv({ overlay }: { overlay: NonNullable<SectionBackground['overl
 function ZoneGrid({ section }: { section: PageSection }) {
   return (
     <div
-      className="relative"
-      style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gap: '0' }}
+      className="relative flex-1 min-h-0"
+      style={{ display: 'grid', gridTemplateColumns: `repeat(${section.columns}, 1fr)`, gap: '0', height: '100%' }}
     >
       {section.zones.map((zone) => {
         const alignStyle = ZONE_ALIGN_STYLES[zone.align ?? 'start'];
@@ -132,7 +132,7 @@ function ZoneGrid({ section }: { section: PageSection }) {
         return (
           <div
             key={zone.id}
-            style={{ gridColumn: `span ${zone.span}`, ...alignStyle }}
+            style={{ gridColumn: `span ${zone.span}`, display: 'flex', flexDirection: 'column', ...alignStyle }}
             className={`${paddingClass} min-w-0 ${schemeClass}`}
           >
             <div className={widthClass}>
@@ -449,7 +449,7 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
             <div
               key={section.id}
               data-section-spacer={section.id}
-              className={`relative ${paddingClass} ${borderClass}`}
+              className={`relative flex flex-col ${paddingClass} ${borderClass}`}
               style={{ ...heightStyle, background: 'transparent', zIndex: contentZ }}
             >
               <ZoneGrid section={section} />
@@ -493,7 +493,7 @@ export function SectionsLayout({ content }: { content: SectionsPageContent }) {
         return (
           <div
             key={section.id}
-            className={`relative ${paddingClass} ${borderClass}`}
+            className={`relative flex flex-col ${paddingClass} ${borderClass}`}
             style={{ ...heightStyle, ...inlineStyle, position: 'relative', zIndex: contentZ }}
           >
             {hasOverlay && bg?.overlay && <OverlayDiv overlay={bg.overlay} />}

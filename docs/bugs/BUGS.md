@@ -23,6 +23,7 @@ _None_
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
+| [BUG-004](BUG-004-zone-vertical-alignment-icons-and-no-effect.md) | medium | page-editor, sections | Zone vertical alignment: wrong icons (horizontal variants used) and no visual effect (alignSelf on auto-height grid row) |
 | [BUG-003](BUG-003-media-uploads-broken-on-cloud-storage.md) | high | media, storage | Uploaded images and thumbnails broken on live site — all URL construction now delegates to `storageProvider.getUrl()` |
 
 ## Deferred / Won't Fix
