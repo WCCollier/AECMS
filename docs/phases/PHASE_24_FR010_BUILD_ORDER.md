@@ -1,7 +1,7 @@
 # Phase 24 + FR-010: Combined Build Order
 
 **Covers**: Phase 24A (Sales Tax), Phase 24B (Shipping), FR-010 (PII Encryption at Rest)  
-**Status**: 📋 PLANNED  
+**Status**: 🚧 IN PROGRESS — Deploy 1 live (2026-06-28); awaiting owner backfill run, then Deploy 2  
 **Source docs**: [PHASE_24_PLAN.md](./PHASE_24_PLAN.md) · [FR-010-pii-encryption.md](../feature-requests/FR-010-pii-encryption.md)
 
 ---

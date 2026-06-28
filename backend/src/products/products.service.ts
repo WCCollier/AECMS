@@ -711,8 +711,8 @@ export class ProductsService {
       author: {
         select: {
           id: true,
-          first_name: true,
-          last_name: true,
+          first_name_enc: true,
+          last_name_enc: true,
           email: true,
         },
       },

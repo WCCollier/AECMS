@@ -99,9 +99,7 @@ export class AuthService {
         email: registerDto.email,
         username: registerDto.username,
         password_hash: passwordHash,
-        first_name: registerDto.firstName,
         first_name_enc: await this.encryption.encrypt(registerDto.firstName),
-        last_name: registerDto.lastName,
         last_name_enc: await this.encryption.encrypt(registerDto.lastName),
         role_name: defaultRole,
         email_verified: false,
@@ -113,8 +111,8 @@ export class AuthService {
       },
     });
 
-    // Send verification email
-    await this.sendVerificationEmail(user.email, verificationToken, user.first_name);
+    // Send verification email — use plaintext from DTO since it was just registered
+    await this.sendVerificationEmail(user.email, verificationToken, registerDto.firstName);
 
     return {
       message: 'Registration successful. Please check your email to verify your account.',
@@ -178,8 +176,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.first_name || undefined,
-        lastName: user.last_name || undefined,
+        firstName: (await this.encryption.decrypt(user.first_name_enc)) || undefined,
+        lastName: (await this.encryption.decrypt(user.last_name_enc)) || undefined,
         role: user.role_name,
         emailVerified: user.email_verified,
       },
@@ -257,8 +255,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.first_name || undefined,
-        lastName: user.last_name || undefined,
+        firstName: await this.decryptName(user.first_name_enc),
+        lastName: await this.decryptName(user.last_name_enc),
         role: user.role_name,
         emailVerified: user.email_verified,
       },
@@ -284,13 +282,11 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || !(user.totp_secret_enc ?? user.totp_secret) || !user.totp_enabled) {
+    if (!user || !user.totp_secret_enc || !user.totp_enabled) {
       throw new UnauthorizedException('2FA not configured for this account');
     }
 
-    const totpSecret = user.totp_secret_enc
-      ? (await this.encryption.decrypt(user.totp_secret_enc) ?? user.totp_secret ?? '')
-      : (user.totp_secret ?? '');
+    const totpSecret = (await this.encryption.decrypt(user.totp_secret_enc)) ?? '';
     const isValid = speakeasy.totp.verify({ secret: totpSecret, encoding: 'base32', token: code, window: 1 });
     if (!isValid) {
       throw new UnauthorizedException('Invalid authenticator code');
@@ -316,8 +312,8 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.first_name || undefined,
-        lastName: user.last_name || undefined,
+        firstName: await this.decryptName(user.first_name_enc),
+        lastName: await this.decryptName(user.last_name_enc),
         role: user.role_name,
         emailVerified: user.email_verified,
       },
@@ -338,10 +334,7 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        totp_secret: secret,
-        totp_secret_enc: await this.encryption.encrypt(secret),
-      },
+      data: { totp_secret_enc: await this.encryption.encrypt(secret) },
     });
 
     return { secret, otpauthUrl };
@@ -352,12 +345,10 @@ export class AuthService {
    */
   async enableTwoFactor(userId: string, code: string): Promise<{ success: boolean }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !(user.totp_secret_enc ?? user.totp_secret)) throw new BadRequestException('2FA setup not initiated');
+    if (!user || !user.totp_secret_enc) throw new BadRequestException('2FA setup not initiated');
     if (user.totp_enabled) throw new BadRequestException('2FA is already enabled');
 
-    const totpSecret = user.totp_secret_enc
-      ? (await this.encryption.decrypt(user.totp_secret_enc) ?? user.totp_secret ?? '')
-      : (user.totp_secret ?? '');
+    const totpSecret = (await this.encryption.decrypt(user.totp_secret_enc)) ?? '';
     const isValid = speakeasy.totp.verify({ secret: totpSecret, encoding: 'base32', token: code, window: 1 });
     if (!isValid) throw new BadRequestException('Invalid verification code');
 
@@ -445,8 +436,8 @@ export class AuthService {
         user: {
           id: storedToken.user.id,
           email: storedToken.user.email,
-          firstName: storedToken.user.first_name || undefined,
-          lastName: storedToken.user.last_name || undefined,
+          firstName: await this.decryptName(storedToken.user.first_name_enc),
+          lastName: await this.decryptName(storedToken.user.last_name_enc),
           role: storedToken.user.role_name,
         },
       };
@@ -499,7 +490,12 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    // Decrypt PII fields for callers
+    return {
+      ...user,
+      first_name: (await this.encryption.decrypt(user.first_name_enc)) ?? null,
+      last_name: (await this.encryption.decrypt(user.last_name_enc)) ?? null,
+    };
   }
 
   async getShippingAddress(_userId: string) {
@@ -567,7 +563,7 @@ export class AuthService {
     // If approval gate is on, notify all approvers and return a distinct message
     const requireApproval = await this.isApprovalRequired();
     if (requireApproval) {
-      await this.notifyApprovers(user.email, user.first_name).catch((e) =>
+      await this.notifyApprovers(user.email, await this.decryptName(user.first_name_enc)).catch((e) =>
         console.error('[auth] notifyApprovers failed:', e?.message),
       );
       return { message: 'Email verified. Your account is awaiting admin approval. You will receive an email once it is reviewed.' };
@@ -606,7 +602,7 @@ export class AuthService {
     });
 
     // Send verification email
-    await this.sendVerificationEmail(user.email, verificationToken, user.first_name);
+    await this.sendVerificationEmail(user.email, verificationToken, await this.decryptName(user.first_name_enc));
 
     return { message: 'If an account exists with this email, a verification link will be sent.' };
   }
@@ -878,6 +874,11 @@ export class AuthService {
   /**
    * Store refresh token in database
    */
+  private async decryptName(enc: string | null | undefined): Promise<string | undefined> {
+    if (!enc) return undefined;
+    return (await this.encryption.decrypt(enc)) ?? undefined;
+  }
+
   private async storeRefreshToken(
     userId: string,
     token: string,
@@ -952,8 +953,6 @@ export class AuthService {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },
         { username: { contains: search, mode: 'insensitive' } },
-        { first_name: { contains: search, mode: 'insensitive' } },
-        { last_name: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -967,8 +966,8 @@ export class AuthService {
           id: true,
           email: true,
           username: true,
-          first_name: true,
-          last_name: true,
+          first_name_enc: true,
+          last_name_enc: true,
           role_name: true,
           email_verified: true,
           created_at: true,
@@ -977,10 +976,12 @@ export class AuthService {
       this.prisma.user.count({ where }),
     ]);
 
-    const normalized = users.map(({ role_name, ...rest }) => ({
+    const normalized = await Promise.all(users.map(async ({ role_name, first_name_enc, last_name_enc, ...rest }) => ({
       ...rest,
+      first_name: await this.decryptName(first_name_enc),
+      last_name: await this.decryptName(last_name_enc),
       role: role_name,
-    }));
+    })));
     return { data: normalized, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
@@ -1048,15 +1049,21 @@ export class AuthService {
         id: true,
         email: true,
         username: true,
-        first_name: true,
-        last_name: true,
+        first_name_enc: true,
+        last_name_enc: true,
         role_name: true,
         email_verified: true,
         created_at: true,
       },
       orderBy: { created_at: 'asc' },
     });
-    return { data: users, total: users.length };
+    const data = await Promise.all(users.map(async ({ role_name, first_name_enc, last_name_enc, ...rest }) => ({
+      ...rest,
+      first_name: await this.decryptName(first_name_enc),
+      last_name: await this.decryptName(last_name_enc),
+      role: role_name,
+    })));
+    return { data, total: data.length };
   }
 
   async approveRegistration(actorId: string, targetId: string): Promise<{ message: string }> {
@@ -1077,13 +1084,14 @@ export class AuthService {
     });
 
     const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
+    const firstName = (await this.decryptName(user.first_name_enc)) || 'there';
     await this.emailProvider.send({
       to: user.email,
       subject: 'Your account has been approved',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #333;">Welcome!</h1>
-          <p>Hi ${user.first_name || 'there'},</p>
+          <p>Hi ${firstName},</p>
           <p>Your account registration has been approved. You can now log in at:</p>
           <p style="text-align: center; margin: 30px 0;">
             <a href="${appUrl}/login"
@@ -1094,7 +1102,7 @@ export class AuthService {
           </p>
         </div>
       `,
-      text: `Hi ${user.first_name || 'there'},\n\nYour account has been approved. Log in at: ${appUrl}/login`,
+      text: `Hi ${firstName},\n\nYour account has been approved. Log in at: ${appUrl}/login`,
     }).catch((e) => console.error('[auth] approval email failed:', e?.message));
 
     return { message: 'Registration approved' };

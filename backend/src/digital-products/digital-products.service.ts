@@ -7,6 +7,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import type { StorageProvider } from '../storage';
 import { STORAGE_PROVIDER } from '../storage';
 import { PersonalizationService } from './personalization.service';
@@ -31,6 +32,7 @@ export class DigitalProductsService {
     @Inject(STORAGE_PROVIDER)
     private storageProvider: StorageProvider,
     private personalizationService: PersonalizationService,
+    private encryption: EncryptionService,
   ) {}
 
   /**
@@ -388,12 +390,15 @@ export class DigitalProductsService {
       // Resolve customer name: explicit param → order.customer_name → user record → order email
       let resolvedName = personalizationOptions?.customerName;
       if (!resolvedName) {
-        if ((download.order as any).customer_name) {
-          resolvedName = (download.order as any).customer_name;
+        const orderCustName = await this.encryption.decrypt((download.order as any).customer_name_enc);
+        if (orderCustName) {
+          resolvedName = orderCustName;
         } else if (download.user_id) {
           const user = await this.prisma.user.findUnique({ where: { id: download.user_id } });
+          const fn = user ? await this.encryption.decrypt(user.first_name_enc) : null;
+          const ln = user ? await this.encryption.decrypt(user.last_name_enc) : null;
           resolvedName = user
-            ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
+            ? `${fn || ''} ${ln || ''}`.trim() || user.email
             : download.order.email;
         } else {
           resolvedName = download.order.email;

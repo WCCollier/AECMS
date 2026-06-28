@@ -12,6 +12,19 @@ import * as path from 'path';
 import { config } from 'dotenv';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import * as crypto from 'crypto';
+
+function encryptWp(plaintext: string | null | undefined): string | null {
+  if (!plaintext) return null;
+  const keyHex = process.env.SETTINGS_ENCRYPTION_KEY;
+  if (!keyHex || keyHex.length !== 64) return null;
+  const key = Buffer.from(keyHex, 'hex');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv) as crypto.CipherGCM;
+  const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, enc]).toString('base64');
+}
 
 // Load environment variables
 config({ path: path.join(__dirname, '..', '.env') });
@@ -109,8 +122,8 @@ async function importUsers(): Promise<Map<number, string>> {
         data: {
           email: user.email,
           password_hash: tempPasswordHash,
-          first_name: user.first_name,
-          last_name: user.last_name,
+          first_name_enc: encryptWp(user.first_name),
+          last_name_enc: encryptWp(user.last_name),
           role_name: user.role_name ?? user.role ?? 'member',
           email_verified: user.email_verified,
         },

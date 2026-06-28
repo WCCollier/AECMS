@@ -4,6 +4,7 @@ import { config } from 'dotenv';
 import * as path from 'path';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import * as crypto from 'crypto';
 
 // Load environment variables
 config({ path: path.join(__dirname, '..', '.env') });
@@ -16,6 +17,18 @@ const adapter = new PrismaPg(pool);
 
 // Initialize PrismaClient with adapter
 const prisma = new PrismaClient({ adapter });
+
+function encryptForSeed(plaintext: string | null | undefined): string | null {
+  if (!plaintext) return null;
+  const keyHex = process.env.SETTINGS_ENCRYPTION_KEY;
+  if (!keyHex || keyHex.length !== 64) return null; // skip encryption if key not set
+  const key = Buffer.from(keyHex, 'hex');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv) as crypto.CipherGCM;
+  const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, enc]).toString('base64');
+}
 
 async function main() {
   const profile = (process.env.SEED_PROFILE ?? 'minimal').trim();
@@ -138,8 +151,8 @@ async function main() {
       create: {
         email: 'owner@aecms.local',
         password_hash: passwordHash,
-        first_name: 'System',
-        last_name: 'Owner',
+        first_name_enc: encryptForSeed('System'),
+        last_name_enc: encryptForSeed('Owner'),
         role_name: 'owner',
         email_verified: true,
         approved_at: new Date(),
@@ -154,8 +167,8 @@ async function main() {
       create: {
         email: 'admin@aecms.local',
         password_hash: adminHash,
-        first_name: 'System',
-        last_name: 'Admin',
+        first_name_enc: encryptForSeed('System'),
+        last_name_enc: encryptForSeed('Admin'),
         role_name: 'admin',
         email_verified: true,
       },
@@ -169,8 +182,8 @@ async function main() {
       create: {
         email: 'member@aecms.local',
         password_hash: memberHash,
-        first_name: 'Test',
-        last_name: 'Member',
+        first_name_enc: encryptForSeed('Test'),
+        last_name_enc: encryptForSeed('Member'),
         role_name: 'member',
         email_verified: true,
       },
