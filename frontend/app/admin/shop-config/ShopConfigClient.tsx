@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Store, Building2, Truck, Save, Loader2 } from 'lucide-react';
+import { Store, Building2, Truck, Receipt, Save, Loader2 } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 
@@ -20,6 +20,10 @@ interface ShopSettings {
   'shop.shipping_state': string;
   'shop.shipping_postal_code': string;
   'shop.shipping_country': string;
+  // Tax (Step 3)
+  'tax.enabled': string;
+  'tax.default_stripe_tax_code': string;
+  'tax.flat_rate': string;
 }
 
 const EMPTY: ShopSettings = {
@@ -37,6 +41,9 @@ const EMPTY: ShopSettings = {
   'shop.shipping_state': '',
   'shop.shipping_postal_code': '',
   'shop.shipping_country': 'US',
+  'tax.enabled': 'false',
+  'tax.default_stripe_tax_code': '',
+  'tax.flat_rate': '',
 };
 
 function Field({
@@ -200,6 +207,48 @@ export function ShopConfigClient() {
             countryKey="shop.shipping_country"
           />
         )}
+      </section>
+
+      {/* Tax */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-border pb-2">
+          <Receipt className="w-4 h-4 text-foreground/50" />
+          <h2 className="text-sm font-semibold">Tax</h2>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Tax collection</p>
+            <p className="text-xs text-foreground/50">Enable only after registering with your state tax authority and configuring Stripe Tax in the Dashboard.</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings['tax.enabled'] === 'true'}
+              onChange={(e) => set('tax.enabled', e.target.checked ? 'true' : 'false')}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-foreground/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent" />
+          </label>
+        </div>
+        {settings['tax.enabled'] === 'true' && (
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-700/50 p-3 text-xs text-amber-800 dark:text-amber-300">
+            Tax collection is active. Ensure Stripe Tax is enabled in your Stripe Dashboard and your registration number is filled in above.
+          </div>
+        )}
+        <Field
+          label="Default Stripe Tax code"
+          value={settings['tax.default_stripe_tax_code']}
+          onChange={(v) => set('tax.default_stripe_tax_code', v)}
+          placeholder="e.g. txcd_10040001"
+          hint="Applied to all products that don't have a per-product tax code. Find codes at stripe.com/docs/tax/tax-codes."
+        />
+        <Field
+          label="PayPal flat rate (%)"
+          value={settings['tax.flat_rate']}
+          onChange={(v) => set('tax.flat_rate', v)}
+          placeholder="e.g. 8.25"
+          hint="Used for PayPal orders (Stripe Tax handles Stripe orders automatically). Enter max state rate."
+        />
       </section>
 
       {/* Save */}

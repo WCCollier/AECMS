@@ -111,6 +111,10 @@ const adminBackstageCaps = [
 ];
 
 const defaultSettings = [
+  // Tax defaults (all off — activate via Shop Config when legally ready)
+  { key: 'tax.enabled',                  value: 'false' },
+  { key: 'tax.flat_rate',                value: '' },
+  { key: 'tax.default_stripe_tax_code',  value: '' },
   { key: 'general.site_title',    value: 'My Site' },
   { key: 'general.tagline',       value: '' },
   { key: 'general.timezone',      value: 'America/New_York' },

@@ -416,6 +416,9 @@ model Product {
   amazon_url          String?
   goodreads_url       String?
 
+  // Tax
+  stripe_tax_code     String?   // Stripe Tax code (e.g. txcd_10040001); null = use shop default
+
   published_at        DateTime?
   created_at          DateTime    @default(now())
   updated_at          DateTime    @updatedAt

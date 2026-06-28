@@ -207,6 +207,7 @@ export class SettingsController {
       'shop.shipping_same_as_business',
       'shop.shipping_street', 'shop.shipping_city', 'shop.shipping_state',
       'shop.shipping_postal_code', 'shop.shipping_country',
+      'tax.enabled', 'tax.default_stripe_tax_code', 'tax.flat_rate',
     ];
     const values = await Promise.all(keys.map((k) => this.settingsService.getEffective(k)));
     return Object.fromEntries(keys.map((k, i) => [k, values[i] ?? '']));
@@ -217,7 +218,7 @@ export class SettingsController {
   @ApiOperation({ summary: 'Update shop configuration settings' })
   async updateShop(@Body() dto: UpdateSettingsDto, @Request() req: any) {
     const allowed = Object.fromEntries(
-      Object.entries(dto.updates).filter(([k]) => k.startsWith('shop.')),
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('shop.') || k.startsWith('tax.')),
     );
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'Shop settings saved' };
