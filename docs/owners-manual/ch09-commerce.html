@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chapter 9 — Commerce: Tax &amp; Shipping | AECMS Owner's Manual</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><a href="index.html"><div class="product">AECMS</div><div class="title">Owner's Manual</div></a></div>
+    <nav>
+      <div class="nav-section">
+        <div class="nav-section-title">Getting Started</div>
+        <a href="index.html">Overview</a>
+        <a href="ch01-infrastructure.html">Ch 1 — Choose Infrastructure</a>
+        <a href="ch02-platform-setup/index.html">Ch 2 — Platform Setup</a>
+        <a href="ch03-aecms-config.html">Ch 3 — Configure AECMS</a>
+        <a href="ch04-first-launch.html">Ch 4 — First Launch &amp; Wizard</a>
+        <a href="ch08-seo.html">Ch 8 — SEO Setup</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Running Your Site</div>
+        <a href="ch05-admin-settings.html">Ch 5 — Admin Settings</a>
+        <a href="ch06-going-live.html">Ch 6 — Going Live</a>
+        <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
+        <a href="ch09-commerce.html" class="active">Ch 9 — Commerce</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">This Chapter</div>
+        <a href="#overview">Overview</a>
+        <a href="#shop-config">Shop Config</a>
+        <a href="#tax">Activating Tax</a>
+        <a href="#shipping">Activating Shipping</a>
+        <a href="#tax-report">Tax Reporting</a>
+        <a href="#account-page">Customer Account Page</a>
+      </div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="content">
+      <div class="breadcrumb"><a href="index.html">Owner's Manual</a> <span>›</span> Chapter 9</div>
+      <div class="page-header">
+        <h1>Chapter 9 — Commerce: Tax &amp; Shipping</h1>
+        <p class="subtitle">Configure your business identity, activate sales tax collection, set shipping rates, and understand the customer account experience.</p>
+      </div>
+
+      <!-- Overview -->
+      <h2 id="overview">How Commerce Infrastructure Works</h2>
+      <p>The tax and shipping systems are <strong>built into every AECMS deployment</strong> but are off by default. All the code, database fields, and UI is present on day one — nothing is installed or upgraded when you activate. Two ISM flags control whether customers see any of it:</p>
+      <table>
+        <thead><tr><th>Flag</th><th>Default</th><th>Effect when enabled</th></tr></thead>
+        <tbody>
+          <tr><td><code>tax.enabled</code></td><td>false</td><td>Tax computed, displayed, and collected on all orders</td></tr>
+          <tr><td><code>shipping.enabled</code></td><td>false</td><td>Shipping cost added to physical-product orders at checkout</td></tr>
+        </tbody>
+      </table>
+      <p>The address book and checkout address-collection flow are always active — they are useful for logged-in customers regardless of tax or shipping status.</p>
+      <div class="callout tip">
+        <div class="callout-title">✅ Ship dark, activate when ready</div>
+        <p>You can fill in Shop Config, set your tax codes, and configure shipping rates at any time without affecting live customers. Flip the flag when you are legally and operationally ready. No redeploy required for activation.</p>
+      </div>
+
+      <!-- Shop Config -->
+      <h2 id="shop-config">Shop Config — <code>/admin/shop-config</code></h2>
+      <p>Gated on the <code>shop.configure</code> capability (Owner only). This is where AECMS learns who your business is — the information that appears on receipts, drives tax nexus determination, and anchors your shipping origin. Fill this in before activating either tax or shipping.</p>
+
+      <h3>Business Identity</h3>
+      <table>
+        <thead><tr><th>Field</th><th>Used for</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Legal business name</strong></td><td>Appears on order confirmation emails and tax receipts. May differ from your site title (e.g. "Jane Smith LLC" vs "Jane's Books").</td></tr>
+          <tr><td><strong>EIN / Tax ID</strong></td><td>Stored encrypted. Required for future 1099 obligations if you pay contractors. Leave blank until you have it.</td></tr>
+          <tr><td><strong>State tax registration number</strong></td><td>Your Comptroller permit number or equivalent. Displayed on tax-inclusive receipts. Required before flipping <code>tax.enabled</code>.</td></tr>
+          <tr><td><strong>Business address</strong></td><td>Your registered legal address. Stripe Tax uses this to determine your nexus — the state(s) where you have a tax obligation.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Shipping Origin</h3>
+      <p>By default, your shipping origin is the same as your business address — check <strong>"Same as business address"</strong> to use it. If you ship from a warehouse or fulfillment center at a different address, uncheck the box and enter the origin address separately. All shipping calculations use this address for domestic/international rate determination.</p>
+
+      <h3>Tax section</h3>
+      <p>The Tax section within Shop Config shows your tax toggle and rate settings. Business state and registration number are read from Business Identity above. See <a href="#tax">Activating Tax</a> for the full walkthrough.</p>
+
+      <h3>Shipping section</h3>
+      <p>The Shipping section shows your shipping toggle and rate tiers. Shipping origin is read from Business Identity above. See <a href="#shipping">Activating Shipping</a> for the full walkthrough.</p>
+
+      <!-- Tax -->
+      <h2 id="tax">Activating Tax Collection</h2>
+
+      <div class="callout warning">
+        <div class="callout-title">⚠️ Do not activate tax before you are registered</div>
+        <p>Collecting sales tax without a state permit can expose you to penalties. Complete the prerequisite steps below before flipping <code>tax.enabled = true</code>.</p>
+      </div>
+
+      <h3>Prerequisites (non-code steps)</h3>
+      <ol>
+        <li><strong>Determine your nexus.</strong> You are typically obligated to collect sales tax in states where you have a physical presence (home office, warehouse). For most single-owner sites, this is one state.</li>
+        <li><strong>Register with your state tax authority.</strong> In Texas, this is the <a href="https://comptroller.texas.gov" target="_blank" rel="noopener">Texas Comptroller</a>. Registration is free and takes a few days. You will receive a permit number — keep it handy.</li>
+        <li><strong>Enable Stripe Tax in the Stripe Dashboard.</strong> Log in → Tax → Enable Stripe Tax → enter your business address. Stripe uses this to compute the correct rate for each jurisdiction automatically, including local rates. This step is required even if all your orders come through Stripe Checkout — Stripe Tax is not on by default.</li>
+      </ol>
+
+      <h3>Configuring tax in Shop Config</h3>
+      <ol>
+        <li>Go to <strong>Admin → Shop Config → Tax</strong>.</li>
+        <li>Enter your <strong>state tax registration number</strong> (from registration step above) in Business Identity.</li>
+        <li>Set a <strong>Default Stripe tax code</strong> — the Stripe tax code used for any product that does not have one set on its own. Common codes:
+          <table>
+            <thead><tr><th>Product type</th><th>Stripe tax code</th></tr></thead>
+            <tbody>
+              <tr><td>Physical goods (general)</td><td><code>txcd_99999999</code></td></tr>
+              <tr><td>Digital books / ebooks</td><td><code>txcd_10010001</code></td></tr>
+              <tr><td>Digital audio</td><td><code>txcd_10020000</code></td></tr>
+              <tr><td>Digital video</td><td><code>txcd_10040000</code></td></tr>
+              <tr><td>Online courses</td><td><code>txcd_10070000</code></td></tr>
+              <tr><td>Services</td><td><code>txcd_20030000</code></td></tr>
+            </tbody>
+          </table>
+        </li>
+        <li>Set the <strong>PayPal flat rate</strong> — the flat tax percentage applied to PayPal orders (e.g. <code>8.25</code> for Texas). PayPal cannot call Stripe Tax automatically, so AECMS applies this flat rate to all PayPal transactions when tax is enabled.</li>
+      </ol>
+
+      <h3>Setting per-product tax codes</h3>
+      <p>Open any product in the Product editor. Under the Details panel, find the <strong>Tax Code</strong> dropdown. Select the code that matches this product's taxability. Products with no code set use the Default Stripe Tax Code from Shop Config.</p>
+
+      <h3>Activating</h3>
+      <ol>
+        <li>Confirm <strong>Business address</strong> and <strong>state</strong> are filled in under Shop Config → Business Identity.</li>
+        <li>Confirm <strong>Stripe Tax is enabled</strong> in your Stripe Dashboard (Stripe Dashboard → Tax → settings show "Enabled").</li>
+        <li>In Shop Config → Tax, flip <strong>Tax collection enabled</strong> to on and click Save.</li>
+      </ol>
+      <p>Tax collection goes live immediately on the next customer purchase. Stripe Checkout will compute and display the correct tax based on the customer's location. The tax amount is stored on every order and appears on the customer's confirmation email and order page.</p>
+
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Filing tax returns</div>
+        <p>AECMS collects tax on your behalf — you are responsible for remitting it to your state tax authority on the schedule they assign (typically quarterly or annually for low-volume sellers). Use the <a href="#tax-report">Tax Report</a> in the Backstage to get your totals per period.</p>
+      </div>
+
+      <!-- Shipping -->
+      <h2 id="shipping">Activating Shipping</h2>
+      <p>AECMS supports flat-rate shipping tiers. You define up to two domestic rates (standard and priority) and an optional international rate. Per-product overrides are available for items that ship differently.</p>
+
+      <h3>Setting shipping rates</h3>
+      <ol>
+        <li>Go to <strong>Admin → Shop Config → Shipping</strong>.</li>
+        <li>Confirm your <strong>shipping origin</strong> is correct under Business Identity (or fill it in if different from your business address).</li>
+        <li>Enter <strong>Tier 1 — Standard</strong>: a label (e.g. "Standard Shipping") and a rate in cents (e.g. <code>799</code> for $7.99).</li>
+        <li>Optionally enter <strong>Tier 2 — Priority</strong> for an express option.</li>
+        <li>Optionally enter a <strong>Free shipping threshold</strong> in cents — orders above this subtotal get free shipping (e.g. <code>5000</code> for "free over $50").</li>
+        <li>Optionally enter an <strong>International rate</strong> if you ship outside your home country.</li>
+      </ol>
+      <div class="callout tip">
+        <div class="callout-title">✅ How to price shipping</div>
+        <p>Look up USPS Priority Mail flat-rate box costs from your zip code to a few representative destinations. Round up a dollar or two. For most low-volume sellers, this is simpler and more predictable than real-time carrier rates.</p>
+      </div>
+
+      <h3>Per-product overrides</h3>
+      <p>Open a <strong>Physical</strong> product in the Product editor. Find the <strong>Shipping Cost Override</strong> field (only shown for physical products). Enter a cost in cents. When set, this exact amount is charged for shipping this product — ignoring the global tiers. Useful for oversized or unusually heavy items.</p>
+      <p>Leave blank on most products to use the global tier rate.</p>
+
+      <h3>Activating</h3>
+      <ol>
+        <li>In Shop Config → Shipping, flip <strong>Shipping enabled</strong> to on and click Save.</li>
+      </ol>
+      <p>Shipping costs appear immediately on the cart page and at checkout for any order containing physical products. The shipping amount is stored on the order and shown to the customer on the confirmation email and their order detail page.</p>
+
+      <!-- Tax Report -->
+      <h2 id="tax-report">Tax Report — <code>/admin/tax-report</code></h2>
+      <p>The Tax Report gives you the numbers you need to file your periodic tax return.</p>
+      <ul>
+        <li><strong>Date range picker</strong> — defaults to the current calendar quarter. Set any custom range to match your filing period.</li>
+        <li><strong>Total sales (pre-tax)</strong> — the sum of all order subtotals in the period.</li>
+        <li><strong>Total tax collected</strong> — the sum of all <code>tax_amount</code> values on completed orders.</li>
+        <li><strong>State breakdown</strong> — tax collected per jurisdiction (from Stripe Tax's breakdown data).</li>
+        <li><strong>CSV export</strong> — download the breakdown for your accountant or tax filing software.</li>
+      </ul>
+      <div class="callout note">
+        <div class="callout-title">ℹ️ Tax report only includes orders where tax was collected</div>
+        <p>Orders placed before <code>tax.enabled</code> was flipped, or PayPal orders with a zero flat rate, will show <code>tax_amount = 0</code> and are excluded from the tax totals. This is correct — no tax was collected on those orders.</p>
+      </div>
+
+      <!-- Account Page -->
+      <h2 id="account-page">Customer Account Page — <code>/account</code></h2>
+      <p>Logged-in customers manage their own data at <code>/account</code>. As the site owner, you are also a customer — this is where you update your own display name, manage saved addresses, and control notification preferences.</p>
+
+      <h3>Edit Profile</h3>
+      <p>The <strong>Edit Profile</strong> section (collapsible, below the read-only Profile display) lets any logged-in user update their first name, last name, and username. Only fields you fill in are changed — leave a field blank to keep the current value. Names are stored encrypted at rest.</p>
+      <div class="callout tip">
+        <div class="callout-title">✅ Set your display name here</div>
+        <p>After initial setup your display name may be blank. Go to <code>/account</code> → Edit Profile and enter your first and last name. This name appears in the admin sidebar and on any content you author.</p>
+      </div>
+
+      <h3>Saved Addresses</h3>
+      <p>The <strong>Saved Addresses</strong> section lets customers save shipping addresses for faster checkout. Addresses are stored encrypted at rest. Customers can add multiple addresses, set a default, and delete old ones. At checkout, the default address is offered with a "Use this / Change" option.</p>
+
+      <h3>Notifications</h3>
+      <p>Subscription preferences for optional marketing emails — new articles, new products, news &amp; alerts. System emails (order confirmation, password reset, email verification) cannot be disabled. Customers control their preferences here; you control the defaults in Settings → General → Subscription Defaults.</p>
+
+      <h3>Order History</h3>
+      <p>Shows the customer's 5 most recent orders with status and a link to the order detail page. Customers can also view all orders from the order detail link.</p>
+
+      <h3>Digital Library</h3>
+      <p>Appears automatically for customers who have purchased digital products. Shows all their owned files with download links. Download tokens are time-limited and regenerated on each access.</p>
+
+      <h3>Change Password &amp; Delete Account</h3>
+      <p>Standard self-service account management. Changing the password revokes all active sessions and redirects to login. Account deletion is a soft-delete — the record is retained for order history integrity.</p>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

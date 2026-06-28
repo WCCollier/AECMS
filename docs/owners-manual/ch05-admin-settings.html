@@ -25,6 +25,7 @@
         <a href="ch05-admin-settings.html" class="active">Ch 5 — Admin Settings</a>
         <a href="ch06-going-live.html">Ch 6 — Going Live</a>
         <a href="ch07-maintenance.html">Ch 7 — Maintenance</a>
+        <a href="ch09-commerce.html">Ch 9 — Commerce</a>
       </div>
       <div class="nav-section">
         <div class="nav-section-title">Settings Tabs</div>
@@ -47,6 +48,8 @@
         <a href="#registrations">Registration Queue</a>
         <a href="#audit">Audit Log</a>
         <a href="#mul-converter">Mul Converter</a>
+        <a href="#shop-config">Shop Config</a>
+        <a href="#tax-report">Tax Report</a>
       </div>
     </nav>
   </aside>
@@ -310,8 +313,15 @@
       <h3>Refunding an order</h3>
       <p>Open an order and click <strong>Refund</strong>. You can issue a full or partial refund. The refund is processed directly through the payment gateway (Stripe or PayPal) and the order status updates to <strong>Refunded</strong>.</p>
 
+      <h3>Tax and shipping on orders</h3>
+      <p>When tax or shipping collection is active, each order detail view shows a breakdown:</p>
+      <ul>
+        <li><strong>Tax amount</strong> — collected via Stripe Tax (per-jurisdiction) or PayPal flat rate. Null on orders placed before tax was activated.</li>
+        <li><strong>Shipping amount</strong> — the shipping cost charged at checkout. Zero for digital and service orders, or when shipping was not yet enabled.</li>
+      </ul>
+
       <h3>Exporting transactions</h3>
-      <p>Click <strong>Export CSV</strong> on the Orders list to download a transaction history. Select a date range (defaults to the current calendar month). The CSV is suitable for accounting software or AI-assisted bookkeeping.</p>
+      <p>Click <strong>Export CSV</strong> on the Orders list to download a transaction history. Select a date range (defaults to the current calendar month). The CSV includes <code>tax_amount</code> and <code>shipping_amount</code> columns and is suitable for accounting software or AI-assisted bookkeeping.</p>
 
       <!-- Registration Queue -->
       <h2 id="registrations">Registration Queue — <code>/admin/registrations</code></h2>
@@ -350,6 +360,28 @@
         <div class="callout-title">ℹ️ Preview frame may be blank</div>
         <p>Many sites block iframe embedding. A blank preview is expected — the backend fetches the page directly, not through the iframe, so the analysis still works.</p>
       </div>
+
+      <!-- Shop Config -->
+      <h2 id="shop-config">Shop Config — <code>/admin/shop-config</code></h2>
+      <p>Gated on the <code>shop.configure</code> capability (Owner only). Separate from the general Settings panel — this covers information that only matters because money and physical goods are changing hands.</p>
+      <p>Three tabs:</p>
+      <ul>
+        <li><strong>Business</strong> — legal name, EIN (encrypted), state tax registration number, registered business address, and shipping origin (with "same as business address" toggle).</li>
+        <li><strong>Tax</strong> — <code>tax.enabled</code> toggle, default Stripe tax code, PayPal flat rate. Business state and registration number are shown read-only here, sourced from Business.</li>
+        <li><strong>Shipping</strong> — <code>shipping.enabled</code> toggle, flat-rate tiers (standard/priority), free shipping threshold, international rate. Shipping origin shown read-only, sourced from Business.</li>
+      </ul>
+      <p>See <a href="ch09-commerce.html">Chapter 9 — Commerce</a> for the full activation walkthroughs for tax and shipping.</p>
+
+      <!-- Tax Report -->
+      <h2 id="tax-report">Tax Report — <code>/admin/tax-report</code></h2>
+      <p>Shows tax collected across all completed orders within a selected date range. Requires <code>order.manage</code> capability (Admin and Owner by default).</p>
+      <ul>
+        <li>Date range picker — defaults to the current calendar quarter</li>
+        <li>Total sales (pre-tax) and total tax collected</li>
+        <li>State/jurisdiction breakdown (from Stripe Tax data on each order)</li>
+        <li>CSV export for your accountant or filing software</li>
+      </ul>
+      <p>Only appears when <code>tax.enabled = true</code>. Orders placed before tax was activated show <code>tax_amount = 0</code> and are excluded from totals.</p>
 
     </div>
   </main>
