@@ -115,6 +115,7 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
   const [articles, setArticles] = useState<Article[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedArticles, setSelectedArticles] = useState<Set<string>>(new Set());
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -122,13 +123,16 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
 
   useEffect(() => {
     setLoading(true);
+    setFetchError(null);
     Promise.all([
-      adminApi.get('/articles?limit=1000&status=published').then((r) => r.data),
-      adminApi.get('/products?limit=1000&status=published').then((r) => r.data),
+      adminApi.get('/articles?limit=100&status=published').then((r) => r.data),
+      adminApi.get('/products?limit=100&status=published').then((r) => r.data),
     ]).then(([aRes, pRes]) => {
       setArticles(aRes.data ?? []);
       setProducts(pRes.data ?? []);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch((e) => {
+      setFetchError(getErrorMessage(e));
+    }).finally(() => setLoading(false));
   }, []);
 
   const articleAlreadyTagged = (a: Article) => a.tags.some((t) => t.slug === tag.slug);
@@ -177,6 +181,8 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
         <div className="overflow-y-auto flex-1 p-5 space-y-6">
           {loading ? (
             <p className="text-sm text-foreground/50">Loading content…</p>
+          ) : fetchError ? (
+            <p className="text-sm text-red-500 py-4 text-center">Failed to load content: {fetchError}</p>
           ) : (
             <>
               {/* Articles */}

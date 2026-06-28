@@ -1,6 +1,6 @@
 # BUG-007: Tag Assign Modal Shows "All Already Tagged" for Every Tag
 
-**Status:** `accepted`
+**Status:** `fixed`
 **Severity:** `high`
 **Area:** backstage, tags, FR-014
 
@@ -111,8 +111,19 @@ Add the error to the modal body, just below the `{loading ? ...}` block:
 2. Click **Assign** on a tag that has some but not all articles → untagged articles appear in the checklist, already-tagged articles are excluded
 3. Click **Assign** on a tag with 0 articles/products assigned → all articles and products appear as selectable
 
+## Completion Report
+
+**Files changed:** `frontend/app/admin/tags/TagEditorClient.tsx`
+
+- Changed `limit=1000` → `limit=100` on both article and product fetch calls in `AssignModal.useEffect`
+- Replaced `.catch(() => {})` with `.catch((e) => { setFetchError(getErrorMessage(e)); })`
+- Added `fetchError` state; modal body shows a centered red error message when fetch fails instead of the misleading "all already tagged" empty state
+
+---
+
 ## Status History
 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-27 | accepted | Root-caused: limit=1000 exceeds @Max(100), silent catch hides 400 |
+| 2026-06-28 | fixed | limit=100, fetchError state replaces silent catch |

@@ -75,7 +75,18 @@ export function TwoFactorClient() {
       }
       router.push('/admin');
     } catch (err) {
-      setError(getErrorMessage(err));
+      const message = getErrorMessage(err);
+      const isSessionExpired =
+        message.toLowerCase().includes('session expired') ||
+        (err as any)?.response?.status === 401;
+
+      if (isSessionExpired) {
+        sessionStorage.removeItem('admin_pre_auth_token');
+        router.replace('/admin/login?error=session_expired');
+        return;
+      }
+
+      setError(message);
       setDigits(['', '', '', '', '', '']);
       setIsLoading(false);
       setTimeout(() => inputRefs.current[0]?.focus(), 50);
