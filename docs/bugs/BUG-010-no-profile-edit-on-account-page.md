@@ -1,6 +1,6 @@
 # BUG-010: No way to edit display name (first/last) on the account page
 
-**Status:** `open`
+**Status:** `fixed`
 **Reported:** 2026-06-28
 **Severity:** `high`
 **Area:** frontend, auth, account
@@ -77,12 +77,14 @@ frontend/app/(site)/account/AccountPageClient.tsx  — add profile edit section 
 
 ## Completion Report
 
-> _Fill in after fix is deployed._
-
-**Fixed:** YYYY-MM-DD
-**Commit(s):** `abc1234`
+**Fixed:** 2026-06-28
+**Commit(s):** `5156afe`
 
 ### What changed
+
+Implemented as planned. `PATCH /auth/profile` added to `AuthController` behind `JwtAuthGuard`. New `UpdateProfileDto` accepts optional `firstName`, `lastName`, `username`. `AuthService.updateProfile()` encrypts names via `EncryptionService` before writing to `first_name_enc`/`last_name_enc`; checks username uniqueness and throws 409 on conflict. Returns decrypted field values.
+
+Account page gains a collapsible **Edit Profile** section following the same accordion pattern as Change Password. Opens pre-filled with current values. Only non-empty fields are sent — blank fields are skipped, preserving existing values. Calls `refreshUser()` on success so the Profile header reflects the new name immediately.
 
 ---
 
@@ -91,3 +93,4 @@ frontend/app/(site)/account/AccountPageClient.tsx  — add profile edit section 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-28 | open | Initial report — oversight discovered after FR-010 Deploy 2 nulled existing names |
+| 2026-06-28 | fixed | PATCH /auth/profile + Edit Profile section on account page deployed in 5156afe |
