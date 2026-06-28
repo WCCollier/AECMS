@@ -30,6 +30,7 @@ import { UsersModule } from './users/users.module';
 import { MulConverterModule } from './mul-converter/mul-converter.module';
 import { RolesModule } from './roles/roles.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { EncryptionModule } from './encryption/encryption.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { SubscriptionsModule } from './subscriptions/subscriptions.module';
     MulConverterModule,
     RolesModule,
     SubscriptionsModule,
+    EncryptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
