@@ -100,13 +100,14 @@ export class SettingsController {
     private testEmailService: TestEmailService,
   ) {}
 
-  // Any one of the configure.* or broadcast.config caps grants read access to all settings.
+  // Any one of the configure.* or shop.configure or broadcast.config caps grants read access to all settings.
   @Get()
   @RequiresCapability(
     'system.configure.general',
     'system.configure.email',
     'system.configure.payments',
     'system.configure.storage',
+    'shop.configure',
     'broadcast.config',
   )
   @ApiOperation({ summary: 'Get all site settings (encrypted fields redacted)' })
@@ -191,6 +192,35 @@ export class SettingsController {
     );
     await this.settingsService.set(allowed, req.user.id);
     return { message: 'SEO settings saved' };
+  }
+
+  // ── Shop Config (business identity, shipping origin) ──────────────────────
+
+  @Get('shop')
+  @RequiresCapability('shop.configure')
+  @ApiOperation({ summary: 'Get shop configuration settings (business identity, shipping origin)' })
+  async getShop() {
+    const keys = [
+      'shop.legal_name', 'shop.ein_enc', 'shop.tax_registration_number',
+      'shop.address_street', 'shop.address_city', 'shop.address_state',
+      'shop.address_postal_code', 'shop.address_country',
+      'shop.shipping_same_as_business',
+      'shop.shipping_street', 'shop.shipping_city', 'shop.shipping_state',
+      'shop.shipping_postal_code', 'shop.shipping_country',
+    ];
+    const values = await Promise.all(keys.map((k) => this.settingsService.getEffective(k)));
+    return Object.fromEntries(keys.map((k, i) => [k, values[i] ?? '']));
+  }
+
+  @Patch('shop')
+  @RequiresCapability('shop.configure')
+  @ApiOperation({ summary: 'Update shop configuration settings' })
+  async updateShop(@Body() dto: UpdateSettingsDto, @Request() req: any) {
+    const allowed = Object.fromEntries(
+      Object.entries(dto.updates).filter(([k]) => k.startsWith('shop.')),
+    );
+    await this.settingsService.set(allowed, req.user.id);
+    return { message: 'Shop settings saved' };
   }
 
   // ── Notifications (subscription defaults — broadcast.config) ──────────────

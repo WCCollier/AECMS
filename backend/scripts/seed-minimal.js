@@ -72,6 +72,8 @@ const capabilities = [
   { name: 'account.delete.any',     category: 'users',  scope: 'backstage', description: 'Delete any account except your own (including other owners)' },
   // Tag Management
   { name: 'tag.edit',         category: 'content',       scope: 'backstage', description: 'Create, rename, delete, and bulk-assign tags' },
+  // Shop Configuration (Owner-only)
+  { name: 'shop.configure',   category: 'system',        scope: 'backstage', description: 'Configure shop identity, tax, and shipping settings' },
   // Subscriptions & Broadcasts
   { name: 'broadcast.send',   category: 'communication', scope: 'backstage', description: 'Send a news/alert broadcast email to all subscribed members' },
   { name: 'broadcast.config', category: 'communication', scope: 'backstage', description: 'Configure default subscription preferences for new sign-ups' },

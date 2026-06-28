@@ -88,6 +88,8 @@ async function main() {
 
     // Tag Management
     { name: 'tag.edit',            category: 'content',   scope: 'backstage', description: 'Create, rename, delete, and bulk-assign tags' },
+    // Shop Configuration (Owner-only)
+    { name: 'shop.configure',      category: 'system',    scope: 'backstage', description: 'Configure shop identity, tax, and shipping settings' },
     // Customer-facing: comment & review actions (scope:'customer' — no backstage required)
     { name: 'comment.article',     category: 'content',   scope: 'customer',  description: 'Post a comment on an article' },
     { name: 'review.article',      category: 'content',   scope: 'customer',  description: 'Post a rated review on an article' },
