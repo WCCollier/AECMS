@@ -1,6 +1,6 @@
 # BUG-002: Mul Converter saves duplicate palettes on repeated or confused clicks
 
-**Status:** `open`
+**Status:** `fixed`
 **Reported:** 2026-06-27
 **Severity:** `medium`
 **Area:** mul-converter — ActionBar, palette save flow
@@ -128,7 +128,11 @@ A simpler approach: always say "Saved! Your selections have been applied." and d
 
 ## Completion Report
 
-> _Fill in after fix is deployed._
+**Files changed:** `frontend/app/admin/mul-converter/components/ActionBar.tsx`
+
+1. **Added `'done'` to `busy`** — all three save buttons are disabled permanently once any save action succeeds. Navigating away resets state naturally.
+2. **Wrapped `newPalette` in `useMemo`** — the palette object (and its UUID) is now stable for the lifetime of the component mount, eliminating identity-based duplication if the button guard ever regresses.
+3. **Fixed success message** — text-only saves now read "Saved! Palette has been saved to your theme." rather than the confusing "Check your Media Library" copy. When page sections are present it reads "Saved! Page draft and palette have been created."
 
 ---
 
@@ -137,3 +141,4 @@ A simpler approach: always say "Saved! Your selections have been applied." and d
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-27 | open | Reported after text-only Mul Converter test produced 3 duplicate palettes |
+| 2026-06-28 | fixed | done added to busy, newPalette memoized, success message clarified |

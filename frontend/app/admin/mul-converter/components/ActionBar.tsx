@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Loader2, Save, FileText, Layers } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
 import type { MulResult } from '../mul-converter.types';
@@ -19,12 +19,12 @@ export function ActionBar({ result, customPalettes, onPaletteSaved, onPageCreate
   const [state, setState] = useState<State>('idle');
   const [error, setError] = useState('');
 
-  const newPalette: ThemePalette = {
+  const newPalette: ThemePalette = useMemo(() => ({
     id: `custom-${crypto.randomUUID()}`,
     name: result.palette.name,
     scheme: result.palette.scheme,
     colors: result.palette.colors as unknown as ThemePalette['colors'],
-  };
+  }), [result.palette]);
 
   const savePalette = async () => {
     await adminApi.patch('/settings/appearance', {
@@ -88,7 +88,7 @@ export function ActionBar({ result, customPalettes, onPaletteSaved, onPageCreate
     }
   };
 
-  const busy = state === 'savingPalette' || state === 'creatingPage' || state === 'savingBoth';
+  const busy = state === 'savingPalette' || state === 'creatingPage' || state === 'savingBoth' || state === 'done';
 
   return (
     <div className="space-y-3">
@@ -128,7 +128,12 @@ export function ActionBar({ result, customPalettes, onPaletteSaved, onPageCreate
       </div>
 
       {state === 'done' && (
-        <p className="text-xs text-green-400">Done! Check your Media Library for generated images.</p>
+        <p className="text-xs text-green-400">
+          Saved!{' '}
+          {result.page?.sections?.length
+            ? 'Page draft and palette have been created.'
+            : 'Palette has been saved to your theme.'}
+        </p>
       )}
     </div>
   );

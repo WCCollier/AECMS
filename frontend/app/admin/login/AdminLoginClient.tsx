@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import api, { getErrorMessage, setAdminAccessToken, setAdminRefreshToken } from '@/lib/api';
@@ -33,6 +33,13 @@ export function AdminLoginClient() {
   const [showPassword, setShowPassword] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'session_expired') {
+      setError('Your session expired. Please log in again.');
+    }
+  }, []);
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);

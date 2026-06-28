@@ -1,6 +1,6 @@
 # BUG-001: Session-expired error on 2FA page doesn't redirect back to login
 
-**Status:** `open`
+**Status:** `fixed`
 **Reported:** 2026-06-27
 **Severity:** `medium`
 **Area:** auth — backstage 2FA flow
@@ -78,7 +78,13 @@ Read the `?error=session_expired` query param on mount and display a contextual 
 
 ## Completion Report
 
-> _Fill in after fix is deployed._
+**Files changed:**
+- `frontend/app/admin/login/2fa/TwoFactorClient.tsx`
+- `frontend/app/admin/login/AdminLoginClient.tsx`
+
+**TwoFactorClient.tsx:** In the `submitCode` catch block, added a session-expiry check. If the error message contains "session expired" (case-insensitive) or the HTTP status is 401, the pre-auth token is cleared from `sessionStorage` and the router redirects to `/admin/login?error=session_expired`. Wrong-code errors continue to stay on the 2FA page as before.
+
+**AdminLoginClient.tsx:** Added a `useEffect` that reads `window.location.search` on mount. If `?error=session_expired` is present, the existing error state is pre-populated with "Your session expired. Please log in again." — displayed in the same red banner used for credential errors.
 
 ---
 
@@ -87,3 +93,4 @@ Read the `?error=session_expired` query param on mount and display a contextual 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-27 | open | Reported during manual QA of backstage login flow |
+| 2026-06-28 | fixed | Session-expiry redirects to login with flash message; wrong-code stays on 2FA page |
