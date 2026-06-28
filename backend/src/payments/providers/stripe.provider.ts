@@ -66,16 +66,21 @@ export class StripeProvider implements PaymentProvider {
     const frontendUrl = this.getFrontendUrl();
     // Use Stripe Checkout (hosted page). Apple Pay, Google Pay, and Amazon Pay
     // are automatically enabled by Stripe for eligible customers — no extra work needed.
-    const session = await stripe.checkout.sessions.create({
+    const productData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData.ProductData = {
+      name: `Order #${params.metadata?.order_number || params.orderId}`,
+    };
+    if (params.taxEnabled && params.defaultTaxCode) {
+      productData.tax_code = params.defaultTaxCode;
+    }
+
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'payment',
       customer_email: params.customerEmail,
       line_items: [
         {
           price_data: {
             currency: params.currency.toLowerCase(),
-            product_data: {
-              name: `Order #${params.metadata?.order_number || params.orderId}`,
-            },
+            product_data: productData,
             unit_amount: params.amount,
           },
           quantity: 1,
@@ -87,7 +92,13 @@ export class StripeProvider implements PaymentProvider {
       },
       success_url: `${frontendUrl}/order-confirmation?order=${params.orderId}`,
       cancel_url: `${frontendUrl}/checkout/cancel?order=${params.orderId}`,
-    });
+    };
+
+    if (params.taxEnabled) {
+      sessionParams.automatic_tax = { enabled: true };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     return {
       id: session.id,

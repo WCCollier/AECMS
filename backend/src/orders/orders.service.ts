@@ -334,7 +334,7 @@ export class OrdersService {
   /**
    * Mark order as paid (called after payment confirmation)
    */
-  async markAsPaid(id: string, paymentIntentId: string) {
+  async markAsPaid(id: string, paymentIntentId: string, taxAmountCents?: number, taxDetails?: any) {
     const order = await this.prisma.order.findUnique({
       where: { id },
     });
@@ -349,6 +349,8 @@ export class OrdersService {
         status: 'processing',
         payment_intent_id: paymentIntentId,
         paid_at: new Date(),
+        ...(taxAmountCents != null ? { tax_amount: taxAmountCents } : {}),
+        ...(taxDetails != null ? { tax_details: taxDetails } : {}),
       },
       include: this.getOrderIncludes(),
     });

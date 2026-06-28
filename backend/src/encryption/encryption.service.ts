@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { KeyProvider } from '../settings/key-provider.interface';
+import type { KeyProvider } from '../settings/key-provider.interface';
 
 export const ENCRYPTION_KEY_PROVIDER = 'ENCRYPTION_KEY_PROVIDER';
 

@@ -598,6 +598,10 @@ model Order {
   shipping          Decimal     @db.Decimal(10, 2) @default(0)
   total             Decimal     @db.Decimal(10, 2)
 
+  // Tax (populated from payment gateway webhook when tax.enabled = true)
+  tax_amount        Int?        // Actual tax collected in cents (from Stripe/PayPal)
+  tax_details       Json?       // Gateway tax breakdown details
+
   // Payment
   payment_method    String      // 'stripe', 'paypal', 'amazon_pay'
   payment_intent_id String?

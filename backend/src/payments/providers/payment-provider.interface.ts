@@ -43,6 +43,9 @@ export interface CreatePaymentParams {
   orderId: string;
   customerEmail: string;
   metadata?: Record<string, string>;
+  // Tax (only passed when tax.enabled = true in ISM)
+  taxEnabled?: boolean;
+  defaultTaxCode?: string;
 }
 
 export interface WebhookEvent {
