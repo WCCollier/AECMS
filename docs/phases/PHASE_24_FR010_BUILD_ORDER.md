@@ -6,6 +6,70 @@
 
 ---
 
+## ⚡ Current owner action required
+
+Steps 1–8 (Phase 24 infrastructure) and FR-010 Deploy 1 (new encrypted columns, dual-write code) are live as of 2026-06-28. The backfill scripts are now ready to run.
+
+### Step A — Set required environment variables
+
+In the Codespaces terminal, export both variables (get `SETTINGS_ENCRYPTION_KEY` from `backend/.env`):
+
+```bash
+export DATABASE_URL="postgresql://..."   # your Neon direct URL (not the pooler)
+export SETTINGS_ENCRYPTION_KEY="..."     # 64-char hex from backend/.env
+```
+
+Confirm the DB connects:
+
+```bash
+cd /workspaces/AECMS/backend && node -e "const {Pool}=require('pg'); const p=new Pool({connectionString:process.env.DATABASE_URL}); p.query('SELECT 1').then(()=>{console.log('OK');p.end()}).catch(e=>{console.error(e);p.end();})"
+```
+
+### Step B — Run all five backfill scripts
+
+Run these one at a time. Each is idempotent — safe to run twice if interrupted.
+
+```bash
+# Step 9 — encrypt existing TOTP secrets
+node backend/scripts/encrypt-totp-backfill.js
+
+# Step 10 — encrypt existing OAuth tokens (likely 0 rows; run anyway)
+node backend/scripts/encrypt-oauth-backfill.js
+
+# Step 11 — encrypt existing order shipping PII
+node backend/scripts/encrypt-orders-backfill.js
+
+# Step 12 — encrypt existing user first/last names
+node backend/scripts/encrypt-users-names-backfill.js
+
+# Step 13 — hash existing IP addresses (likely 0 rows; run anyway)
+node backend/scripts/hash-ip-backfill.js
+```
+
+### Step C — Verify the live site
+
+1. **2FA** — log into `/admin/login` with a 2FA-enabled account. TOTP codes must still be accepted.
+2. **Display name** — confirm your name appears correctly in the admin sidebar and `/account`.
+3. **Orders** — open Admin → Orders and confirm shipping names/addresses still display on existing orders.
+4. **Address book** — open `/account` → Addresses, confirm your saved address (if any) still shows.
+
+### Step D — Signal Claude to deploy Deploy 2
+
+When all verifications pass, tell Claude: **"Backfills verified — deploy Deploy 2."**
+
+Claude will then merge commit `bc95ed4` to the deploy branch. That deploy drops all plaintext columns. The site remains live throughout — Deploy 2 is fully backward compatible with the data written by Deploy 1 code.
+
+### Step E — Fill in Shop Config [BROWSER]
+
+After the deploy settles (can be done any time after Step A):
+
+1. Go to Admin → Shop Config
+2. Fill in **Legal business name** and **Business address** (used by Stripe Tax for nexus determination)
+3. Optionally add EIN and state tax registration number (required before activating tax collection)
+4. Save
+
+---
+
 ## How to read this document
 
 Each step is labeled with:

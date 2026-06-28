@@ -3,6 +3,7 @@ import { DigitalProductsService } from './digital-products.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { STORAGE_PROVIDER } from '../storage';
 import { PersonalizationService } from './personalization.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { FileFormat } from './dto/digital-product.dto';
 
@@ -48,6 +49,11 @@ describe('DigitalProductsService', () => {
     personalize: jest.fn(),
   };
 
+  const mockEncryptionService = {
+    encrypt: jest.fn().mockResolvedValue('encrypted'),
+    decrypt: jest.fn().mockResolvedValue(null),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -55,6 +61,7 @@ describe('DigitalProductsService', () => {
         { provide: PrismaService, useValue: mockPrisma },
         { provide: STORAGE_PROVIDER, useValue: mockStorageProvider },
         { provide: PersonalizationService, useValue: mockPersonalizationService },
+        { provide: EncryptionService, useValue: mockEncryptionService },
       ],
     }).compile();
 
