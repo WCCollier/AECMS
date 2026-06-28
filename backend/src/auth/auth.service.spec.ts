@@ -10,6 +10,7 @@ import {
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit/audit.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import * as bcrypt from 'bcrypt';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 
@@ -86,6 +87,11 @@ describe('AuthService', () => {
     getProviderType: jest.fn().mockReturnValue('console'),
   };
 
+  const mockEncryptionService = {
+    encrypt: jest.fn().mockResolvedValue('encrypted'),
+    decrypt: jest.fn().mockResolvedValue(null),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -95,6 +101,7 @@ describe('AuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: EMAIL_PROVIDER, useValue: mockEmailProvider },
         { provide: AuditLogService, useValue: { log: jest.fn() } },
+        { provide: EncryptionService, useValue: mockEncryptionService },
       ],
     }).compile();
 
@@ -329,7 +336,9 @@ describe('AuthService', () => {
 
       const result = await service.validateUser(mockUser.id);
 
-      expect(result).toEqual(mockUser);
+      expect(result.id).toBe(mockUser.id);
+      expect(result.email).toBe(mockUser.email);
+      expect(result.role_name).toBe(mockUser.role_name);
     });
 
     it('should throw NotFoundException if user not found', async () => {

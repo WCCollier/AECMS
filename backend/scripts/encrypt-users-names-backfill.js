@@ -4,14 +4,10 @@
  * Run after Step 12 Deploy 1, before Deploy 2.
  * Idempotent: skips rows where first_name_enc is already set.
  */
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const crypto = require('crypto');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -39,21 +35,18 @@ async function main() {
   console.log('Starting Step 12 user name backfill...');
 
   do {
-    const rows = await prisma.user.findMany({
-      where: { id: { gt: cursor }, first_name_enc: null },
-      select: { id: true, first_name: true, last_name: true },
-      take: 500,
-      orderBy: { id: 'asc' },
-    });
+    const { rows } = await pool.query(
+      `SELECT id, first_name, last_name FROM users
+       WHERE first_name_enc IS NULL AND id > $1
+       ORDER BY id ASC LIMIT 500`,
+      [cursor],
+    );
 
     for (const row of rows) {
-      await prisma.user.update({
-        where: { id: row.id },
-        data: {
-          first_name_enc: encrypt(row.first_name, key),
-          last_name_enc:  encrypt(row.last_name, key),
-        },
-      });
+      await pool.query(
+        'UPDATE users SET first_name_enc = $1, last_name_enc = $2 WHERE id = $3',
+        [encrypt(row.first_name, key), encrypt(row.last_name, key), row.id],
+      );
       processed++;
     }
 
@@ -63,7 +56,6 @@ async function main() {
   } while (true);
 
   console.log(`Done. Encrypted names for ${processed} users.`);
-  await prisma.$disconnect();
   await pool.end();
 }
 

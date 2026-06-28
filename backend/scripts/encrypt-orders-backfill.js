@@ -5,14 +5,10 @@
  * Processes in batches of 500 to avoid long-running transactions.
  * Idempotent: skips rows where customer_name_enc is already set.
  */
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const crypto = require('crypto');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
@@ -40,24 +36,32 @@ async function main() {
   console.log('Starting Step 11 orders PII backfill...');
 
   do {
-    const rows = await prisma.order.findMany({
-      where: { id: { gt: cursor }, customer_name_enc: null },
-      select: { id: true, customer_name: true, shipping_name: true, shipping_address: true, shipping_city: true, shipping_zip: true },
-      take: 500,
-      orderBy: { id: 'asc' },
-    });
+    const { rows } = await pool.query(
+      `SELECT id, customer_name, shipping_name, shipping_address, shipping_city, shipping_zip
+       FROM orders
+       WHERE customer_name_enc IS NULL AND id > $1
+       ORDER BY id ASC LIMIT 500`,
+      [cursor],
+    );
 
     for (const row of rows) {
-      await prisma.order.update({
-        where: { id: row.id },
-        data: {
-          customer_name_enc:    encrypt(row.customer_name, key),
-          shipping_name_enc:    encrypt(row.shipping_name, key),
-          shipping_address_enc: encrypt(row.shipping_address, key),
-          shipping_city_enc:    encrypt(row.shipping_city, key),
-          shipping_zip_enc:     encrypt(row.shipping_zip, key),
-        },
-      });
+      await pool.query(
+        `UPDATE orders SET
+           customer_name_enc    = $1,
+           shipping_name_enc    = $2,
+           shipping_address_enc = $3,
+           shipping_city_enc    = $4,
+           shipping_zip_enc     = $5
+         WHERE id = $6`,
+        [
+          encrypt(row.customer_name, key),
+          encrypt(row.shipping_name, key),
+          encrypt(row.shipping_address, key),
+          encrypt(row.shipping_city, key),
+          encrypt(row.shipping_zip, key),
+          row.id,
+        ],
+      );
       processed++;
     }
 
@@ -67,7 +71,6 @@ async function main() {
   } while (true);
 
   console.log(`Done. Encrypted PII in ${processed} orders.`);
-  await prisma.$disconnect();
   await pool.end();
 }
 

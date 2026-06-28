@@ -10,15 +10,16 @@
 
 Steps 1–8 (Phase 24 infrastructure) and FR-010 Deploy 1 (new encrypted columns, dual-write code) are live as of 2026-06-28. The backfill scripts are now ready to run.
 
-### Step A — Set the Neon direct URL
+### Step A — Set required environment variables
 
-In the Codespaces terminal, paste your saved Neon **direct** connection URL (not the pooled one):
+In the Codespaces terminal, export both variables (get `SETTINGS_ENCRYPTION_KEY` from `backend/.env`):
 
 ```bash
-export DATABASE_URL="postgresql://..."   # your Neon direct URL
+export DATABASE_URL="postgresql://..."   # your Neon direct URL (not the pooler)
+export SETTINGS_ENCRYPTION_KEY="..."     # 64-char hex from backend/.env
 ```
 
-Confirm it connects:
+Confirm the DB connects:
 
 ```bash
 cd /workspaces/AECMS/backend && node -e "const {Pool}=require('pg'); const p=new Pool({connectionString:process.env.DATABASE_URL}); p.query('SELECT 1').then(()=>{console.log('OK');p.end()}).catch(e=>{console.error(e);p.end();})"

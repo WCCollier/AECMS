@@ -5,6 +5,7 @@ import { STORAGE_PROVIDER } from '../storage';
 import { EMAIL_PROVIDER } from '../email';
 import { PersonalizationService } from './personalization.service';
 import { SettingsService } from '../settings/settings.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 
 describe('KindleService', () => {
@@ -56,6 +57,7 @@ describe('KindleService', () => {
         { provide: EMAIL_PROVIDER, useValue: mockEmailProvider },
         { provide: PersonalizationService, useValue: mockPersonalizationService },
         { provide: SettingsService, useValue: { getEffective: jest.fn().mockResolvedValue('') } },
+        { provide: EncryptionService, useValue: { encrypt: jest.fn().mockResolvedValue('encrypted'), decrypt: jest.fn().mockResolvedValue(null) } },
       ],
     }).compile();
 

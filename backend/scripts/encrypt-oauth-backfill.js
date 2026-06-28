@@ -4,18 +4,13 @@
  * Run after Step 10 Deploy 1, before Deploy 2.
  * Idempotent: skips rows where access_token_enc is already set.
  */
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const crypto = require('crypto');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
 
 function getKey() {
   const hex = process.env.SETTINGS_ENCRYPTION_KEY;
@@ -24,6 +19,7 @@ function getKey() {
 }
 
 function encrypt(plaintext, key) {
+  if (!plaintext) return null;
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -39,21 +35,18 @@ async function main() {
   console.log('Starting Step 10 OAuth token backfill...');
 
   do {
-    const rows = await prisma.oAuthAccount.findMany({
-      where: { id: { gt: cursor }, access_token_enc: null },
-      select: { id: true, access_token: true, refresh_token: true },
-      take: 500,
-      orderBy: { id: 'asc' },
-    });
+    const { rows } = await pool.query(
+      `SELECT id, access_token, refresh_token FROM oauth_accounts
+       WHERE access_token_enc IS NULL AND id > $1
+       ORDER BY id ASC LIMIT 500`,
+      [cursor],
+    );
 
     for (const row of rows) {
-      await prisma.oAuthAccount.update({
-        where: { id: row.id },
-        data: {
-          access_token_enc: row.access_token ? encrypt(row.access_token, key) : null,
-          refresh_token_enc: row.refresh_token ? encrypt(row.refresh_token, key) : null,
-        },
-      });
+      await pool.query(
+        'UPDATE oauth_accounts SET access_token_enc = $1, refresh_token_enc = $2 WHERE id = $3',
+        [encrypt(row.access_token, key), encrypt(row.refresh_token, key), row.id],
+      );
       processed++;
     }
 
@@ -62,7 +55,6 @@ async function main() {
   } while (true);
 
   console.log(`Done. Encrypted: ${processed} OAuth accounts.`);
-  await prisma.$disconnect();
   await pool.end();
 }
 
