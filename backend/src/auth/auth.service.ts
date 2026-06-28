@@ -21,6 +21,7 @@ import type { EmailProvider } from '../email/email.interface';
 import { AuditLogService } from '../audit/audit.service';
 import { CAPABILITY_DEFINITIONS } from '../capabilities/capability-definitions';
 import { LocalKeyProvider } from '../settings/local-key.provider';
+import { EncryptionService } from '../encryption/encryption.service';
 
 @Injectable()
 export class AuthService {
@@ -33,6 +34,7 @@ export class AuthService {
     private configService: ConfigService,
     @Inject(EMAIL_PROVIDER) private emailProvider: EmailProvider,
     private auditLog: AuditLogService,
+    private encryption: EncryptionService,
   ) {}
 
   /**
@@ -98,7 +100,9 @@ export class AuthService {
         username: registerDto.username,
         password_hash: passwordHash,
         first_name: registerDto.firstName,
+        first_name_enc: await this.encryption.encrypt(registerDto.firstName),
         last_name: registerDto.lastName,
+        last_name_enc: await this.encryption.encrypt(registerDto.lastName),
         role_name: defaultRole,
         email_verified: false,
         email_verification_token: verificationToken,
@@ -280,11 +284,14 @@ export class AuthService {
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
-    if (!user || !user.totp_secret || !user.totp_enabled) {
+    if (!user || !(user.totp_secret_enc ?? user.totp_secret) || !user.totp_enabled) {
       throw new UnauthorizedException('2FA not configured for this account');
     }
 
-    const isValid = speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: code, window: 1 });
+    const totpSecret = user.totp_secret_enc
+      ? (await this.encryption.decrypt(user.totp_secret_enc) ?? user.totp_secret ?? '')
+      : (user.totp_secret ?? '');
+    const isValid = speakeasy.totp.verify({ secret: totpSecret, encoding: 'base32', token: code, window: 1 });
     if (!isValid) {
       throw new UnauthorizedException('Invalid authenticator code');
     }
@@ -331,7 +338,10 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { totp_secret: secret },
+      data: {
+        totp_secret: secret,
+        totp_secret_enc: await this.encryption.encrypt(secret),
+      },
     });
 
     return { secret, otpauthUrl };
@@ -342,10 +352,13 @@ export class AuthService {
    */
   async enableTwoFactor(userId: string, code: string): Promise<{ success: boolean }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.totp_secret) throw new BadRequestException('2FA setup not initiated');
+    if (!user || !(user.totp_secret_enc ?? user.totp_secret)) throw new BadRequestException('2FA setup not initiated');
     if (user.totp_enabled) throw new BadRequestException('2FA is already enabled');
 
-    const isValid = speakeasy.totp.verify({ secret: user.totp_secret, encoding: 'base32', token: code, window: 1 });
+    const totpSecret = user.totp_secret_enc
+      ? (await this.encryption.decrypt(user.totp_secret_enc) ?? user.totp_secret ?? '')
+      : (user.totp_secret ?? '');
+    const isValid = speakeasy.totp.verify({ secret: totpSecret, encoding: 'base32', token: code, window: 1 });
     if (!isValid) throw new BadRequestException('Invalid verification code');
 
     await this.prisma.user.update({
@@ -489,34 +502,16 @@ export class AuthService {
     return user;
   }
 
-  async getShippingAddress(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        shipping_street: true,
-        shipping_city: true,
-        shipping_state: true,
-        shipping_postal_code: true,
-        shipping_country: true,
-      },
-    });
-    if (!user) throw new NotFoundException('User not found');
-    const hasAddress = !!(user.shipping_street || user.shipping_city);
-    return { ...user, has_address: hasAddress };
+  async getShippingAddress(_userId: string) {
+    // Legacy endpoint — users.shipping_* columns dropped in Step 14.
+    // Checkout and account now use GET /addresses/default instead.
+    return { has_address: false };
   }
 
-  async updateShippingAddress(userId: string, dto: {
-    shipping_street?: string;
-    shipping_city?: string;
-    shipping_state?: string;
-    shipping_postal_code?: string;
-    shipping_country?: string;
-  }) {
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: dto,
-    });
-    return this.getShippingAddress(userId);
+  async updateShippingAddress(_userId: string, _dto: any) {
+    // Legacy endpoint — no longer writes to users table (columns dropped in Step 14).
+    // Checkout now uses POST /addresses with is_default: true instead.
+    return { has_address: false };
   }
 
   async hasBackstageAccess(userId: string): Promise<boolean> {

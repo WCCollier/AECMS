@@ -44,8 +44,10 @@ model User {
   email                 String    @unique
   username              String?   @unique
   password_hash         String?   // Null for OAuth-only users
-  first_name            String?
-  last_name             String?
+  first_name            String?   // Plaintext — backfill pending (Step 12 Deploy 1)
+  first_name_enc        String?   // AES-256-GCM encrypted (Step 12)
+  last_name             String?   // Plaintext — backfill pending (Step 12 Deploy 1)
+  last_name_enc         String?   // AES-256-GCM encrypted (Step 12)
   avatar_url            String?
   role_name             String    @default("member")
   role_ref              Role      @relation("UserRoleName", fields: [role_name], references: [name])
@@ -54,11 +56,13 @@ model User {
   email_verification_expires DateTime?
   password_reset_token  String?
   password_reset_expires DateTime?
-  totp_secret           String?   // Encrypted TOTP secret
+  totp_secret           String?   // Plaintext — backfill pending (Step 9 Deploy 1)
+  totp_secret_enc       String?   // AES-256-GCM encrypted TOTP secret (Step 9)
   totp_enabled          Boolean   @default(false)
   totp_backup_codes     String[]  // Encrypted recovery codes
   last_login_at         DateTime?
-  last_login_ip         String?
+  last_login_ip         String?       // Plaintext — to be hashed (Step 13 Deploy 1)
+  last_login_ip_hash    String?       // SHA-256 hash (Step 13)
   approved_at           DateTime? // Set when registration is approved (null = pending or approval not required)
   approved_by           String?   // User ID of the approver
 
@@ -71,13 +75,6 @@ model User {
   created_at            DateTime  @default(now())
   updated_at            DateTime  @updatedAt
   deleted_at            DateTime? // Soft delete
-
-  // Saved shipping address
-  shipping_street       String?
-  shipping_city         String?
-  shipping_state        String?
-  shipping_postal_code  String?
-  shipping_country      String?
 
   // Relations
   oauth_accounts        OAuthAccount[]
@@ -104,8 +101,10 @@ model OAuthAccount {
   user_id         String
   provider        String   // 'google' | 'apple'
   provider_user_id String
-  access_token    String?  // Encrypted
-  refresh_token   String?  // Encrypted
+  access_token        String?  // Plaintext — backfill pending (Step 10 Deploy 1)
+  access_token_enc    String?  // AES-256-GCM encrypted (Step 10)
+  refresh_token       String?  // Plaintext — backfill pending (Step 10 Deploy 1)
+  refresh_token_enc   String?  // AES-256-GCM encrypted (Step 10)
   expires_at      DateTime?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -123,7 +122,8 @@ model RefreshToken {
   token_hash      String    @unique
   session_type    String    @default("customer") // 'customer' | 'backstage'
   device_info     String?
-  ip_address      String?
+  ip_address      String?       // Plaintext — to be hashed (Step 13 Deploy 1)
+  ip_address_hash String?       // SHA-256 hash (Step 13)
   expires_at      DateTime
   created_at      DateTime  @default(now())
   revoked_at      DateTime?
@@ -611,15 +611,20 @@ model Order {
   paid_at           DateTime?
 
   // Customer name for personalization (set at checkout; saved to user record if authenticated)
-  customer_name     String?
+  customer_name         String?   // Plaintext — backfill pending (Step 11 Deploy 1)
+  customer_name_enc     String?   // AES-256-GCM encrypted (Step 11)
 
   // Shipping (null for digital-only orders)
-  shipping_name     String?
-  shipping_address  String?
-  shipping_city     String?
-  shipping_state    String?
-  shipping_zip      String?
-  shipping_country  String?
+  shipping_name         String?   // Plaintext — backfill pending (Step 11 Deploy 1)
+  shipping_name_enc     String?   // AES-256-GCM encrypted (Step 11)
+  shipping_address      String?   // Plaintext — backfill pending (Step 11 Deploy 1)
+  shipping_address_enc  String?   // AES-256-GCM encrypted (Step 11)
+  shipping_city         String?   // Plaintext — backfill pending (Step 11 Deploy 1)
+  shipping_city_enc     String?   // AES-256-GCM encrypted (Step 11)
+  shipping_state        String?   // Plaintext (used in tax aggregation — stays plaintext)
+  shipping_zip          String?   // Plaintext — backfill pending (Step 11 Deploy 1)
+  shipping_zip_enc      String?   // AES-256-GCM encrypted (Step 11)
+  shipping_country      String?   // Plaintext (used in tax aggregation — stays plaintext)
 
   // Address book link (set when user selects/saves a UserAddress at checkout)
   address_id        String?

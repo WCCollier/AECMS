@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { CapabilitiesService } from '../capabilities/capabilities.service';
 import { SettingsService } from '../settings/settings.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';
 import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit/audit.service';
@@ -20,6 +21,7 @@ export class OrdersService {
     private auditLog: AuditLogService,
     private capabilitiesService: CapabilitiesService,
     private settingsService: SettingsService,
+    private encryption: EncryptionService,
   ) {}
 
   private async computeShippingCents(
@@ -147,7 +149,6 @@ export class OrdersService {
         order_number: orderNumber,
         user_id: userId,
         email: userEmail ?? dto.guest_email ?? '',
-        customer_name: customerName,
         status: 'pending',
         subtotal,
         tax,
@@ -155,11 +156,17 @@ export class OrdersService {
         total,
         payment_method: dto.payment_method ?? 'stripe',
         address_id: dto.address_id ?? null,
+        customer_name: customerName ?? null,
+        customer_name_enc: await this.encryption.encrypt(customerName),
         shipping_name: dto.shipping_address?.name ?? customerName,
+        shipping_name_enc: await this.encryption.encrypt(dto.shipping_address?.name ?? customerName),
         shipping_address: dto.shipping_address?.street,
+        shipping_address_enc: await this.encryption.encrypt(dto.shipping_address?.street),
         shipping_city: dto.shipping_address?.city,
+        shipping_city_enc: await this.encryption.encrypt(dto.shipping_address?.city),
         shipping_state: dto.shipping_address?.state,
         shipping_zip: dto.shipping_address?.postal_code,
+        shipping_zip_enc: await this.encryption.encrypt(dto.shipping_address?.postal_code),
         shipping_country: dto.shipping_address?.country,
         items: {
           create: cart.items.map((item: any) => ({
