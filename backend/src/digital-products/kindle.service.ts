@@ -7,6 +7,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import type { StorageProvider } from '../storage';
 import { STORAGE_PROVIDER } from '../storage';
 import type { EmailProvider } from '../email';
@@ -47,6 +48,7 @@ export class KindleService {
     private emailProvider: EmailProvider,
     private personalizationService: PersonalizationService,
     private settingsService: SettingsService,
+    private encryption: EncryptionService,
   ) {}
 
   // ============================================================================
@@ -306,9 +308,11 @@ export class KindleService {
         where: { id: userId },
       });
 
+      const fn = user ? await this.encryption.decrypt(user.first_name_enc) : null;
+      const ln = user ? await this.encryption.decrypt(user.last_name_enc) : null;
       const options: PersonalizationOptionsDto = {
         customerName: user
-          ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
+          ? `${fn || ''} ${ln || ''}`.trim() || user.email
           : undefined,
         orderNumber: download.order.order_number,
         purchaseDate: download.order.created_at.toLocaleDateString(),

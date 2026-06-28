@@ -4,6 +4,7 @@ import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { EncryptionService } from '../encryption/encryption.service';
 
 @Injectable()
 export class OrderEmailService {
@@ -14,6 +15,7 @@ export class OrderEmailService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
     private readonly settingsService: SettingsService,
+    private readonly encryption: EncryptionService,
   ) {}
 
   async sendOrderConfirmation(orderId: string): Promise<void> {
@@ -37,7 +39,7 @@ export class OrderEmailService {
       Promise.resolve(this.configService.get<string>('APP_URL', 'http://localhost:3000')),
     ]);
 
-    const customerName = order.customer_name || 'there';
+    const customerName = (await this.encryption.decrypt(order.customer_name_enc)) || 'there';
     const orderDate = order.created_at.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const totalFormatted = `$${parseFloat(order.total.toString()).toFixed(2)}`;
 
@@ -66,8 +68,12 @@ export class OrderEmailService {
       typeHtml += `<p style="color: #555;">Your download link(s) will arrive in a separate email shortly.</p>`;
       typeText += `\nYour download link(s) will arrive in a separate email shortly.`;
     }
-    if (hasPhysical && order.shipping_name) {
-      const addr = [order.shipping_name, order.shipping_address, `${order.shipping_city || ''}, ${order.shipping_state || ''} ${order.shipping_zip || ''}`.trim(), order.shipping_country].filter(Boolean).join('\n');
+    const shippingName = await this.encryption.decrypt(order.shipping_name_enc);
+    const shippingAddress = await this.encryption.decrypt(order.shipping_address_enc);
+    const shippingCity = await this.encryption.decrypt(order.shipping_city_enc);
+    const shippingZip = await this.encryption.decrypt(order.shipping_zip_enc);
+    if (hasPhysical && shippingName) {
+      const addr = [shippingName, shippingAddress, `${shippingCity || ''}, ${order.shipping_state || ''} ${shippingZip || ''}`.trim(), order.shipping_country].filter(Boolean).join('\n');
       typeHtml += `<p style="color: #555;"><strong>Shipping to:</strong><br><span style="white-space: pre-line;">${addr.replace(/\n/g, '<br>')}</span></p>`;
       typeText += `\nShipping to:\n${addr}`;
     }

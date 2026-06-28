@@ -2,6 +2,7 @@ import { Injectable, ConflictException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { CompleteSetupDto } from './dto/complete-setup.dto';
 import { buildTermsContent, buildPrivacyContent } from './policy-templates';
 
@@ -10,6 +11,7 @@ export class SetupService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: SettingsService,
+    private readonly encryption: EncryptionService,
   ) {}
 
   async isSetupRequired(): Promise<boolean> {
@@ -55,8 +57,8 @@ export class SetupService {
       data: {
         email: dto.email,
         password_hash: passwordHash,
-        first_name: dto.first_name,
-        last_name: dto.last_name,
+        first_name_enc: await this.encryption.encrypt(dto.first_name),
+        last_name_enc: await this.encryption.encrypt(dto.last_name),
         role_name: 'owner',
         email_verified: true,
         approved_at: new Date(),

@@ -156,16 +156,11 @@ export class OrdersService {
         total,
         payment_method: dto.payment_method ?? 'stripe',
         address_id: dto.address_id ?? null,
-        customer_name: customerName ?? null,
         customer_name_enc: await this.encryption.encrypt(customerName),
-        shipping_name: dto.shipping_address?.name ?? customerName,
         shipping_name_enc: await this.encryption.encrypt(dto.shipping_address?.name ?? customerName),
-        shipping_address: dto.shipping_address?.street,
         shipping_address_enc: await this.encryption.encrypt(dto.shipping_address?.street),
-        shipping_city: dto.shipping_address?.city,
         shipping_city_enc: await this.encryption.encrypt(dto.shipping_address?.city),
         shipping_state: dto.shipping_address?.state,
-        shipping_zip: dto.shipping_address?.postal_code,
         shipping_zip_enc: await this.encryption.encrypt(dto.shipping_address?.postal_code),
         shipping_country: dto.shipping_address?.country,
         items: {
@@ -184,14 +179,14 @@ export class OrdersService {
     if (userId && dto.customer_first_name) {
       const userRecord = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { first_name: true },
+        select: { first_name_enc: true },
       });
-      if (!userRecord?.first_name) {
+      if (!userRecord?.first_name_enc) {
         await this.prisma.user.update({
           where: { id: userId },
           data: {
-            first_name: dto.customer_first_name,
-            last_name: dto.customer_last_name ?? null,
+            first_name_enc: await this.encryption.encrypt(dto.customer_first_name),
+            last_name_enc: await this.encryption.encrypt(dto.customer_last_name),
           },
         });
       }
@@ -224,7 +219,7 @@ export class OrdersService {
     // Clear cart
     await this.cartService.clearCart(userId, sessionId);
 
-    return this.transformOrder(order);
+    return await this.transformOrder(order);
   }
 
   /**
@@ -274,7 +269,7 @@ export class OrdersService {
     ]);
 
     return {
-      data: orders.map((order) => this.transformOrder(order)),
+      data: await Promise.all(orders.map((order) => this.transformOrder(order))),
       meta: {
         total,
         page,
@@ -312,7 +307,7 @@ export class OrdersService {
       throw new ForbiddenException('Access denied');
     }
 
-    return this.transformOrder(order);
+    return await this.transformOrder(order);
   }
 
   /**
@@ -333,7 +328,7 @@ export class OrdersService {
       throw new ForbiddenException('Access denied');
     }
 
-    return this.transformOrder(order);
+    return await this.transformOrder(order);
   }
 
   /**
@@ -543,8 +538,8 @@ export class OrdersService {
         select: {
           id: true,
           email: true,
-          first_name: true,
-          last_name: true,
+          first_name_enc: true,
+          last_name_enc: true,
         },
       },
     };
@@ -553,19 +548,26 @@ export class OrdersService {
   /**
    * Transform order response
    */
-  private transformOrder(order: any) {
+  private async transformOrder(order: any) {
+    const customerName = await this.encryption.decrypt(order.customer_name_enc);
+    const shippingName = await this.encryption.decrypt(order.shipping_name_enc);
+    const shippingStreet = await this.encryption.decrypt(order.shipping_address_enc);
+    const shippingCity = await this.encryption.decrypt(order.shipping_city_enc);
+    const shippingZip = await this.encryption.decrypt(order.shipping_zip_enc);
+
     return {
       ...order,
+      customer_name: customerName ?? null,
       subtotal: parseFloat(order.subtotal.toString()),
       tax: parseFloat(order.tax.toString()),
       shipping: parseFloat(order.shipping.toString()),
       total: parseFloat(order.total.toString()),
-      // Remap flat DB shipping columns → nested object the frontend expects
-      shipping_address: order.shipping_address ? {
-        street: order.shipping_address,
-        city: order.shipping_city ?? '',
+      // Remap encrypted shipping columns → nested object the frontend expects
+      shipping_address: shippingStreet ? {
+        street: shippingStreet,
+        city: shippingCity ?? '',
         state: order.shipping_state ?? '',
-        postal_code: order.shipping_zip ?? '',
+        postal_code: shippingZip ?? '',
         country: order.shipping_country ?? '',
       } : null,
       items: order.items.map((item: any) => {
@@ -672,6 +674,7 @@ export class OrdersService {
       d != null ? parseFloat(d.toString()).toFixed(2) : '0.00';
 
     for (const order of orders) {
+      const customerName = await this.encryption.decrypt(order.customer_name_enc);
       const itemsStr = order.items
         .map((i: any) => {
           const title = (i.product_title && i.product_title.length > 0)
@@ -687,7 +690,7 @@ export class OrdersService {
         csvVal('sale'),
         csvVal(order.order_number),
         csvVal(order.email),
-        csvVal(order.customer_name ?? ''),
+        csvVal(customerName ?? ''),
         csvVal(order.payment_method),
         csvVal(order.payment_intent_id ?? ''),
         csvVal(itemsStr),
@@ -712,7 +715,7 @@ export class OrdersService {
           csvVal('refund'),
           csvVal(order.order_number),
           csvVal(order.email),
-          csvVal(order.customer_name ?? ''),
+          csvVal(customerName ?? ''),
           csvVal(order.payment_method),
           csvVal(order.refund_id ?? order.payment_intent_id ?? ''),
           csvVal(itemsStr),

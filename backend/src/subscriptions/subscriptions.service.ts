@@ -2,6 +2,7 @@ import { Injectable, Inject, Logger, BadRequestException } from '@nestjs/common'
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
@@ -16,6 +17,7 @@ export class SubscriptionsService {
     private readonly settingsService: SettingsService,
     private readonly configService: ConfigService,
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
+    private readonly encryption: EncryptionService,
   ) {}
 
   async getPreferences(userId: string) {
@@ -89,7 +91,7 @@ export class SubscriptionsService {
       this.prisma.article.findUnique({ where: { id: articleId }, select: { title: true, slug: true, excerpt: true } }),
       this.prisma.user.findMany({
         where: { subscribe_new_articles: true, deleted_at: null },
-        select: { email: true, first_name: true, unsubscribe_token: true },
+        select: { email: true, first_name_enc: true, unsubscribe_token: true },
       }),
       this.getEmailSettings(),
     ]);
@@ -101,6 +103,7 @@ export class SubscriptionsService {
     const excerpt = article.excerpt || '';
 
     for (const sub of subscribers) {
+      const firstName = (await this.encryption.decrypt((sub as any).first_name_enc)) || 'there';
       const unsubLink = sub.unsubscribe_token
         ? `${appUrl}/auth/unsubscribe?token=${sub.unsubscribe_token}&category=articles`
         : `${appUrl}/account`;
@@ -109,10 +112,10 @@ export class SubscriptionsService {
         to: sub.email,
         from: settings.fromAddress,
         subject: `New article: ${article.title}`,
-        text: `Hi ${sub.first_name || 'there'},\n\n${settings.siteName} just published a new article:\n\n"${article.title}"\n${excerpt ? excerpt + '\n\n' : ''}Read it here: ${articleUrl}\n\n---\nYou're receiving this because you subscribed to new article emails from ${settings.siteName}.\nUnsubscribe: ${unsubLink}`,
+        text: `Hi ${firstName},\n\n${settings.siteName} just published a new article:\n\n"${article.title}"\n${excerpt ? excerpt + '\n\n' : ''}Read it here: ${articleUrl}\n\n---\nYou're receiving this because you subscribed to new article emails from ${settings.siteName}.\nUnsubscribe: ${unsubLink}`,
         html: this.buildNotificationHtml({
           siteName: settings.siteName,
-          greeting: `Hi ${sub.first_name || 'there'},`,
+          greeting: `Hi ${firstName},`,
           intro: `<strong>${settings.siteName}</strong> just published a new article:`,
           title: article.title,
           excerpt,
@@ -132,7 +135,7 @@ export class SubscriptionsService {
       this.prisma.product.findUnique({ where: { id: productId }, select: { title: true, slug: true, short_description: true, price: true } }),
       this.prisma.user.findMany({
         where: { subscribe_new_products: true, deleted_at: null },
-        select: { email: true, first_name: true, unsubscribe_token: true },
+        select: { email: true, first_name_enc: true, unsubscribe_token: true },
       }),
       this.getEmailSettings(),
     ]);
@@ -145,6 +148,7 @@ export class SubscriptionsService {
     const priceStr = product.price ? `$${parseFloat(product.price.toString()).toFixed(2)}` : '';
 
     for (const sub of subscribers) {
+      const firstName = (await this.encryption.decrypt((sub as any).first_name_enc)) || 'there';
       const unsubLink = sub.unsubscribe_token
         ? `${appUrl}/auth/unsubscribe?token=${sub.unsubscribe_token}&category=products`
         : `${appUrl}/account`;
@@ -153,10 +157,10 @@ export class SubscriptionsService {
         to: sub.email,
         from: settings.fromAddress,
         subject: `New product: ${product.title}`,
-        text: `Hi ${sub.first_name || 'there'},\n\n${settings.siteName} just added a new product:\n\n"${product.title}"${priceStr ? ' — ' + priceStr : ''}\n${excerpt ? excerpt + '\n\n' : ''}View it here: ${productUrl}\n\n---\nYou're receiving this because you subscribed to new product emails from ${settings.siteName}.\nUnsubscribe: ${unsubLink}`,
+        text: `Hi ${firstName},\n\n${settings.siteName} just added a new product:\n\n"${product.title}"${priceStr ? ' — ' + priceStr : ''}\n${excerpt ? excerpt + '\n\n' : ''}View it here: ${productUrl}\n\n---\nYou're receiving this because you subscribed to new product emails from ${settings.siteName}.\nUnsubscribe: ${unsubLink}`,
         html: this.buildNotificationHtml({
           siteName: settings.siteName,
-          greeting: `Hi ${sub.first_name || 'there'},`,
+          greeting: `Hi ${firstName},`,
           intro: `<strong>${settings.siteName}</strong> just added a new product${priceStr ? ' — ' + priceStr : ''}:`,
           title: product.title,
           excerpt,
@@ -175,7 +179,7 @@ export class SubscriptionsService {
     const [subscribers, settings] = await Promise.all([
       this.prisma.user.findMany({
         where: { subscribe_news_alerts: true, deleted_at: null },
-        select: { email: true, first_name: true, unsubscribe_token: true },
+        select: { email: true, first_name_enc: true, unsubscribe_token: true },
       }),
       this.getEmailSettings(),
     ]);
@@ -186,6 +190,7 @@ export class SubscriptionsService {
     let sent = 0;
 
     for (const sub of subscribers) {
+      const firstName = (await this.encryption.decrypt((sub as any).first_name_enc)) || 'there';
       const unsubLink = sub.unsubscribe_token
         ? `${appUrl}/auth/unsubscribe?token=${sub.unsubscribe_token}&category=news`
         : `${appUrl}/account`;
@@ -195,8 +200,8 @@ export class SubscriptionsService {
           to: sub.email,
           from: settings.fromAddress,
           subject,
-          text: `Hi ${sub.first_name || 'there'},\n\n${body}\n\n---\n${settings.siteName}\nYou're receiving this because you subscribed to news and alerts from ${settings.siteName}.\nUnsubscribe: ${unsubLink}`,
-          html: this.buildBroadcastHtml({ siteName: settings.siteName, greeting: `Hi ${sub.first_name || 'there'},`, body, unsubLink }),
+          text: `Hi ${firstName},\n\n${body}\n\n---\n${settings.siteName}\nYou're receiving this because you subscribed to news and alerts from ${settings.siteName}.\nUnsubscribe: ${unsubLink}`,
+          html: this.buildBroadcastHtml({ siteName: settings.siteName, greeting: `Hi ${firstName},`, body, unsubLink }),
         });
         sent++;
       } catch (err) {

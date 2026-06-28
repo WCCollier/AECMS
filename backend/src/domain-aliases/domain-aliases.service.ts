@@ -57,8 +57,8 @@ export class DomainAliasesService {
           select: {
             id: true,
             email: true,
-            first_name: true,
-            last_name: true,
+            first_name_enc: true,
+            last_name_enc: true,
           },
         },
       },
@@ -98,8 +98,8 @@ export class DomainAliasesService {
           select: {
             id: true,
             email: true,
-            first_name: true,
-            last_name: true,
+            first_name_enc: true,
+            last_name_enc: true,
           },
         },
       },

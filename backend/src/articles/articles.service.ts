@@ -39,7 +39,7 @@ export class ArticlesService {
 
   private getArticleInclude(withCounts = false) {
     return {
-      author: { select: { id: true, email: true, first_name: true, last_name: true } },
+      author: { select: { id: true, email: true, first_name_enc: true, last_name_enc: true } },
       ...this.getMediaInclude(),
       tags: { include: { tag: true } },
       ...(withCounts ? { _count: { select: { comments: true, versions: true } } } : {}),

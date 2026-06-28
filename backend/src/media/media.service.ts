@@ -371,7 +371,7 @@ export class MediaService {
       this.prisma.media.findMany({
         where, skip, take: limit, orderBy,
         include: {
-          uploader: { select: { id: true, email: true, first_name: true, last_name: true } },
+          uploader: { select: { id: true, email: true, first_name_enc: true, last_name_enc: true } },
           _count: { select: { article_media: true, product_media: true, page_media: true } },
         },
       }),
@@ -391,7 +391,7 @@ export class MediaService {
     const media = await this.prisma.media.findUnique({
       where: { id },
       include: {
-        uploader: { select: { id: true, email: true, first_name: true, last_name: true } },
+        uploader: { select: { id: true, email: true, first_name_enc: true, last_name_enc: true } },
       },
     });
     if (!media) throw new NotFoundException('Media not found');

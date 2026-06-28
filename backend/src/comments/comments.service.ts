@@ -28,7 +28,7 @@ export class CommentsService {
 
   private commentInclude(includeProduct = false) {
     return {
-      user: { select: { id: true, email: true, first_name: true, last_name: true } },
+      user: { select: { id: true, email: true, first_name_enc: true, last_name_enc: true } },
       ratings: { orderBy: { title: 'asc' as const } },
       article: { select: { id: true, title: true, slug: true } },
       ...(includeProduct && {
@@ -39,7 +39,7 @@ export class CommentsService {
 
   private replyInclude() {
     return {
-      user: { select: { id: true, email: true, first_name: true, last_name: true } },
+      user: { select: { id: true, email: true, first_name_enc: true, last_name_enc: true } },
       ratings: { orderBy: { title: 'asc' as const } },
     };
   }
