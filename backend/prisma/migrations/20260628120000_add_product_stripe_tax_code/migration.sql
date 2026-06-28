@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Product" ADD COLUMN "stripe_tax_code" TEXT;
+ALTER TABLE "products" ADD COLUMN "stripe_tax_code" TEXT;
