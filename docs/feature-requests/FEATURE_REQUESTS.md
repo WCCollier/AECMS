@@ -13,13 +13,13 @@ Small, self-contained features that don't constitute major phase-level work. One
 | ID | Size | Status | Description |
 |----|------|--------|-------------|
 | [FR-013](FR-013-x-timeline-tiptap-widget.md) | medium | accepted | X Account Timeline Widget — TipTap block node fetching latest N posts via X API v2; ISM bearer token; Redis cache; first-use inline setup |
-| [FR-010](FR-010-pii-encryption.md) | medium | accepted | PII Encryption at Rest — `EncryptionService`, encrypted `UserAddress`, backfill for existing plaintext PII; paired with Phase 24 |
 | [FR-011](FR-011-resend-broadcast-integration.md) | medium | accepted | Resend Broadcast Integration — article/product/admin broadcasts via Resend Broadcast API + Topics; SMTP loop fallback when unset |
 
 ## Deployed
 
 | ID | Size | Description |
 |----|------|-------------|
+| [FR-010](FR-010-pii-encryption.md) | medium | PII Encryption at Rest — `EncryptionService`, all plaintext PII columns dropped; `UserAddress` encrypted from day one; TOTP + OAuth + orders + user names + IP hashing |
 | [FR-015](FR-015-collection-embed-display-modes-and-tag-exclusion.md) | medium | Collection Embed — `preview` (100dvh pane + fade) and `full` (inline body) display modes; tag exclusion filter with ANY/ALL toggle |
 | [FR-014](FR-014-tag-editor.md) | medium | Tag Editor — `/admin/tags` panel: rename/delete tags, add without assigning, mass-assign to articles/products; new `tag.edit` capability |
 | [FR-012](FR-012-media-picker-for-logo-and-favicon.md) | small | Media Picker for Logo & Favicon — replace text input + bespoke upload with `ImageField` picker; fixes favicon cloud-storage bug |

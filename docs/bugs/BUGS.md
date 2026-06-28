@@ -10,7 +10,10 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 ## Open
 
-_None_
+| ID | Severity | Area | Description |
+|----|----------|------|-------------|
+| [BUG-011](BUG-011-totp-secret-wiped-by-fr010-deploy2.md) | critical | auth, FR-010, deployment | TOTP secret wiped by Deploy 2 (plaintext col dropped before backfill); owner locked out of backstage — SQL remediation + 2FA re-setup required |
+| [BUG-010](BUG-010-no-profile-edit-on-account-page.md) | high | frontend, auth, account | No way to edit display name (first/last/username) on the customer-facing account page — backend endpoint and UI form both missing |
 
 ## In Dev
 

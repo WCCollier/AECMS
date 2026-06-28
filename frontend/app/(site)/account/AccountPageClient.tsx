@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrders } from '@/hooks/useOrders';
 import { Button, Input, PasswordInput } from '@/components/ui';
 import api, { getErrorMessage } from '@/lib/api';
-import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin, Bell, Plus, Check } from 'lucide-react';
+import { ShoppingBag, MessageSquare, Lock, Trash2, ChevronRight, Star, Pencil, ExternalLink, MapPin, Bell, Plus, Check, UserPen } from 'lucide-react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import type { Comment, PaginatedResponse, UserAddress } from '@/types';
@@ -23,14 +23,20 @@ const formatDate = (s: string) =>
 
 export function AccountPageClient() {
   const router = useRouter();
-  const { user, logout, isLoading: authLoading } = useAuth();
+  const { user, logout, isLoading: authLoading, refreshUser } = useAuth();
   const { orders, isLoading: ordersLoading } = useOrders({ limit: 5 });
   const { data: commentsData, isLoading: commentsLoading, mutate: mutateComments } = useSWR<PaginatedResponse<Comment>>(
     user ? '/comments/mine?limit=5' : null,
     fetcher,
   );
 
-  const [activeSection, setActiveSection] = useState<'orders' | 'comments' | 'addresses' | 'notifications' | 'password' | 'delete' | null>(null);
+  const [activeSection, setActiveSection] = useState<'profile' | 'orders' | 'comments' | 'addresses' | 'notifications' | 'password' | 'delete' | null>(null);
+
+  // Edit profile state
+  const [profileForm, setProfileForm] = useState({ firstName: '', lastName: '', username: '' });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   // Addresses state
@@ -74,6 +80,28 @@ export function AccountPageClient() {
         <Link href="/auth/login?from=/account"><Button>Sign In</Button></Link>
       </div>
     );
+  }
+
+  async function handleProfileSave(e: FormEvent) {
+    e.preventDefault();
+    setProfileError('');
+    setProfileSuccess('');
+    const body: Record<string, string> = {};
+    if (profileForm.firstName.trim()) body.firstName = profileForm.firstName.trim();
+    if (profileForm.lastName.trim()) body.lastName = profileForm.lastName.trim();
+    if (profileForm.username.trim()) body.username = profileForm.username.trim();
+    if (!Object.keys(body).length) return;
+    setProfileLoading(true);
+    try {
+      await api.patch('/auth/profile', body);
+      await refreshUser();
+      setProfileSuccess('Profile updated.');
+      setProfileForm({ firstName: '', lastName: '', username: '' });
+    } catch (err) {
+      setProfileError(getErrorMessage(err));
+    } finally {
+      setProfileLoading(false);
+    }
   }
 
   async function handlePasswordChange(e: FormEvent) {
@@ -199,6 +227,68 @@ export function AccountPageClient() {
             </div>
           )}
         </div>
+      </section>
+
+      {/* Edit Profile */}
+      <section className="bg-surface border border-border rounded-xl mb-6 overflow-hidden">
+        <button
+          onClick={() => {
+            if (activeSection !== 'profile') {
+              setProfileForm({
+                firstName: user.firstName ?? '',
+                lastName: user.lastName ?? '',
+                username: user.username ?? '',
+              });
+              setProfileError('');
+              setProfileSuccess('');
+            }
+            setActiveSection(activeSection === 'profile' ? null : 'profile');
+          }}
+          className="w-full flex items-center justify-between px-6 py-4 hover:bg-surface-raised transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <UserPen className="w-5 h-5 text-accent" />
+            <span className="font-semibold">Edit Profile</span>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-foreground/40 transition-transform ${activeSection === 'profile' ? 'rotate-90' : ''}`} />
+        </button>
+
+        {activeSection === 'profile' && (
+          <div className="border-t border-border px-6 py-4">
+            <form onSubmit={handleProfileSave} className="space-y-3">
+              {profileError && <p className="text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded px-3 py-2">{profileError}</p>}
+              {profileSuccess && <p className="text-sm text-green-600 bg-green-500/10 border border-green-500/20 rounded px-3 py-2">{profileSuccess}</p>}
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="First name"
+                  type="text"
+                  value={profileForm.firstName}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, firstName: e.target.value }))}
+                  placeholder={user.firstName ?? 'First name'}
+                  autoComplete="given-name"
+                />
+                <Input
+                  label="Last name"
+                  type="text"
+                  value={profileForm.lastName}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, lastName: e.target.value }))}
+                  placeholder={user.lastName ?? 'Last name'}
+                  autoComplete="family-name"
+                />
+              </div>
+              <Input
+                label="Username"
+                type="text"
+                value={profileForm.username}
+                onChange={(e) => setProfileForm((f) => ({ ...f, username: e.target.value }))}
+                placeholder={user.username ?? 'username'}
+                autoComplete="username"
+              />
+              <p className="text-xs text-foreground/50">Only fill in fields you want to change. Leave blank to keep current values.</p>
+              <Button type="submit" size="sm" isLoading={profileLoading}>Save Changes</Button>
+            </form>
+          </div>
+        )}
       </section>
 
       {/* Digital Library — only renders if user has downloads */}

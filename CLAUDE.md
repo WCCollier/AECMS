@@ -44,13 +44,12 @@ Specific rules:
 **FR-007**: ✅ DEPLOYED — Order Confirmation Emails (`OrderEmailService`, fire-and-forget on Stripe webhook + PayPal capture, adapts by product type). Docs: `docs/feature-requests/FR-007-order-confirmation-emails.md`
 **FR-008**: ✅ DEPLOYED — Free Product Checkout: bypass payment for $0 orders, service products now require shipping address, free digital requires login. Docs: `docs/feature-requests/FR-008-free-products.md`
 **FR-009**: ✅ DEPLOYED — Member Subscriptions & Syndication: opt-in email notifications for articles/products/news, admin broadcast tool, RSS feed at `/feed.xml`, account Notifications tab, unsubscribe page, default subscription ISM settings. Docs: `docs/feature-requests/FR-009-syndication.md`
-**FR-010**: 📋 ACCEPTED — PII Encryption at Rest: `EncryptionService` (shared AES-256-GCM wrapper), `UserAddress` encrypted from day one, backfill for existing plaintext PII (`totp_secret`, OAuth tokens, order shipping fields, user names, IP hashing). Paired with Phase 24. Docs: `docs/feature-requests/FR-010-pii-encryption.md`
+**FR-010**: ✅ DEPLOYED — PII Encryption at Rest: `EncryptionService` (shared AES-256-GCM wrapper), all plaintext PII columns dropped; `UserAddress` encrypted from day one; `totp_secret`, OAuth tokens, order shipping fields, user names all encrypted; IP addresses hashed. Docs: `docs/feature-requests/FR-010-pii-encryption.md`
 **FR-011**: 📋 ACCEPTED — Resend Broadcast Integration: article/product/admin notifications routed to Resend Broadcast API + Topics when `email.broadcast_provider = 'resend'`; SMTP loop fallback when unset; bidirectional contact/topic sync; webhook for inbound unsubscribes. Docs: `docs/feature-requests/FR-011-resend-broadcast-integration.md`
 **FR-014**: ✅ DEPLOYED — Tag Editor: `/admin/tags` panel gated on new `tag.edit` capability (Owner + Admin); rename/re-slug tags with breaking-change warning, cascade-delete with confirmation, add tags, mass-assign via modal checklist. Docs: `docs/feature-requests/FR-014-tag-editor.md`
 **FR-015**: ✅ DEPLOYED — Collection Embed extensions: `preview` (100dvh pane + fade + CTA) and `full` (inline body) display modes; tag exclusion filter (`exclude_tags` / `exclude_tag_logic`) on GET /articles + GET /products; recursion guard via `depth` prop on `RichTextContent`. Docs: `docs/feature-requests/FR-015-collection-embed-display-modes-and-tag-exclusion.md`
 
-**Phase 24A**: 📋 PLANNED — Sales tax. Trigger: revenue >$1k or TX Comptroller registration. Plan: `docs/phases/PHASE_24_PLAN.md`
-**Phase 24B**: 📋 PLANNED — Shipping. Trigger: first physical product sale. Plan: `docs/phases/PHASE_24_PLAN.md`
+**Phase 24**: ✅ DEPLOYED — Commerce infrastructure (Shop Config panel, sales tax, shipping, address book). Tax and shipping dark behind `tax.enabled`/`shipping.enabled` ISM flags; activate when TX Comptroller registration + Stripe Tax Dashboard setup complete. Plan: `docs/phases/PHASE_24_PLAN.md`. Report: `docs/phases/PHASE_24_COMPLETION_REPORT.md`
 **Phase 25**: ✅ DEPLOYED — Cloud SQL → Neon migration. Database now on Neon free tier; Cloud SQL deleted. Plan: `docs/phases/PHASE_25_PLAN.md`
 **Phase 26**: ✅ DEPLOYED — SEO toolkit: generateMetadata on all site routes, JSON-LD (Book/Article/Person/WebSite/BreadcrumbList), /sitemap.xml, /robots.txt, SEO settings tab, per-content SEO panels + snippet preview, book fields (ISBN/format/page count/publisher/Amazon+Goodreads URLs), Owner's Manual ch08. PRD: `docs/prd/15-seo-toolkit.md`. Plan: `docs/phases/PHASE_26_PLAN.md`
 **Phase 27**: 📋 PLANNED — Design Library: manual palettes, page templates, export/import. PRD: `docs/prd/16-design-library.md`. Plan: `docs/phases/PHASE_27_PLAN.md`
@@ -283,9 +282,10 @@ Known bugs, planned fixes, and fix history. One file per bug.
 - `docs/phases/PHASE_22_PLAN.md` - Dependency upgrades & live-testing fixes (TipTap version alignment, GH Actions Node 20 deprecation)
 - `docs/phases/PHASE_23_PLAN.md` - Mul Converter: AI-driven webpage ingestion → custom palette + page scaffold
 - `docs/phases/PHASE_23_COMPLETION_REPORT.md` - Phase 23 completion: section schema, SectionEditor, Mul Converter pipeline, image gen, scroll transitions, SectionBackgroundPanel
-- `docs/feature-requests/FR-010-pii-encryption.md` - PII Encryption at Rest: EncryptionService, UserAddress encrypted columns, backfill strategy for totp/OAuth/orders/users, IP hashing
+- `docs/feature-requests/FR-010-pii-encryption.md` - PII Encryption at Rest: EncryptionService, all plaintext PII columns dropped, UserAddress encrypted, backfill scripts (raw pg SQL)
 - `docs/phases/PHASE_24_PLAN.md` - Sales tax: Stripe Tax integration, address book (encrypted), PayPal flat-rate, tax settings, reporting; paired with FR-010
-- `docs/phases/PHASE_24_FR010_BUILD_ORDER.md` - Authoritative combined build order for Phase 24 + FR-010: 16 deploys, 5 two-pass backfill sequences, owner actions, Neon URL usage, external prerequisites
+- `docs/phases/PHASE_24_COMPLETION_REPORT.md` - Phase 24 completion: Shop Config, tax, shipping, address book; deployment bugs fixed (table names, Neon pooler, test mocks)
+- `docs/phases/PHASE_24_FR010_BUILD_ORDER.md` - Combined build order for Phase 24 + FR-010: ✅ COMPLETE as of 2026-06-28
 - `docs/phases/PHASE_25_PLAN.md` - Cloud SQL → Neon migration: ~$10/mo savings, one-line deploy change
 - `docs/phases/PHASE_25_COMPLETION_REPORT.md` - Phase 25 completion: Cloud SQL → Neon operational migration, cost to $0
 - `docs/phases/PHASE_26_PLAN.md` - SEO toolkit: 11 items, generateMetadata, JSON-LD, sitemap, robots, book fields

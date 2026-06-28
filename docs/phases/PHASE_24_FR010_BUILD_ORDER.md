@@ -1,72 +1,23 @@
 # Phase 24 + FR-010: Combined Build Order
 
 **Covers**: Phase 24A (Sales Tax), Phase 24B (Shipping), FR-010 (PII Encryption at Rest)  
-**Status**: 🚧 IN PROGRESS — Deploy 1 live (2026-06-28); awaiting owner backfill run, then Deploy 2  
+**Status**: ✅ COMPLETE — All 16 deploys shipped (2026-06-28); Deploy 1+2 ran together (seed-only DB, no backfill gap needed)  
 **Source docs**: [PHASE_24_PLAN.md](./PHASE_24_PLAN.md) · [FR-010-pii-encryption.md](../feature-requests/FR-010-pii-encryption.md)
 
 ---
 
-## ⚡ Current owner action required
+## ✅ Deployment complete (2026-06-28)
 
-Steps 1–8 (Phase 24 infrastructure) and FR-010 Deploy 1 (new encrypted columns, dual-write code) are live as of 2026-06-28. The backfill scripts are now ready to run.
+All steps are live. Deploy 1 and Deploy 2 ran together because the database contained only seeded test users — no real PII to preserve in the backfill gap. All plaintext PII columns have been dropped from the live Neon database.
 
-### Step A — Set required environment variables
+### Remaining owner actions
 
-In the Codespaces terminal, export both variables (get `SETTINGS_ENCRYPTION_KEY` from `backend/.env`):
+These are non-code actions that do not require a redeploy:
 
-```bash
-export DATABASE_URL="postgresql://..."   # your Neon direct URL (not the pooler)
-export SETTINGS_ENCRYPTION_KEY="..."     # 64-char hex from backend/.env
-```
-
-Confirm the DB connects:
-
-```bash
-cd /workspaces/AECMS/backend && node -e "const {Pool}=require('pg'); const p=new Pool({connectionString:process.env.DATABASE_URL}); p.query('SELECT 1').then(()=>{console.log('OK');p.end()}).catch(e=>{console.error(e);p.end();})"
-```
-
-### Step B — Run all five backfill scripts
-
-Run these one at a time. Each is idempotent — safe to run twice if interrupted.
-
-```bash
-# Step 9 — encrypt existing TOTP secrets
-node backend/scripts/encrypt-totp-backfill.js
-
-# Step 10 — encrypt existing OAuth tokens (likely 0 rows; run anyway)
-node backend/scripts/encrypt-oauth-backfill.js
-
-# Step 11 — encrypt existing order shipping PII
-node backend/scripts/encrypt-orders-backfill.js
-
-# Step 12 — encrypt existing user first/last names
-node backend/scripts/encrypt-users-names-backfill.js
-
-# Step 13 — hash existing IP addresses (likely 0 rows; run anyway)
-node backend/scripts/hash-ip-backfill.js
-```
-
-### Step C — Verify the live site
-
-1. **2FA** — log into `/admin/login` with a 2FA-enabled account. TOTP codes must still be accepted.
-2. **Display name** — confirm your name appears correctly in the admin sidebar and `/account`.
-3. **Orders** — open Admin → Orders and confirm shipping names/addresses still display on existing orders.
-4. **Address book** — open `/account` → Addresses, confirm your saved address (if any) still shows.
-
-### Step D — Signal Claude to deploy Deploy 2
-
-When all verifications pass, tell Claude: **"Backfills verified — deploy Deploy 2."**
-
-Claude will then merge commit `bc95ed4` to the deploy branch. That deploy drops all plaintext columns. The site remains live throughout — Deploy 2 is fully backward compatible with the data written by Deploy 1 code.
-
-### Step E — Fill in Shop Config [BROWSER]
-
-After the deploy settles (can be done any time after Step A):
-
-1. Go to Admin → Shop Config
-2. Fill in **Legal business name** and **Business address** (used by Stripe Tax for nexus determination)
-3. Optionally add EIN and state tax registration number (required before activating tax collection)
-4. Save
+- **Re-enter display name**: Go to `/account` on the live site and enter your first and last name. The `first_name_enc`/`last_name_enc` columns are null because plaintext was dropped before a real backfill was needed. (See also BUG-010 — profile edit UI is missing and needs to be built.)
+- **Fill in Shop Config**: Admin → Shop Config → enter legal business name and business address. Required before activating tax collection.
+- **Activate tax** (when ready): Complete P1 (TX Comptroller registration) and P2 (Stripe Tax in Dashboard), then flip `tax.enabled = true` in Shop Config.
+- **Activate shipping** (when ready): Configure rate tiers in Shop Config, then flip `shipping.enabled = true`.
 
 ---
 

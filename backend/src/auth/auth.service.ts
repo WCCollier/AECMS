@@ -776,6 +776,28 @@ export class AuthService {
     });
   }
 
+  async updateProfile(userId: string, dto: { firstName?: string; lastName?: string; username?: string }) {
+    if (dto.username) {
+      const existing = await this.prisma.user.findFirst({
+        where: { username: dto.username, NOT: { id: userId } },
+      });
+      if (existing) throw new ConflictException('Username is already taken');
+    }
+
+    const data: Record<string, unknown> = {};
+    if (dto.firstName !== undefined) data.first_name_enc = await this.encryption.encrypt(dto.firstName) ?? null;
+    if (dto.lastName !== undefined) data.last_name_enc = await this.encryption.encrypt(dto.lastName) ?? null;
+    if (dto.username !== undefined) data.username = dto.username;
+
+    const user = await this.prisma.user.update({ where: { id: userId }, data });
+
+    return {
+      firstName: await this.decryptName(user.first_name_enc),
+      lastName: await this.decryptName(user.last_name_enc),
+      username: user.username,
+    };
+  }
+
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
