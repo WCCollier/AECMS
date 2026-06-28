@@ -123,6 +123,7 @@ export class OrdersService {
         shipping,
         total,
         payment_method: dto.payment_method ?? 'stripe',
+        address_id: dto.address_id ?? null,
         shipping_name: dto.shipping_address?.name ?? customerName,
         shipping_address: dto.shipping_address?.street,
         shipping_city: dto.shipping_address?.city,

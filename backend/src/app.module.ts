@@ -31,6 +31,7 @@ import { MulConverterModule } from './mul-converter/mul-converter.module';
 import { RolesModule } from './roles/roles.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { EncryptionModule } from './encryption/encryption.module';
+import { AddressesModule } from './addresses/addresses.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { EncryptionModule } from './encryption/encryption.module';
     RolesModule,
     SubscriptionsModule,
     EncryptionModule,
+    AddressesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

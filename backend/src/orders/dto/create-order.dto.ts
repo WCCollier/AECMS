@@ -72,6 +72,11 @@ export class CreateOrderDto {
   @Type(() => ShippingAddressDto)
   @IsOptional()
   shipping_address?: ShippingAddressDto;
+
+  @ApiPropertyOptional({ description: 'Saved UserAddress ID used at checkout (links order to address book entry)' })
+  @IsString()
+  @IsOptional()
+  address_id?: string;
 }
 
 export class UpdateOrderStatusDto {

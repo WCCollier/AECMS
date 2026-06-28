@@ -92,6 +92,7 @@ model User {
   audit_logs            AuditLog[]
   media_uploads         Media[]       @relation("MediaUploader")
   domain_aliases        DomainAlias[]
+  addresses             UserAddress[]
 
   @@index([email])
   @@index([role_name])
@@ -613,6 +614,10 @@ model Order {
   shipping_zip      String?
   shipping_country  String?
 
+  // Address book link (set when user selects/saves a UserAddress at checkout)
+  address_id        String?
+  address           UserAddress? @relation(fields: [address_id], references: [id], onDelete: SetNull)
+
   // Refund details (populated by PaymentsService.refund())
   refunded_at       DateTime?
   refund_amount     Decimal?  @db.Decimal(10, 2) // null = full order total
@@ -638,6 +643,27 @@ model Order {
   @@index([user_id])
   @@index([status])
   @@map("orders")
+}
+
+model UserAddress {
+  id              String   @id @default(uuid())
+  user_id         String
+  label           String?  // e.g. "Home", "Office"
+  full_name_enc   String?  // encrypted full name
+  street_enc      String   // encrypted street address
+  city_enc        String   // encrypted city
+  state           String   // plaintext — needed for tax queries
+  postal_code_enc String   // encrypted postal code
+  country         String   // plaintext — needed for tax queries
+  is_default      Boolean  @default(false)
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user   User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  orders Order[]
+
+  @@index([user_id])
+  @@map("user_addresses")
 }
 
 enum OrderStatus {

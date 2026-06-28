@@ -49,6 +49,7 @@ export function useOrder(id: string | undefined) {
 export interface CreateOrderData {
   shipping_address?: ShippingAddress;
   billing_address?: ShippingAddress;
+  address_id?: string;
   guest_email?: string;
   customer_first_name?: string;
   customer_last_name?: string;
