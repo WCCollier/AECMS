@@ -1,8 +1,8 @@
 # FR-010: PII Encryption at Rest
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Requested:** 2026-06-26
-**Deployed:** —
+**Deployed:** 2026-06-28
 **Size:** `medium`
 **Paired with:** Phase 24 (address book built encrypted from day one; `EncryptionService` extracted as shared infrastructure)
 
@@ -19,6 +19,7 @@ Several fields in the database that contain personally identifiable information 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-26 | accepted | Identified during Phase 24 design session; paired with Phase 24 implementation |
+| 2026-06-28 | deployed | Full Deploy 1+2 shipped together; all plaintext PII columns dropped from live DB |
 
 ---
 
@@ -194,7 +195,57 @@ No new endpoints. All changes are internal to the service layer. Encrypted value
 
 ## Completion Report
 
-> _Fill in after implementation._
+**Deployed:** 2026-06-28  
+**Commits:** `7470f37` (Deploy 1), `bc95ed4` (Deploy 2), `424fd41` (docker-start.sh direct URL fix)
+
+### What shipped
+
+All planned FR-010 work is live. The full two-deploy sequence (Deploy 1: add `_enc` columns + dual-write; Deploy 2: drop plaintext) ran as a combined deployment because the live database contained only 2 seeded test users with no real PII to preserve. No backfill gap was required.
+
+**EncryptionService** — `backend/src/encryption/encryption.service.ts` / `encryption.module.ts`. Wraps the existing `LocalKeyProvider` / `GcpKeyProvider` AES-256-GCM stack as a separately importable NestJS global module. All encrypted columns use this service at the application layer before any Prisma read or write.
+
+**Fields encrypted** (all use `_enc`-suffixed columns, plaintext columns dropped):
+
+| Field | Table | Encrypted column |
+|-------|-------|-----------------|
+| `first_name` | `users` | `first_name_enc` |
+| `last_name` | `users` | `last_name_enc` |
+| `totp_secret` | `users` | `totp_secret_enc` |
+| `access_token` | `oauth_accounts` | `access_token_enc` |
+| `refresh_token` | `oauth_accounts` | `refresh_token_enc` |
+| `customer_name` | `orders` | `customer_name_enc` |
+| `shipping_name` | `orders` | `shipping_name_enc` |
+| `shipping_address` | `orders` | `shipping_address_enc` |
+| `shipping_city` | `orders` | `shipping_city_enc` |
+| `shipping_zip` | `orders` | `shipping_zip_enc` |
+| `full_name` | `user_addresses` | `full_name_enc` (new table, encrypted from day one) |
+| `street` | `user_addresses` | `street_enc` |
+| `city` | `user_addresses` | `city_enc` |
+| `postal_code` | `user_addresses` | `postal_code_enc` |
+
+**Fields hashed** (one-way SHA-256, no decryption needed):
+- `users.last_login_ip` → `last_login_ip_hash`
+- `refresh_tokens.ip_address` → `ip_address_hash`
+
+**False "Encrypted" comments resolved**: `totp_secret` and `oauth_accounts.access_token`/`refresh_token` were previously documented as encrypted but stored as plaintext. Both are now actually encrypted.
+
+### Deviations from the plan
+
+**Backfill scripts rewritten to raw SQL**: The 5 backfill scripts were initially written using Prisma ORM. During the deployment session it was discovered the Prisma client had been generated from the Deploy 2 schema (which had already dropped the plaintext columns), causing `PrismaClientValidationError: Unknown argument 'totp_secret'`. All 5 scripts were rewritten to use the `pg` Pool directly with raw SQL, bypassing Prisma's type system entirely. This made them robust to schema state.
+
+**Neon pooler / advisory lock incompatibility fixed**: `prisma migrate deploy` requires `pg_advisory_lock`, which PgBouncer (Neon's pooler URL) does not relay reliably. `docker-start.sh` was updated to derive the direct Neon URL at startup by stripping `-pooler.` from the hostname using `sed`. This fix is permanent infrastructure and prevents the same timeout on all future deployments.
+
+**CI test failures fixed**: `EncryptionService` is declared `@Global()` but global modules do not apply in isolated NestJS unit test modules. Three spec files were missing the `EncryptionService` mock: `auth.service.spec.ts`, `digital-products.service.spec.ts`, and `kindle.service.spec.ts`. All fixed with a mock provider. The `validateUser` assertion in `auth.service.spec.ts` was also updated to match the new return shape (object now includes decrypted virtual fields rather than matching the raw DB row).
+
+**Migration SQL table name bug**: Two migration files used `ALTER TABLE "Product"` (the Prisma model name) instead of `ALTER TABLE "products"` (the actual `@@map` table). Fixed in both files before final deployment.
+
+### Schema state after Deploy 2
+
+All plaintext PII columns dropped from the live Neon database. A `pg_dump` of the production DB no longer contains any readable PII — all sensitive fields are AES-256-GCM ciphertexts. The encryption key (`SETTINGS_ENCRYPTION_KEY`) is stored in GCP Secret Manager and never appears in the database.
+
+### Known gap
+
+Because Deploy 1 and Deploy 2 ran together without a backfill gap, existing seed user names (`first_name_enc`, `last_name_enc`) are **null** in production. The owner must re-enter their display name at `/account`. This is cosmetic only — no real user data was at risk. See BUG-010 for the missing profile edit UI that makes this possible.
 
 ---
 
@@ -228,13 +279,13 @@ No new endpoints. All changes are internal to the service layer. Encrypted value
 
 ### Acceptance criteria
 
-- [ ] `EncryptionService` extracted and importable from any module
-- [ ] All `UserAddress` free-text fields stored as ciphertexts in DB
-- [ ] `totp_secret` actually encrypted (false comment resolved)
-- [ ] OAuth `access_token` / `refresh_token` actually encrypted
-- [ ] `orders` shipping PII encrypted; `shipping_state` / `shipping_country` remain plaintext
-- [ ] `users` name fields encrypted; `email` remains plaintext
-- [ ] IP fields hashed (not encrypted); existing values migrated
-- [ ] All backfill scripts are idempotent and batch-safe
-- [ ] No plaintext PII visible in a `pg_dump` of the live DB after Deploy 2
-- [ ] All existing tests pass; no decrypt errors in normal operation
+- [x] `EncryptionService` extracted and importable from any module
+- [x] All `UserAddress` free-text fields stored as ciphertexts in DB
+- [x] `totp_secret` actually encrypted (false comment resolved)
+- [x] OAuth `access_token` / `refresh_token` actually encrypted
+- [x] `orders` shipping PII encrypted; `shipping_state` / `shipping_country` remain plaintext
+- [x] `users` name fields encrypted; `email` remains plaintext
+- [x] IP fields hashed (not encrypted); existing values migrated
+- [x] All backfill scripts are idempotent and batch-safe
+- [x] No plaintext PII visible in a `pg_dump` of the live DB after Deploy 2
+- [x] All existing tests pass; no decrypt errors in normal operation
