@@ -11,7 +11,7 @@ import api, { getErrorMessage } from '@/lib/api';
 const ADJUSTMENT_KEY = 'cart_stock_adjustments';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui';
 import { ArrowLeft, ShoppingCart, Loader2 } from 'lucide-react';
-import type { PaymentIntent, ShippingAddress, SavedShippingAddress } from '@/types';
+import type { PaymentIntent, ShippingAddress, UserAddress } from '@/types';
 
 export function CheckoutPageClient() {
   const router = useRouter();
@@ -23,7 +23,7 @@ export function CheckoutPageClient() {
   const [step, setStep] = useState<'shipping' | 'payment'>('shipping');
   const [orderId, setOrderId] = useState<string | null>(null);
   const [saveAddress, setSaveAddress] = useState(false);
-  const [savedAddress, setSavedAddress] = useState<SavedShippingAddress | null>(null);
+  const [defaultAddress, setDefaultAddress] = useState<UserAddress | null>(null);
 
   const [formData, setFormData] = useState({
     email: user?.email || '',
@@ -47,20 +47,20 @@ export function CheckoutPageClient() {
   // Show name fields when guest, or when logged-in user hasn't provided a name yet
   const needsName = !isAuthenticated || !user?.firstName;
 
-  // Load saved shipping address for authenticated users
+  // Load default saved address for authenticated users
   useEffect(() => {
     if (!isAuthenticated) return;
-    api.get<SavedShippingAddress>('/auth/shipping-address').then((res) => {
+    api.get<UserAddress | null>('/addresses/default').then((res) => {
       const addr = res.data;
-      setSavedAddress(addr);
-      if (addr.has_address) {
+      setDefaultAddress(addr);
+      if (addr) {
         setFormData((prev) => ({
           ...prev,
-          street: addr.shipping_street ?? '',
-          city: addr.shipping_city ?? '',
-          state: addr.shipping_state ?? '',
-          postal_code: addr.shipping_postal_code ?? '',
-          country: addr.shipping_country ?? 'US',
+          street: addr.street,
+          city: addr.city,
+          state: addr.state,
+          postal_code: addr.postal_code,
+          country: addr.country,
         }));
       }
     }).catch(() => {});
@@ -120,19 +120,25 @@ export function CheckoutPageClient() {
         country: formData.country,
       };
 
-      // Optionally save address to profile
+      // Optionally save address to address book
+      let savedAddressId: string | undefined;
       if (saveAddress && isAuthenticated) {
-        await api.patch('/auth/shipping-address', {
-          shipping_street: formData.street,
-          shipping_city: formData.city,
-          shipping_state: formData.state,
-          shipping_postal_code: formData.postal_code,
-          shipping_country: formData.country,
-        });
+        try {
+          const res = await api.post<UserAddress>('/addresses', {
+            street: formData.street,
+            city: formData.city,
+            state: formData.state,
+            postal_code: formData.postal_code,
+            country: formData.country,
+            is_default: true,
+          });
+          savedAddressId = res.data.id;
+        } catch { /* non-fatal — order still proceeds */ }
       }
 
       const order = await createOrder({
         shipping_address: shippingAddress,
+        address_id: savedAddressId,
         guest_email: !isAuthenticated ? formData.email : undefined,
         customer_first_name: formData.firstName || undefined,
         customer_last_name: formData.lastName || undefined,
@@ -280,12 +286,12 @@ export function CheckoutPageClient() {
     );
   }
 
-  const addressChanged = savedAddress?.has_address && (
-    formData.street !== (savedAddress.shipping_street ?? '') ||
-    formData.city !== (savedAddress.shipping_city ?? '') ||
-    formData.state !== (savedAddress.shipping_state ?? '') ||
-    formData.postal_code !== (savedAddress.shipping_postal_code ?? '') ||
-    formData.country !== (savedAddress.shipping_country ?? 'US')
+  const addressChanged = defaultAddress && (
+    formData.street !== defaultAddress.street ||
+    formData.city !== defaultAddress.city ||
+    formData.state !== defaultAddress.state ||
+    formData.postal_code !== defaultAddress.postal_code ||
+    formData.country !== defaultAddress.country
   );
 
   return (
@@ -349,7 +355,7 @@ export function CheckoutPageClient() {
                     </div>
                   )}
 
-                  {savedAddress?.has_address && (
+                  {defaultAddress && (
                     <div className="text-sm text-foreground/60 bg-foreground/5 rounded-lg px-3 py-2">
                       Your saved address has been pre-filled below.
                     </div>
@@ -420,8 +426,8 @@ export function CheckoutPageClient() {
                         onChange={(e) => setSaveAddress(e.target.checked)}
                         className="rounded"
                       />
-                      {savedAddress?.has_address
-                        ? 'Update my saved shipping address'
+                      {defaultAddress
+                        ? 'Save as new default address'
                         : 'Save this address for future orders'}
                     </label>
                   )}

@@ -72,6 +72,8 @@ const capabilities = [
   { name: 'account.delete.any',     category: 'users',  scope: 'backstage', description: 'Delete any account except your own (including other owners)' },
   // Tag Management
   { name: 'tag.edit',         category: 'content',       scope: 'backstage', description: 'Create, rename, delete, and bulk-assign tags' },
+  // Shop Configuration (Owner-only)
+  { name: 'shop.configure',   category: 'system',        scope: 'backstage', description: 'Configure shop identity, tax, and shipping settings' },
   // Subscriptions & Broadcasts
   { name: 'broadcast.send',   category: 'communication', scope: 'backstage', description: 'Send a news/alert broadcast email to all subscribed members' },
   { name: 'broadcast.config', category: 'communication', scope: 'backstage', description: 'Configure default subscription preferences for new sign-ups' },
@@ -109,6 +111,18 @@ const adminBackstageCaps = [
 ];
 
 const defaultSettings = [
+  // Tax defaults (all off — activate via Shop Config when legally ready)
+  { key: 'tax.enabled',                  value: 'false' },
+  { key: 'tax.flat_rate',                value: '' },
+  { key: 'tax.default_stripe_tax_code',  value: '' },
+  // Shipping defaults (all off — activate via Shop Config when ready)
+  { key: 'shipping.enabled',             value: 'false' },
+  { key: 'shipping.tier1_label',         value: '' },
+  { key: 'shipping.tier1_rate',          value: '' },
+  { key: 'shipping.tier2_label',         value: '' },
+  { key: 'shipping.tier2_rate',          value: '' },
+  { key: 'shipping.free_threshold',      value: '' },
+  { key: 'shipping.international_rate',  value: '' },
   { key: 'general.site_title',    value: 'My Site' },
   { key: 'general.tagline',       value: '' },
   { key: 'general.timezone',      value: 'America/New_York' },

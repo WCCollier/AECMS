@@ -152,6 +152,18 @@ export class CreateProductDto {
   @IsOptional()
   goodreads_url?: string;
 
+  @ApiPropertyOptional({ description: 'Stripe Tax code (e.g. txcd_10040001); null uses shop default' })
+  @IsString()
+  @IsOptional()
+  stripe_tax_code?: string;
+
+  @ApiPropertyOptional({ description: 'Per-product flat shipping rate in cents; null uses shop tier rates' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  shipping_override?: number;
+
   @ApiPropertyOptional({ description: 'Tag IDs', type: [String] })
   @IsArray()
   @IsUUID('4', { each: true })

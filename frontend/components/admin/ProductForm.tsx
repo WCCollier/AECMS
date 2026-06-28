@@ -47,6 +47,8 @@ interface ProductFormData {
   publisher: string;
   amazon_url: string;
   goodreads_url: string;
+  stripe_tax_code: string;
+  shipping_override: string;
 }
 
 interface ProductFormProps {
@@ -107,6 +109,10 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
       publisher: (initialData as any)?.publisher || '',
       amazon_url: (initialData as any)?.amazon_url || '',
       goodreads_url: (initialData as any)?.goodreads_url || '',
+      stripe_tax_code: (initialData as any)?.stripe_tax_code || '',
+      shipping_override: (initialData as any)?.shipping_override != null
+        ? String((initialData as any).shipping_override / 100)
+        : '',
     },
   });
 
@@ -176,6 +182,10 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
         publisher: data.publisher || undefined,
         amazon_url: data.amazon_url || undefined,
         goodreads_url: data.goodreads_url || undefined,
+        stripe_tax_code: data.stripe_tax_code || undefined,
+        shipping_override: data.shipping_override
+          ? Math.round(parseFloat(data.shipping_override) * 100)
+          : undefined,
         media_ids: gallery.map((e) => e.mediaId),
         tag_ids: tags.map((t) => t.id),
       };
@@ -580,6 +590,35 @@ export function ProductForm({ productId, initialData, mainExtra, digitalFileCoun
               {(isbnValue || watch('book_format')) && (
                 <p className="text-xs text-green-400/80">Book schema will be emitted for this product page.</p>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Tax &amp; Shipping</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Stripe Tax code</label>
+                <Input
+                  {...register('stripe_tax_code')}
+                  placeholder="e.g. txcd_10040001 (leave blank for shop default)"
+                  className="w-full font-mono text-sm"
+                />
+                <p className="text-xs text-foreground/50 mt-1">Override the shop-level default. Leave blank to use Shop Config default.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Shipping rate override ($)</label>
+                <Input
+                  {...register('shipping_override')}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g. 4.99 (leave blank for shop tier rates)"
+                  className="w-full"
+                />
+                <p className="text-xs text-foreground/50 mt-1">Flat rate for this product. Leave blank to use the shop-level tier rates.</p>
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -312,6 +312,7 @@ export interface Order {
   paid_at: string | null;
   subtotal: number;
   tax: number;
+  tax_amount: number | null;  // actual tax collected in cents (from Stripe/PayPal webhook)
   shipping: number;
   total: number;
   shipping_address: ShippingAddress | null;
@@ -323,6 +324,20 @@ export interface Order {
   scheduled_at: string | null;
   scheduled_note: string | null;
   items: OrderItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserAddress {
+  id: string;
+  label: string | null;
+  full_name: string | null;
+  street: string;
+  city: string;
+  state: string;
+  postal_code: string;
+  country: string;
+  is_default: boolean;
   created_at: string;
   updated_at: string;
 }

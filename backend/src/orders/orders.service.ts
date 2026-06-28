@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { CapabilitiesService } from '../capabilities/capabilities.service';
+import { SettingsService } from '../settings/settings.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';
 import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit/audit.service';
@@ -18,7 +20,33 @@ export class OrdersService {
     private cartService: CartService,
     private auditLog: AuditLogService,
     private capabilitiesService: CapabilitiesService,
+    private settingsService: SettingsService,
+    private encryption: EncryptionService,
   ) {}
+
+  private async computeShippingCents(
+    hasPhysical: boolean,
+    subtotalCents: number,
+    destCountry?: string,
+  ): Promise<number> {
+    if (!hasPhysical) return 0;
+    const enabled = (await this.settingsService.getEffective('shipping.enabled')) === 'true';
+    if (!enabled) return 0;
+
+    const freeThreshold = parseFloat(await this.settingsService.getEffective('shipping.free_threshold') ?? '0') || 0;
+    if (freeThreshold > 0 && subtotalCents / 100 >= freeThreshold) return 0;
+
+    const shopCountry = (await this.settingsService.getEffective('shop.address_country')) || 'US';
+    const isInternational = destCountry && destCountry !== shopCountry;
+
+    if (isInternational) {
+      const rate = parseFloat(await this.settingsService.getEffective('shipping.international_rate') ?? '0') || 0;
+      return Math.round(rate * 100);
+    }
+
+    const tier1Rate = parseFloat(await this.settingsService.getEffective('shipping.tier1_rate') ?? '0') || 0;
+    return Math.round(tier1Rate * 100);
+  }
 
   /**
    * Create order from cart
@@ -101,8 +129,13 @@ export class OrdersService {
 
     // Calculate totals
     const subtotal = cart.subtotal;
-    const tax = 0; // Tax calculation would go here
-    const shipping = hasPhysical ? 0 : 0; // Shipping calculation would go here
+    const tax = 0;
+    const shippingCents = await this.computeShippingCents(
+      hasPhysical,
+      Math.round(subtotal * 100),
+      dto.shipping_address?.country,
+    );
+    const shipping = shippingCents / 100;
     const total = subtotal + tax + shipping;
 
     // Compose customer name from checkout form (first+last) or shipping address name
@@ -116,18 +149,24 @@ export class OrdersService {
         order_number: orderNumber,
         user_id: userId,
         email: userEmail ?? dto.guest_email ?? '',
-        customer_name: customerName,
         status: 'pending',
         subtotal,
         tax,
         shipping,
         total,
         payment_method: dto.payment_method ?? 'stripe',
+        address_id: dto.address_id ?? null,
+        customer_name: customerName ?? null,
+        customer_name_enc: await this.encryption.encrypt(customerName),
         shipping_name: dto.shipping_address?.name ?? customerName,
+        shipping_name_enc: await this.encryption.encrypt(dto.shipping_address?.name ?? customerName),
         shipping_address: dto.shipping_address?.street,
+        shipping_address_enc: await this.encryption.encrypt(dto.shipping_address?.street),
         shipping_city: dto.shipping_address?.city,
+        shipping_city_enc: await this.encryption.encrypt(dto.shipping_address?.city),
         shipping_state: dto.shipping_address?.state,
         shipping_zip: dto.shipping_address?.postal_code,
+        shipping_zip_enc: await this.encryption.encrypt(dto.shipping_address?.postal_code),
         shipping_country: dto.shipping_address?.country,
         items: {
           create: cart.items.map((item: any) => ({
@@ -333,7 +372,7 @@ export class OrdersService {
   /**
    * Mark order as paid (called after payment confirmation)
    */
-  async markAsPaid(id: string, paymentIntentId: string) {
+  async markAsPaid(id: string, paymentIntentId: string, taxAmountCents?: number, taxDetails?: any) {
     const order = await this.prisma.order.findUnique({
       where: { id },
     });
@@ -348,6 +387,8 @@ export class OrdersService {
         status: 'processing',
         payment_intent_id: paymentIntentId,
         paid_at: new Date(),
+        ...(taxAmountCents != null ? { tax_amount: taxAmountCents } : {}),
+        ...(taxDetails != null ? { tax_details: taxDetails } : {}),
       },
       include: this.getOrderIncludes(),
     });
@@ -537,6 +578,60 @@ export class OrdersService {
           total_price: unitPrice * item.quantity,
         };
       }),
+    };
+  }
+
+  async taxReport(from: Date, to: Date) {
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        created_at: { gte: from, lte: toEnd },
+        status: { not: 'pending' },
+        tax_amount: { not: null, gt: 0 },
+      },
+      select: {
+        id: true,
+        order_number: true,
+        created_at: true,
+        total: true,
+        tax_amount: true,
+        shipping_state: true,
+        payment_method: true,
+      },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const totalCents = orders.reduce((sum, o) => sum + (o.tax_amount ?? 0), 0);
+
+    // Group by state
+    const byState: Record<string, number> = {};
+    for (const o of orders) {
+      const state = o.shipping_state || 'N/A';
+      byState[state] = (byState[state] ?? 0) + (o.tax_amount ?? 0);
+    }
+
+    return {
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      total_tax_cents: totalCents,
+      total_tax_dollars: (totalCents / 100).toFixed(2),
+      order_count: orders.length,
+      by_state: Object.entries(byState).map(([state, cents]) => ({
+        state,
+        tax_cents: cents,
+        tax_dollars: (cents / 100).toFixed(2),
+      })),
+      orders: orders.map((o) => ({
+        order_number: o.order_number,
+        date: o.created_at.toISOString().slice(0, 10),
+        total: parseFloat(o.total.toString()),
+        tax_cents: o.tax_amount,
+        tax_dollars: ((o.tax_amount ?? 0) / 100).toFixed(2),
+        state: o.shipping_state,
+        payment_method: o.payment_method,
+      })),
     };
   }
 

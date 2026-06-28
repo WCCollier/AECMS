@@ -21,6 +21,7 @@ import {
 import { PaymentProvider, WebhookEvent } from './providers/payment-provider.interface';
 import { AuditLogService } from '../audit/audit.service';
 import { OrderEmailService } from './order-email.service';
+import { SettingsService } from '../settings/settings.service';
 
 @Injectable()
 export class PaymentsService {
@@ -36,6 +37,7 @@ export class PaymentsService {
     private paypalProvider: PayPalProvider,
     private auditLog: AuditLogService,
     private orderEmailService: OrderEmailService,
+    private settingsService: SettingsService,
   ) {
     this.providers = new Map();
     this.providers.set('stripe', stripeProvider);
@@ -115,6 +117,13 @@ export class PaymentsService {
     // Create payment
     const totalInCents = Math.round(parseFloat(order.total.toString()) * 100);
 
+    // Read tax settings from ISM (ship dark — only apply when tax.enabled = true)
+    const taxEnabledRaw = await this.settingsService.getEffective('tax.enabled');
+    const taxEnabled = taxEnabledRaw === 'true';
+    const defaultTaxCode = taxEnabled
+      ? (await this.settingsService.getEffective('tax.default_stripe_tax_code') || undefined)
+      : undefined;
+
     const payment = await provider.createPayment({
       amount: totalInCents,
       currency: 'USD',
@@ -123,6 +132,11 @@ export class PaymentsService {
       metadata: {
         order_number: order.order_number,
       },
+      taxEnabled,
+      // Stripe uses Stripe Tax codes; PayPal reuses defaultTaxCode to carry the flat rate %
+      defaultTaxCode: dto.provider === 'stripe'
+        ? defaultTaxCode
+        : taxEnabled ? (await this.settingsService.getEffective('tax.flat_rate') || undefined) : undefined,
     });
 
     // Update order with payment intent
@@ -415,13 +429,28 @@ export class PaymentsService {
     let orderId: string;
     let paymentId: string;
 
+    let taxAmountCents: number | undefined;
+    let taxDetails: any;
+
     if (event.provider === 'stripe') {
       orderId = event.data.metadata?.order_id;
       paymentId = event.data.id;
+      // Extract Stripe Tax collected amount (only present when automatic_tax was enabled)
+      const totalDetails = event.data.total_details;
+      if (totalDetails?.amount_tax != null && totalDetails.amount_tax > 0) {
+        taxAmountCents = totalDetails.amount_tax;
+        taxDetails = totalDetails;
+      }
     } else {
       // PayPal
       orderId = event.data.custom_id || event.data.purchase_units?.[0]?.custom_id;
       paymentId = event.data.id;
+      // Extract PayPal flat-rate tax from breakdown if present
+      const taxTotalValue = event.data.purchase_units?.[0]?.amount?.breakdown?.tax_total?.value;
+      if (taxTotalValue && parseFloat(taxTotalValue) > 0) {
+        taxAmountCents = Math.round(parseFloat(taxTotalValue) * 100);
+        taxDetails = { tax_total: taxTotalValue };
+      }
     }
 
     if (!orderId) {
@@ -430,7 +459,7 @@ export class PaymentsService {
     }
 
     try {
-      await this.ordersService.markAsPaid(orderId, paymentId);
+      await this.ordersService.markAsPaid(orderId, paymentId, taxAmountCents, taxDetails);
       this.logger.log(`Order ${orderId} marked as paid`);
       // Create download tokens for any digital items in the order (idempotent)
       try {

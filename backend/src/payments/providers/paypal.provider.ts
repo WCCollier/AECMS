@@ -83,10 +83,24 @@ export class PayPalProvider implements PaymentProvider {
         purchase_units: [
           {
             reference_id: params.orderId,
-            amount: {
-              currency_code: params.currency.toUpperCase(),
-              value: (params.amount / 100).toFixed(2), // Convert cents to dollars
-            },
+            amount: (() => {
+              const subtotalDollars = (params.amount / 100).toFixed(2);
+              if (!params.taxEnabled || !params.defaultTaxCode) {
+                return { currency_code: params.currency.toUpperCase(), value: subtotalDollars };
+              }
+              const taxRate = parseFloat(params.defaultTaxCode) / 100; // flat_rate stored as "8.25"
+              const taxCents = Math.round(params.amount * taxRate);
+              const totalDollars = ((params.amount + taxCents) / 100).toFixed(2);
+              const taxDollars = (taxCents / 100).toFixed(2);
+              return {
+                currency_code: params.currency.toUpperCase(),
+                value: totalDollars,
+                breakdown: {
+                  item_total: { currency_code: params.currency.toUpperCase(), value: subtotalDollars },
+                  tax_total:  { currency_code: params.currency.toUpperCase(), value: taxDollars },
+                },
+              };
+            })(),
             custom_id: params.orderId,
           },
         ],
