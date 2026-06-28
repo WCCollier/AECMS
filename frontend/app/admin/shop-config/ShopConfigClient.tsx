@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Store, Building2, Truck, Receipt, Save, Loader2 } from 'lucide-react';
+import { Store, Building2, Truck, Receipt, Package, Save, Loader2 } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
 
@@ -24,6 +24,14 @@ interface ShopSettings {
   'tax.enabled': string;
   'tax.default_stripe_tax_code': string;
   'tax.flat_rate': string;
+  // Shipping (Step 8)
+  'shipping.enabled': string;
+  'shipping.tier1_label': string;
+  'shipping.tier1_rate': string;
+  'shipping.tier2_label': string;
+  'shipping.tier2_rate': string;
+  'shipping.free_threshold': string;
+  'shipping.international_rate': string;
 }
 
 const EMPTY: ShopSettings = {
@@ -44,6 +52,13 @@ const EMPTY: ShopSettings = {
   'tax.enabled': 'false',
   'tax.default_stripe_tax_code': '',
   'tax.flat_rate': '',
+  'shipping.enabled': 'false',
+  'shipping.tier1_label': '',
+  'shipping.tier1_rate': '',
+  'shipping.tier2_label': '',
+  'shipping.tier2_rate': '',
+  'shipping.free_threshold': '',
+  'shipping.international_rate': '',
 };
 
 function Field({
@@ -249,6 +264,41 @@ export function ShopConfigClient() {
           placeholder="e.g. 8.25"
           hint="Used for PayPal orders (Stripe Tax handles Stripe orders automatically). Enter max state rate."
         />
+      </section>
+
+      {/* Shipping */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-border pb-2">
+          <Package className="w-4 h-4 text-foreground/50" />
+          <h2 className="text-sm font-semibold">Shipping</h2>
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Shipping charges</p>
+            <p className="text-xs text-foreground/50">Enable to collect flat-rate shipping on physical product orders.</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings['shipping.enabled'] === 'true'}
+              onChange={(e) => set('shipping.enabled', e.target.checked ? 'true' : 'false')}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-foreground/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent" />
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Tier 1 label" value={settings['shipping.tier1_label']} onChange={(v) => set('shipping.tier1_label', v)} placeholder="Standard Shipping" />
+          <Field label="Tier 1 rate ($)" value={settings['shipping.tier1_rate']} onChange={(v) => set('shipping.tier1_rate', v)} placeholder="5.99" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Tier 2 label (optional)" value={settings['shipping.tier2_label']} onChange={(v) => set('shipping.tier2_label', v)} placeholder="Expedited Shipping" />
+          <Field label="Tier 2 rate ($)" value={settings['shipping.tier2_rate']} onChange={(v) => set('shipping.tier2_rate', v)} placeholder="14.99" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Free shipping threshold ($)" value={settings['shipping.free_threshold']} onChange={(v) => set('shipping.free_threshold', v)} placeholder="75.00" hint="Orders at or above this total ship free. Leave blank to disable." />
+          <Field label="International rate ($)" value={settings['shipping.international_rate']} onChange={(v) => set('shipping.international_rate', v)} placeholder="24.99" hint="Applied when ship-to country differs from shop origin." />
+        </div>
       </section>
 
       {/* Save */}

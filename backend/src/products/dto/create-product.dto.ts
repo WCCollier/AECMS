@@ -157,6 +157,13 @@ export class CreateProductDto {
   @IsOptional()
   stripe_tax_code?: string;
 
+  @ApiPropertyOptional({ description: 'Per-product flat shipping rate in cents; null uses shop tier rates' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  shipping_override?: number;
+
   @ApiPropertyOptional({ description: 'Tag IDs', type: [String] })
   @IsArray()
   @IsUUID('4', { each: true })

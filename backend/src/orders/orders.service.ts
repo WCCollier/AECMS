@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
 import { CapabilitiesService } from '../capabilities/capabilities.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateOrderDto, UpdateOrderStatusDto, UpdateFulfillmentDto, QueryOrdersDto } from './dto';
 import { Prisma } from '@prisma/client';
 import { AuditLogService } from '../audit/audit.service';
@@ -18,7 +19,32 @@ export class OrdersService {
     private cartService: CartService,
     private auditLog: AuditLogService,
     private capabilitiesService: CapabilitiesService,
+    private settingsService: SettingsService,
   ) {}
+
+  private async computeShippingCents(
+    hasPhysical: boolean,
+    subtotalCents: number,
+    destCountry?: string,
+  ): Promise<number> {
+    if (!hasPhysical) return 0;
+    const enabled = (await this.settingsService.getEffective('shipping.enabled')) === 'true';
+    if (!enabled) return 0;
+
+    const freeThreshold = parseFloat(await this.settingsService.getEffective('shipping.free_threshold') ?? '0') || 0;
+    if (freeThreshold > 0 && subtotalCents / 100 >= freeThreshold) return 0;
+
+    const shopCountry = (await this.settingsService.getEffective('shop.address_country')) || 'US';
+    const isInternational = destCountry && destCountry !== shopCountry;
+
+    if (isInternational) {
+      const rate = parseFloat(await this.settingsService.getEffective('shipping.international_rate') ?? '0') || 0;
+      return Math.round(rate * 100);
+    }
+
+    const tier1Rate = parseFloat(await this.settingsService.getEffective('shipping.tier1_rate') ?? '0') || 0;
+    return Math.round(tier1Rate * 100);
+  }
 
   /**
    * Create order from cart
@@ -101,8 +127,13 @@ export class OrdersService {
 
     // Calculate totals
     const subtotal = cart.subtotal;
-    const tax = 0; // Tax calculation would go here
-    const shipping = hasPhysical ? 0 : 0; // Shipping calculation would go here
+    const tax = 0;
+    const shippingCents = await this.computeShippingCents(
+      hasPhysical,
+      Math.round(subtotal * 100),
+      dto.shipping_address?.country,
+    );
+    const shipping = shippingCents / 100;
     const total = subtotal + tax + shipping;
 
     // Compose customer name from checkout form (first+last) or shipping address name
