@@ -24,6 +24,7 @@ import {
   Mail,
   Tag,
   Store,
+  Receipt,
 } from 'lucide-react';
 import { getAdminAccessToken, clearAdminSession } from '@/lib/api';
 import adminApi from '@/lib/adminApi';
@@ -55,6 +56,7 @@ const navItems: { href: string; label: string; icon: React.ElementType; required
   { href: '/admin/media', label: 'Media', icon: Images, requiredCap: 'media.upload' },
   { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { href: '/admin/shop-config', label: 'Shop Config', icon: Store, requiredCap: 'shop.configure' },
+  { href: '/admin/tax-report', label: 'Tax Report', icon: Receipt, requiredCap: 'shop.configure' },
   { href: '/admin/users', label: 'Users', icon: Users, requiredCap: 'user.assign_role' },
   { href: '/admin/roles', label: 'Roles', icon: Shield, requiredCap: 'role.manage' },
   { href: '/admin/registrations', label: 'Registrations', icon: UserCheck, requiredCap: 'registration.approve' },

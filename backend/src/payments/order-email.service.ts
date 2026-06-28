@@ -109,6 +109,11 @@ export class OrderEmailService {
             </thead>
             <tbody>${itemsHtml}</tbody>
             <tfoot>
+              ${order.tax_amount && order.tax_amount > 0 ? `
+              <tr>
+                <td colspan="2" style="padding-top: 8px; text-align: right; padding-right: 8px; color: #666;">Tax</td>
+                <td style="padding-top: 8px; text-align: right; color: #666;">$${(order.tax_amount / 100).toFixed(2)}</td>
+              </tr>` : ''}
               <tr>
                 <td colspan="2" style="padding-top: 12px; font-weight: bold; text-align: right; padding-right: 8px;">Total</td>
                 <td style="padding-top: 12px; font-weight: bold; text-align: right;">${totalFormatted}</td>

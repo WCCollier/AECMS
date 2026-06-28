@@ -543,6 +543,60 @@ export class OrdersService {
     };
   }
 
+  async taxReport(from: Date, to: Date) {
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+
+    const orders = await this.prisma.order.findMany({
+      where: {
+        created_at: { gte: from, lte: toEnd },
+        status: { not: 'pending' },
+        tax_amount: { not: null, gt: 0 },
+      },
+      select: {
+        id: true,
+        order_number: true,
+        created_at: true,
+        total: true,
+        tax_amount: true,
+        shipping_state: true,
+        payment_method: true,
+      },
+      orderBy: { created_at: 'asc' },
+    });
+
+    const totalCents = orders.reduce((sum, o) => sum + (o.tax_amount ?? 0), 0);
+
+    // Group by state
+    const byState: Record<string, number> = {};
+    for (const o of orders) {
+      const state = o.shipping_state || 'N/A';
+      byState[state] = (byState[state] ?? 0) + (o.tax_amount ?? 0);
+    }
+
+    return {
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      total_tax_cents: totalCents,
+      total_tax_dollars: (totalCents / 100).toFixed(2),
+      order_count: orders.length,
+      by_state: Object.entries(byState).map(([state, cents]) => ({
+        state,
+        tax_cents: cents,
+        tax_dollars: (cents / 100).toFixed(2),
+      })),
+      orders: orders.map((o) => ({
+        order_number: o.order_number,
+        date: o.created_at.toISOString().slice(0, 10),
+        total: parseFloat(o.total.toString()),
+        tax_cents: o.tax_amount,
+        tax_dollars: ((o.tax_amount ?? 0) / 100).toFixed(2),
+        state: o.shipping_state,
+        payment_method: o.payment_method,
+      })),
+    };
+  }
+
   async exportCsv(from: Date, to: Date): Promise<string> {
     // Include day boundary on 'to' date
     const toEnd = new Date(to);

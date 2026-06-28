@@ -76,10 +76,10 @@ export function OrderConfirmationClient() {
               <span>{formatPrice(order.shipping)}</span>
             </div>
           )}
-          {order.tax > 0 && (
+          {(order.tax_amount != null && order.tax_amount > 0) && (
             <div className="flex justify-between text-foreground/60">
               <span>Tax</span>
-              <span>{formatPrice(order.tax)}</span>
+              <span>{formatPrice(order.tax_amount / 100)}</span>
             </div>
           )}
           <div className="flex justify-between font-bold text-base pt-1">

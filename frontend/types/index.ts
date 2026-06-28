@@ -312,6 +312,7 @@ export interface Order {
   paid_at: string | null;
   subtotal: number;
   tax: number;
+  tax_amount: number | null;  // actual tax collected in cents (from Stripe/PayPal webhook)
   shipping: number;
   total: number;
   shipping_address: ShippingAddress | null;

@@ -55,6 +55,19 @@ export class OrdersController {
     return this.ordersService.findUserOrders(user.id, query);
   }
 
+  @Get('tax-report')
+  @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
+  @RequiresCapability('shop.configure')
+  @ApiOperation({ summary: 'Get tax collected report for a date range' })
+  async taxReport(
+    @Query('from') fromStr: string,
+    @Query('to') toStr: string,
+  ) {
+    const from = fromStr ? new Date(fromStr) : new Date(new Date().getFullYear(), 0, 1);
+    const to   = toStr   ? new Date(toStr)   : new Date();
+    return this.ordersService.taxReport(from, to);
+  }
+
   @Get('export')
   @UseGuards(JwtAuthGuard, BackstageGuard, CapabilityGuard)
   @RequiresCapability('order.view.all')
