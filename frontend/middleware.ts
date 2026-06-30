@@ -37,8 +37,7 @@ async function getActiveAliases() {
   }
   try {
     const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:4000';
-    const res = await fetch(`${backendUrl}/domain-aliases/active`, {
-      headers: { 'x-internal-request': '1' },
+    const res = await fetch(`${backendUrl}/domain-aliases/routing`, {
       next: { revalidate: 300 },
     });
     if (res.ok) {
