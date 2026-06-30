@@ -67,7 +67,7 @@ frontend/middleware.ts                                   — change /domain-alia
 ## Completion Report
 
 **Fixed:** 2026-06-30
-**Commit(s):** see status history
+**Commit(s):** `d9ffda8`
 
 ### What changed
 
@@ -85,4 +85,4 @@ frontend/middleware.ts                                   — change /domain-alia
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-30 | open | Reported: secondary domain routes to site root instead of aliased target |
-| 2026-06-30 | fixed | `DomainRoutingController` added; middleware updated to call unauthenticated endpoint |
+| 2026-06-30 | fixed | `d9ffda8` — `DomainRoutingController` added; middleware updated to call unauthenticated endpoint |
