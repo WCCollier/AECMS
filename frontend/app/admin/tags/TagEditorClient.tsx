@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { Tag as TagIcon, Plus, Edit2, Trash2, Users, Check, X, AlertTriangle } from 'lucide-react';
 import adminApi from '@/lib/adminApi';
 import { getErrorMessage } from '@/lib/api';
+import { UnifiedSearchInput } from '@/components/ui/UnifiedSearchInput';
 import type { Article, Product } from '@/types';
 
 interface TagRow {
@@ -111,6 +112,35 @@ function AddTagForm({ onAdded }: { onAdded: () => void }) {
 
 // ── Assign Modal ─────────────────────────────────────────────────────────────
 
+interface ContentFilter {
+  tags: string[];
+  tagLogic: 'and' | 'or';
+  search: string;
+}
+
+const EMPTY_FILTER: ContentFilter = { tags: [], tagLogic: 'and', search: '' };
+
+function applyFilter<T extends { title: string; tags: Array<{ slug: string }> }>(
+  items: T[],
+  filter: ContentFilter,
+): T[] {
+  return items.filter((item) => {
+    const textOk =
+      !filter.search ||
+      item.title.toLowerCase().includes(filter.search.toLowerCase());
+    const tagOk =
+      filter.tags.length === 0 ||
+      (filter.tagLogic === 'and'
+        ? filter.tags.every((slug) => item.tags.some((t) => t.slug === slug))
+        : filter.tags.some((slug) => item.tags.some((t) => t.slug === slug)));
+    return textOk && tagOk;
+  });
+}
+
+function isFilterActive(f: ContentFilter) {
+  return f.search !== '' || f.tags.length > 0;
+}
+
 function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => void; onDone: () => void }) {
   const [articles, setArticles] = useState<Article[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -120,6 +150,8 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [articleFilter, setArticleFilter] = useState<ContentFilter>(EMPTY_FILTER);
+  const [productFilter, setProductFilter] = useState<ContentFilter>(EMPTY_FILTER);
 
   useEffect(() => {
     setLoading(true);
@@ -146,10 +178,33 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
   const untaggedArticles = articles.filter((a) => !articleAlreadyTagged(a));
   const untaggedProducts = products.filter((p) => !productAlreadyTagged(p));
 
-  const handleSelectAllArticles = () =>
-    setSelectedArticles(selectedArticles.size === untaggedArticles.length ? new Set() : new Set(untaggedArticles.map((a) => a.id)));
-  const handleSelectAllProducts = () =>
-    setSelectedProducts(selectedProducts.size === untaggedProducts.length ? new Set() : new Set(untaggedProducts.map((p) => p.id)));
+  const visibleArticles = applyFilter(untaggedArticles, articleFilter);
+  const visibleProducts = applyFilter(untaggedProducts, productFilter);
+
+  const articleFilterOn = isFilterActive(articleFilter);
+  const productFilterOn = isFilterActive(productFilter);
+
+  const hiddenSelectedArticles = articleFilterOn
+    ? Array.from(selectedArticles).filter((id) => !visibleArticles.some((a) => a.id === id)).length
+    : 0;
+  const hiddenSelectedProducts = productFilterOn
+    ? Array.from(selectedProducts).filter((id) => !visibleProducts.some((p) => p.id === id)).length
+    : 0;
+
+  const handleSelectAllArticles = () => {
+    if (selectedArticles.size > 0) {
+      setSelectedArticles(new Set());
+    } else {
+      setSelectedArticles(new Set(visibleArticles.map((a) => a.id)));
+    }
+  };
+  const handleSelectAllProducts = () => {
+    if (selectedProducts.size > 0) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(visibleProducts.map((p) => p.id)));
+    }
+  };
 
   const totalSelected = selectedArticles.size + selectedProducts.size;
 
@@ -188,24 +243,45 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
               {/* Articles */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-semibold">Articles ({untaggedArticles.length} untagged)</p>
-                  {untaggedArticles.length > 0 && (
+                  <p className="text-sm font-semibold">
+                    Articles{' '}
+                    <span className="font-normal text-foreground/50">
+                      ({articleFilterOn
+                        ? `${visibleArticles.length} of ${untaggedArticles.length} untagged`
+                        : `${untaggedArticles.length} untagged`})
+                    </span>
+                  </p>
+                  {(visibleArticles.length > 0 || selectedArticles.size > 0) && (
                     <button type="button" onClick={handleSelectAllArticles} className="text-xs text-accent hover:underline">
-                      {selectedArticles.size === untaggedArticles.length ? 'Deselect all' : 'Select all'}
+                      {selectedArticles.size > 0 ? 'Deselect all' : 'Select all'}
                     </button>
                   )}
                 </div>
+                <div className="mb-2">
+                  <UnifiedSearchInput
+                    placeholder="Filter articles by title or tag…"
+                    onSearch={(tags, tagLogic, search) => setArticleFilter({ tags, tagLogic, search })}
+                    onClear={() => setArticleFilter(EMPTY_FILTER)}
+                  />
+                </div>
                 {untaggedArticles.length === 0 ? (
                   <p className="text-xs text-foreground/40">All published articles already have this tag.</p>
+                ) : visibleArticles.length === 0 ? (
+                  <p className="text-xs text-foreground/40 py-2 text-center">No articles match the current filter.</p>
                 ) : (
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {untaggedArticles.map((a) => (
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {visibleArticles.map((a) => (
                       <label key={a.id} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface cursor-pointer text-sm">
                         <input type="checkbox" checked={selectedArticles.has(a.id)} onChange={() => toggleArticle(a.id)} className="accent-accent" />
                         {a.title}
                       </label>
                     ))}
                   </div>
+                )}
+                {hiddenSelectedArticles > 0 && (
+                  <p className="text-xs text-foreground/50 mt-1 italic">
+                    {hiddenSelectedArticles} item{hiddenSelectedArticles !== 1 ? 's' : ''} selected but not visible in current filter.
+                  </p>
                 )}
                 {articles.filter(articleAlreadyTagged).length > 0 && (
                   <p className="text-xs text-foreground/40 mt-1 flex items-center gap-1">
@@ -217,24 +293,45 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
               {/* Products */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-semibold">Products ({untaggedProducts.length} untagged)</p>
-                  {untaggedProducts.length > 0 && (
+                  <p className="text-sm font-semibold">
+                    Products{' '}
+                    <span className="font-normal text-foreground/50">
+                      ({productFilterOn
+                        ? `${visibleProducts.length} of ${untaggedProducts.length} untagged`
+                        : `${untaggedProducts.length} untagged`})
+                    </span>
+                  </p>
+                  {(visibleProducts.length > 0 || selectedProducts.size > 0) && (
                     <button type="button" onClick={handleSelectAllProducts} className="text-xs text-accent hover:underline">
-                      {selectedProducts.size === untaggedProducts.length ? 'Deselect all' : 'Select all'}
+                      {selectedProducts.size > 0 ? 'Deselect all' : 'Select all'}
                     </button>
                   )}
                 </div>
+                <div className="mb-2">
+                  <UnifiedSearchInput
+                    placeholder="Filter products by title or tag…"
+                    onSearch={(tags, tagLogic, search) => setProductFilter({ tags, tagLogic, search })}
+                    onClear={() => setProductFilter(EMPTY_FILTER)}
+                  />
+                </div>
                 {untaggedProducts.length === 0 ? (
                   <p className="text-xs text-foreground/40">All published products already have this tag.</p>
+                ) : visibleProducts.length === 0 ? (
+                  <p className="text-xs text-foreground/40 py-2 text-center">No products match the current filter.</p>
                 ) : (
-                  <div className="space-y-1 max-h-48 overflow-y-auto">
-                    {untaggedProducts.map((p) => (
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {visibleProducts.map((p) => (
                       <label key={p.id} className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface cursor-pointer text-sm">
                         <input type="checkbox" checked={selectedProducts.has(p.id)} onChange={() => toggleProduct(p.id)} className="accent-accent" />
                         {p.title}
                       </label>
                     ))}
                   </div>
+                )}
+                {hiddenSelectedProducts > 0 && (
+                  <p className="text-xs text-foreground/50 mt-1 italic">
+                    {hiddenSelectedProducts} item{hiddenSelectedProducts !== 1 ? 's' : ''} selected but not visible in current filter.
+                  </p>
                 )}
                 {products.filter(productAlreadyTagged).length > 0 && (
                   <p className="text-xs text-foreground/40 mt-1 flex items-center gap-1">
