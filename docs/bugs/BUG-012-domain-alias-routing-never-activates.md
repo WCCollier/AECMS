@@ -1,6 +1,6 @@
 # BUG-012: Domain alias routing never activates — secondary domain always serves full site
 
-**Status:** `fixed`
+**Status:** `open`
 **Reported:** 2026-06-30
 **Severity:** `high`
 **Area:** domain-aliases, middleware, backend
@@ -80,9 +80,27 @@ frontend/middleware.ts                                   — change /domain-alia
 
 ---
 
+## Known remaining issue — UI `is_verified` field mismatch
+
+The `DomainAlias` frontend type declared `is_verified: boolean`, but the backend never sends this field — it only sends `verified_at: string | null`. As a result, `alias.is_verified` was always `undefined` in the Domains panel, so every alias always displayed "Pending Verification" even after successful verification. Additionally, the verify button in the actions column never hid itself, allowing the user to re-submit verification which returned "Domain is already verified" (the correct DB state) without any status update in the UI.
+
+**Fix (deployed with BUG-012 patch 2):**
+- `frontend/types/index.ts` — removed `is_verified: boolean`, added `alias_type: string`
+- `frontend/app/admin/domains/AdminDomainsClient.tsx` — replaced all `alias.is_verified` with `!!alias.verified_at`
+
+## Diagnostic logging added
+
+Middleware now logs to stdout (visible in Cloud Run logs) whenever:
+1. The alias list is refreshed from the backend (`[domain-routing] loaded N active alias(es)`)
+2. A non-primary-domain request arrives but no alias matches (`[domain-routing] host="..." — no alias found`)
+3. The backend call fails with a non-200 status or throws
+
+This allows diagnosing whether the routing issue is a middleware/DB problem or an infrastructure DNS/domain-mapping problem.
+
 ## Status History
 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-30 | open | Reported: secondary domain routes to site root instead of aliased target |
 | 2026-06-30 | fixed | `d9ffda8` — `DomainRoutingController` added; middleware updated to call unauthenticated endpoint |
+| 2026-07-02 | open | After d9ffda8 deployed: UI still showed "Pending Verification" (is_verified field bug); routing still not working; diagnostic logging added; `is_verified` → `verified_at` fix deployed |

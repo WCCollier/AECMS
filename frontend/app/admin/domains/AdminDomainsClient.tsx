@@ -389,7 +389,7 @@ export function AdminDomainsClient() {
                         {alias.target_route}
                       </td>
                       <td className="px-6 py-4">
-                        {alias.is_verified ? (
+                        {alias.verified_at ? (
                           <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-green-500/10 text-green-600">
                             <CheckCircle className="w-3.5 h-3.5" />
                             Verified
@@ -407,7 +407,7 @@ export function AdminDomainsClient() {
                       <td className="px-6 py-4">
                         <button
                           onClick={() => handleToggleActive(alias)}
-                          disabled={isToggling === alias.id || !alias.is_verified}
+                          disabled={isToggling === alias.id || !alias.verified_at}
                           className={`
                             inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full
                             transition-colors
@@ -415,9 +415,9 @@ export function AdminDomainsClient() {
                               ? 'bg-green-500/10 text-green-600 hover:bg-green-500/20'
                               : 'bg-foreground/10 text-foreground/50 hover:bg-foreground/20'
                             }
-                            ${(!alias.is_verified || isToggling === alias.id) ? 'opacity-50 cursor-not-allowed' : ''}
+                            ${(!alias.verified_at || isToggling === alias.id) ? 'opacity-50 cursor-not-allowed' : ''}
                           `}
-                          title={!alias.is_verified ? 'Domain must be verified first' : undefined}
+                          title={!alias.verified_at ? 'Domain must be verified first' : undefined}
                         >
                           {isToggling === alias.id ? (
                             <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -431,7 +431,7 @@ export function AdminDomainsClient() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {!alias.is_verified && (
+                          {!alias.verified_at && (
                             <Button
                               variant="ghost"
                               size="sm"
