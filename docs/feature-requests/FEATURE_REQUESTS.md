@@ -19,6 +19,7 @@ Small, self-contained features that don't constitute major phase-level work. One
 
 | ID | Size | Description |
 |----|------|-------------|
+| [FR-016](FR-016-assign-modal-search.md) | small | Assign Modal Search — independent `UnifiedSearchInput` filter bar per list in the tag assign modal; client-side title + tag filtering; selection persists across filter changes |
 | [FR-010](FR-010-pii-encryption.md) | medium | PII Encryption at Rest — `EncryptionService`, all plaintext PII columns dropped; `UserAddress` encrypted from day one; TOTP + OAuth + orders + user names + IP hashing |
 | [FR-015](FR-015-collection-embed-display-modes-and-tag-exclusion.md) | medium | Collection Embed — `preview` (100dvh pane + fade) and `full` (inline body) display modes; tag exclusion filter with ANY/ALL toggle |
 | [FR-014](FR-014-tag-editor.md) | medium | Tag Editor — `/admin/tags` panel: rename/delete tags, add without assigning, mass-assign to articles/products; new `tag.edit` capability |
