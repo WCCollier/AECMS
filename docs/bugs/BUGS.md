@@ -12,7 +12,7 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
-| [BUG-011](BUG-011-totp-secret-wiped-by-fr010-deploy2.md) | critical | auth, FR-010, deployment | TOTP secret wiped by Deploy 2 (plaintext col dropped before backfill); owner locked out of backstage — SQL remediation + 2FA re-setup required |
+| [BUG-012](BUG-012-domain-alias-routing-never-activates.md) | high | domain-aliases, middleware, frontend | Secondary domain routing not working; `is_verified` UI field bug fixed; diagnostic logging added; infrastructure DNS/domain-mapping check pending |
 
 ## In Dev
 
@@ -22,7 +22,7 @@ _None_
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
-| [BUG-012](BUG-012-domain-alias-routing-never-activates.md) | high | domain-aliases, middleware | Secondary domain routing never fired — backend `/domain-aliases/active` required auth the middleware couldn't provide; fixed with unauthenticated `/domain-aliases/routing` endpoint |
+| [BUG-011](BUG-011-totp-secret-wiped-by-fr010-deploy2.md) | critical | auth, FR-010, deployment | TOTP secret wiped by Deploy 2; owner ran SQL remediation + re-setup 2FA |
 | [BUG-010](BUG-010-no-profile-edit-on-account-page.md) | high | frontend, auth, account | No profile edit on account page — `PATCH /auth/profile` + Edit Profile section added |
 | [BUG-007](BUG-007-tag-assign-modal-always-empty.md) | high | backstage, tags | Tag Assign modal showed "All already tagged" — `limit=1000` exceeded `@Max(100)`, silent catch hid the 400 |
 | [BUG-002](BUG-002-mul-converter-palette-saved-multiple-times.md) | medium | mul-converter | Save buttons re-enabled after `done`, allowing duplicate palette entries |

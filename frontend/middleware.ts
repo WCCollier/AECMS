@@ -43,9 +43,12 @@ async function getActiveAliases() {
     if (res.ok) {
       aliasCache = await res.json();
       aliasCacheExpiry = Date.now() + CACHE_TTL_MS;
+      console.log(`[domain-routing] loaded ${aliasCache?.length ?? 0} active alias(es) from backend`);
+    } else {
+      console.warn(`[domain-routing] backend returned ${res.status} for /domain-aliases/routing`);
     }
-  } catch {
-    // Cache miss — return existing stale cache or empty list
+  } catch (err) {
+    console.warn(`[domain-routing] failed to fetch alias list: ${err}`);
   }
   return aliasCache ?? [];
 }
@@ -80,6 +83,7 @@ export async function middleware(request: NextRequest) {
   const alias = aliases.find((a) => a.domain === host);
 
   if (!alias) {
+    console.log(`[domain-routing] host="${host}" baseDomain="${baseDomain}" — no alias found (${aliases.length} alias(es) loaded)`);
     return NextResponse.next();
   }
 

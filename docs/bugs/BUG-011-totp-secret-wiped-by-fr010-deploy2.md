@@ -1,6 +1,6 @@
 # BUG-011: TOTP secret wiped by FR-010 Deploy 2 — owner locked out of backstage
 
-**Status:** `open`
+**Status:** `fixed`
 **Reported:** 2026-06-28
 **Severity:** `critical`
 **Area:** auth, FR-010, deployment
@@ -102,12 +102,14 @@ Add this check pattern to the build order doc for any future two-pass migration.
 
 ## Completion Report
 
-> _Fill in after remediation is applied._
-
-**Fixed:** YYYY-MM-DD
-**Commit(s):** `abc1234` (if code change made)
+**Fixed:** 2026-07-02
+**Commit(s):** SQL-only remediation — no code commit
 
 ### What changed
+
+Owner ran the SQL remediation from `clipboard.md` directly against the Neon database: set `totp_enabled = false, totp_secret_enc = NULL` for the owner account. Logged back in through `/admin/login`, was routed to the TOTP setup page, scanned the new QR code, re-established 2FA. Backstage access fully restored.
+
+The code fix for better 2FA error surfacing (showing the actual server error instead of the generic "session expired" message) remains a deferred item — it did not block remediation.
 
 ---
 
@@ -116,3 +118,4 @@ Add this check pattern to the build order doc for any future two-pass migration.
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-28 | open | Owner locked out of backstage; TOTP secret dropped by Deploy 2 before backfill ran; SQL remediation documented above |
+| 2026-07-02 | fixed | SQL remediation run; TOTP re-setup complete; backstage access restored |

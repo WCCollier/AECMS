@@ -487,10 +487,10 @@ export interface DomainAlias {
   id: string;
   domain: string;
   target_route: string;
-  is_verified: boolean;
+  alias_type: string;         // 'redirect' | 'proxy'
   is_active: boolean;
   verification_token: string;
-  verified_at: string | null;
+  verified_at: string | null; // non-null = verified; backend has no separate is_verified field
   created_at: string;
   updated_at: string;
 }
