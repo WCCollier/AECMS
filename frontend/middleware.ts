@@ -37,7 +37,7 @@ async function getActiveAliases() {
   }
   try {
     const backendUrl = process.env.BACKEND_URL ?? 'http://localhost:4000';
-    const res = await fetch(`${backendUrl}/domain-aliases/routing`, {
+    const res = await fetch(`${backendUrl}/domain-routing`, {
       next: { revalidate: 300 },
     });
     if (res.ok) {
@@ -45,7 +45,7 @@ async function getActiveAliases() {
       aliasCacheExpiry = Date.now() + CACHE_TTL_MS;
       console.log(`[domain-routing] loaded ${aliasCache?.length ?? 0} active alias(es) from backend`);
     } else {
-      console.warn(`[domain-routing] backend returned ${res.status} for /domain-aliases/routing`);
+      console.warn(`[domain-routing] backend returned ${res.status} for /domain-routing`);
     }
   } catch (err) {
     console.warn(`[domain-routing] failed to fetch alias list: ${err}`);
