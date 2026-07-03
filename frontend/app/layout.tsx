@@ -14,13 +14,17 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export const metadata: Metadata = {
-  title: {
-    default: 'AECMS',
-    template: '%s | AECMS',
-  },
-  description: 'Advanced Ecommerce Content Management System',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { siteTitle, faviconUrl } = await getSiteTheme();
+  return {
+    title: {
+      default: siteTitle,
+      template: `%s | ${siteTitle}`,
+    },
+    description: 'Advanced Ecommerce Content Management System',
+    icons: { icon: faviconUrl ?? '/favicon.ico' },
+  };
+}
 
 async function getSiteTheme(): Promise<{ paletteId: string; fontPairingId: string; siteTitle: string; faviconUrl: string | null }> {
   try {
@@ -59,7 +63,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const { paletteId, fontPairingId, siteTitle, faviconUrl } = await getSiteTheme();
+  const { paletteId, fontPairingId, siteTitle } = await getSiteTheme();
   const palette = getPaletteById(paletteId);
   const fontPairing = getFontPairingById(fontPairingId);
   const cssOverrides = buildCssOverrides(palette, fontPairing);
@@ -77,12 +81,8 @@ export default async function RootLayout({
         )}
         {/* Runtime theme override */}
         <style dangerouslySetInnerHTML={{ __html: cssOverrides }} />
-        {/* Favicon from settings */}
-        {faviconUrl && <link rel="icon" href={faviconUrl} />}
         {/* RSS feed auto-discovery */}
         <link rel="alternate" type="application/rss+xml" title={`${siteTitle} — RSS Feed`} href="/feed.xml" />
-        {/* Site title from settings */}
-        <title>{siteTitle}</title>
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         <Providers>

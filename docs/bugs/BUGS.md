@@ -16,7 +16,9 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 ## In Dev
 
-_None_
+| ID | Severity | Area | Description |
+|----|----------|------|-------------|
+| [BUG-014](BUG-014-favicon-not-applied-from-settings.md) | medium | frontend, settings | Favicon set in Site Identity has no effect — static metadata export + manual `<link>` conflicts with `app/favicon.ico` auto-injection |
 
 ## Fixed
 
