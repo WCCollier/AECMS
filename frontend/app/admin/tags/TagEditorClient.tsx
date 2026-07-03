@@ -300,6 +300,8 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
                 )}
               </div>
 
+              <hr className="border-border" />
+
               {/* Products */}
               <div>
                 <div className="flex items-center justify-between mb-2">
