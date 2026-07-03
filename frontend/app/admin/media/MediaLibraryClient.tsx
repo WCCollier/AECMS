@@ -7,6 +7,7 @@ import {
   Upload, Trash2, Download, RefreshCw, X, ChevronDown, ChevronUp,
   Image as ImageIcon, FileText, AlertTriangle, Check, Loader2, FolderOpen,
 } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -20,8 +21,6 @@ interface MediaItem {
   width?: number;
   height?: number;
   url: string;
-  thumbnail_path?: string;
-  thumbnail_url?: string | null;
   alt_text?: string;
   caption?: string;
   uploaded_at: string;
@@ -75,7 +74,6 @@ function MediaThumb({ item, selected, onSelect, onClick }: {
   onClick: () => void;
 }) {
   const isImage = item.mime_type.startsWith('image/');
-  const thumbUrl = item.thumbnail_url ?? item.url;
 
   return (
     <div
@@ -100,12 +98,13 @@ function MediaThumb({ item, selected, onSelect, onClick }: {
       )}
 
       {/* Thumbnail */}
-      <div className="aspect-square bg-muted flex items-center justify-center">
+      <div className="relative aspect-square bg-muted">
         {isImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={thumbUrl} alt={item.alt_text || item.original_name} className="w-full h-full object-cover" />
+          <Image src={item.url} alt={item.alt_text || item.original_name} fill sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 200px" className="object-cover" />
         ) : (
-          <FileText className="w-10 h-10 text-muted-foreground" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <FileText className="w-10 h-10 text-muted-foreground" />
+          </div>
         )}
       </div>
 
@@ -266,7 +265,6 @@ function DetailPanel({ item, onClose, onDeleted, onReplaced }: {
   const { data: usage } = useSWR<UsageData>(`/media/${item.id}/usage`, fetcher);
 
   const isImage = item.mime_type.startsWith('image/');
-  const thumbUrl = item.thumbnail_url ?? item.url;
 
   const saveMetadata = async (field: 'alt_text' | 'caption', value: string) => {
     setSaving(true);
@@ -324,12 +322,13 @@ function DetailPanel({ item, onClose, onDeleted, onReplaced }: {
 
       <div className="p-4 space-y-4 flex-1">
         {/* Preview */}
-        <div className="aspect-video bg-muted rounded-lg flex items-center justify-center overflow-hidden">
+        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
           {isImage ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumbUrl} alt={item.alt_text || item.original_name} className="max-w-full max-h-full object-contain" />
+            <Image src={item.url} alt={item.alt_text || item.original_name} fill sizes="400px" className="object-contain" />
           ) : (
-            <FileText className="w-16 h-16 text-muted-foreground" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <FileText className="w-16 h-16 text-muted-foreground" />
+            </div>
           )}
         </div>
 

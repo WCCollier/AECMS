@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { RichTextContent } from '@/components/editor/RichTextContent';
 import type { Product } from '@/types';
@@ -13,12 +14,19 @@ export function ProductPreviewPane({ product, depth }: ProductPreviewPaneProps) 
   const price = typeof product.price === 'number'
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(product.price / 100)
     : null;
+  const primaryImage = product.media?.find((m) => m.is_primary) ?? product.media?.[0];
+  const imageUrl = primaryImage?.url ?? product.featured_image_url ?? null;
 
   return (
     <div className="relative overflow-hidden" style={{ height: '100dvh' }}>
       {/* Centered flex column — content + button share the same horizontal axis */}
       <div className="flex flex-col h-full overflow-hidden max-w-3xl mx-auto px-6 md:px-10">
         <div className="flex-1 overflow-hidden pt-8">
+          {imageUrl && (
+            <div className="relative aspect-video rounded-lg overflow-hidden mb-6">
+              <Image src={imageUrl} alt={product.title} fill sizes="(max-width: 768px) 100vw, 768px" className="object-cover" />
+            </div>
+          )}
           <h2 className="text-2xl font-bold mb-1">{product.title}</h2>
           {price && <p className="text-lg font-semibold text-accent mb-4">{price}</p>}
           {/* max-w-none overrides the 68ch cap — outer column provides the width constraint */}

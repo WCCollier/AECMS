@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { RichTextContent } from '@/components/editor/RichTextContent';
 import type { Product } from '@/types';
@@ -13,9 +14,16 @@ export function ProductFullEmbed({ product, depth }: ProductFullEmbedProps) {
   const price = typeof product.price === 'number'
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(product.price / 100)
     : null;
+  const primaryImage = product.media?.find((m) => m.is_primary) ?? product.media?.[0];
+  const imageUrl = primaryImage?.url ?? product.featured_image_url ?? null;
 
   return (
     <div className="py-8">
+      {imageUrl && (
+        <div className="relative aspect-video rounded-lg overflow-hidden mb-6">
+          <Image src={imageUrl} alt={product.title} fill sizes="(max-width: 768px) 100vw, 900px" className="object-cover" />
+        </div>
+      )}
       <h2 className="text-2xl font-bold mb-1">
         <Link href={`/shop/${product.slug}`} className="hover:text-accent transition-colors">
           {product.title}

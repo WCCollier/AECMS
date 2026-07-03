@@ -67,13 +67,7 @@ export class MediaService {
         metadata: { originalName, uploadedBy: userId },
       });
 
-      let thumbnailPath: string | null = null;
       const isImage = mimeType.startsWith('image/');
-
-      if (isImage && mimeType !== 'image/svg+xml') {
-        thumbnailPath = await this.generateThumbnail(buffer, filename);
-      }
-
       const dimensions = isImage ? await this.getImageDimensions(buffer) : null;
 
       const media = await this.prisma.media.create({
@@ -83,7 +77,6 @@ export class MediaService {
           mime_type: mimeType,
           size,
           file_path: filename,
-          thumbnail_path: thumbnailPath,
           alt_text: altText || null,
           caption: caption || null,
           uploaded_by: userId,
@@ -218,12 +211,7 @@ export class MediaService {
       metadata: { originalName: file.originalname, replacedBy: userId },
     });
 
-    // Regenerate thumbnail at same key
     const isImage = file.mimetype.startsWith('image/');
-    if (isImage && file.mimetype !== 'image/svg+xml' && existing.thumbnail_path) {
-      await this.generateThumbnailToPath(file.buffer, this.storagePath(existing.thumbnail_path));
-    }
-
     const dimensions = isImage ? await this.getImageDimensions(file.buffer) : null;
 
     const updated = await this.prisma.media.update({
@@ -455,9 +443,6 @@ export class MediaService {
     return {
       ...media,
       url: await this.mediaUrl(media.file_path),
-      thumbnail_url: media.thumbnail_path
-        ? await this.storageProvider.getUrl(this.storagePath(media.thumbnail_path))
-        : null,
     };
   }
 
@@ -490,25 +475,6 @@ export class MediaService {
       '.pdf': 'application/pdf',
     };
     return map[ext] ?? 'application/octet-stream';
-  }
-
-  private async generateThumbnail(fileBuffer: Buffer, originalFilename: string): Promise<string | null> {
-    const thumbFilename = `thumb-${originalFilename.replace(/\.[^.]+$/, '.jpg')}`;
-    return this.generateThumbnailToPath(fileBuffer, thumbFilename);
-  }
-
-  private async generateThumbnailToPath(fileBuffer: Buffer, thumbFilename: string): Promise<string | null> {
-    try {
-      const thumbBuffer = await sharp(fileBuffer)
-        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 80 })
-        .toBuffer();
-      await this.storageProvider.upload(thumbBuffer, thumbFilename, { contentType: 'image/jpeg' });
-      return thumbFilename;
-    } catch (error) {
-      console.error('Thumbnail generation failed:', error);
-      return null;
-    }
   }
 
   private async getImageDimensions(
