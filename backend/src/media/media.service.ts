@@ -401,9 +401,6 @@ export class MediaService {
     const media = await this.findOne(id);
     try {
       await this.storageProvider.delete(this.storagePath(media.file_path));
-      if (media.thumbnail_path) {
-        await this.storageProvider.delete(this.storagePath(media.thumbnail_path)).catch(() => {});
-      }
       await this.prisma.media.delete({ where: { id } });
       await this.auditLog.log({
         event_type: 'media.deleted',

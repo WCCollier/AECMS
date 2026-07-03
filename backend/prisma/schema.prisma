@@ -337,8 +337,7 @@ model Media {
   height        Int?
   alt_text       String?
   caption        String?
-  file_path      String   // Full path to file on disk
-  thumbnail_path String?  // Path to thumbnail (if generated)
+  file_path      String
   uploaded_by    String
   uploaded_at    DateTime @default(now())
   updated_at     DateTime @updatedAt
