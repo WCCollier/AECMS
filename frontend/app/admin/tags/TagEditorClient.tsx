@@ -191,19 +191,28 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
     ? Array.from(selectedProducts).filter((id) => !visibleProducts.some((p) => p.id === id)).length
     : 0;
 
+  const allVisibleArticlesSelected =
+    visibleArticles.length > 0 && visibleArticles.every((a) => selectedArticles.has(a.id));
+  const allVisibleProductsSelected =
+    visibleProducts.length > 0 && visibleProducts.every((p) => selectedProducts.has(p.id));
+
   const handleSelectAllArticles = () => {
-    if (selectedArticles.size > 0) {
-      setSelectedArticles(new Set());
+    const next = new Set(selectedArticles);
+    if (allVisibleArticlesSelected) {
+      visibleArticles.forEach((a) => next.delete(a.id));
     } else {
-      setSelectedArticles(new Set(visibleArticles.map((a) => a.id)));
+      visibleArticles.forEach((a) => next.add(a.id));
     }
+    setSelectedArticles(next);
   };
   const handleSelectAllProducts = () => {
-    if (selectedProducts.size > 0) {
-      setSelectedProducts(new Set());
+    const next = new Set(selectedProducts);
+    if (allVisibleProductsSelected) {
+      visibleProducts.forEach((p) => next.delete(p.id));
     } else {
-      setSelectedProducts(new Set(visibleProducts.map((p) => p.id)));
+      visibleProducts.forEach((p) => next.add(p.id));
     }
+    setSelectedProducts(next);
   };
 
   const totalSelected = selectedArticles.size + selectedProducts.size;
@@ -251,9 +260,9 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
                         : `${untaggedArticles.length} untagged`})
                     </span>
                   </p>
-                  {(visibleArticles.length > 0 || selectedArticles.size > 0) && (
+                  {visibleArticles.length > 0 && (
                     <button type="button" onClick={handleSelectAllArticles} className="text-xs text-accent hover:underline">
-                      {selectedArticles.size > 0 ? 'Deselect all' : 'Select all'}
+                      {allVisibleArticlesSelected ? 'Deselect visible' : 'Select all'}
                     </button>
                   )}
                 </div>
@@ -262,6 +271,7 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
                     placeholder="Filter articles by title or tag…"
                     onSearch={(tags, tagLogic, search) => setArticleFilter({ tags, tagLogic, search })}
                     onClear={() => setArticleFilter(EMPTY_FILTER)}
+                    liveSearch
                   />
                 </div>
                 {untaggedArticles.length === 0 ? (
@@ -301,9 +311,9 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
                         : `${untaggedProducts.length} untagged`})
                     </span>
                   </p>
-                  {(visibleProducts.length > 0 || selectedProducts.size > 0) && (
+                  {visibleProducts.length > 0 && (
                     <button type="button" onClick={handleSelectAllProducts} className="text-xs text-accent hover:underline">
-                      {selectedProducts.size > 0 ? 'Deselect all' : 'Select all'}
+                      {allVisibleProductsSelected ? 'Deselect visible' : 'Select all'}
                     </button>
                   )}
                 </div>
@@ -312,6 +322,7 @@ function AssignModal({ tag, onClose, onDone }: { tag: TagRow; onClose: () => voi
                     placeholder="Filter products by title or tag…"
                     onSearch={(tags, tagLogic, search) => setProductFilter({ tags, tagLogic, search })}
                     onClear={() => setProductFilter(EMPTY_FILTER)}
+                    liveSearch
                   />
                 </div>
                 {untaggedProducts.length === 0 ? (

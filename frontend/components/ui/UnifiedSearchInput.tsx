@@ -12,6 +12,8 @@ export interface UnifiedSearchInputProps {
   placeholder?: string;
   onSearch: (tags: string[], tagLogic: 'and' | 'or', search: string) => void;
   onClear: () => void;
+  /** Fire onSearch on every keystroke instead of waiting for Enter. Use in modal filters. */
+  liveSearch?: boolean;
 }
 
 // Extract chip slugs and trailing text from the contenteditable div
@@ -62,6 +64,7 @@ export function UnifiedSearchInput({
   placeholder = 'Search or filter by tag…',
   onSearch,
   onClear,
+  liveSearch = false,
 }: UnifiedSearchInputProps) {
   const { tags: allTags } = useTags();
   const divRef = useRef<HTMLDivElement>(null);
@@ -142,7 +145,12 @@ export function UnifiedSearchInput({
     setDropdownFilter(text);
     setDropdownOpen(text.length > 0 || false);
     setHighlightedIdx(0);
-  }, []);
+    if (liveSearch) {
+      setCommitted({ tags: slugs, search: text });
+      onSearch(slugs, tagLogic, text);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveSearch, tagLogic, onSearch]);
 
   // ── Add a tag chip ────────────────────────────────────────────────────────
   const addTag = useCallback(
