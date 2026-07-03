@@ -10,9 +10,7 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 ## Open
 
-| ID | Severity | Area | Description |
-|----|----------|------|-------------|
-| [BUG-012](BUG-012-domain-alias-routing-never-activates.md) | high | domain-aliases, middleware, frontend | Secondary domain routing not working; `is_verified` UI field bug fixed; diagnostic logging added; infrastructure DNS/domain-mapping check pending |
+_None_
 
 ## In Dev
 
@@ -23,6 +21,7 @@ _None_
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
 | [BUG-014](BUG-014-favicon-not-applied-from-settings.md) | medium | frontend, settings | Favicon set in Site Identity has no effect — `app/favicon.ico` auto-injection overrides dynamic icon; fixed by moving to `public/` + `generateMetadata()` with mime type |
+| [BUG-012](BUG-012-domain-alias-routing-never-activates.md) | high | domain-aliases, middleware, frontend | Secondary domain routing not working — unauthenticated `/domain-routing` endpoint, `verified_at` UI fix, route shadowing fix; confirmed working in production |
 | [BUG-013](BUG-013-assign-modal-select-all-wrong-scope.md) | medium | backstage, tags, FR-016 | Assign modal Select All scoped to wrong set when filter active; filter not live on keystroke |
 | [BUG-011](BUG-011-totp-secret-wiped-by-fr010-deploy2.md) | critical | auth, FR-010, deployment | TOTP secret wiped by Deploy 2; owner ran SQL remediation + re-setup 2FA |
 | [BUG-010](BUG-010-no-profile-edit-on-account-page.md) | high | frontend, auth, account | No profile edit on account page — `PATCH /auth/profile` + Edit Profile section added |
