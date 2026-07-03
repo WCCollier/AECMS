@@ -5,13 +5,16 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { adminFetcher } from '@/lib/swr';
 import adminApi from '@/lib/adminApi';
-import { Button, Card, CardContent, Input } from '@/components/ui';
-import { Plus, Search, Edit, Trash2, Package, RotateCcw, Trash } from 'lucide-react';
+import { Button, Card, CardContent } from '@/components/ui';
+import { UnifiedSearchInput } from '@/components/ui/UnifiedSearchInput';
+import { Plus, Edit, Trash2, Package, RotateCcw, Trash } from 'lucide-react';
 import type { Product, PaginatedResponse } from '@/types';
 
 export function AdminProductsClient() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagLogic, setTagLogic] = useState<'and' | 'or'>('and');
   const [showDeleted, setShowDeleted] = useState(false);
   const [canAccessTrash, setCanAccessTrash] = useState(false);
 
@@ -32,6 +35,7 @@ export function AdminProductsClient() {
   params.set('page', page.toString());
   params.set('limit', '10');
   if (search) params.set('search', search);
+  if (tags.length > 0) { params.set('tags', tags.join(',')); params.set('tag_logic', tagLogic); }
   if (showDeleted) params.set('include_deleted', 'true');
 
   const { data, isLoading, mutate } = useSWR<PaginatedResponse<Product>>(
@@ -108,17 +112,12 @@ export function AdminProductsClient() {
       </div>
 
       {/* Search */}
-      <div className="mb-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/50" />
-          <Input
-            type="text"
-            placeholder={showDeleted ? 'Search deleted products...' : 'Search products...'}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      <div className="mb-6 max-w-xl">
+        <UnifiedSearchInput
+          placeholder={showDeleted ? 'Search deleted products or filter by tag…' : 'Search products or filter by tag…'}
+          onSearch={(t, logic, s) => { setTags(t); setTagLogic(logic); setSearch(s); setPage(1); }}
+          onClear={() => { setTags([]); setTagLogic('and'); setSearch(''); setPage(1); }}
+        />
       </div>
 
       {/* Products Table */}
