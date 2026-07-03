@@ -1,6 +1,6 @@
 # BUG-014: Favicon set in Site Identity settings has no effect on browser tab
 
-**Status:** `in-dev`
+**Status:** `fixed`
 **Reported:** 2026-07-03
 **Severity:** `medium`
 **Area:** frontend, settings, identity
@@ -56,12 +56,16 @@ frontend/app/layout.tsx  — static metadata → generateMetadata(); remove manu
 
 ## Completion Report
 
-> _Fill in after fix is deployed._
-
-**Fixed:** YYYY-MM-DD
-**Commit(s):** ``
+**Fixed:** 2026-07-03
+**Commit(s):** `9999396`, `<second-commit>`
 
 ### What changed
+
+Two-commit fix (the initial attempt revealed a deeper issue on the live site):
+
+**Commit 1** (`9999396`): Converted `export const metadata` to `export async function generateMetadata()` so the ISM favicon URL flows into `icons: { icon: faviconUrl }`. Also moved the dynamic title into `generateMetadata()` (fixing a secondary bug where the static export hardcoded `'AECMS'`). Removed manual `<link rel="icon">` and `<title>` from JSX head.
+
+**Commit 2**: After the first fix deployed but the favicon still didn't appear (confirmed in incognito), the root cause was narrowed further — Next.js **merges** `generateMetadata()` icons with file-based `app/favicon.ico` metadata rather than replacing it. The ICO gets its own auto-injected `<link>` which browsers resolve first. Fix: moved `app/favicon.ico` → `public/favicon.ico` (static file, no auto-injection) and added a `mimeFromUrl()` helper so the generated `<link>` tag carries an explicit `type=` attribute (e.g. `type="image/png"`), giving browsers an unambiguous signal.
 
 ---
 
@@ -71,3 +75,4 @@ frontend/app/layout.tsx  — static metadata → generateMetadata(); remove manu
 |------|--------|------|
 | 2026-07-03 | open | Reported: PNG favicon set in settings has no visible effect |
 | 2026-07-03 | in-dev | Root cause identified: static metadata + manual link tag conflict with app/favicon.ico auto-injection |
+| 2026-07-03 | fixed | Moved app/favicon.ico → public/, added generateMetadata() with mime-typed icon entry |
