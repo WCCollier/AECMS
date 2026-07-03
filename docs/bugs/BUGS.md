@@ -22,6 +22,7 @@ _None_
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
+| [BUG-013](BUG-013-assign-modal-select-all-wrong-scope.md) | medium | backstage, tags, FR-016 | Assign modal Select All scoped to wrong set when filter active; filter not live on keystroke |
 | [BUG-011](BUG-011-totp-secret-wiped-by-fr010-deploy2.md) | critical | auth, FR-010, deployment | TOTP secret wiped by Deploy 2; owner ran SQL remediation + re-setup 2FA |
 | [BUG-010](BUG-010-no-profile-edit-on-account-page.md) | high | frontend, auth, account | No profile edit on account page — `PATCH /auth/profile` + Edit Profile section added |
 | [BUG-007](BUG-007-tag-assign-modal-always-empty.md) | high | backstage, tags | Tag Assign modal showed "All already tagged" — `limit=1000` exceeded `@Max(100)`, silent catch hid the 400 |
