@@ -9,12 +9,12 @@ import { DomainAliasesService } from './domain-aliases.service';
  * The data (public URL mappings) is not sensitive.
  */
 @ApiTags('domain-aliases')
-@Controller('domain-aliases')
+@Controller('domain-routing')
 export class DomainRoutingController {
   constructor(private readonly service: DomainAliasesService) {}
 
-  @Get('routing')
-  @ApiOperation({ summary: 'Get active alias routing table (unauthenticated — for middleware use)' })
+  @Get()
+  @ApiOperation({ summary: 'Get active alias routing table (unauthenticated — for Next.js middleware)' })
   @ApiResponse({ status: 200, description: 'Active alias routing table' })
   async getRoutingTable() {
     return this.service.findAllActive();
