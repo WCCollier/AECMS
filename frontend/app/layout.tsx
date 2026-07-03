@@ -16,14 +16,23 @@ export const viewport: Viewport = {
 
 export async function generateMetadata(): Promise<Metadata> {
   const { siteTitle, faviconUrl } = await getSiteTheme();
+  const iconEntry = faviconUrl
+    ? { url: faviconUrl, type: mimeFromUrl(faviconUrl) }
+    : { url: '/favicon.ico', type: 'image/x-icon' };
   return {
     title: {
       default: siteTitle,
       template: `%s | ${siteTitle}`,
     },
     description: 'Advanced Ecommerce Content Management System',
-    icons: { icon: faviconUrl ?? '/favicon.ico' },
+    icons: { icon: iconEntry },
   };
+}
+
+function mimeFromUrl(url: string): string {
+  const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+  const map: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml', gif: 'image/gif', webp: 'image/webp', ico: 'image/x-icon' };
+  return map[ext ?? ''] ?? 'image/png';
 }
 
 async function getSiteTheme(): Promise<{ paletteId: string; fontPairingId: string; siteTitle: string; faviconUrl: string | null }> {
