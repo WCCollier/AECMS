@@ -1,8 +1,8 @@
 # FR-011: Resend Broadcast Integration
 
-**Status:** `accepted`
+**Status:** `deployed`
 **Requested:** 2026-06-27
-**Deployed:** —
+**Deployed:** 2026-07-04
 **Size:** `medium`
 
 ---
@@ -21,6 +21,7 @@ The SMTP fallback is not a degraded mode — it is the correct behavior for owne
 |------|--------|------|
 | 2026-06-27 | accepted | Designed during email architecture session; follows FR-009 syndication work |
 | 2026-07-04 | accepted | Pre-build design review: audience ID gap found and corrected; AECMS token unsubscribe semantic corrected; sync architecture documented; backfill script promoted to permanent operator tool |
+| 2026-07-04 | deployed | Full implementation: ResendBroadcastService, ResendWebhookController, EmailModule wired, SubscriptionsService branched, AuthService registration hook, backfill script, Settings UI, account trust copy |
 
 ---
 
@@ -299,7 +300,33 @@ Steps 1–5 are pure configuration — no redeploy required. Step 6 syncs existi
 
 ## Completion Report
 
-> _Fill in after implementation._
+**Built:** 2026-07-04
+**Backend builds:** clean · **Frontend builds:** clean · **Tests:** 190/190 pass
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `backend/src/email/resend-broadcast.service.ts` | New — Resend REST API wrapper: `upsertContact`, `subscribeToTopic`, `unsubscribeFromTopic`, `sendBroadcast`, `syncNewContact` |
+| `backend/src/email/resend-webhook.controller.ts` | New — `POST /email/webhooks/resend` with Svix HMAC-SHA256 verification; `contact.unsubscribed` handler writes to correct `subscribe_*` DB field |
+| `backend/src/email/email.module.ts` | Added `ResendBroadcastService` + `ResendWebhookController`; updated exports |
+| `backend/src/main.ts` | Added `express.raw()` for `/email/webhooks/resend` before `express.json()` |
+| `backend/src/subscriptions/subscriptions.service.ts` | Injected `ResendBroadcastService`; provider branch in `notifyNewArticle`, `notifyNewProduct`, `sendBroadcast`; Resend delta-sync in `updatePreferences` and `unsubscribeByToken` |
+| `backend/src/auth/auth.service.ts` | Injected `ResendBroadcastService`; fire-and-forget `syncNewContact()` after `prisma.user.create()` |
+| `backend/src/auth/auth.service.spec.ts` | Added `ResendBroadcastService` mock to test module |
+| `backend/scripts/resend-backfill.ts` | New permanent operator tool — idempotent sync of all AECMS subscribers into Resend Audience + Topics |
+| `frontend/app/admin/settings/SettingsClient.tsx` | Added Subscriber Broadcasts section to Email tab: provider selector, Resend fields (API key, audience ID, 3 topic IDs, webhook secret), revert-to-SMTP flow with inline confirmation |
+| `frontend/app/(site)/account/AccountPageClient.tsx` | Added trust copy paragraph to Notifications → Subscription Preferences section |
+
+### Implementation notes
+
+- `ResendBroadcastService` uses native `fetch` (Node 22) — no `resend` npm package required
+- All Resend methods check for configured `apiKey` + `audienceId`; methods return early (no-op) when unconfigured
+- `syncNewContact()` additionally checks `email.broadcast_provider === 'resend'` before any API calls — safe to call fire-and-forget from registration flow
+- SMTP fallback is not degraded mode: `notifyNewArticle`/`notifyNewProduct`/`sendBroadcast` all fall through to the existing SMTP loop when provider is unset or Resend audience/topic IDs are missing
+- Resend webhook body is raw-buffered via `express.raw()` for signature verification; Svix signing format implemented in `verifySignature()`
+- `updatePreferences` select now includes `email` for Resend sync, stripped from return value before sending to client
+- Backfill script decrypts ISM `_enc` settings using the same AES-256-GCM algorithm as `LocalKeyProvider`
 
 ---
 

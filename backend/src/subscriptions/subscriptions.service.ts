@@ -5,6 +5,7 @@ import { SettingsService } from '../settings/settings.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
+import { ResendBroadcastService } from '../email/resend-broadcast.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { ConfigService } from '@nestjs/config';
 
@@ -18,6 +19,7 @@ export class SubscriptionsService {
     private readonly configService: ConfigService,
     @Inject(EMAIL_PROVIDER) private readonly emailProvider: EmailProvider,
     private readonly encryption: EncryptionService,
+    private readonly resendBroadcast: ResendBroadcastService,
   ) {}
 
   async getPreferences(userId: string) {
@@ -56,13 +58,43 @@ export class SubscriptionsService {
         ...(unsubscribeToken && { unsubscribe_token: unsubscribeToken }),
       },
       select: {
+        email: true,
         subscribe_new_articles: true,
         subscribe_new_products: true,
         subscribe_news_alerts: true,
       },
     });
 
-    return updated;
+    // Sync delta to Resend if configured
+    const broadcastProvider = await this.settingsService.getEffective('email.broadcast_provider');
+    if (broadcastProvider === 'resend') {
+      const [articlesTopicId, productsTopicId, newsTopicId] = await Promise.all([
+        this.settingsService.getEffective('email.broadcast_resend_articles_topic_id'),
+        this.settingsService.getEffective('email.broadcast_resend_products_topic_id'),
+        this.settingsService.getEffective('email.broadcast_resend_news_topic_id'),
+      ]);
+      const email = (updated as any).email as string;
+      const syncs: Promise<void>[] = [];
+      if (dto.subscribe_new_articles !== undefined && articlesTopicId) {
+        syncs.push(dto.subscribe_new_articles
+          ? this.resendBroadcast.subscribeToTopic(email, articlesTopicId)
+          : this.resendBroadcast.unsubscribeFromTopic(email, articlesTopicId));
+      }
+      if (dto.subscribe_new_products !== undefined && productsTopicId) {
+        syncs.push(dto.subscribe_new_products
+          ? this.resendBroadcast.subscribeToTopic(email, productsTopicId)
+          : this.resendBroadcast.unsubscribeFromTopic(email, productsTopicId));
+      }
+      if (dto.subscribe_news_alerts !== undefined && newsTopicId) {
+        syncs.push(dto.subscribe_news_alerts
+          ? this.resendBroadcast.subscribeToTopic(email, newsTopicId)
+          : this.resendBroadcast.unsubscribeFromTopic(email, newsTopicId));
+      }
+      await Promise.allSettled(syncs);
+    }
+
+    const { email: _email, ...prefs } = updated as any;
+    return prefs;
   }
 
   async unsubscribeByToken(token: string, category: string): Promise<{ category: string }> {
@@ -83,10 +115,69 @@ export class SubscriptionsService {
       data: { [field]: false },
     });
 
+    // Per-topic Resend sync — NOT a global unsubscribe
+    const broadcastProvider = await this.settingsService.getEffective('email.broadcast_provider');
+    if (broadcastProvider === 'resend') {
+      const topicKeyMap: Record<string, string> = {
+        articles: 'email.broadcast_resend_articles_topic_id',
+        products: 'email.broadcast_resend_products_topic_id',
+        news: 'email.broadcast_resend_news_topic_id',
+      };
+      const topicSettingKey = topicKeyMap[category];
+      if (topicSettingKey) {
+        const topicId = await this.settingsService.getEffective(topicSettingKey);
+        if (topicId) {
+          await this.resendBroadcast.unsubscribeFromTopic(user.email, topicId).catch(() => {});
+        }
+      }
+    }
+
     return { category };
   }
 
   async notifyNewArticle(articleId: string): Promise<void> {
+    const broadcastProvider = await this.settingsService.getEffective('email.broadcast_provider');
+
+    if (broadcastProvider === 'resend') {
+      const [article, subscriberCount, settings, audienceId, topicId] = await Promise.all([
+        this.prisma.article.findUnique({ where: { id: articleId }, select: { title: true, slug: true, excerpt: true } }),
+        this.prisma.user.count({ where: { subscribe_new_articles: true, deleted_at: null } }),
+        this.getEmailSettings(),
+        this.settingsService.getEffective('email.broadcast_resend_audience_id'),
+        this.settingsService.getEffective('email.broadcast_resend_articles_topic_id'),
+      ]);
+      if (!article || subscriberCount === 0) return;
+      if (!audienceId || !topicId) {
+        this.logger.warn('Resend configured but audience/articles topic ID missing; falling back to SMTP');
+      } else {
+        const articleUrl = `${settings.appUrl}/articles/${article.slug}`;
+        try {
+          await this.resendBroadcast.sendBroadcast({
+            audienceId,
+            topicId,
+            from: settings.fromAddress ?? '',
+            subject: `New article: ${article.title}`,
+            html: this.buildNotificationHtml({
+              siteName: settings.siteName,
+              greeting: 'Hi there,',
+              intro: `<strong>${settings.siteName}</strong> just published a new article:`,
+              title: article.title,
+              excerpt: article.excerpt || '',
+              ctaUrl: articleUrl,
+              ctaLabel: 'Read Article',
+              unsubLink: '{{{RESEND_UNSUBSCRIBE_URL}}}',
+              category: 'new article emails',
+            }),
+          });
+          this.logger.log(`Sent new article broadcast via Resend to ~${subscriberCount} subscribers`);
+        } catch (err: any) {
+          this.logger.error(`Resend article broadcast failed: ${err.message}`);
+        }
+        return;
+      }
+    }
+
+    // ── SMTP loop (default / Resend misconfigured fallback) ──────────────────
     const [article, subscribers, settings] = await Promise.all([
       this.prisma.article.findUnique({ where: { id: articleId }, select: { title: true, slug: true, excerpt: true } }),
       this.prisma.user.findMany({
@@ -131,6 +222,49 @@ export class SubscriptionsService {
   }
 
   async notifyNewProduct(productId: string): Promise<void> {
+    const broadcastProvider = await this.settingsService.getEffective('email.broadcast_provider');
+
+    if (broadcastProvider === 'resend') {
+      const [product, subscriberCount, settings, audienceId, topicId] = await Promise.all([
+        this.prisma.product.findUnique({ where: { id: productId }, select: { title: true, slug: true, short_description: true, price: true } }),
+        this.prisma.user.count({ where: { subscribe_new_products: true, deleted_at: null } }),
+        this.getEmailSettings(),
+        this.settingsService.getEffective('email.broadcast_resend_audience_id'),
+        this.settingsService.getEffective('email.broadcast_resend_products_topic_id'),
+      ]);
+      if (!product || subscriberCount === 0) return;
+      if (!audienceId || !topicId) {
+        this.logger.warn('Resend configured but audience/products topic ID missing; falling back to SMTP');
+      } else {
+        const productUrl = `${settings.appUrl}/products/${product.slug}`;
+        const priceStr = product.price ? `$${parseFloat(product.price.toString()).toFixed(2)}` : '';
+        try {
+          await this.resendBroadcast.sendBroadcast({
+            audienceId,
+            topicId,
+            from: settings.fromAddress ?? '',
+            subject: `New product: ${product.title}`,
+            html: this.buildNotificationHtml({
+              siteName: settings.siteName,
+              greeting: 'Hi there,',
+              intro: `<strong>${settings.siteName}</strong> just added a new product${priceStr ? ' — ' + priceStr : ''}:`,
+              title: product.title,
+              excerpt: product.short_description || '',
+              ctaUrl: productUrl,
+              ctaLabel: 'View Product',
+              unsubLink: '{{{RESEND_UNSUBSCRIBE_URL}}}',
+              category: 'new product emails',
+            }),
+          });
+          this.logger.log(`Sent new product broadcast via Resend to ~${subscriberCount} subscribers`);
+        } catch (err: any) {
+          this.logger.error(`Resend product broadcast failed: ${err.message}`);
+        }
+        return;
+      }
+    }
+
+    // ── SMTP loop (default / Resend misconfigured fallback) ──────────────────
     const [product, subscribers, settings] = await Promise.all([
       this.prisma.product.findUnique({ where: { id: productId }, select: { title: true, slug: true, short_description: true, price: true } }),
       this.prisma.user.findMany({
@@ -176,6 +310,37 @@ export class SubscriptionsService {
   }
 
   async sendBroadcast(subject: string, body: string): Promise<{ sent: number }> {
+    const broadcastProvider = await this.settingsService.getEffective('email.broadcast_provider');
+
+    if (broadcastProvider === 'resend') {
+      const [subscriberCount, settings, audienceId, topicId] = await Promise.all([
+        this.prisma.user.count({ where: { subscribe_news_alerts: true, deleted_at: null } }),
+        this.getEmailSettings(),
+        this.settingsService.getEffective('email.broadcast_resend_audience_id'),
+        this.settingsService.getEffective('email.broadcast_resend_news_topic_id'),
+      ]);
+      if (subscriberCount === 0) return { sent: 0 };
+      if (!audienceId || !topicId) {
+        this.logger.warn('Resend configured but audience/news topic ID missing; falling back to SMTP');
+      } else {
+        await this.resendBroadcast.sendBroadcast({
+          audienceId,
+          topicId,
+          from: settings.fromAddress ?? '',
+          subject,
+          html: this.buildBroadcastHtml({
+            siteName: settings.siteName,
+            greeting: 'Hi there,',
+            body,
+            unsubLink: '{{{RESEND_UNSUBSCRIBE_URL}}}',
+          }),
+        });
+        this.logger.log(`Broadcast sent via Resend to ~${subscriberCount} subscribers`);
+        return { sent: subscriberCount };
+      }
+    }
+
+    // ── SMTP loop (default / Resend misconfigured fallback) ──────────────────
     const [subscribers, settings] = await Promise.all([
       this.prisma.user.findMany({
         where: { subscribe_news_alerts: true, deleted_at: null },

@@ -13,6 +13,7 @@ import { AuditLogService } from '../audit/audit.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import * as bcrypt from 'bcrypt';
 import { EMAIL_PROVIDER } from '../email/email.interface';
+import { ResendBroadcastService } from '../email/resend-broadcast.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -102,6 +103,7 @@ describe('AuthService', () => {
         { provide: EMAIL_PROVIDER, useValue: mockEmailProvider },
         { provide: AuditLogService, useValue: { log: jest.fn() } },
         { provide: EncryptionService, useValue: mockEncryptionService },
+        { provide: ResendBroadcastService, useValue: { syncNewContact: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 

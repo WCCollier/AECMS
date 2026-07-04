@@ -18,6 +18,7 @@ import { AuthResponse, AdminLoginResponse, TokenPayload } from './interfaces/aut
 import * as crypto from 'crypto';
 import { EMAIL_PROVIDER } from '../email/email.interface';
 import type { EmailProvider } from '../email/email.interface';
+import { ResendBroadcastService } from '../email/resend-broadcast.service';
 import { AuditLogService } from '../audit/audit.service';
 import { CAPABILITY_DEFINITIONS } from '../capabilities/capability-definitions';
 import { LocalKeyProvider } from '../settings/local-key.provider';
@@ -35,6 +36,7 @@ export class AuthService {
     @Inject(EMAIL_PROVIDER) private emailProvider: EmailProvider,
     private auditLog: AuditLogService,
     private encryption: EncryptionService,
+    private resendBroadcast: ResendBroadcastService,
   ) {}
 
   /**
@@ -110,6 +112,12 @@ export class AuthService {
         subscribe_news_alerts: subscribeAlerts,
       },
     });
+
+    // Fire-and-forget Resend contact sync (no-op when Resend not configured)
+    this.resendBroadcast.syncNewContact(
+      { email: user.email, firstName: registerDto.firstName ?? '', lastName: registerDto.lastName ?? '' },
+      { articles: subscribeArticles, products: subscribeProducts, news: subscribeAlerts },
+    ).catch(() => {});
 
     // Send verification email — use plaintext from DTO since it was just registered
     await this.sendVerificationEmail(user.email, verificationToken, registerDto.firstName);
