@@ -12,8 +12,8 @@ Small, self-contained features that don't constitute major phase-level work. One
 
 | ID | Size | Status | Description |
 |----|------|--------|-------------|
+| [FR-011](FR-011-resend-broadcast-integration.md) | medium | in-dev | Resend Broadcast Integration — Resend Broadcast API + Topics when configured; SMTP loop fallback when unset; 5-trigger bidirectional sync; permanent backfill script |
 | [FR-013](FR-013-x-timeline-tiptap-widget.md) | medium | accepted | X Account Timeline Widget — TipTap block node fetching latest N posts via X API v2; ISM bearer token; Redis cache; first-use inline setup |
-| [FR-011](FR-011-resend-broadcast-integration.md) | medium | accepted | Resend Broadcast Integration — article/product/admin broadcasts via Resend Broadcast API + Topics; SMTP loop fallback when unset |
 
 ## Deployed
 
