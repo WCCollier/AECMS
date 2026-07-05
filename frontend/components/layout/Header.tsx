@@ -107,6 +107,8 @@ export function Header({ siteTitle }: { siteTitle: string }) {
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [showResend, setShowResend] = useState(false);
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const flyoutRef = useRef<HTMLDivElement>(null);
   const loginBtnRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLElement>(null);
@@ -141,6 +143,8 @@ export function Header({ siteTitle }: { siteTitle: string }) {
       ) {
         setLoginOpen(false);
         setLoginError('');
+        setShowResend(false);
+        setResendStatus('idle');
       }
     }
     document.addEventListener('mousedown', handleClick);
@@ -151,15 +155,31 @@ export function Header({ siteTitle }: { siteTitle: string }) {
     e.preventDefault();
     setLoginLoading(true);
     setLoginError('');
+    setShowResend(false);
+    setResendStatus('idle');
     try {
       await login(loginData);
       setLoginOpen(false);
       setLoginData({ email: '', password: '' });
     } catch (err) {
-      setLoginError(getErrorMessage(err));
+      const msg = getErrorMessage(err);
+      setLoginError(msg);
+      if (msg.toLowerCase().includes('not verified')) {
+        setShowResend(true);
+      }
     } finally {
       setLoginLoading(false);
     }
+  }
+
+  async function handleResend() {
+    setResendStatus('sending');
+    try {
+      await api.post('/auth/resend-verification', { email: loginData.email });
+    } catch {
+      // always show success — endpoint is enumeration-safe
+    }
+    setResendStatus('sent');
   }
 
   return (
@@ -234,6 +254,25 @@ export function Header({ siteTitle }: { siteTitle: string }) {
                         <p className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 rounded px-2 py-1.5">
                           {loginError}
                         </p>
+                      )}
+                      {showResend && (
+                        <div className="text-xs bg-foreground/5 border border-foreground/10 rounded px-2 py-2 space-y-1.5">
+                          {resendStatus === 'sent' ? (
+                            <p className="text-foreground/70">Check your inbox for a new verification link.</p>
+                          ) : (
+                            <>
+                              <p className="text-foreground/60">Need a new verification link?</p>
+                              <button
+                                type="button"
+                                onClick={handleResend}
+                                disabled={resendStatus === 'sending'}
+                                className="text-accent hover:underline disabled:opacity-50"
+                              >
+                                {resendStatus === 'sending' ? 'Sending…' : 'Resend verification email'}
+                              </button>
+                            </>
+                          )}
+                        </div>
                       )}
                       <Input
                         type="email"
