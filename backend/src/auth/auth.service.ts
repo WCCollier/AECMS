@@ -43,6 +43,7 @@ export class AuthService {
    * Register a new user
    */
   async register(registerDto: RegisterDto): Promise<{ message: string; userId: string }> {
+    registerDto.email = registerDto.email.toLowerCase();
     // Verify CAPTCHA token if a secret key is configured (ISM DB-first, env fallback)
     const turnstileSecret = await this.getTurnstileSecret();
     if (turnstileSecret) {
@@ -132,7 +133,7 @@ export class AuthService {
    * Login user
    */
   async login(loginDto: LoginDto): Promise<AuthResponse> {
-    // Find user by email
+    loginDto.email = loginDto.email.toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email: loginDto.email },
     });
@@ -196,6 +197,7 @@ export class AuthService {
    * Admin back-door login — enforces admin/owner role, handles 2FA gating
    */
   async adminLogin(loginDto: LoginDto): Promise<AdminLoginResponse> {
+    loginDto.email = loginDto.email.toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email: loginDto.email },
     });
@@ -584,6 +586,7 @@ export class AuthService {
    * Resend verification email
    */
   async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    email = email.toLowerCase();
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -703,6 +706,7 @@ export class AuthService {
   }
 
   async forgotPassword(email: string): Promise<{ message: string }> {
+    email = email.toLowerCase();
     const user = await this.prisma.user.findFirst({
       where: { email, deleted_at: null, email_verified: true },
     });
