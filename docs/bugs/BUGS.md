@@ -10,7 +10,9 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 ## Open
 
-_None_
+| ID | Severity | Area | Description |
+|----|----------|------|-------------|
+| [BUG-016](BUG-016-email-case-sensitivity.md) | high | auth, backend | Email case-sensitive at sign-in — no `.toLowerCase()` normalization at any auth entry point; affects login, register duplicate check, resend verification, forgot password, Resend webhook |
 
 ## In Dev
 
