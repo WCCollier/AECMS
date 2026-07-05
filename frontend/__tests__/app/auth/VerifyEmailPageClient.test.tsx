@@ -35,7 +35,7 @@ describe('VerifyEmailPageClient', () => {
   it('shows no-token state when no token is provided', () => {
     render(<VerifyEmailPageClient />);
     expect(screen.getByText(/invalid verification link/i)).toBeInTheDocument();
-    expect(screen.getByText(/no verification token was provided/i)).toBeInTheDocument();
+    expect(screen.getByText(/no verification token found/i)).toBeInTheDocument();
   });
 
   it('shows loading state initially when token is provided', () => {
