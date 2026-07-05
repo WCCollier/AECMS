@@ -13,13 +13,13 @@ Small, self-contained features that don't constitute major phase-level work. One
 | ID | Size | Status | Description |
 |----|------|--------|-------------|
 | [FR-013](FR-013-x-timeline-tiptap-widget.md) | medium | accepted | X Account Timeline Widget — TipTap block node fetching latest N posts via X API v2; ISM bearer token; Redis cache; first-use inline setup |
-| [FR-011](FR-011-resend-broadcast-integration.md) | medium | accepted | Resend Broadcast Integration — article/product/admin broadcasts via Resend Broadcast API + Topics; SMTP loop fallback when unset |
 
 ## Deployed
 
 | ID | Size | Description |
 |----|------|-------------|
 | [FR-017](FR-017-nextjs-image-normalization.md) | small | Next.js Image Normalization — eliminate pre-generated thumbnails; port media library to `<Image>`; add featured image to collection embed partial/full modes |
+| [FR-011](FR-011-resend-broadcast-integration.md) | medium | Resend Broadcast Integration — Resend Broadcast API + Topics when configured; SMTP loop fallback when unset; 5-trigger bidirectional sync; permanent backfill script |
 | [FR-016](FR-016-assign-modal-search.md) | small | Assign Modal Search — independent `UnifiedSearchInput` filter bar per list in the tag assign modal; client-side title + tag filtering; selection persists across filter changes |
 | [FR-010](FR-010-pii-encryption.md) | medium | PII Encryption at Rest — `EncryptionService`, all plaintext PII columns dropped; `UserAddress` encrypted from day one; TOTP + OAuth + orders + user names + IP hashing |
 | [FR-015](FR-015-collection-embed-display-modes-and-tag-exclusion.md) | medium | Collection Embed — `preview` (100dvh pane + fade) and `full` (inline body) display modes; tag exclusion filter with ANY/ALL toggle |

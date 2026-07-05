@@ -556,6 +556,10 @@ export function AccountPageClient() {
             </div>
             <div>
               <h3 className="text-sm font-semibold text-foreground/80 mb-2">Subscription Preferences</h3>
+              <p className="text-xs text-foreground/50 mb-3">
+                We don&apos;t spam. No daily or weekly digests — just one email when a new article or product is published,
+                or in the very rare instance we need to send an all-hands alert.
+              </p>
               {[
                 { key: 'subscribe_new_articles' as const, label: 'New Articles', desc: 'Get an email when a new article is published' },
                 { key: 'subscribe_new_products' as const, label: 'New Products', desc: 'Get an email when a new product is added to the shop' },

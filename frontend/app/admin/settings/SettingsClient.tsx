@@ -181,6 +181,9 @@ export function SettingsClient() {
   const [emailTesting, setEmailTesting] = useState(false);
   const [emailTestResult, setEmailTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Broadcast clear-settings confirmation
+  const [clearBroadcastConfirm, setClearBroadcastConfirm] = useState(false);
+
   // Payment verify state
   const [stripeStatus, setStripeStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [stripeError, setStripeError] = useState('');
@@ -671,6 +674,110 @@ export function SettingsClient() {
                 ? 'Test uses the values currently entered above. Save after a successful test.'
                 : 'Fill in Host, Port, Username, and From Address to enable the test.'}
             </p>
+          </div>
+
+          {/* ─── Subscriber Broadcasts ─── */}
+          <div className="border-t border-neutral-800 mt-8 pt-6">
+            <h3 className="text-sm font-semibold text-neutral-200 mb-1">Subscriber Broadcasts</h3>
+            <p className="text-xs text-neutral-500 mb-4">
+              Article notifications, product notifications, and newsletters are broadcast emails — sent to groups of
+              subscribers at once. Configure a provider below, or leave as SMTP to send individually via your relay above.
+            </p>
+            <FieldRow label="Broadcast service">
+              <Select
+                value={f('email.broadcast_provider') || ''}
+                onChange={(v) => { set('email.broadcast_provider', v); setClearBroadcastConfirm(false); }}
+                options={[
+                  { value: '', label: 'None (SMTP per-subscriber delivery)' },
+                  { value: 'resend', label: 'Resend Broadcast API' },
+                ]}
+              />
+              {!f('email.broadcast_provider') && (
+                <p className="text-xs text-neutral-500 mt-2">
+                  Broadcast emails will be sent individually via your SMTP settings above. For large subscriber lists,
+                  consider connecting a dedicated broadcast provider.
+                </p>
+              )}
+            </FieldRow>
+
+            {f('email.broadcast_provider') === 'resend' && (
+              <>
+                <FieldRow label="API Key" help="Resend API key — must have Broadcast access">
+                  <SecretInput
+                    value={f('email.broadcast_resend_api_key_enc')}
+                    onChange={(v) => set('email.broadcast_resend_api_key_enc', v)}
+                    placeholder="re_..."
+                  />
+                </FieldRow>
+                <FieldRow label="Audience ID" help="UUID of the Resend Audience containing all site contacts">
+                  <TextInput
+                    value={f('email.broadcast_resend_audience_id')}
+                    onChange={(v) => set('email.broadcast_resend_audience_id', v)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </FieldRow>
+                <FieldRow label="Articles Topic ID" help="Resend Topic UUID for new article notification broadcasts">
+                  <TextInput
+                    value={f('email.broadcast_resend_articles_topic_id')}
+                    onChange={(v) => set('email.broadcast_resend_articles_topic_id', v)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </FieldRow>
+                <FieldRow label="Products Topic ID" help="Resend Topic UUID for new product notification broadcasts">
+                  <TextInput
+                    value={f('email.broadcast_resend_products_topic_id')}
+                    onChange={(v) => set('email.broadcast_resend_products_topic_id', v)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </FieldRow>
+                <FieldRow label="News & Alerts Topic ID" help="Resend Topic UUID for admin newsletters and broadcast messages">
+                  <TextInput
+                    value={f('email.broadcast_resend_news_topic_id')}
+                    onChange={(v) => set('email.broadcast_resend_news_topic_id', v)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </FieldRow>
+                <FieldRow label="Webhook Secret" help="Signing secret from Resend Webhooks dashboard. Register POST /email/webhooks/resend for the contact.unsubscribed event.">
+                  <SecretInput
+                    value={f('email.broadcast_resend_webhook_secret_enc')}
+                    onChange={(v) => set('email.broadcast_resend_webhook_secret_enc', v)}
+                    placeholder="whsec_..."
+                  />
+                </FieldRow>
+
+                <div className="py-4 border-b border-neutral-800">
+                  {!clearBroadcastConfirm ? (
+                    <button
+                      type="button"
+                      onClick={() => setClearBroadcastConfirm(true)}
+                      className="text-xs text-neutral-500 hover:text-red-400 transition-colors"
+                    >
+                      Revert to SMTP (clear broadcast provider)
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-neutral-400">
+                        This will revert broadcasts to SMTP delivery. Resend contact data is preserved.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { set('email.broadcast_provider', ''); setClearBroadcastConfirm(false); }}
+                        className="text-xs text-red-400 hover:text-red-300 font-medium"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setClearBroadcastConfirm(false)}
+                        className="text-xs text-neutral-500 hover:text-neutral-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <SaveBar onSave={handleSave} saving={saving} saved={saved} dirty={dirty} />

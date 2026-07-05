@@ -1,6 +1,6 @@
 # BUG-012: Domain alias routing never activates — secondary domain always serves full site
 
-**Status:** `open`
+**Status:** `fixed`
 **Reported:** 2026-06-30
 **Severity:** `high`
 **Area:** domain-aliases, middleware, backend
@@ -105,3 +105,4 @@ This allows diagnosing whether the routing issue is a middleware/DB problem or a
 | 2026-06-30 | fixed | `d9ffda8` — `DomainRoutingController` added; middleware updated to call unauthenticated endpoint |
 | 2026-07-02 | open | After d9ffda8 deployed: UI still showed "Pending Verification" (is_verified field bug); routing still not working; diagnostic logging added; `is_verified` → `verified_at` fix deployed |
 | 2026-07-03 | open | Logs confirmed: backend still returning 401 for `/domain-aliases/routing` — `GET /domain-aliases/:id` dynamic route on the authenticated controller was shadowing the new endpoint. Fixed by moving `DomainRoutingController` to `@Controller('domain-routing')` (GET `/domain-routing`), fully unambiguous path. Deployed `026f7d1`. |
+| 2026-07-03 | fixed | Owner confirmed: domain alias routing working correctly in production. |

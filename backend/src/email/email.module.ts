@@ -2,6 +2,8 @@ import { Module, Global, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ConsoleEmailProvider } from './console-email.provider';
 import { SmtpEmailProvider } from './smtp-email.provider';
+import { ResendBroadcastService } from './resend-broadcast.service';
+import { ResendWebhookController } from './resend-webhook.controller';
 import { EMAIL_PROVIDER, EmailProviderType } from './email.interface';
 import { SettingsModule } from '../settings/settings.module';
 import { SettingsService } from '../settings/settings.service';
@@ -9,6 +11,7 @@ import { SettingsService } from '../settings/settings.service';
 @Global()
 @Module({
   imports: [ConfigModule, forwardRef(() => SettingsModule)],
+  controllers: [ResendWebhookController],
   providers: [
     {
       provide: EMAIL_PROVIDER,
@@ -29,7 +32,8 @@ import { SettingsService } from '../settings/settings.service';
     },
     ConsoleEmailProvider,
     SmtpEmailProvider,
+    ResendBroadcastService,
   ],
-  exports: [EMAIL_PROVIDER, ConsoleEmailProvider, SmtpEmailProvider],
+  exports: [EMAIL_PROVIDER, ConsoleEmailProvider, SmtpEmailProvider, ResendBroadcastService],
 })
 export class EmailModule {}

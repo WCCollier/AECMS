@@ -29,11 +29,9 @@ async function bootstrap() {
   // Stripe's signature verification requires the exact raw bytes of the body.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
-  // Raw buffer for Stripe webhooks — must be registered before express.json().
-  app.use(
-    '/payments/webhooks/stripe',
-    express.raw({ type: 'application/json' }),
-  );
+  // Raw buffer for webhook signature verification — must be registered before express.json().
+  app.use('/payments/webhooks/stripe', express.raw({ type: 'application/json' }));
+  app.use('/email/webhooks/resend', express.raw({ type: 'application/json' }));
 
   // JSON parser for all other endpoints.
   app.use(express.json({ limit: '10mb' }));
