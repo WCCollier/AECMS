@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import api, { getErrorMessage } from '@/lib/api';
-import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
+import api from '@/lib/api';
+import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 
 type VerificationStatus = 'loading' | 'success' | 'error' | 'no-token';
 
@@ -14,6 +14,8 @@ export function VerifyEmailPageClient() {
 
   const [status, setStatus] = useState<VerificationStatus>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [resendEmail, setResendEmail] = useState('');
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
 
   useEffect(() => {
     if (!token) {
@@ -27,12 +29,25 @@ export function VerifyEmailPageClient() {
         setStatus('success');
       } catch (error) {
         setStatus('error');
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(error instanceof Error ? error.message : 'Verification failed');
       }
     };
 
     verifyEmail();
   }, [token]);
+
+  const handleResend = async () => {
+    if (!resendEmail.trim()) return;
+    setResendStatus('sending');
+    try {
+      await api.post('/auth/resend-verification', { email: resendEmail.trim() });
+    } catch {
+      // endpoint returns a generic message for unknown emails — always show success
+    }
+    setResendStatus('sent');
+  };
+
+  const needsResend = status === 'error' || status === 'no-token';
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -72,7 +87,7 @@ export function VerifyEmailPageClient() {
               <ErrorIcon />
               <p className="text-red-500">{errorMessage}</p>
               <p className="text-foreground/70 text-sm">
-                The verification link may have expired or is invalid. Please request a new verification email.
+                The verification link may have expired or is invalid.
               </p>
             </div>
           )}
@@ -81,8 +96,38 @@ export function VerifyEmailPageClient() {
             <div className="flex flex-col items-center gap-4 py-8">
               <ErrorIcon />
               <p className="text-foreground/70">
-                No verification token was provided. Please check your email for the correct verification link.
+                No verification token found. Please check your email for the correct link.
               </p>
+            </div>
+          )}
+
+          {needsResend && (
+            <div className="mt-2 p-4 bg-foreground/5 border border-foreground/10 rounded-lg text-left space-y-3">
+              {resendStatus === 'sent' ? (
+                <p className="text-sm text-foreground/70 text-center">
+                  Check your inbox — a new verification link is on its way.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-foreground/70">Request a new verification link:</p>
+                  <Input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    autoComplete="email"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    isLoading={resendStatus === 'sending'}
+                    onClick={handleResend}
+                  >
+                    Resend verification email
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </CardContent>
@@ -94,14 +139,12 @@ export function VerifyEmailPageClient() {
             </Link>
           )}
 
-          {(status === 'error' || status === 'no-token') && (
-            <>
-              <Link href="/auth/login" className="w-full">
-                <Button variant="outline" className="w-full">
-                  Back to Login
-                </Button>
-              </Link>
-            </>
+          {needsResend && (
+            <Link href="/auth/login" className="w-full">
+              <Button variant="outline" className="w-full">
+                Back to Login
+              </Button>
+            </Link>
           )}
 
           {status === 'loading' && (

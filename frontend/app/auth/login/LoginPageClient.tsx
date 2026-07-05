@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import api, { getErrorMessage } from '@/lib/api';
 import { Button, Input, PasswordInput, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 
 export function LoginPageClient() {
@@ -12,6 +13,8 @@ export function LoginPageClient() {
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showResend, setShowResend] = useState(false);
+  const [resendStatus, setResendStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -23,22 +26,40 @@ export function LoginPageClient() {
       [e.target.name]: e.target.value,
     }));
     setError('');
+    setShowResend(false);
+    setResendStatus('idle');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    setShowResend(false);
+    setResendStatus('idle');
 
     try {
       await login(formData);
       const returnTo = searchParams?.get('from') ?? '/';
       router.push(returnTo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      const msg = err instanceof Error ? err.message : 'Login failed';
+      setError(msg);
+      if (msg.toLowerCase().includes('not verified')) {
+        setShowResend(true);
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleResend = async () => {
+    setResendStatus('sending');
+    try {
+      await api.post('/auth/resend-verification', { email: formData.email });
+    } catch {
+      // endpoint returns a generic message even for unknown emails — always show success
+    }
+    setResendStatus('sent');
   };
 
   return (
@@ -57,6 +78,27 @@ export function LoginPageClient() {
             {error && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-500 text-sm">
                 {error}
+              </div>
+            )}
+
+            {showResend && (
+              <div className="p-3 bg-foreground/5 border border-foreground/10 rounded-lg text-sm space-y-2">
+                {resendStatus === 'sent' ? (
+                  <p className="text-foreground/70">Check your inbox — a new verification link is on its way.</p>
+                ) : (
+                  <>
+                    <p className="text-foreground/70">Need a new verification link?</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      isLoading={resendStatus === 'sending'}
+                      onClick={handleResend}
+                    >
+                      Resend verification email
+                    </Button>
+                  </>
+                )}
               </div>
             )}
 
