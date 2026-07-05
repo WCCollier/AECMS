@@ -662,7 +662,7 @@ export class AuthService {
     firstName?: string | null,
   ): Promise<void> {
     const appUrl = this.configService.get<string>('APP_URL', 'http://localhost:3000');
-    const verificationUrl = `${appUrl}/verify-email?token=${token}`;
+    const verificationUrl = `${appUrl}/auth/verify-email?token=${token}`;
     const name = firstName || 'there';
 
     await this.emailProvider.send({
@@ -1124,7 +1124,7 @@ export class AuthService {
           <p>Hi ${firstName},</p>
           <p>Your account registration has been approved. You can now log in at:</p>
           <p style="text-align: center; margin: 30px 0;">
-            <a href="${appUrl}/login"
+            <a href="${appUrl}/auth/login"
                style="background-color: #4F46E5; color: white; padding: 12px 24px;
                       text-decoration: none; border-radius: 6px; display: inline-block;">
               Log In Now
@@ -1132,7 +1132,7 @@ export class AuthService {
           </p>
         </div>
       `,
-      text: `Hi ${firstName},\n\nYour account has been approved. Log in at: ${appUrl}/login`,
+      text: `Hi ${firstName},\n\nYour account has been approved. Log in at: ${appUrl}/auth/login`,
     }).catch((e) => console.error('[auth] approval email failed:', e?.message));
 
     return { message: 'Registration approved' };

@@ -20,6 +20,7 @@ _None_
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
+| [BUG-015](BUG-015-verify-email-link-404.md) | critical | auth, email | Verify-email link in registration email returns 404 — URL was `/verify-email` instead of `/auth/verify-email`; approval email also linked to `/login` instead of `/auth/login` |
 | [BUG-014](BUG-014-favicon-not-applied-from-settings.md) | medium | frontend, settings | Favicon set in Site Identity has no effect — `app/favicon.ico` auto-injection overrides dynamic icon; fixed by moving to `public/` + `generateMetadata()` with mime type |
 | [BUG-012](BUG-012-domain-alias-routing-never-activates.md) | high | domain-aliases, middleware, frontend | Secondary domain routing not working — unauthenticated `/domain-routing` endpoint, `verified_at` UI fix, route shadowing fix; confirmed working in production |
 | [BUG-013](BUG-013-assign-modal-select-all-wrong-scope.md) | medium | backstage, tags, FR-016 | Assign modal Select All scoped to wrong set when filter active; filter not live on keystroke |
