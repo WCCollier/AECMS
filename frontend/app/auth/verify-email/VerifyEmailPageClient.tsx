@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import api from '@/lib/api';
+import api, { getErrorMessage } from '@/lib/api';
 import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui';
 
 type VerificationStatus = 'loading' | 'success' | 'error' | 'no-token';
@@ -29,7 +29,7 @@ export function VerifyEmailPageClient() {
         setStatus('success');
       } catch (error) {
         setStatus('error');
-        setErrorMessage(error instanceof Error ? error.message : 'Verification failed');
+        setErrorMessage(getErrorMessage(error));
       }
     };
 
