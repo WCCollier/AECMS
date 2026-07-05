@@ -12,7 +12,7 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
-| [BUG-016](BUG-016-email-case-sensitivity.md) | high | auth, backend | Email case-sensitive at sign-in — no `.toLowerCase()` normalization at any auth entry point; affects login, register duplicate check, resend verification, forgot password, Resend webhook |
+_None_
 
 ## In Dev
 
@@ -22,6 +22,7 @@ _None_
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
+| [BUG-016](BUG-016-email-case-sensitivity.md) | high | auth, backend | Email case-sensitive at all auth entry points — `.toLowerCase()` added to register, login, adminLogin, resendVerification, forgotPassword, Resend webhook |
 | [BUG-015](BUG-015-verify-email-link-404.md) | critical | auth, email | Verify-email link in registration email returns 404 — URL was `/verify-email` instead of `/auth/verify-email`; approval email also linked to `/login` instead of `/auth/login` |
 | [BUG-014](BUG-014-favicon-not-applied-from-settings.md) | medium | frontend, settings | Favicon set in Site Identity has no effect — `app/favicon.ico` auto-injection overrides dynamic icon; fixed by moving to `public/` + `generateMetadata()` with mime type |
 | [BUG-012](BUG-012-domain-alias-routing-never-activates.md) | high | domain-aliases, middleware, frontend | Secondary domain routing not working — unauthenticated `/domain-routing` endpoint, `verified_at` UI fix, route shadowing fix; confirmed working in production |

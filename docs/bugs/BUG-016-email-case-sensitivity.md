@@ -1,6 +1,6 @@
 # BUG-016: Email Treated as Case-Sensitive at Sign-In and All Auth Lookups
 
-**Status:** `open`
+**Status:** `fixed`
 **Reported:** 2026-07-05
 **Severity:** `high`
 **Area:** auth, backend
@@ -75,12 +75,12 @@ handleWebhook():  normalize email extracted from webhook payload before findUniq
 
 ## Completion Report
 
-> _Fill in after fix is deployed._
-
-**Fixed:** —
-**Commit(s):** —
+**Fixed:** 2026-07-05
+**Commit(s):** see next commit
 
 ### What changed
+
+`.toLowerCase()` added at the top of all six affected methods in `auth.service.ts` (register, login, adminLogin, resendVerificationEmail, forgotPassword) and inline at the email extraction point in `resend-webhook.controller.ts`. No schema changes; existing data confirmed clean.
 
 ---
 
@@ -89,3 +89,4 @@ handleWebhook():  normalize email extracted from webhook payload before findUniq
 | Date | Status | Note |
 |------|--------|------|
 | 2026-07-05 | open | Reported after live sign-in failure due to email capitalization |
+| 2026-07-05 | fixed | .toLowerCase() at all six auth entry points; existing data confirmed clean |

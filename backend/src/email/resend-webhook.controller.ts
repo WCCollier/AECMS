@@ -87,7 +87,7 @@ export class ResendWebhookController {
   }
 
   private async handleContactUnsubscribed(data: any): Promise<void> {
-    const email: string = data?.email;
+    const email: string = data?.email?.toLowerCase();
     // Resend may send topic_id or topicId depending on API version
     const topicId: string = data?.topic_id ?? data?.topicId;
     if (!email || !topicId) return;
