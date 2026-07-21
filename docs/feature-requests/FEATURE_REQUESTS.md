@@ -13,6 +13,7 @@ Small, self-contained features that don't constitute major phase-level work. One
 | ID | Size | Status | Description |
 |----|------|--------|-------------|
 | [FR-013](FR-013-x-timeline-tiptap-widget.md) | medium | accepted | X Account Timeline Widget — TipTap block node fetching latest N posts via X API v2; ISM bearer token; Redis cache; first-use inline setup |
+| [FR-019](FR-019-substack-syndication.md) | medium | in-dev | Substack Syndication — weekly script catalogues `Articles`-tagged content, drafts (never publishes) the next 5 oldest→newest to Substack via its unofficial API, tracks synced state in a new `SubstackSyncRecord` table |
 
 ## Deployed
 

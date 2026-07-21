@@ -213,6 +213,7 @@ model Article {
   media           ArticleMedia[]
   comments        Comment[]
   versions        ArticleVersion[]
+  substack_sync   SubstackSyncRecord?
 
   @@index([slug])
   @@index([author_id])
@@ -325,6 +326,20 @@ model ArticleTag {
 
   @@id([article_id, tag_id])
   @@map("article_tags")
+}
+
+// FR-019: Substack syndication — one row per article that has been pushed to
+// Substack (as a draft), so the sync script never sends the same article twice.
+model SubstackSyncRecord {
+  id                String   @id @default(uuid())
+  article_id        String   @unique
+  substack_draft_id String?  // null when marked done manually (article was published on Substack by hand, not via the script)
+  synced_at         DateTime @default(now())
+  created_at        DateTime @default(now())
+
+  article Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+
+  @@map("substack_sync_records")
 }
 
 model Media {
