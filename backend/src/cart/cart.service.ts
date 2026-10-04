@@ -1,4 +1,6 @@
+import * as path from 'path';
 import {
+  Inject,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -7,10 +9,15 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddToCartDto, UpdateCartItemDto } from './dto';
+import { STORAGE_PROVIDER } from '../storage';
+import type { StorageProvider } from '../storage';
 
 @Injectable()
 export class CartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(STORAGE_PROVIDER) private storageProvider: StorageProvider,
+  ) {}
 
   /**
    * Get or create cart for user or session
@@ -34,7 +41,7 @@ export class CartService {
       });
     }
 
-    return this.transformCart(cart);
+    return await this.transformCart(cart);
   }
 
   /**
@@ -60,7 +67,7 @@ export class CartService {
       };
     }
 
-    return this.transformCart(cart);
+    return await this.transformCart(cart);
   }
 
   /**
@@ -434,14 +441,14 @@ export class CartService {
    * anonymous sessions). Stripping them would force a non-trivial backend change when
    * that feature is built. See docs/Shape_Audit.md Item 6 for full rationale.
    */
-  private transformCart(cart: any) {
-    const items = cart.items.map((item: any) => {
+  private async transformCart(cart: any) {
+    const items = await Promise.all(cart.items.map(async (item: any) => {
       const unitPrice = parseFloat(item.product.price.toString());
       const fp = item.product.media?.[0]?.media?.file_path ?? null;
+      // Resolve through the storage provider so cloud (GCS/S3/CDN) URLs are returned
+      // as-is; legacy absolute paths are reduced to the stored filename.
       const featured_image_url = fp
-        ? fp.startsWith('/uploads/') ? fp
-          : fp.includes('/uploads/') ? fp.replace(/.*\/uploads\//, '/uploads/')
-          : `/uploads/${fp}`
+        ? await this.storageProvider.getUrl(path.isAbsolute(fp) ? path.basename(fp) : fp)
         : null;
       return {
         id: item.id,
@@ -460,7 +467,7 @@ export class CartService {
         },
         line_total: unitPrice * item.quantity,
       };
-    });
+    }));
 
     const subtotal = items.reduce(
       (sum: number, item: any) => sum + item.line_total,
