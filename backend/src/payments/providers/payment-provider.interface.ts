@@ -64,7 +64,7 @@ export interface PaymentProvider {
   /**
    * Check if provider is configured and available
    */
-  isAvailable(): boolean;
+  isAvailable(): Promise<boolean>;
 
   /**
    * Create a payment intent/order

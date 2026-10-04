@@ -29,10 +29,9 @@ export class StripeProvider implements PaymentProvider {
     }
   }
 
-  isAvailable(): boolean {
-    // Optimistic: env var present, or assume ISM may have it. Actual availability
-    // is confirmed when getStripe() succeeds on first real operation.
-    return !!(process.env.STRIPE_SECRET_KEY || this.configService.get<string>('STRIPE_SECRET_KEY'));
+  async isAvailable(): Promise<boolean> {
+    // getEffective() checks the ISM first, then falls back to the env var.
+    return !!(await this.settingsService.getEffective('payment.stripe_secret_key_enc'));
   }
 
   private async getStripe(): Promise<Stripe> {

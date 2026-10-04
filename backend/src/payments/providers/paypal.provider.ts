@@ -47,11 +47,11 @@ export class PayPalProvider implements PaymentProvider {
     return this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
   }
 
-  isAvailable(): boolean {
-    return !!(
-      this.configService.get<string>('PAYPAL_CLIENT_ID') &&
-      this.configService.get<string>('PAYPAL_CLIENT_SECRET')
-    );
+  async isAvailable(): Promise<boolean> {
+    // getEffective() checks the ISM first, then falls back to the env var.
+    const clientId = await this.settingsService.getEffective('payment.paypal_client_id');
+    const clientSecret = await this.settingsService.getEffective('payment.paypal_client_secret_enc');
+    return !!(clientId && clientSecret);
   }
 
   private async getCredentials(): Promise<{ clientId: string; clientSecret: string }> {
@@ -65,7 +65,7 @@ export class PayPalProvider implements PaymentProvider {
   }
 
   async createPayment(params: CreatePaymentParams): Promise<PaymentIntent> {
-    if (!this.isAvailable()) {
+    if (!(await this.isAvailable())) {
       throw new Error('PayPal is not configured');
     }
 
@@ -142,7 +142,7 @@ export class PayPalProvider implements PaymentProvider {
   }
 
   async capturePayment(paymentId: string): Promise<PaymentCapture> {
-    if (!this.isAvailable()) {
+    if (!(await this.isAvailable())) {
       throw new Error('PayPal is not configured');
     }
 
@@ -202,7 +202,7 @@ export class PayPalProvider implements PaymentProvider {
   }
 
   async getOrderRawStatus(paypalOrderId: string): Promise<{ rawStatus: string; captureId?: string }> {
-    if (!this.isAvailable()) throw new Error('PayPal is not configured');
+    if (!(await this.isAvailable())) throw new Error('PayPal is not configured');
     const accessToken = await this.getAccessToken();
     const response = await fetch(`${await this.getBaseUrl()}/v2/checkout/orders/${paypalOrderId}`, {
       headers: { 'Authorization': `Bearer ${accessToken}` },
@@ -214,7 +214,7 @@ export class PayPalProvider implements PaymentProvider {
   }
 
   async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
-    if (!this.isAvailable()) {
+    if (!(await this.isAvailable())) {
       throw new Error('PayPal is not configured');
     }
 
@@ -238,7 +238,7 @@ export class PayPalProvider implements PaymentProvider {
   }
 
   async refund(paymentId: string, amount?: number): Promise<RefundResult> {
-    if (!this.isAvailable()) {
+    if (!(await this.isAvailable())) {
       throw new Error('PayPal is not configured');
     }
 

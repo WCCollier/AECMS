@@ -43,15 +43,15 @@ export class PaymentsService {
     this.providers.set('stripe', stripeProvider);
     this.providers.set('paypal', paypalProvider);
 
-    this.logAvailableProviders();
+    this.logAvailableProviders().catch(() => undefined);
   }
 
-  private logAvailableProviders() {
+  private async logAvailableProviders() {
     const available = [];
     const unavailable = [];
 
     for (const [name, provider] of this.providers) {
-      if (provider.isAvailable()) {
+      if (await provider.isAvailable()) {
         available.push(name);
       } else {
         unavailable.push(name);
@@ -69,10 +69,10 @@ export class PaymentsService {
   /**
    * Get available payment providers
    */
-  getAvailableProviders(): string[] {
+  async getAvailableProviders(): Promise<string[]> {
     const available: string[] = [];
     for (const [name, provider] of this.providers) {
-      if (provider.isAvailable()) {
+      if (await provider.isAvailable()) {
         available.push(name);
       }
     }
@@ -110,7 +110,7 @@ export class PaymentsService {
 
     // Get provider
     const provider = this.providers.get(dto.provider);
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException(`Payment provider ${dto.provider} is not available`);
     }
 
@@ -185,7 +185,7 @@ export class PaymentsService {
     }
 
     const provider = this.providers.get('paypal') as PayPalProvider;
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException('PayPal is not available');
     }
 
@@ -298,7 +298,7 @@ export class PaymentsService {
     }
 
     const provider = this.providers.get(order.payment_method);
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException(`Payment provider ${order.payment_method} is not available`);
     }
 
@@ -336,7 +336,7 @@ export class PaymentsService {
    */
   async handleStripeWebhook(payload: string | Buffer, signature: string) {
     const provider = this.providers.get('stripe') as StripeProvider;
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException('Stripe is not configured');
     }
 
@@ -349,7 +349,7 @@ export class PaymentsService {
    */
   async handlePayPalWebhook(payload: string | Buffer, signature: string) {
     const provider = this.providers.get('paypal') as PayPalProvider;
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException('PayPal is not configured');
     }
 
@@ -515,7 +515,7 @@ export class PaymentsService {
     this.logger.log('[paypal-reconcile] Starting reconciliation run');
 
     const provider = this.providers.get('paypal') as PayPalProvider;
-    if (!provider?.isAvailable()) {
+    if (!(await provider?.isAvailable())) {
       this.logger.warn('[paypal-reconcile] PayPal not configured — skipping');
       return { checked: 0, recovered: 0, errors: 0 };
     }
