@@ -9,6 +9,7 @@ import {
   PaymentStatus,
   CreatePaymentParams,
   WebhookEvent,
+  PaymentState,
 } from './payment-provider.interface';
 
 interface PayPalAccessToken {
@@ -46,6 +47,16 @@ export class PayPalProvider implements PaymentProvider {
     }
     return this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
   }
+
+  async getPaymentState(paymentId: string): Promise<PaymentState> {
+    const { rawStatus } = await this.getOrderRawStatus(paymentId);
+    if (rawStatus === 'APPROVED' || rawStatus === 'COMPLETED') return 'paid';
+    if (rawStatus === 'VOIDED') return 'closed';
+    return 'open';
+  }
+
+  // PayPal orders cannot be expired through the API; an unapproved order simply lapses.
+  async expirePayment(_paymentId: string): Promise<void> {}
 
   async isAvailable(): Promise<boolean> {
     // getEffective() checks the ISM first, then falls back to the env var.

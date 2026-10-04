@@ -1,7 +1,12 @@
+import { Suspense } from 'react';
 import { CheckoutPageClient } from './CheckoutPageClient';
 
 export const dynamic = 'force-dynamic';
 
 export default function CheckoutPage() {
-  return <CheckoutPageClient />;
+  return (
+    <Suspense fallback={null}>
+      <CheckoutPageClient />
+    </Suspense>
+  );
 }

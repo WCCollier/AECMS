@@ -28,6 +28,14 @@ export interface RefundResult {
   status: 'succeeded' | 'pending' | 'failed';
 }
 
+/**
+ * Lifecycle of a hosted payment session from our point of view:
+ *   open   — buyer can still pay it
+ *   paid   — buyer has paid or approved it (do NOT cancel the order; webhook/reconcile will settle it)
+ *   closed — expired, voided or otherwise unusable
+ */
+export type PaymentState = 'open' | 'paid' | 'closed';
+
 export type PaymentStatus =
   | 'requires_payment_method'
   | 'requires_confirmation'
@@ -65,6 +73,17 @@ export interface PaymentProvider {
    * Check if provider is configured and available
    */
   isAvailable(): Promise<boolean>;
+
+  /**
+   * Look up whether a previously created payment session can still be paid.
+   */
+  getPaymentState(paymentId: string): Promise<PaymentState>;
+
+  /**
+   * Best-effort: make an open payment session unusable. Must not throw if it is
+   * already closed or the provider has no such concept.
+   */
+  expirePayment(paymentId: string): Promise<void>;
 
   /**
    * Create a payment intent/order

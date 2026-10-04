@@ -56,3 +56,16 @@ describe('CartService.getOrCreateCart image URLs', () => {
     expect(cart.items[0].product.featured_image_url).toBeNull();
   });
 });
+
+describe('CartService.purgeStaleCarts', () => {
+  it('deletes carts whose cart row and items are all older than 30 days', async () => {
+    const prisma: any = { cart: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) } };
+    const service = new CartService(prisma, {} as any);
+    await expect(service.purgeStaleCarts()).resolves.toBe(3);
+    const where = prisma.cart.deleteMany.mock.calls[0][0].where;
+    expect(where.updated_at.lt).toBeInstanceOf(Date);
+    expect(where.items.none.updated_at.gte).toBeInstanceOf(Date);
+    const ageDays = (Date.now() - where.updated_at.lt.getTime()) / 86_400_000;
+    expect(Math.round(ageDays)).toBe(30);
+  });
+});

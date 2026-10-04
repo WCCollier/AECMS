@@ -16,7 +16,9 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 ## In Dev
 
-_None_
+| ID | Severity | Area | Description |
+|----|----------|------|-------------|
+| [BUG-018](BUG-018-checkout-payment-failure-empty-cart-no-retry.md) | high | checkout, orders, payments, stock | Checkout payment-failure handling: retry from pending order, 30-min Stripe hold + auto-release of stock, markAsPaid guard, stale-cart purge (implemented, awaiting deploy) |
 
 ## Fixed
 

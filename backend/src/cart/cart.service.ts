@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { Cron } from '@nestjs/schedule';
 import {
   Inject,
   Injectable,
@@ -12,12 +13,32 @@ import { AddToCartDto, UpdateCartItemDto } from './dto';
 import { STORAGE_PROVIDER } from '../storage';
 import type { StorageProvider } from '../storage';
 
+/** Carts untouched this long are deleted, releasing the stock their items virtually reserve. */
+const STALE_CART_DAYS = 30;
+
 @Injectable()
 export class CartService {
   constructor(
     private prisma: PrismaService,
     @Inject(STORAGE_PROVIDER) private storageProvider: StorageProvider,
   ) {}
+
+  /**
+   * Delete carts with no activity for STALE_CART_DAYS. Abandoned carts (guest carts
+   * especially) otherwise reserve stock virtually forever. Cart rows don't change when
+   * their items do, so "activity" is the newer of the cart's and its items' updated_at.
+   */
+  @Cron('0 3 * * *', { name: 'stale-cart-purge', timeZone: 'America/Chicago' })
+  async purgeStaleCarts(): Promise<number> {
+    const cutoff = new Date(Date.now() - STALE_CART_DAYS * 24 * 60 * 60 * 1000);
+    const result = await this.prisma.cart.deleteMany({
+      where: {
+        updated_at: { lt: cutoff },
+        items: { none: { updated_at: { gte: cutoff } } },
+      },
+    });
+    return result.count;
+  }
 
   /**
    * Get or create cart for user or session
