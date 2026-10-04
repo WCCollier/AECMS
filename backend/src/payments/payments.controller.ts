@@ -32,9 +32,9 @@ export class PaymentsController {
 
   @Get('providers')
   @ApiOperation({ summary: 'Get available payment providers' })
-  getProviders() {
+  async getProviders() {
     return {
-      providers: this.paymentsService.getAvailableProviders(),
+      providers: await this.paymentsService.getAvailableProviders(),
     };
   }
 

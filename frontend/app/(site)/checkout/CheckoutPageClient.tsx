@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCart } from '@/hooks/useCart';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,19 +9,27 @@ import { createOrder } from '@/hooks/useOrders';
 import api, { getErrorMessage } from '@/lib/api';
 
 const ADJUSTMENT_KEY = 'cart_stock_adjustments';
+// The order created from the cart lives server-side; this keeps its id across reloads so a
+// failed or cancelled payment can be retried even though the cart itself is already empty.
+const PENDING_ORDER_KEY = 'checkout_pending_order';
 import { Button, Input, Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui';
 import { ArrowLeft, ShoppingCart, Loader2 } from 'lucide-react';
-import type { PaymentIntent, ShippingAddress, UserAddress } from '@/types';
+import type { Order, PaymentIntent, ShippingAddress, UserAddress } from '@/types';
 
 export function CheckoutPageClient() {
   const router = useRouter();
-  const { items, subtotal, clearCart, mutate: mutateCart } = useCart();
+  const searchParams = useSearchParams();
+  const { items, subtotal, clearCart, mutate: mutateCart, isLoading: cartLoading } = useCart();
   const { user, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState<'shipping' | 'payment'>('shipping');
   const [orderId, setOrderId] = useState<string | null>(null);
+  // The server-side order being paid for. When set, it (not the cart) drives the page.
+  const [pendingOrder, setPendingOrder] = useState<Order | null>(null);
+  const [resumeNotice, setResumeNotice] = useState('');
+  const [resumeChecked, setResumeChecked] = useState(false);
   const [saveAddress, setSaveAddress] = useState(false);
   const [defaultAddress, setDefaultAddress] = useState<UserAddress | null>(null);
 
@@ -36,16 +44,82 @@ export function CheckoutPageClient() {
     country: 'US',
   });
 
-  // Physical and service products require a shipping address (service may mail materials)
-  const needsShipping = items.some(
-    (item) => item.product.product_type === 'physical' || item.product.product_type === 'service',
-  );
+  // Once an order exists the cart is empty; the order is the source of truth for the page.
+  const viewItems = pendingOrder
+    ? pendingOrder.items.map((item) => ({
+        id: item.id,
+        title: item.product_name,
+        quantity: item.quantity,
+        type: item.product?.product_type ?? 'physical',
+        lineTotal: item.unit_price * item.quantity,
+      }))
+    : items.map((item) => ({
+        id: item.id,
+        title: item.product.title,
+        quantity: item.quantity,
+        type: item.product.product_type,
+        lineTotal: item.unit_price * item.quantity,
+      }));
+  const viewSubtotal = pendingOrder ? pendingOrder.subtotal : subtotal;
+  const viewTotal = pendingOrder ? pendingOrder.total : subtotal;
+
+  // Physical and service products require a shipping address (service may mail materials).
+  // Not asked again once the order (and its address) exists.
+  const needsShipping =
+    !pendingOrder &&
+    items.some((item) => item.product.product_type === 'physical' || item.product.product_type === 'service');
+  // Contact/name fields are only collected before the order exists
+  const collectsContact = !needsShipping && !pendingOrder;
   // Cart is free when all items total zero
-  const isFreeCart = subtotal === 0 && items.length > 0;
+  const isFreeCart = viewTotal === 0 && viewItems.length > 0;
   // Free digital products require a logged-in user (no payment gateway to validate guest identity)
-  const hasDigital = items.some((item) => item.product.product_type === 'digital');
+  const hasDigital = viewItems.some((item) => item.type === 'digital');
   // Show name fields when guest, or when logged-in user hasn't provided a name yet
-  const needsName = !isAuthenticated || !user?.firstName;
+  const needsName = !pendingOrder && (!isAuthenticated || !user?.firstName);
+
+  const rememberOrder = (order: Order) => {
+    setOrderId(order.id);
+    setPendingOrder(order);
+    try { sessionStorage.setItem(PENDING_ORDER_KEY, order.id); } catch { /* storage unavailable */ }
+  };
+
+  // Resume an existing pending order: from ?order=<id> (e.g. the payment-cancelled page) or
+  // from the id remembered in this browser tab.
+  useEffect(() => {
+    if (cartLoading) return;
+    const fromUrl = searchParams?.get('order') ?? null;
+    let remembered: string | null = null;
+    try { remembered = sessionStorage.getItem(PENDING_ORDER_KEY); } catch { /* storage unavailable */ }
+    // A remembered order is only resumed when the cart is empty; a cart with items means
+    // the buyer has started a new purchase.
+    const id = fromUrl ?? (items.length === 0 ? remembered : null);
+    if (!id) {
+      setResumeChecked(true);
+      return;
+    }
+    api.get<Order>(`/orders/${id}`)
+      .then((res) => {
+        if (res.data.status === 'pending') {
+          rememberOrder(res.data);
+          setStep('payment');
+        } else {
+          try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* storage unavailable */ }
+          if (fromUrl) {
+            setResumeNotice(
+              res.data.status === 'cancelled'
+                ? 'This order expired because payment was not completed in time. Please add your items to the cart again.'
+                : 'This order is no longer awaiting payment.',
+            );
+          }
+        }
+      })
+      .catch(() => {
+        try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* storage unavailable */ }
+        if (fromUrl) setResumeNotice('We could not find that order.');
+      })
+      .finally(() => setResumeChecked(true));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartLoading]);
 
   // Load default saved address for authenticated users
   useEffect(() => {
@@ -144,7 +218,7 @@ export function CheckoutPageClient() {
         customer_last_name: formData.lastName || undefined,
       });
 
-      setOrderId(order.id);
+      rememberOrder(order);
       setStep('payment');
     } catch (err) {
       setError(getErrorMessage(err));
@@ -178,7 +252,7 @@ export function CheckoutPageClient() {
           customer_last_name: formData.lastName || undefined,
         });
         currentOrderId = order.id;
-        setOrderId(order.id);
+        rememberOrder(order);
       } catch (err) {
         setError(getErrorMessage(err));
         setIsLoading(false);
@@ -234,7 +308,7 @@ export function CheckoutPageClient() {
           customer_last_name: formData.lastName || undefined,
         });
         currentOrderId = order.id;
-        setOrderId(order.id);
+        rememberOrder(order);
       } catch (err) {
         setError(getErrorMessage(err));
         setIsLoading(false);
@@ -247,6 +321,7 @@ export function CheckoutPageClient() {
     setError('');
     try {
       await api.post('/payments/complete-free', { order_id: currentOrderId });
+      try { sessionStorage.removeItem(PENDING_ORDER_KEY); } catch { /* storage unavailable */ }
       await clearCart();
       router.push(`/order-confirmation?order=${currentOrderId}`);
     } catch (err) {
@@ -268,7 +343,27 @@ export function CheckoutPageClient() {
     );
   }
 
-  if (items.length === 0) {
+  if (!resumeChecked && items.length === 0) return null;
+
+  if (resumeNotice) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-16">
+          <ShoppingCart className="w-16 h-16 mx-auto text-foreground/30 mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Order unavailable</h2>
+          <p className="text-foreground/60 mb-6">{resumeNotice}</p>
+          <Link href="/shop">
+            <Button>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Browse Products
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (items.length === 0 && !pendingOrder) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center py-16">
@@ -444,7 +539,7 @@ export function CheckoutPageClient() {
             <Card>
               <CardHeader>
                 <CardTitle>{isFreeCart ? 'Complete Your Order' : 'Payment Method'}</CardTitle>
-                {!needsShipping && !isFreeCart && (
+                {collectsContact && !isFreeCart && (
                   <p className="text-sm text-foreground/60 mt-1">
                     No shipping required for your items.
                   </p>
@@ -468,7 +563,7 @@ export function CheckoutPageClient() {
                   </div>
                 ) : isFreeCart ? (
                   <>
-                    {!isAuthenticated && !needsShipping && (
+                    {!isAuthenticated && collectsContact && (
                       <Input
                         label="Email"
                         type="email"
@@ -479,7 +574,7 @@ export function CheckoutPageClient() {
                         placeholder="your@email.com"
                       />
                     )}
-                    {needsName && !needsShipping && (
+                    {needsName && collectsContact && (
                       <div className="grid grid-cols-2 gap-3">
                         <Input
                           label="First Name"
@@ -523,7 +618,7 @@ export function CheckoutPageClient() {
                   </>
                 ) : (
                   <>
-                    {!isAuthenticated && !needsShipping && (
+                    {!isAuthenticated && collectsContact && (
                       <Input
                         label="Email"
                         type="email"
@@ -535,7 +630,7 @@ export function CheckoutPageClient() {
                       />
                     )}
 
-                    {needsName && !needsShipping && (
+                    {needsName && collectsContact && (
                       <div className="space-y-3">
                         <p className="text-sm text-foreground/60">
                           {isAuthenticated
@@ -626,32 +721,36 @@ export function CheckoutPageClient() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {items.map((item) => (
+                {viewItems.map((item) => (
                   <div key={item.id} className="flex justify-between text-sm">
                     <span className="text-foreground/70">
-                      {item.product.title} x {item.quantity}
-                      {item.product.product_type !== 'physical' && (
+                      {item.title} x {item.quantity}
+                      {item.type !== 'physical' && (
                         <span className="ml-1 text-foreground/40 text-xs capitalize">
-                          ({item.product.product_type})
+                          ({item.type})
                         </span>
                       )}
                     </span>
-                    <span>{formatPrice(item.unit_price * item.quantity)}</span>
+                    <span>{formatPrice(item.lineTotal)}</span>
                   </div>
                 ))}
                 <hr className="border-foreground/10" />
                 <div className="flex justify-between">
                   <span className="text-foreground/60">Subtotal</span>
-                  <span>{formatPrice(subtotal)}</span>
+                  <span>{formatPrice(viewSubtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-foreground/60">Shipping</span>
-                  <span className="text-foreground/60">{needsShipping ? 'Free' : 'N/A'}</span>
+                  <span className="text-foreground/60">
+                    {pendingOrder
+                      ? (pendingOrder.shipping > 0 ? formatPrice(pendingOrder.shipping) : 'Free')
+                      : needsShipping ? 'Free' : 'N/A'}
+                  </span>
                 </div>
                 <hr className="border-foreground/10" />
                 <div className="flex justify-between font-bold">
                   <span>Total</span>
-                  <span>{formatPrice(subtotal)}</span>
+                  <span>{formatPrice(viewTotal)}</span>
                 </div>
               </div>
             </CardContent>

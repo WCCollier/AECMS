@@ -1,4 +1,7 @@
+import * as path from 'path';
+import { Cron } from '@nestjs/schedule';
 import {
+  Inject,
   Injectable,
   NotFoundException,
   BadRequestException,
@@ -7,10 +10,35 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddToCartDto, UpdateCartItemDto } from './dto';
+import { STORAGE_PROVIDER } from '../storage';
+import type { StorageProvider } from '../storage';
+
+/** Carts untouched this long are deleted, releasing the stock their items virtually reserve. */
+const STALE_CART_DAYS = 30;
 
 @Injectable()
 export class CartService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(STORAGE_PROVIDER) private storageProvider: StorageProvider,
+  ) {}
+
+  /**
+   * Delete carts with no activity for STALE_CART_DAYS. Abandoned carts (guest carts
+   * especially) otherwise reserve stock virtually forever. Cart rows don't change when
+   * their items do, so "activity" is the newer of the cart's and its items' updated_at.
+   */
+  @Cron('0 3 * * *', { name: 'stale-cart-purge', timeZone: 'America/Chicago' })
+  async purgeStaleCarts(): Promise<number> {
+    const cutoff = new Date(Date.now() - STALE_CART_DAYS * 24 * 60 * 60 * 1000);
+    const result = await this.prisma.cart.deleteMany({
+      where: {
+        updated_at: { lt: cutoff },
+        items: { none: { updated_at: { gte: cutoff } } },
+      },
+    });
+    return result.count;
+  }
 
   /**
    * Get or create cart for user or session
@@ -34,7 +62,7 @@ export class CartService {
       });
     }
 
-    return this.transformCart(cart);
+    return await this.transformCart(cart);
   }
 
   /**
@@ -60,7 +88,7 @@ export class CartService {
       };
     }
 
-    return this.transformCart(cart);
+    return await this.transformCart(cart);
   }
 
   /**
@@ -434,14 +462,14 @@ export class CartService {
    * anonymous sessions). Stripping them would force a non-trivial backend change when
    * that feature is built. See docs/Shape_Audit.md Item 6 for full rationale.
    */
-  private transformCart(cart: any) {
-    const items = cart.items.map((item: any) => {
+  private async transformCart(cart: any) {
+    const items = await Promise.all(cart.items.map(async (item: any) => {
       const unitPrice = parseFloat(item.product.price.toString());
       const fp = item.product.media?.[0]?.media?.file_path ?? null;
+      // Resolve through the storage provider so cloud (GCS/S3/CDN) URLs are returned
+      // as-is; legacy absolute paths are reduced to the stored filename.
       const featured_image_url = fp
-        ? fp.startsWith('/uploads/') ? fp
-          : fp.includes('/uploads/') ? fp.replace(/.*\/uploads\//, '/uploads/')
-          : `/uploads/${fp}`
+        ? await this.storageProvider.getUrl(path.isAbsolute(fp) ? path.basename(fp) : fp)
         : null;
       return {
         id: item.id,
@@ -460,7 +488,7 @@ export class CartService {
         },
         line_total: unitPrice * item.quantity,
       };
-    });
+    }));
 
     const subtotal = items.reduce(
       (sum: number, item: any) => sum + item.line_total,

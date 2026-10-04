@@ -9,8 +9,12 @@ import {
   PaymentStatus,
   CreatePaymentParams,
   WebhookEvent,
+  PaymentState,
 } from './payment-provider.interface';
 import { SettingsService } from '../../settings/settings.service';
+
+/** How long an unpaid Checkout Session holds the order (and its stock). Stripe's minimum is 30 minutes. */
+const SESSION_TTL_SECONDS = 30 * 60 + 30; // 30 min + 30 s margin so the request never lands under Stripe's 30-minute floor
 
 @Injectable()
 export class StripeProvider implements PaymentProvider {
@@ -29,10 +33,9 @@ export class StripeProvider implements PaymentProvider {
     }
   }
 
-  isAvailable(): boolean {
-    // Optimistic: env var present, or assume ISM may have it. Actual availability
-    // is confirmed when getStripe() succeeds on first real operation.
-    return !!(process.env.STRIPE_SECRET_KEY || this.configService.get<string>('STRIPE_SECRET_KEY'));
+  async isAvailable(): Promise<boolean> {
+    // getEffective() checks the ISM first, then falls back to the env var.
+    return !!(await this.settingsService.getEffective('payment.stripe_secret_key_enc'));
   }
 
   private async getStripe(): Promise<Stripe> {
@@ -90,6 +93,7 @@ export class StripeProvider implements PaymentProvider {
         order_id: params.orderId,
         ...params.metadata,
       },
+      expires_at: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
       success_url: `${frontendUrl}/order-confirmation?order=${params.orderId}`,
       cancel_url: `${frontendUrl}/checkout/cancel?order=${params.orderId}`,
     };
@@ -108,6 +112,24 @@ export class StripeProvider implements PaymentProvider {
       status: 'requires_action',
       metadata: { order_id: params.orderId },
     };
+  }
+
+  async getPaymentState(sessionId: string): Promise<PaymentState> {
+    const stripe = await this.getStripe();
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.status === 'complete') return 'paid';
+    if (session.status === 'expired') return 'closed';
+    return 'open';
+  }
+
+  async expirePayment(sessionId: string): Promise<void> {
+    try {
+      const stripe = await this.getStripe();
+      await stripe.checkout.sessions.expire(sessionId);
+    } catch (err: any) {
+      // Already expired/complete, or unknown id — nothing left to expire.
+      this.logger.warn(`Could not expire Stripe session ${sessionId}: ${err?.message}`);
+    }
   }
 
   async capturePayment(_sessionId: string): Promise<PaymentCapture> {

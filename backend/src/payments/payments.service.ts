@@ -23,6 +23,9 @@ import { AuditLogService } from '../audit/audit.service';
 import { OrderEmailService } from './order-email.service';
 import { SettingsService } from '../settings/settings.service';
 
+/** Idle time after which an unpaid pending order releases its stock (Stripe sessions expire at 30 min). */
+const PENDING_ORDER_HOLD_MS = 45 * 60 * 1000;
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -43,15 +46,18 @@ export class PaymentsService {
     this.providers.set('stripe', stripeProvider);
     this.providers.set('paypal', paypalProvider);
 
-    this.logAvailableProviders();
+    this.logAvailableProviders().catch(() => undefined);
+
+    // Let OrdersService.cancel() ask us whether a payment session is paid / close it.
+    this.ordersService.setPaymentSettler((order) => this.settlePaymentSession(order.payment_method, order.payment_intent_id));
   }
 
-  private logAvailableProviders() {
+  private async logAvailableProviders() {
     const available = [];
     const unavailable = [];
 
     for (const [name, provider] of this.providers) {
-      if (provider.isAvailable()) {
+      if (await provider.isAvailable()) {
         available.push(name);
       } else {
         unavailable.push(name);
@@ -69,10 +75,10 @@ export class PaymentsService {
   /**
    * Get available payment providers
    */
-  getAvailableProviders(): string[] {
+  async getAvailableProviders(): Promise<string[]> {
     const available: string[] = [];
     for (const [name, provider] of this.providers) {
-      if (provider.isAvailable()) {
+      if (await provider.isAvailable()) {
         available.push(name);
       }
     }
@@ -103,15 +109,27 @@ export class PaymentsService {
       throw new BadRequestException('Order is not in pending status');
     }
 
-    // Check if already paid
-    if (order.payment_intent_id) {
-      throw new BadRequestException('Order already has a payment intent');
-    }
-
     // Get provider
     const provider = this.providers.get(dto.provider);
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException(`Payment provider ${dto.provider} is not available`);
+    }
+
+    // Retry: the order may already have a payment session (buyer cancelled, session expired,
+    // or they switched provider). Refuse only if that earlier session was actually paid.
+    const previousId = order.payment_intent_id;
+    const previousProvider = order.payment_method ? this.providers.get(order.payment_method) : undefined;
+    if (previousId && previousProvider) {
+      let state: 'open' | 'paid' | 'closed' = 'closed';
+      try {
+        state = await previousProvider.getPaymentState(previousId);
+      } catch (err: any) {
+        // Unknown/unreadable previous session: treat as closed rather than blocking the buyer.
+        this.logger.warn(`Could not read previous payment session ${previousId} for order ${order.id}: ${err?.message}`);
+      }
+      if (state === 'paid') {
+        throw new BadRequestException('A payment for this order is already in progress or complete');
+      }
     }
 
     // Create payment
@@ -147,6 +165,12 @@ export class PaymentsService {
         payment_intent_id: payment.id,
       },
     });
+
+    // Only now close the superseded session. Order matters: the order already points at the
+    // new session, so the old session's `expired` webhook can never cancel this order.
+    if (previousId && previousProvider) {
+      await previousProvider.expirePayment(previousId);
+    }
 
     return {
       payment_id: payment.id,
@@ -185,7 +209,7 @@ export class PaymentsService {
     }
 
     const provider = this.providers.get('paypal') as PayPalProvider;
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException('PayPal is not available');
     }
 
@@ -298,7 +322,7 @@ export class PaymentsService {
     }
 
     const provider = this.providers.get(order.payment_method);
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException(`Payment provider ${order.payment_method} is not available`);
     }
 
@@ -336,7 +360,7 @@ export class PaymentsService {
    */
   async handleStripeWebhook(payload: string | Buffer, signature: string) {
     const provider = this.providers.get('stripe') as StripeProvider;
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException('Stripe is not configured');
     }
 
@@ -349,7 +373,7 @@ export class PaymentsService {
    */
   async handlePayPalWebhook(payload: string | Buffer, signature: string) {
     const provider = this.providers.get('paypal') as PayPalProvider;
-    if (!provider || !provider.isAvailable()) {
+    if (!provider || !(await provider.isAvailable())) {
       throw new BadRequestException('PayPal is not configured');
     }
 
@@ -495,7 +519,81 @@ export class PaymentsService {
     }
 
     this.logger.warn(`Payment failed for order ${orderId}`);
-    // Order remains in pending status - user can retry
+
+    // A Stripe session expiring means the hold is over: return the stock. Cancel only if the
+    // expired session is the order's CURRENT one (a retry replaces the session id first).
+    if (event.provider === 'stripe' && event.type === 'checkout.session.expired') {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { status: true, payment_intent_id: true },
+      });
+      if (order?.status === 'pending' && order.payment_intent_id === event.data.id) {
+        const cancelled = await this.ordersService.cancelPendingOrder(orderId, 'stripe_session_expired');
+        if (cancelled) this.logger.log(`Order ${orderId} cancelled and stock restored (Stripe session expired)`);
+      }
+    }
+    // Other failures (e.g. PayPal capture denied): order stays pending so the buyer can retry;
+    // the sweep below releases it if they never do.
+  }
+
+  /**
+   * Report whether an order's payment session has been paid; if not, close it.
+   * true = payment exists/in progress, so the order must not be cancelled.
+   * Provider errors count as "paid" (fail safe: never cancel on uncertainty).
+   */
+  private async settlePaymentSession(method: string, paymentId: string): Promise<boolean> {
+    const provider = this.providers.get(method);
+    if (!provider) return false;
+    try {
+      const state = await provider.getPaymentState(paymentId);
+      if (state === 'paid') return true;
+      if (state === 'open') await provider.expirePayment(paymentId);
+      return false;
+    } catch (err: any) {
+      this.logger.warn(`Could not settle ${method} session ${paymentId}: ${err?.message}`);
+      return true;
+    }
+  }
+
+  /**
+   * Release stock held by abandoned pending orders.
+   *
+   * Runs every 15 minutes. A pending order idle for more than the hold window is cancelled
+   * and its stock returned, unless its payment session shows the buyer paid (the webhook or
+   * the PayPal reconcile will settle those). Safe to run concurrently on several instances:
+   * cancelPendingOrder only acts on the instance that flips pending -> cancelled.
+   */
+  @Cron('*/15 * * * *', { name: 'pending-order-sweep' })
+  async sweepStalePendingOrders(): Promise<{ checked: number; cancelled: number; skipped: number }> {
+    const cutoff = new Date(Date.now() - PENDING_ORDER_HOLD_MS);
+    const stale = await this.prisma.order.findMany({
+      where: { status: 'pending', updated_at: { lt: cutoff } },
+      select: { id: true, order_number: true, payment_method: true, payment_intent_id: true },
+    });
+
+    let cancelled = 0;
+    let skipped = 0;
+    for (const order of stale) {
+      try {
+        if (order.payment_intent_id && order.payment_method) {
+          if (await this.settlePaymentSession(order.payment_method, order.payment_intent_id)) {
+            skipped++;
+            continue;
+          }
+        }
+        if (await this.ordersService.cancelPendingOrder(order.id, 'abandoned_pending_order_sweep')) {
+          cancelled++;
+        }
+      } catch (err: any) {
+        skipped++;
+        this.logger.error(`[pending-sweep] ${order.order_number}: ${err?.message}`);
+      }
+    }
+
+    if (stale.length > 0) {
+      this.logger.log(`[pending-sweep] checked ${stale.length}, cancelled ${cancelled}, skipped ${skipped}`);
+    }
+    return { checked: stale.length, cancelled, skipped };
   }
 
   /**
@@ -515,7 +613,7 @@ export class PaymentsService {
     this.logger.log('[paypal-reconcile] Starting reconciliation run');
 
     const provider = this.providers.get('paypal') as PayPalProvider;
-    if (!provider?.isAvailable()) {
+    if (!(await provider?.isAvailable())) {
       this.logger.warn('[paypal-reconcile] PayPal not configured — skipping');
       return { checked: 0, recovered: 0, errors: 0 };
     }

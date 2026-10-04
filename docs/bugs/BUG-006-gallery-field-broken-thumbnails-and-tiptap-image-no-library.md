@@ -1,6 +1,6 @@
 # BUG-006: Next.js `<Image>` blocks cloud storage URLs site-wide; TipTap image insert lacks library browser
 
-**Status:** `open`
+**Status:** `fixed`
 **Reported:** 2026-06-27
 **Severity:** `critical` (Part A) · `medium` (Part B)
 **Area:** media, storage, frontend, editor
@@ -114,9 +114,23 @@ frontend/components/editor/TipTapEditor.tsx  lines 474-529
 
 ---
 
+## Completion Report
+
+**Fixed:** as part of FR-017 (Next.js Image Normalization)
+**Commit(s):** `f40f9b0` (FR-017 main), `3b16084` (FR-017 Deploy 2)
+
+### What changed
+
+Part A — `images.remotePatterns: [{ protocol: 'https', hostname: '**' }]` added to `frontend/next.config.mjs`, covering all consumer pages and embed widgets in one change. FR-017 also ported the media library and other image surfaces to `<Image>`, so the `<img>` fallbacks called out in the fix plan were handled as part of that broader normalization pass rather than individually.
+
+Part B — `MediaPicker` imported and wired into `TipTapEditor.tsx`; replaces the bespoke upload panel as the primary image selection mechanism. URL input retained as fallback for external images.
+
+---
+
 ## Status History
 
 | Date | Status | Note |
 |------|--------|------|
 | 2026-06-27 | open | Initial report — gallery field + TipTap image panel |
 | 2026-06-27 | open | Scope expanded: same `<Image>` / remotePatterns issue affects all consumer pages (article cards, product cards, detail carousels, embed widgets) |
+| 2026-07-05 | fixed | Both parts resolved via FR-017; doc status not updated at the time |

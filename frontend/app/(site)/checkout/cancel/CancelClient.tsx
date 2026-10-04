@@ -21,7 +21,7 @@ export function CancelClient() {
       </p>
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         {orderId && (
-          <Link href={`/checkout`}>
+          <Link href={`/checkout?order=${orderId}`}>
             <Button>Try Again</Button>
           </Link>
         )}

@@ -3,6 +3,8 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CartService } from '../cart/cart.service';
@@ -15,6 +17,20 @@ import { AuditLogService } from '../audit/audit.service';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
+  /**
+   * Hook registered by PaymentsService (which depends on this service, so it cannot be
+   * injected here). Given an order's payment session it reports whether the buyer has
+   * already paid; if not, it expires the session so it cannot be paid after cancellation.
+   * Returns true when payment exists or is in progress (the order must NOT be cancelled).
+   */
+  private paymentSettler: ((order: { id: string; payment_method: string; payment_intent_id: string }) => Promise<boolean>) | null = null;
+
+  setPaymentSettler(fn: NonNullable<OrdersService['paymentSettler']>) {
+    this.paymentSettler = fn;
+  }
+
   constructor(
     private prisma: PrismaService,
     private cartService: CartService,
@@ -376,6 +392,22 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
+    // Only a pending order can become paid. A cancelled order has already had its stock
+    // returned, so flipping it to processing would oversell: leave it alone and flag it
+    // for a manual refund. Callers treat the throw as "do not send emails / tokens".
+    if (order.status !== 'pending') {
+      if (order.status === 'cancelled') {
+        this.logger.error(`Payment ${paymentIntentId} received for CANCELLED order ${id} — manual refund required`);
+        await this.auditLog.log({
+          event_type: 'order.payment_on_cancelled',
+          resource_type: 'order',
+          resource_id: id,
+          metadata: { payment_intent_id: paymentIntentId, action_required: 'refund' },
+        });
+      }
+      throw new ConflictException(`Order is ${order.status}, not pending; payment not applied`);
+    }
+
     const updated = await this.prisma.order.update({
       where: { id },
       data: {
@@ -422,26 +454,70 @@ export class OrdersService {
       throw new BadRequestException('Only pending orders can be cancelled');
     }
 
-    // Restore stock
-    for (const item of order.items) {
-      await this.prisma.product.update({
-        where: { id: item.product_id },
-        data: {
-          stock_quantity: {
-            increment: item.quantity,
-          },
-          stock_status: 'in_stock',
-        },
+    // If a payment session exists, make sure the buyer has not paid, and close it so it
+    // cannot be paid after the order is cancelled.
+    if (order.payment_intent_id && order.payment_method && this.paymentSettler) {
+      const paid = await this.paymentSettler({
+        id: order.id,
+        payment_method: order.payment_method,
+        payment_intent_id: order.payment_intent_id,
       });
+      if (paid) {
+        throw new BadRequestException('Payment for this order is in progress or complete and it cannot be cancelled');
+      }
     }
 
-    const updated = await this.prisma.order.update({
+    await this.cancelPendingOrder(id, userId ? 'cancelled_by_user' : 'cancelled', userId);
+
+    const updated = await this.prisma.order.findUnique({
       where: { id },
-      data: { status: 'cancelled' },
       include: this.getOrderIncludes(),
     });
-
     return this.transformOrder(updated);
+  }
+
+  /**
+   * Cancel a pending order and return its stock to inventory.
+   *
+   * Idempotent and race-safe: only the caller that flips pending -> cancelled restores
+   * stock, so webhook + sweep + manual cancel can all fire without double-restoring.
+   * Returns true if this call performed the cancellation.
+   */
+  async cancelPendingOrder(id: string, reason: string, actorUserId?: string): Promise<boolean> {
+    const restored = await this.prisma.$transaction(async (tx) => {
+      const flipped = await tx.order.updateMany({
+        where: { id, status: 'pending' },
+        data: { status: 'cancelled' },
+      });
+      if (flipped.count === 0) return false;
+
+      const items = await tx.orderItem.findMany({ where: { order_id: id } });
+      for (const item of items) {
+        await tx.product.update({
+          where: { id: item.product_id },
+          data: { stock_quantity: { increment: item.quantity } },
+        });
+        // Re-open the product only if it was out of stock and now has units again.
+        // (Never force in_stock on backorder/other statuses.)
+        await tx.product.updateMany({
+          where: { id: item.product_id, stock_status: 'out_of_stock', stock_quantity: { gt: 0 } },
+          data: { stock_status: 'in_stock' },
+        });
+      }
+      return true;
+    });
+
+    if (restored) {
+      await this.auditLog.log({
+        event_type: 'order.status_changed',
+        user_id: actorUserId,
+        resource_type: 'order',
+        resource_id: id,
+        changes: { before: { status: 'pending' }, after: { status: 'cancelled' } },
+        metadata: { reason, stock_restored: true },
+      });
+    }
+    return restored;
   }
 
   /**

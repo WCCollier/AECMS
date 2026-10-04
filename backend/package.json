@@ -22,7 +22,11 @@
     "seed:short-thoughts": "ts-node -r tsconfig-paths/register prisma/seed-short-thoughts.ts",
     "seed:reviews": "ts-node -r tsconfig-paths/register prisma/seed-reviews.ts",
     "seed:orders": "ts-node -r tsconfig-paths/register prisma/seed-orders.ts",
-    "fix:content": "ts-node -r tsconfig-paths/register prisma/fix-content-and-images.ts"
+    "fix:content": "ts-node -r tsconfig-paths/register prisma/fix-content-and-images.ts",
+    "substack:set-credentials": "ts-node -r tsconfig-paths/register scripts/substack/set-credentials.ts",
+    "substack:sync": "ts-node -r tsconfig-paths/register scripts/substack/sync.ts",
+    "substack:sync:dry-run": "ts-node -r tsconfig-paths/register scripts/substack/sync.ts --dry-run",
+    "substack:mark-synced": "ts-node -r tsconfig-paths/register scripts/substack/mark-synced.ts"
   },
   "prisma": {
     "seed": "bash prisma/seed-all.sh"
