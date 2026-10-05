@@ -77,3 +77,32 @@ describe('OrdersService.cancel with a payment session', () => {
     expect(tx.order.updateMany).toHaveBeenCalled();
   });
 });
+
+describe('OrdersService paid status', () => {
+  const item = (type: string) => ({ product: { product_type: type } });
+
+  it('paidStatusFor: all-digital orders are completed, anything else is processing', () => {
+    const { service } = build({});
+    expect(service.paidStatusFor([item('digital'), item('digital')])).toBe('completed');
+    expect(service.paidStatusFor([item('digital'), item('physical')])).toBe('processing');
+    expect(service.paidStatusFor([item('service')])).toBe('processing');
+    expect(service.paidStatusFor([])).toBe('processing');
+  });
+
+  const paid = async (items: any[]) => {
+    const { service, prisma } = build({ id: 'o1', status: 'pending', items });
+    prisma.order.update.mockResolvedValue({});
+    jest.spyOn(service as any, 'transformOrder').mockResolvedValue({});
+    jest.spyOn(service as any, 'getOrderIncludes').mockReturnValue({});
+    await service.markAsPaid('o1', 'cs_1');
+    return prisma.order.update.mock.calls[0][0].data.status;
+  };
+
+  it('markAsPaid completes an all-digital order', async () => {
+    await expect(paid([item('digital')])).resolves.toBe('completed');
+  });
+
+  it('markAsPaid leaves a mixed order processing', async () => {
+    await expect(paid([item('digital'), item('physical')])).resolves.toBe('processing');
+  });
+});

@@ -199,7 +199,7 @@ export class PaymentsService {
     }
 
     // Idempotency: if already captured (e.g. React StrictMode double-fire), return success
-    if (order.status === 'processing' && order.payment_intent_id) {
+    if ((order.status === 'processing' || order.status === 'completed') && order.payment_intent_id) {
       return {
         success: true,
         order_id: order.id,
@@ -277,7 +277,7 @@ export class PaymentsService {
     await this.prisma.order.update({
       where: { id: orderId },
       data: {
-        status: 'processing',
+        status: this.ordersService.paidStatusFor(order.items),
         payment_method: 'free',
         paid_at: new Date(),
       },
@@ -645,13 +645,13 @@ export class PaymentsService {
           // User approved on PayPal but never completed the redirect — attempt capture now.
           const capture = await provider.capturePayment(paypalId);
           if (capture.status === 'succeeded') {
-            await this.ordersService.markAsPaid(order.id, capture.id);
+            const paid = await this.ordersService.markAsPaid(order.id, capture.id);
             try { await this.digitalProductsService.createDownloadTokensForOrder(order.id); } catch (_) {}
             await this.auditLog.log({
               event_type: 'order.status_changed',
               resource_type: 'order',
               resource_id: order.id,
-              changes: { before: { status: 'pending' }, after: { status: 'processing' } },
+              changes: { before: { status: 'pending' }, after: { status: paid.status } },
               metadata: { reconciled: true, paypal_order_id: paypalId },
             });
             this.logger.log(`[paypal-reconcile] ${order.order_number}: recovered (captured ${capture.id})`);
@@ -659,13 +659,13 @@ export class PaymentsService {
           }
         } else if (rawStatus === 'COMPLETED') {
           // Already captured (maybe by a late webhook) — sync our side.
-          await this.ordersService.markAsPaid(order.id, paypalId);
+          const paid = await this.ordersService.markAsPaid(order.id, paypalId);
           try { await this.digitalProductsService.createDownloadTokensForOrder(order.id); } catch (_) {}
           await this.auditLog.log({
             event_type: 'order.status_changed',
             resource_type: 'order',
             resource_id: order.id,
-            changes: { before: { status: 'pending' }, after: { status: 'processing' } },
+            changes: { before: { status: 'pending' }, after: { status: paid.status } },
             metadata: { reconciled: true, reason: 'already_completed_at_paypal' },
           });
           recovered++;
