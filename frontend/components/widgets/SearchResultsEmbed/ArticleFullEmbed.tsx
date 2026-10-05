@@ -1,5 +1,6 @@
 'use client';
 
+import { articlePath } from '@/lib/routes';
 import Image from 'next/image';
 import Link from 'next/link';
 import { RichTextContent } from '@/components/editor/RichTextContent';
@@ -24,7 +25,7 @@ export function ArticleFullEmbed({ article, depth }: ArticleFullEmbedProps) {
         </div>
       )}
       <h2 className="text-2xl font-bold mb-2">
-        <Link href={`/articles/${article.slug}`} className="hover:text-accent transition-colors">
+        <Link href={articlePath(article.slug)} className="hover:text-accent transition-colors">
           {article.title}
         </Link>
       </h2>

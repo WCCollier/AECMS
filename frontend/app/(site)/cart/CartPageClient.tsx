@@ -1,5 +1,6 @@
 'use client';
 
+import { PRODUCTS_PATH, productPath } from '@/lib/routes';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -68,7 +69,7 @@ export function CartPageClient() {
           <ShoppingCart className="w-16 h-16 mx-auto text-foreground/30 mb-4" />
           <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
           <p className="text-foreground/60 mb-6">Add some products to get started</p>
-          <Link href="/shop">
+          <Link href={PRODUCTS_PATH}>
             <Button>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Continue Shopping
@@ -119,7 +120,7 @@ export function CartPageClient() {
               <CardContent className="p-4">
                 <div className="flex gap-4">
                   {/* Image */}
-                  <Link href={`/shop/${item.product.slug}`} className="shrink-0">
+                  <Link href={productPath(item.product.slug)} className="shrink-0">
                     <div className="w-24 h-24 relative bg-foreground/5 rounded-lg overflow-hidden">
                       {item.product.featured_image_url ? (
                         <Image
@@ -139,7 +140,7 @@ export function CartPageClient() {
 
                   {/* Details */}
                   <div className="flex-1 min-w-0">
-                    <Link href={`/shop/${item.product.slug}`}>
+                    <Link href={productPath(item.product.slug)}>
                       <h3 className="font-semibold hover:text-foreground/70 truncate">
                         {item.product.title}
                       </h3>
@@ -225,7 +226,7 @@ export function CartPageClient() {
                     <Link href="/auth/login" className="underline">Sign in</Link> for faster checkout
                   </p>
                 )}
-                <Link href="/shop" className="block">
+                <Link href={PRODUCTS_PATH} className="block">
                   <Button variant="outline" className="w-full">
                     Continue Shopping
                   </Button>

@@ -1,3 +1,4 @@
+import { ARTICLES_PATH, PRODUCTS_PATH } from '@/lib/routes';
 import Link from 'next/link';
 
 async function getSiteIdentity(): Promise<{ title: string; tagline: string }> {
@@ -38,7 +39,7 @@ export async function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-3 text-foreground/80 uppercase tracking-wider">Reading</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/articles" className={footerLink}>Articles</Link></li>
+              <li><Link href={ARTICLES_PATH} className={footerLink}>Articles</Link></li>
             </ul>
           </div>
 
@@ -46,7 +47,7 @@ export async function Footer() {
           <div>
             <h4 className="text-sm font-semibold mb-3 text-foreground/80 uppercase tracking-wider">Shop</h4>
             <ul className="space-y-2 text-sm">
-              <li><Link href="/shop" className={footerLink}>All Products</Link></li>
+              <li><Link href={PRODUCTS_PATH} className={footerLink}>All Products</Link></li>
               <li><Link href="/cart" className={footerLink}>Shopping Cart</Link></li>
             </ul>
           </div>

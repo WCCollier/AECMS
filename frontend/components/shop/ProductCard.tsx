@@ -1,5 +1,6 @@
 'use client';
 
+import { PRODUCTS_PATH, productPath } from '@/lib/routes';
 import { useState, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -56,7 +57,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
   return (
     <div className="group relative">
       {/* Cover link — declared first so content paints on top */}
-      <Link href={`/shop/${product.slug}`} className="absolute inset-0 rounded-xl" aria-label={product.title} />
+      <Link href={productPath(product.slug)} className="absolute inset-0 rounded-xl" aria-label={product.title} />
 
       <div className="bg-surface border border-border rounded-xl overflow-hidden hover:border-accent/30 transition-colors">
         {/* Image */}
@@ -100,7 +101,7 @@ export function ProductCard({ product, priority = false }: ProductCardProps) {
               {product.tags.slice(0, 3).map((tag) => (
                 <Link
                   key={tag.id}
-                  href={`/shop?tags=${tag.slug}`}
+                  href={`${PRODUCTS_PATH}?tags=${tag.slug}`}
                   className="relative text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium hover:bg-accent/20 transition-colors"
                 >
                   {tag.name}

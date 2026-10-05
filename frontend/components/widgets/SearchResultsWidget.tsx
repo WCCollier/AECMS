@@ -1,5 +1,6 @@
 'use client';
 
+import { ARTICLES_PATH, PRODUCTS_PATH } from '@/lib/routes';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useArticles } from '@/hooks/useArticles';
@@ -32,7 +33,7 @@ export interface SearchResultsWidgetProps {
 }
 
 function buildSeeAllUrl(contentType: 'articles' | 'products', tags: string[], tagLogic: 'and' | 'or', search: string) {
-  const base = contentType === 'articles' ? '/articles' : '/shop';
+  const base = contentType === 'articles' ? ARTICLES_PATH : PRODUCTS_PATH;
   const params = new URLSearchParams();
   if (tags.length > 0) {
     params.set('tags', tags.join(','));

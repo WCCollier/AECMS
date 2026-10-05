@@ -1,3 +1,4 @@
+import { articlePath, productPath } from '@/lib/routes';
 import type { Metadata } from 'next';
 
 export interface SeoSettings {
@@ -45,7 +46,7 @@ export function buildArticleMetadata(
   const title       = article.meta_title       || article.title;
   const description = article.meta_description || article.excerpt || seo.site_description;
   const image       = article.og_image_url     || seo.og_default_image;
-  const url         = `${seo.canonical_domain}/articles/${slug}`;
+  const url         = `${seo.canonical_domain}${articlePath(slug)}`;
 
   return {
     title,
@@ -77,7 +78,7 @@ export function buildProductMetadata(
   const title       = product.meta_title       || product.title;
   const description = product.meta_description || product.short_description || seo.site_description;
   const image       = product.og_image_url     || product.media?.[0]?.url   || seo.og_default_image;
-  const url         = `${seo.canonical_domain}/shop/${slug}`;
+  const url         = `${seo.canonical_domain}${productPath(slug)}`;
 
   return {
     title, description,

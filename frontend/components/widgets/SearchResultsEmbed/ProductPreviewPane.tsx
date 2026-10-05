@@ -1,5 +1,6 @@
 'use client';
 
+import { productPath } from '@/lib/routes';
 import Image from 'next/image';
 import Link from 'next/link';
 import { RichTextContent } from '@/components/editor/RichTextContent';
@@ -40,7 +41,7 @@ export function ProductPreviewPane({ product, depth }: ProductPreviewPaneProps) 
         {/* Button lives in the same column so it aligns with the text */}
         <div className="py-6 flex justify-center relative z-10">
           <Link
-            href={`/shop/${product.slug}`}
+            href={productPath(product.slug)}
             className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-accent text-sm font-medium hover:bg-accent/80 transition-colors"
             style={{ color: 'white', textDecoration: 'none' }}
           >

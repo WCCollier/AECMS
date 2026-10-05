@@ -18,6 +18,7 @@ Known bugs, planned fixes, and fix history. One file per bug under `docs/bugs/`.
 
 | ID | Severity | Area | Description |
 |----|----------|------|-------------|
+| [BUG-020](BUG-020-internal-links-wrong-public-routes.md) | high | editor, widgets, email, routing | Auto-generated internal links used wrong routes (editor Products tab and product emails emitted `/products/…`; real route `/shop/…`); central route config + helpers + legacy redirects (implemented, awaiting deploy) |
 | [BUG-019](BUG-019-digital-orders-stay-processing.md) | low | orders, payments | All-digital orders stay "Processing" after payment; now complete on payment (implemented, awaiting deploy) |
 | [BUG-018](BUG-018-checkout-payment-failure-empty-cart-no-retry.md) | high | checkout, orders, payments, stock | Checkout payment-failure handling: retry from pending order, 30-min Stripe hold + auto-release of stock, markAsPaid guard, stale-cart purge (implemented, awaiting deploy) |
 

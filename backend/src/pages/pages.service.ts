@@ -11,9 +11,11 @@ import { CreatePageDto, UpdatePageDto, QueryPagesDto, ReorderPagesDto } from './
 import { Prisma, ContentVisibility } from '@prisma/client';
 import { AuditLogService, diffChanges } from '../audit/audit.service';
 import { MediaSyncService } from '../media/media-sync.service';
+import { RESERVED_ROUTE_SLUGS } from '../common/public-routes';
 
 const RESERVED_SLUGS = [
-  'shop', 'articles', 'cart', 'checkout', 'account',
+  ...RESERVED_ROUTE_SLUGS, // content segments (+ legacy aliases) — see common/public-routes.ts
+  'cart', 'checkout', 'account',
   'order-confirmation', 'admin', 'auth', 'api',
   '_home_', // system slug for the editable root landing page
 ];

@@ -1,5 +1,6 @@
 'use client';
 
+import { articlePath, productPath } from '@/lib/routes';
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -365,9 +366,9 @@ export function AccountPageClient() {
                 {comments.map((c) => {
                   const overallRating = c.ratings?.find((r) => r.title === 'Overall');
                   const target = c.article
-                    ? { href: `/articles/${c.article.slug}`, name: c.article.title }
+                    ? { href: articlePath(c.article.slug), name: c.article.title }
                     : c.product
-                    ? { href: `/shop/${c.product.slug}`, name: c.product.title }
+                    ? { href: productPath(c.product.slug), name: c.product.title }
                     : null;
                   const commentHref = target ? `${target.href}#comment-${c.id}` : null;
 

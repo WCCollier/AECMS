@@ -1,3 +1,13 @@
+import { ROUTE_SEGMENTS, LEGACY_ROUTE_SEGMENTS } from './lib/routes.config.mjs';
+
+// Permanent redirects from every legacy segment to the current one (index and detail pages).
+const legacyRouteRedirects = Object.entries(LEGACY_ROUTE_SEGMENTS).flatMap(([kind, legacy]) =>
+  legacy.flatMap((from) => [
+    { source: `/${from}`, destination: `/${ROUTE_SEGMENTS[kind]}`, permanent: true },
+    { source: `/${from}/:path*`, destination: `/${ROUTE_SEGMENTS[kind]}/:path*`, permanent: true },
+  ]),
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -11,10 +21,7 @@ const nextConfig = {
   },
 
   async redirects() {
-    return [
-      { source: '/latest', destination: '/articles', permanent: true },
-      { source: '/latest/:path*', destination: '/articles/:path*', permanent: true },
-    ];
+    return legacyRouteRedirects;
   },
 
   async rewrites() {

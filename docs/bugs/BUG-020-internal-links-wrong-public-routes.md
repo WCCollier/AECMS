@@ -1,6 +1,6 @@
 # BUG-020: Auto-generated internal links use wrong public routes
 
-**Status:** `open`
+**Status:** `in-dev`
 **Reported:** 2026-10-05
 **Severity:** `high`
 **Area:** editor, widgets, email, routing
@@ -31,19 +31,22 @@ Root cause: no single source of truth for public URL paths; each generator hard-
 
 ---
 
-## Fix Plan (proposed — pending owner decision)
+## Fix Plan
 
-1. **Shared route helpers** — `frontend/lib/routes.ts` (`productPath`, `articlePath`, `pagePath(page, pagesById)`, `linkKind(href)`) and a small backend equivalent (`productUrl/articleUrl(appUrl, slug)`); route every generator above through them.
-2. **Safety-net redirects** in `next.config.mjs`: `/products/:slug` and `/product/:slug` → `/shop/:slug` (permanent). Repairs links already saved in content, emails already sent, and bookmarks, with no data migration; backward compatible. Optionally keep `/latest` as is.
-3. **LinkModal**: use helpers for all three tabs; `detectInitialTab` recognises `/shop/`, legacy `/products/`, `/articles/`, `/latest/`.
-4. **Regression guard**: unit tests for the helpers and LinkModal output, plus a test that fails if source files hard-code the legacy prefixes.
-5. Optional: maintenance scan/rewrite of `/products/` links stored in TipTap JSON (existing `admin/maintenance/migrate-content` pattern) to canonicalise stored content.
+Owner decision 2026-10-05: implement items 1-4 below (not the optional content rewrite). Requirement: the content categories (products / articles / pages) are canonical, but the customer-facing URL word ("shop") must be changeable in ONE place.
+
+1. **Single source of truth** — `frontend/lib/routes.config.mjs` (`ROUTE_SEGMENTS`, `LEGACY_ROUTE_SEGMENTS`; plain .mjs so `next.config.mjs`, app code and a backend test can all read it) with typed helpers in `frontend/lib/routes.ts` (`PRODUCTS_PATH`, `ARTICLES_PATH`, `productPath`, `articlePath`, `pagePath`, `linkKind`). Backend mirror: `backend/src/common/public-routes.ts` (`publicProductUrl`, `publicArticleUrl`, `RESERVED_ROUTE_SLUGS`), kept honest by `public-routes.spec.ts`, which fails if the two files disagree.
+2. **Safety-net redirects** generated from the config in `next.config.mjs`: `/products`, `/product`, `/latest` (index and `/:path*`) → current segment, permanent. Repairs already-saved content links, sent emails, bookmarks. Legacy segments are also reserved page slugs so a CMS page cannot be shadowed.
+3. **LinkModal**: all three tabs use the helpers; Pages tab builds the full nested path; `detectInitialTab` uses `linkKind` (recognises current + legacy segments).
+4. **Regression guard**: tests for helpers, redirects and LinkModal output, plus a test that fails if source hard-codes `/shop` or an `href` to `/products|/articles|/latest`.
+
+Renaming a segment later: change `routes.config.mjs` (+ backend mirror), rename the matching `app/(site)/<segment>` folder (Next.js routes are folder-based), move the old name into `LEGACY_ROUTE_SEGMENTS`. The guard tests catch any missed reference.
 
 ---
 
 ## Completion Report
 
-> _Fill in after fix is deployed._
+> _Implemented 2026-10-05; awaiting deploy. Replaced hand-written links in ~25 frontend files (cards, embeds, cart, account, header/footer, SEO/JSON-LD/sitemap/RSS, link dialog) and the 4 subscriber-email URLs. API-call paths (`/products/...` backend endpoints) are a separate namespace and unchanged. The dead legacy `app/(site)/latest/` pages (unreachable behind the redirect) were left untouched._
 
 ---
 
@@ -52,3 +55,4 @@ Root cause: no single source of truth for public URL paths; each generator hard-
 | Date | Status | Note |
 |------|--------|------|
 | 2026-10-05 | open | Reported from live testing; full link-generator audit recorded; fix pending owner decision |
+| 2026-10-05 | in-dev | Owner approved items 1-4; implemented, awaiting deploy |

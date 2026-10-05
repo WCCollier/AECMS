@@ -1,3 +1,4 @@
+import { ARTICLES_PATH, articlePath } from '@/lib/routes';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Article } from '@/types';
@@ -21,7 +22,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
   return (
     <div className="group relative">
       {/* Cover link — makes the whole card clickable; declared first so content paints on top */}
-      <Link href={`/articles/${article.slug}`} className="absolute inset-0 rounded-xl" aria-label={article.title} />
+      <Link href={articlePath(article.slug)} className="absolute inset-0 rounded-xl" aria-label={article.title} />
 
       <article className="h-full bg-surface border border-border rounded-xl overflow-hidden hover:border-accent/30 transition-colors">
         {hasImage && (
@@ -42,7 +43,7 @@ export function ArticleCard({ article }: ArticleCardProps) {
               {article.tags.slice(0, 3).map((tag) => (
                 <Link
                   key={tag.id}
-                  href={`/articles?tags=${tag.slug}`}
+                  href={`${ARTICLES_PATH}?tags=${tag.slug}`}
                   className="relative text-xs px-2 py-0.5 bg-accent/10 text-accent rounded-full font-medium hover:bg-accent/20 transition-colors"
                 >
                   {tag.name}

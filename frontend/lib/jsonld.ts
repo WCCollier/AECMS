@@ -1,3 +1,4 @@
+import { articlePath, productPath } from '@/lib/routes';
 import type { SeoSettings } from './seoMeta';
 
 // ── Breadcrumb ──────────────────────────────────────────────────────────────
@@ -32,7 +33,7 @@ export function buildArticleSchema(
 ) {
   const image = article.og_image_url || article.media?.[0]?.url || seo.og_default_image;
   const description = article.meta_description || article.excerpt || '';
-  const url = `${seo.canonical_domain}/articles/${article.slug}`;
+  const url = `${seo.canonical_domain}${articlePath(article.slug)}`;
 
   return {
     '@context': 'https://schema.org',
@@ -79,7 +80,7 @@ export function buildBookSchema(
 ) {
   const image = product.og_image_url || product.media?.[0]?.url || seo.og_default_image;
   const description = product.meta_description || product.short_description || '';
-  const url = `${seo.canonical_domain}/shop/${product.slug}`;
+  const url = `${seo.canonical_domain}${productPath(product.slug)}`;
 
   const sameAs = [product.amazon_url, product.goodreads_url].filter(Boolean);
 
@@ -136,7 +137,7 @@ export function buildServiceSchema(
     '@type': 'Service',
     name: product.title,
     description,
-    url: `${seo.canonical_domain}/shop/${product.slug}`,
+    url: `${seo.canonical_domain}${productPath(product.slug)}`,
     provider: seo.author_name ? {
       '@type': 'Person',
       name: seo.author_name,
@@ -162,7 +163,7 @@ export function buildProductSchema(
 ) {
   const image = product.og_image_url || product.media?.[0]?.url || seo.og_default_image;
   const description = product.meta_description || product.short_description || '';
-  const url = `${seo.canonical_domain}/shop/${product.slug}`;
+  const url = `${seo.canonical_domain}${productPath(product.slug)}`;
 
   return {
     '@context': 'https://schema.org',

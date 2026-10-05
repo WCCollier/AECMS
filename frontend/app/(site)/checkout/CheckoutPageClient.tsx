@@ -1,5 +1,6 @@
 'use client';
 
+import { PRODUCTS_PATH } from '@/lib/routes';
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -352,7 +353,7 @@ export function CheckoutPageClient() {
           <ShoppingCart className="w-16 h-16 mx-auto text-foreground/30 mb-4" />
           <h2 className="text-xl font-semibold mb-2">Order unavailable</h2>
           <p className="text-foreground/60 mb-6">{resumeNotice}</p>
-          <Link href="/shop">
+          <Link href={PRODUCTS_PATH}>
             <Button>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Browse Products
@@ -370,7 +371,7 @@ export function CheckoutPageClient() {
           <ShoppingCart className="w-16 h-16 mx-auto text-foreground/30 mb-4" />
           <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
           <p className="text-foreground/60 mb-6">Add some products before checkout</p>
-          <Link href="/shop">
+          <Link href={PRODUCTS_PATH}>
             <Button>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Browse Products

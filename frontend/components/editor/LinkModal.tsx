@@ -1,5 +1,6 @@
 'use client';
 
+import { articlePath, linkKind, pagePath, productPath } from '@/lib/routes';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Search, FileText, ShoppingBag, Globe, X, Loader2, LayoutDashboard } from 'lucide-react';
@@ -23,11 +24,12 @@ interface LinkModalProps {
 }
 
 function detectInitialTab(href: string | undefined): Tab {
-  if (!href) return 'pages';
-  if (href.startsWith('/articles/')) return 'articles';
-  if (href.startsWith('/products/')) return 'products';
-  if (href.startsWith('/') || href.startsWith('#')) return 'pages';
-  return 'external';
+  switch (linkKind(href)) {
+    case 'article': return 'articles';
+    case 'product': return 'products';
+    case 'external': return 'external';
+    default: return 'pages';
+  }
 }
 
 const TAB_CONFIG: { id: Tab; label: string; icon: React.ReactNode }[] = [
@@ -73,17 +75,25 @@ export function LinkModal({ isOpen, initialHref, initialTarget, onApply, onRemov
     setLoading(tab);
     try {
       if (tab === 'pages') {
-        const res = await adminApi.get('/pages', { params: { search: q || undefined, limit: 100 } });
-        const items = (res.data.data ?? res.data).filter((p: any) => p.slug !== '_home_');
-        setPages(items.map((p: any) => ({ id: p.id, title: p.title, href: `/${p.slug}` })));
+        // Fetch the full list (not a server-side search) so every page's ancestors are present
+        // to build its full path; the search box then filters client-side.
+        const res = await adminApi.get('/pages', { params: { limit: 100 } });
+        const all = (res.data.data ?? res.data) as any[];
+        const byId = new Map(all.map((p) => [p.id, p]));
+        const needle = q.trim().toLowerCase();
+        setPages(
+          all
+            .filter((p) => p.slug !== '_home_' && (!needle || p.title.toLowerCase().includes(needle)))
+            .map((p) => ({ id: p.id, title: p.title, href: pagePath(p, byId) })),
+        );
       } else if (tab === 'articles') {
         const res = await adminApi.get('/articles', { params: { search: q || undefined, limit: 100, status: 'published' } });
         const items = res.data.data ?? res.data;
-        setArticles(items.map((a: any) => ({ id: a.id, title: a.title, href: `/articles/${a.slug}` })));
+        setArticles(items.map((a: any) => ({ id: a.id, title: a.title, href: articlePath(a.slug) })));
       } else if (tab === 'products') {
         const res = await adminApi.get('/products', { params: { search: q || undefined, limit: 100, status: 'published' } });
         const items = res.data.data ?? res.data;
-        setProducts(items.map((p: any) => ({ id: p.id, title: p.title, href: `/products/${p.slug}` })));
+        setProducts(items.map((p: any) => ({ id: p.id, title: p.title, href: productPath(p.slug) })));
       }
     } catch {
       // leave existing list in place on error

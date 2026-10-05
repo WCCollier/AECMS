@@ -1,5 +1,6 @@
 'use client';
 
+import { ARTICLES_PATH, PRODUCTS_PATH } from '@/lib/routes';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/hooks/useCart';
@@ -194,8 +195,8 @@ export function Header({ siteTitle }: { siteTitle: string }) {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-7">
             {/* Hard routes — always visible */}
-            <Link href="/shop" className={navLink}>Shop</Link>
-            <Link href="/articles" className={navLink}>Articles</Link>
+            <Link href={PRODUCTS_PATH} className={navLink}>Shop</Link>
+            <Link href={ARTICLES_PATH} className={navLink}>Articles</Link>
 
             {/* Page taxonomy — shown only when pages exist */}
             {navPages && navPages.length > 0 && (
@@ -323,8 +324,8 @@ export function Header({ siteTitle }: { siteTitle: string }) {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border">
             <nav className="flex flex-col gap-4">
-              <Link href="/shop" className={navLink} onClick={() => setMobileMenuOpen(false)}>Shop</Link>
-              <Link href="/articles" className={navLink} onClick={() => setMobileMenuOpen(false)}>Articles</Link>
+              <Link href={PRODUCTS_PATH} className={navLink} onClick={() => setMobileMenuOpen(false)}>Shop</Link>
+              <Link href={ARTICLES_PATH} className={navLink} onClick={() => setMobileMenuOpen(false)}>Articles</Link>
               {navPages && navPages.length > 0 && (
                 <>
                   <hr className="border-border/40" />
