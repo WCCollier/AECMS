@@ -535,7 +535,7 @@ server {
     }
 
     # Stripe webhook - no body size limit
-    location /payments/stripe/webhook {
+    location /payments/webhooks/stripe {
         proxy_pass http://127.0.0.1:4000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -693,11 +693,11 @@ docker compose -f docker-compose.prod.yml ps
 ### 4. Configure Stripe Webhooks
 
 1. Go to Stripe Dashboard > Developers > Webhooks
-2. Add endpoint: `https://api.yourdomain.com/payments/stripe/webhook`
-3. Select events:
-   - `payment_intent.succeeded`
-   - `payment_intent.payment_failed`
-   - `checkout.session.completed`
+2. Add endpoint: `https://api.yourdomain.com/payments/webhooks/stripe`
+   - If the backend is not on its own host (e.g. the Cloud Run setup, where only the frontend is public), use the frontend's proxy path instead: `https://yourdomain.com/api-proxy/payments/webhooks/stripe`. The bare `/payments/webhooks/stripe` path on the frontend host returns the site's 404 page and the webhook silently fails.
+3. Select events (the only two the backend acts on):
+   - `checkout.session.completed` — marks the order paid
+   - `checkout.session.expired` — cancels the unpaid order and returns its stock
 4. Copy the webhook signing secret to `STRIPE_WEBHOOK_SECRET`
 5. Restart backend to apply changes
 
@@ -705,10 +705,10 @@ docker compose -f docker-compose.prod.yml ps
 
 1. Go to PayPal Developer Dashboard > My Apps & Credentials
 2. Select your live app
-3. Add webhook URL: `https://api.yourdomain.com/payments/paypal/webhook`
+3. Add webhook URL: `https://api.yourdomain.com/payments/webhooks/paypal` (or `https://yourdomain.com/api-proxy/payments/webhooks/paypal` if the backend is only reachable through the frontend proxy)
 4. Subscribe to events:
-   - `CHECKOUT.ORDER.APPROVED`
    - `PAYMENT.CAPTURE.COMPLETED`
+   - `PAYMENT.CAPTURE.DENIED`
 
 ---
 

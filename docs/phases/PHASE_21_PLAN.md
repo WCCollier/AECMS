@@ -454,7 +454,7 @@ Once the production instance is running and the setup wizard is complete:
    - Payments: Stripe live keys, PayPal live keys
    - Storage: already set to GCS via env vars on Cloud Run; verify Test Connection ✓
 
-5. **Stripe webhook**: Update webhook endpoint in Stripe dashboard to `https://yourdomain.com/api/payments/webhooks/stripe`. Re-run `stripe listen` is not needed in production — use the Stripe dashboard to create a production webhook.
+5. **Stripe webhook**: Update webhook endpoint in Stripe dashboard to `https://yourdomain.com/api-proxy/payments/webhooks/stripe`. Re-run `stripe listen` is not needed in production — use the Stripe dashboard to create a production webhook.
 
 6. **PayPal return URLs**: Update in PayPal developer portal to `https://yourdomain.com/checkout/success` and `/checkout/cancel`.
 
@@ -555,7 +555,7 @@ No Load Balancer. Cloud Run custom domain mappings handle SSL natively. CDN defe
 - [ ] Admin Settings → Email: SMTP configured; test email sent ✓
 - [ ] Admin Settings → Payment: Stripe live keys; PayPal live keys; both verified ✓
 - [ ] Admin Settings → Storage: GCS; Test Connection ✓
-- [ ] Stripe webhook updated to `https://yourdomain.com/api/payments/webhooks/stripe`
+- [ ] Stripe webhook updated to `https://yourdomain.com/api-proxy/payments/webhooks/stripe`
 - [ ] PayPal return URLs updated to production domain
 - [ ] End-to-end purchase flow tested in production (Stripe live, small amount)
 

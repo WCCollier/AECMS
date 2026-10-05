@@ -807,6 +807,13 @@ export function SettingsClient() {
               <div>
                 <label className="text-xs text-neutral-400 mb-1 block">Webhook Secret</label>
                 <SecretInput value={f('payment.stripe_webhook_secret_enc')} onChange={(v) => set('payment.stripe_webhook_secret_enc', v)} placeholder="whsec_..." />
+                <p className="text-xs text-neutral-500 mt-1">
+                  In Stripe → Developers → Webhooks, create an endpoint with this URL and the events{' '}
+                  <code>checkout.session.completed</code> and <code>checkout.session.expired</code>:
+                </p>
+                <code className="block text-xs text-neutral-300 bg-neutral-900 rounded px-2 py-1 mt-1 break-all select-all">
+                  {typeof window !== 'undefined' ? window.location.origin : ''}/api-proxy/payments/webhooks/stripe
+                </code>
               </div>
             </div>
             <button
