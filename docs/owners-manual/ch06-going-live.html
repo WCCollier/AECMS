@@ -108,7 +108,9 @@
       <h3>Payments (if taking payments)</h3>
       <ul>
         <li>☐ Stripe credentials saved and Verify passed</li>
+        <li>☐ Stripe webhook endpoint created at <code>https://yourdomain.com/api-proxy/payments/webhooks/stripe</code> with events <code>checkout.session.completed</code> and <code>checkout.session.expired</code></li>
         <li>☐ Stripe webhook secret configured (<code>whsec_...</code> from dashboard or <code>stripe listen</code>)</li>
+        <li>☐ After the test purchase, the Stripe webhook delivery shows 200 and the order shows Payment confirmed</li>
         <li>☐ PayPal credentials saved and Verify passed (if offering PayPal)</li>
         <li>☐ End-to-end test purchase completed — confirm order confirmation email arrives</li>
       </ul>

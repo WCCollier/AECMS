@@ -383,9 +383,21 @@ export class OrdersService {
   /**
    * Mark order as paid (called after payment confirmation)
    */
+  /**
+   * Status a freshly paid order should take. An order made up entirely of digital products
+   * has nothing left to fulfil (downloads are available on payment), so it is complete;
+   * anything with a physical or service item still needs fulfilment and stays processing.
+   */
+  paidStatusFor(items: Array<{ product?: { product_type?: string } | null }>): 'processing' | 'completed' {
+    return items.length > 0 && items.every((i) => i.product?.product_type === 'digital')
+      ? 'completed'
+      : 'processing';
+  }
+
   async markAsPaid(id: string, paymentIntentId: string, taxAmountCents?: number, taxDetails?: any) {
     const order = await this.prisma.order.findUnique({
       where: { id },
+      include: { items: { include: { product: { select: { product_type: true } } } } },
     });
 
     if (!order) {
@@ -408,10 +420,12 @@ export class OrdersService {
       throw new ConflictException(`Order is ${order.status}, not pending; payment not applied`);
     }
 
+    const paidStatus = this.paidStatusFor(order.items);
+
     const updated = await this.prisma.order.update({
       where: { id },
       data: {
-        status: 'processing',
+        status: paidStatus,
         payment_intent_id: paymentIntentId,
         paid_at: new Date(),
         ...(taxAmountCents != null ? { tax_amount: taxAmountCents } : {}),
@@ -424,7 +438,7 @@ export class OrdersService {
       event_type: 'order.status_changed',
       resource_type: 'order',
       resource_id: id,
-      changes: { before: { status: order.status }, after: { status: 'processing' } },
+      changes: { before: { status: order.status }, after: { status: paidStatus } },
       metadata: { payment_intent_id: paymentIntentId },
     });
 

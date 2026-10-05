@@ -157,6 +157,7 @@
       <div class="callout warning">
         <div class="callout-title">⚠️ Stripe webhook secret</div>
         <p>The webhook secret is different from your API key. It begins with <code>whsec_</code> and is generated either by the Stripe CLI (<code>stripe listen</code>) during development, or from your Stripe Dashboard → Developers → Webhooks in production. Without it, AECMS cannot confirm payment completion from Stripe.</p>
+        <p>In production, create the webhook endpoint with the URL <code>https://yourdomain.com/api-proxy/payments/webhooks/stripe</code> (the <code>/api-proxy</code> part is required &mdash; without it Stripe reaches the website instead of the application and every delivery fails with a 404) and select two events: <code>checkout.session.completed</code> and <code>checkout.session.expired</code>. The exact URL for your site is shown under the Webhook Secret field in Settings &rarr; Payments.</p>
       </div>
 
       <!-- File Storage -->
