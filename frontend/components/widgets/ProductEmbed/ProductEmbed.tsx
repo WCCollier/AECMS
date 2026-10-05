@@ -1,5 +1,6 @@
 'use client';
 
+import { productPath } from '@/lib/routes';
 import useSWR from 'swr';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -125,7 +126,7 @@ export function ProductEmbed({ productId, titleAttrs = DEFAULT_TITLE_ATTRS }: Pr
 
   const { titleOverride, titleCase, titleAlign, titleLevel, titleHidden } = titleAttrs;
   const displayTitle = titleOverride || product.title;
-  const href = `/shop/${product.slug}`;
+  const href = productPath(product.slug);
   const description = getProductDescription(product);
   const primaryImage = product.media?.find((m) => m.is_primary) ?? product.media?.[0];
   const imageUrl = primaryImage?.url ?? product.featured_image_url ?? null;

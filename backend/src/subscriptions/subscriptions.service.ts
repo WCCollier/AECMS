@@ -1,3 +1,4 @@
+import { publicArticleUrl, publicProductUrl } from '../common/public-routes';
 import { Injectable, Inject, Logger, BadRequestException } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -150,7 +151,7 @@ export class SubscriptionsService {
       if (!audienceId || !topicId) {
         this.logger.warn('Resend configured but audience/articles topic ID missing; falling back to SMTP');
       } else {
-        const articleUrl = `${settings.appUrl}/articles/${article.slug}`;
+        const articleUrl = publicArticleUrl(settings.appUrl, article.slug);
         try {
           await this.resendBroadcast.sendBroadcast({
             audienceId,
@@ -190,7 +191,7 @@ export class SubscriptionsService {
     if (!article || subscribers.length === 0) return;
 
     const appUrl = settings.appUrl;
-    const articleUrl = `${appUrl}/articles/${article.slug}`;
+    const articleUrl = publicArticleUrl(appUrl, article.slug);
     const excerpt = article.excerpt || '';
 
     for (const sub of subscribers) {
@@ -236,7 +237,7 @@ export class SubscriptionsService {
       if (!audienceId || !topicId) {
         this.logger.warn('Resend configured but audience/products topic ID missing; falling back to SMTP');
       } else {
-        const productUrl = `${settings.appUrl}/products/${product.slug}`;
+        const productUrl = publicProductUrl(settings.appUrl, product.slug);
         const priceStr = product.price ? `$${parseFloat(product.price.toString()).toFixed(2)}` : '';
         try {
           await this.resendBroadcast.sendBroadcast({
@@ -277,7 +278,7 @@ export class SubscriptionsService {
     if (!product || subscribers.length === 0) return;
 
     const appUrl = settings.appUrl;
-    const productUrl = `${appUrl}/products/${product.slug}`;
+    const productUrl = publicProductUrl(appUrl, product.slug);
     const excerpt = product.short_description || '';
     const priceStr = product.price ? `$${parseFloat(product.price.toString()).toFixed(2)}` : '';
 

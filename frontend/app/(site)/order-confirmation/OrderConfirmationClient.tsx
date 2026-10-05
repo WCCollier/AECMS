@@ -1,5 +1,6 @@
 'use client';
 
+import { ARTICLES_PATH, PRODUCTS_PATH } from '@/lib/routes';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -44,7 +45,7 @@ export function OrderConfirmationClient() {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
         <p className="text-foreground/60 mb-4">Order not found.</p>
-        <Link href="/shop"><Button>Continue Shopping</Button></Link>
+        <Link href={PRODUCTS_PATH}><Button>Continue Shopping</Button></Link>
       </div>
     );
   }
@@ -180,13 +181,13 @@ export function OrderConfirmationClient() {
 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <Link href="/shop" className="flex-1">
+        <Link href={PRODUCTS_PATH} className="flex-1">
           <Button variant="outline" className="w-full">
             <ShoppingBag className="w-4 h-4 mr-2" />
             Continue Shopping
           </Button>
         </Link>
-        <Link href="/articles" className="flex-1">
+        <Link href={ARTICLES_PATH} className="flex-1">
           <Button variant="outline" className="w-full">
             Read Latest Articles
             <ArrowRight className="w-4 h-4 ml-2" />

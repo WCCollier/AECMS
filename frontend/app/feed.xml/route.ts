@@ -1,3 +1,4 @@
+import { articlePath } from '@/lib/routes';
 import { NextResponse } from 'next/server';
 
 export const revalidate = 3600;
@@ -58,7 +59,7 @@ export async function GET() {
     : toRfc822(new Date().toISOString());
 
   const items = articles.map((a: any) => {
-    const link = `${BASE_URL}/articles/${a.slug}`;
+    const link = `${BASE_URL}${articlePath(a.slug)}`;
     const description = a.excerpt || a.meta_description || '';
     const pubDate = toRfc822(a.published_at || a.created_at);
     return `    <item>

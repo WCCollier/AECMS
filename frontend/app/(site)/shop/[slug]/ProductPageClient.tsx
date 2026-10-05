@@ -1,5 +1,6 @@
 'use client';
 
+import { PRODUCTS_PATH } from '@/lib/routes';
 import { useState } from 'react';
 import Link from 'next/link';
 import { MediaGallery } from '@/components/widgets';
@@ -83,7 +84,7 @@ export function ProductPageClient() {
   if (isError || !product) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Link href="/shop" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
+        <Link href={PRODUCTS_PATH} className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
           <ArrowLeft className="w-4 h-4" />
           Back to Shop
         </Link>
@@ -105,7 +106,7 @@ export function ProductPageClient() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Back Link */}
-      <Link href="/shop" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
+      <Link href={PRODUCTS_PATH} className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
         <ArrowLeft className="w-4 h-4" />
         Back to Shop
       </Link>
@@ -139,7 +140,7 @@ export function ProductPageClient() {
               {product.tags.map((tag) => (
                 <Link
                   key={tag.id}
-                  href={`/shop?tags=${tag.slug}`}
+                  href={`${PRODUCTS_PATH}?tags=${tag.slug}`}
                   className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-accent/10 hover:text-accent transition-colors"
                 >
                   #{tag.name}

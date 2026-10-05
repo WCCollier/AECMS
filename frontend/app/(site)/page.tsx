@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+import { ARTICLES_PATH } from '@/lib/routes';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { PageRenderer } from '@/components/pages/PageRenderer';
@@ -89,7 +90,7 @@ export default async function HomePage() {
   );
 
   if (mode === 'latest_articles') {
-    redirect('/articles');
+    redirect(ARTICLES_PATH);
   }
 
   // static_page mode — try the designated page first, fall back to _home_
@@ -107,5 +108,5 @@ export default async function HomePage() {
   }
 
   // Ultimate fallback: no published homepage configured at all
-  redirect('/articles');
+  redirect(ARTICLES_PATH);
 }

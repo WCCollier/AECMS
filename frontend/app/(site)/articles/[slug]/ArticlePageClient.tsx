@@ -1,5 +1,6 @@
 'use client';
 
+import { ARTICLES_PATH } from '@/lib/routes';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useArticle } from '@/hooks/useArticles';
@@ -42,7 +43,7 @@ export function ArticlePageClient() {
   if (isError || !article) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Link href="/articles" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
+        <Link href={ARTICLES_PATH} className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
           <ArrowLeft className="w-4 h-4" />
           Back to Latest
         </Link>
@@ -56,7 +57,7 @@ export function ArticlePageClient() {
   return (
     <article className="container mx-auto px-4 py-8 max-w-3xl">
       {/* Back Link */}
-      <Link href="/articles" className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
+      <Link href={ARTICLES_PATH} className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground mb-8">
         <ArrowLeft className="w-4 h-4" />
         Back to Latest
       </Link>
@@ -87,7 +88,7 @@ export function ArticlePageClient() {
           {article.tags.map((tag) => (
             <Link
               key={tag.id}
-              href={`/articles?tags=${tag.slug}`}
+              href={`${ARTICLES_PATH}?tags=${tag.slug}`}
               className="text-sm px-3 py-1 bg-foreground/5 rounded-full hover:bg-accent/10 hover:text-accent transition-colors"
             >
               #{tag.name}

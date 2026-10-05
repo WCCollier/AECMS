@@ -1,5 +1,6 @@
 'use client';
 
+import { PRODUCTS_PATH } from '@/lib/routes';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useProducts } from '@/hooks/useProducts';
@@ -61,7 +62,7 @@ export function ShopPageClient() {
 
   const updateUrl = useCallback((p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const qs = buildParams(p, tags, logic, srch);
-    router.replace(`/shop${qs ? `?${qs}` : ''}`, { scroll: false });
+    router.replace(`${PRODUCTS_PATH}${qs ? `?${qs}` : ''}`, { scroll: false });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, searchParams]);
 
@@ -73,7 +74,7 @@ export function ShopPageClient() {
 
   useEffect(() => {
     if (effectiveMode === 'infinite' && searchParams?.get('page')) {
-      router.replace('/shop', { scroll: false });
+      router.replace(PRODUCTS_PATH, { scroll: false });
     }
   }, [effectiveMode, router, searchParams]);
 

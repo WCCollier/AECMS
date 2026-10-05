@@ -1,5 +1,6 @@
 'use client';
 
+import { articlePath } from '@/lib/routes';
 import useSWR from 'swr';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -113,7 +114,7 @@ export function ArticleEmbed({ articleId, titleAttrs = DEFAULT_TITLE_ATTRS }: Ar
 
   const { titleOverride, titleCase, titleAlign, titleLevel, titleHidden } = titleAttrs;
   const displayTitle = titleOverride || article.title;
-  const href = `/latest/${article.slug}`;
+  const href = articlePath(article.slug);
   const excerpt = getExcerpt(article);
   const bodyContent = getBodyContent(article);
   const primaryImage = article.media?.find((m) => m.is_primary) ?? article.media?.[0];

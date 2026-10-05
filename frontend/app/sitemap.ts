@@ -1,3 +1,4 @@
+import { articlePath, productPath } from '@/lib/routes';
 import type { MetadataRoute } from 'next';
 
 export const revalidate = 3600;
@@ -24,14 +25,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ]);
 
   const articleEntries: MetadataRoute.Sitemap = articles.map((a: any) => ({
-    url: `${BASE_URL}/articles/${a.slug}`,
+    url: `${BASE_URL}${articlePath(a.slug)}`,
     lastModified: a.updated_at ? new Date(a.updated_at) : new Date(),
     changeFrequency: 'monthly',
     priority: 0.7,
   }));
 
   const productEntries: MetadataRoute.Sitemap = products.map((p: any) => ({
-    url: `${BASE_URL}/shop/${p.slug}`,
+    url: `${BASE_URL}${productPath(p.slug)}`,
     lastModified: p.updated_at ? new Date(p.updated_at) : new Date(),
     changeFrequency: 'monthly',
     priority: 0.8,

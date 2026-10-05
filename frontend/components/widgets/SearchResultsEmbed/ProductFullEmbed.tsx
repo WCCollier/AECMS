@@ -1,5 +1,6 @@
 'use client';
 
+import { productPath } from '@/lib/routes';
 import Image from 'next/image';
 import Link from 'next/link';
 import { RichTextContent } from '@/components/editor/RichTextContent';
@@ -25,7 +26,7 @@ export function ProductFullEmbed({ product, depth }: ProductFullEmbedProps) {
         </div>
       )}
       <h2 className="text-2xl font-bold mb-1">
-        <Link href={`/shop/${product.slug}`} className="hover:text-accent transition-colors">
+        <Link href={productPath(product.slug)} className="hover:text-accent transition-colors">
           {product.title}
         </Link>
       </h2>
@@ -49,7 +50,7 @@ export function ProductFullEmbed({ product, depth }: ProductFullEmbedProps) {
 
       <div className="mt-6">
         <Link
-          href={`/shop/${product.slug}`}
+          href={productPath(product.slug)}
           className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors"
         >
           View product →

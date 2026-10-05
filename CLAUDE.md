@@ -146,6 +146,9 @@ Every access and refresh token carries `session_type: 'customer' | 'backstage'`.
 - Prisma for database (no raw SQL)
 - Consistent API response format
 
+### Public URLs
+- Links to products, articles and pages are built ONLY via `frontend/lib/routes.ts` (and `backend/src/common/public-routes.ts` for emails) — never hand-write `/shop/...` or `/articles/...`. The URL segments live in `frontend/lib/routes.config.mjs`; a test fails on hard-coded paths. Legacy segments redirect automatically.
+
 ### Database
 - UUIDs for primary keys
 - created_at/updated_at on all tables

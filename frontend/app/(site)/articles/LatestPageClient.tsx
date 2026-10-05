@@ -1,5 +1,6 @@
 'use client';
 
+import { ARTICLES_PATH } from '@/lib/routes';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useArticles } from '@/hooks/useArticles';
@@ -60,7 +61,7 @@ export function LatestPageClient() {
 
   const updateUrl = useCallback((p: number, tags: string[], logic: 'and' | 'or', srch: string) => {
     const qs = buildParams(p, tags, logic, srch);
-    router.replace(`/articles${qs ? `?${qs}` : ''}`, { scroll: false });
+    router.replace(`${ARTICLES_PATH}${qs ? `?${qs}` : ''}`, { scroll: false });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router, searchParams]);
 
@@ -75,7 +76,7 @@ export function LatestPageClient() {
       const params = new URLSearchParams(searchParams.toString());
       params.delete('page');
       const qs = params.toString();
-      router.replace(`/articles${qs ? `?${qs}` : ''}`, { scroll: false });
+      router.replace(`${ARTICLES_PATH}${qs ? `?${qs}` : ''}`, { scroll: false });
     }
   }, [effectiveMode, router, searchParams]);
 
