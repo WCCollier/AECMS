@@ -1,17 +1,33 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/hooks/useOrders';
 import { Button } from '@/components/ui';
-import { CheckCircle, ShoppingBag, ArrowRight } from 'lucide-react';
+import { CheckCircle, Clock, Loader2, ShoppingBag, ArrowRight, XCircle } from 'lucide-react';
 import { DigitalDownloadsPanel } from '@/components/digital/DigitalDownloadsPanel';
 import { orderStatusClass } from '@/lib/orderStatus';
+
+// Stripe/PayPal send the buyer back before their webhook has necessarily been processed,
+// so a just-paid order can still read "pending" for a few seconds. Poll briefly for the flip.
+const POLL_INTERVAL_MS = 2000;
+const POLL_WINDOW_MS = 30000;
 
 export function OrderConfirmationClient() {
   const searchParams = useSearchParams();
   const orderId = searchParams?.get('order') ?? '';
-  const { order, isLoading, isError } = useOrder(orderId || undefined);
+  const [startedAt] = useState(() => Date.now());
+  const [pollExpired, setPollExpired] = useState(false);
+  const { order, isLoading, isError } = useOrder(orderId || undefined, {
+    refreshInterval: (o) =>
+      o?.status === 'pending' && Date.now() - startedAt < POLL_WINDOW_MS ? POLL_INTERVAL_MS : 0,
+  });
+
+  useEffect(() => {
+    const t = setTimeout(() => setPollExpired(true), POLL_WINDOW_MS);
+    return () => clearTimeout(t);
+  }, []);
 
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price);
@@ -33,15 +49,52 @@ export function OrderConfirmationClient() {
     );
   }
 
+  const isPending = order.status === 'pending';
+  const isClosed = order.status === 'cancelled' || order.status === 'refunded';
+  const isPaid = !isPending && !isClosed;
+
   return (
     <div className="container mx-auto px-4 py-16 max-w-2xl">
-      {/* Success header */}
+      {/* Header reflects the real order state, not just that the buyer arrived here */}
       <div className="text-center mb-10">
-        <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-        <h1 className="text-3xl font-bold mb-2">Order Confirmed!</h1>
-        <p className="text-foreground/60">
-          Thank you for your order. We&apos;ll be in touch soon.
-        </p>
+        {isPaid && (
+          <>
+            <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold mb-2">Order Confirmed!</h1>
+            <p className="text-foreground/60">Thank you for your order. We&apos;ll be in touch soon.</p>
+          </>
+        )}
+        {isPending && !pollExpired && (
+          <>
+            <Loader2 className="w-16 h-16 text-foreground/40 mx-auto mb-4 animate-spin" />
+            <h1 className="text-3xl font-bold mb-2">Confirming your payment…</h1>
+            <p className="text-foreground/60">This usually takes just a few seconds. Please keep this page open.</p>
+          </>
+        )}
+        {isPending && pollExpired && (
+          <>
+            <Clock className="w-16 h-16 text-foreground/40 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold mb-2">Order received</h1>
+            <p className="text-foreground/60">
+              We haven&apos;t received confirmation of your payment yet. If you were charged, this page
+              will update once it arrives and we&apos;ll email you. Your order number is{' '}
+              <span className="font-mono">{order.order_number}</span>.
+            </p>
+          </>
+        )}
+        {isClosed && (
+          <>
+            <XCircle className="w-16 h-16 text-foreground/40 mx-auto mb-4" />
+            <h1 className="text-3xl font-bold mb-2">
+              {order.status === 'refunded' ? 'Order refunded' : 'Order cancelled'}
+            </h1>
+            <p className="text-foreground/60">
+              {order.status === 'refunded'
+                ? 'This order has been refunded.'
+                : 'This order was cancelled and has not been charged.'}
+            </p>
+          </>
+        )}
       </div>
 
       {/* Order summary card */}
@@ -121,7 +174,7 @@ export function OrderConfirmationClient() {
       </div>
 
       {/* Digital downloads (shown when order contains digital products) */}
-      {order.items.some((i) => i.product?.product_type === 'digital') && (
+      {isPaid && order.items.some((i) => i.product?.product_type === 'digital') && (
         <DigitalDownloadsPanel orderId={order.id} showAccountHint />
       )}
 

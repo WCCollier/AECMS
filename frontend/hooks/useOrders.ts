@@ -31,10 +31,14 @@ export function useOrders(options: UseOrdersOptions = {}) {
   };
 }
 
-export function useOrder(id: string | undefined) {
+export function useOrder(
+  id: string | undefined,
+  options: { refreshInterval?: number | ((order?: Order) => number) } = {},
+) {
   const { data, error, isLoading, mutate } = useSWR<Order>(
     id ? `/orders/${id}` : null,
-    fetcher
+    fetcher,
+    { refreshInterval: options.refreshInterval },
   );
 
   return {
